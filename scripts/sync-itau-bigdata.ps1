@@ -1,5 +1,5 @@
 param(
-    [string]$AdminAppBaseUrl = "https://admin-app.pages.dev",
+    [string]$AdminAppBaseUrl = "https://admin-app-bir.pages.dev",
     [string[]]$FallbackBaseUrls = @(),
     [int]$Limit = 300,
     [switch]$DryRun,
