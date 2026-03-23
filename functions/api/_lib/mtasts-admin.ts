@@ -49,6 +49,11 @@ const buildErrorMessage = async (response: Response, fallback: string) => {
     return `${fallback}: HTTP ${response.status}`
   }
 
+  const looksLikeHtml = rawText.startsWith('<!DOCTYPE') || rawText.startsWith('<html')
+  if (looksLikeHtml) {
+    return `${fallback}: resposta HTML inesperada do legado (HTTP ${response.status}). Verifique Cloudflare Access/challenge e CF_API_TOKEN no mtasts-admin.`
+  }
+
   try {
     const payload = JSON.parse(rawText) as { error?: string }
     if (typeof payload.error === 'string' && payload.error.trim()) {
@@ -61,6 +66,24 @@ const buildErrorMessage = async (response: Response, fallback: string) => {
   return `${fallback}: ${rawText}`
 }
 
+const parseJsonOrThrow = <T>(rawText: string, fallback: string, response: Response): T => {
+  const trimmed = rawText.trim()
+  if (!trimmed) {
+    throw new Error(`${fallback}: corpo vazio inesperado (HTTP ${response.status}).`)
+  }
+
+  const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')
+  if (looksLikeHtml) {
+    throw new Error(`${fallback}: resposta HTML inesperada do legado (HTTP ${response.status}). Verifique Cloudflare Access/challenge e CF_API_TOKEN no mtasts-admin.`)
+  }
+
+  try {
+    return JSON.parse(trimmed) as T
+  } catch {
+    throw new Error(`${fallback}: resposta não-JSON do legado (HTTP ${response.status}).`)
+  }
+}
+
 export const fetchLegacyJson = async <T>(env: Env, path: string, fallback: string, init?: RequestInit) => {
   const response = await fetch(`${resolveBaseUrl(env)}${path}`, {
     ...init,
@@ -71,7 +94,8 @@ export const fetchLegacyJson = async <T>(env: Env, path: string, fallback: strin
     throw new Error(await buildErrorMessage(response, fallback))
   }
 
-  return await response.json() as T
+  const rawText = await response.text()
+  return parseJsonOrThrow<T>(rawText, fallback, response)
 }
 
 export const postLegacyJson = async <T>(env: Env, path: string, fallback: string, body: unknown, adminActor?: string) => {

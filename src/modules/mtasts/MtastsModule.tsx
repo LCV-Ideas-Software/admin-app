@@ -43,6 +43,26 @@ type MtastsPolicyResponse = {
   mxRecords: string[]
 }
 
+const parseApiPayload = async <T,>(response: Response, fallback: string): Promise<T> => {
+  const rawText = await response.text()
+  const trimmed = rawText.trim()
+
+  if (!trimmed) {
+    throw new Error(`${fallback} (HTTP ${response.status}, corpo vazio).`)
+  }
+
+  const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')
+  if (looksLikeHtml) {
+    throw new Error(`${fallback} (HTTP ${response.status}, resposta HTML inesperada).`)
+  }
+
+  try {
+    return JSON.parse(trimmed) as T
+  } catch {
+    throw new Error(`${fallback} (HTTP ${response.status}, resposta não-JSON).`)
+  }
+}
+
 const initialPayload: MtastsPayload = {
   ok: true,
   fonte: 'bigdata_db',
@@ -90,7 +110,7 @@ export function MtastsModule() {
           'X-Admin-Actor': adminActor,
         },
       })
-      const nextPayload = await response.json() as { ok: boolean; error?: string; request_id?: string; zones?: MtastsZone[] }
+      const nextPayload = await parseApiPayload<{ ok: boolean; error?: string; request_id?: string; zones?: MtastsZone[] }>(response, 'Falha ao carregar zonas do MTA-STS')
 
       if (!response.ok || !nextPayload.ok) {
         throw new Error(nextPayload.error ?? 'Falha ao carregar zonas do MTA-STS.')
@@ -131,7 +151,7 @@ export function MtastsModule() {
           'X-Admin-Actor': adminActor,
         },
       })
-      const nextPayload = await response.json() as { ok: boolean; error?: string; request_id?: string; policy?: MtastsPolicyResponse }
+      const nextPayload = await parseApiPayload<{ ok: boolean; error?: string; request_id?: string; policy?: MtastsPolicyResponse }>(response, 'Falha ao carregar policy do domínio')
 
       if (!response.ok || !nextPayload.ok || !nextPayload.policy) {
         throw new Error(nextPayload.error ?? 'Falha ao carregar policy do domínio.')
@@ -193,7 +213,7 @@ export function MtastsModule() {
     setOverviewLoading(true)
     try {
       const response = await fetch(`/api/mtasts/overview?${query.toString()}`)
-      const nextPayload = await response.json() as MtastsPayload
+      const nextPayload = await parseApiPayload<MtastsPayload>(response, 'Falha ao consultar o módulo MTA-STS')
 
       if (!response.ok || !nextPayload.ok) {
         throw new Error(nextPayload.error ?? 'Falha ao consultar o módulo MTA-STS.')
@@ -204,8 +224,9 @@ export function MtastsModule() {
       if (Array.isArray(nextPayload.avisos) && nextPayload.avisos.length > 0) {
         showNotification(nextPayload.avisos[0], 'info')
       }
-    } catch {
-      showNotification('Não foi possível carregar o módulo MTA-STS.', 'error')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível carregar o módulo MTA-STS.'
+      showNotification(message, 'error')
     } finally {
       setOverviewLoading(false)
     }
@@ -243,7 +264,7 @@ export function MtastsModule() {
         }),
       })
 
-      const nextPayload = await response.json() as { ok: boolean; error?: string; id?: string; request_id?: string }
+      const nextPayload = await parseApiPayload<{ ok: boolean; error?: string; id?: string; request_id?: string }>(response, 'Falha ao orquestrar sincronização MTA-STS')
       if (!response.ok || !nextPayload.ok) {
         throw new Error(nextPayload.error ?? 'Falha ao orquestrar sincronização MTA-STS.')
       }
@@ -260,7 +281,7 @@ export function MtastsModule() {
           if (!overviewResponse.ok) {
             return
           }
-          const overviewPayload = await overviewResponse.json() as MtastsPayload
+          const overviewPayload = await parseApiPayload<MtastsPayload>(overviewResponse, 'Falha ao atualizar overview MTA-STS após orquestração')
           if (overviewPayload.ok) {
             setPayload(overviewPayload)
           }
@@ -268,8 +289,9 @@ export function MtastsModule() {
       ])
 
       showNotification(withTrace(`MTA-STS sincronizado com sucesso para ${selectedDomain}.`, nextPayload), 'success')
-    } catch {
-      showNotification('Não foi possível executar a sincronização orquestrada do MTA-STS.', 'error')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível executar a sincronização orquestrada do MTA-STS.'
+      showNotification(message, 'error')
     } finally {
       setOrchestrating(false)
     }
