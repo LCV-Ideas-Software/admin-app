@@ -10,12 +10,14 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Sync manual disponível para Astrólogo em `POST /api/astrologo/sync` (mapas para `astrologo_mapas`).
 - Sync manual disponível para Calculadora em `POST /api/calculadora/sync` (observabilidade + rate limit policies).
 - Sync manual disponível para MainSite em `POST /api/mainsite/sync` (posts + settings públicos).
+- Ações administrativas do MainSite já disponíveis no shell: `GET|POST|PUT|DELETE /api/mainsite/posts`, `POST /api/mainsite/posts-pin` e `GET|PUT /api/mainsite/settings`.
 - Sync manual disponível para MTA-STS em `POST /api/mtasts/sync` (history + policies auditáveis por zonas).
 - Health check ativo em `/api/health`.
 
 ## Diretivas de arquitetura
 
 - Segredos reais: **somente server-side** (Cloudflare Secrets).
+- Para habilitar CRUD e save de settings públicos do MainSite, configurar o secret `MAINSITE_WORKER_API_SECRET` no runtime do `admin-app`.
 - Variáveis client-side públicas: prefixo `VITE_`.
 - Migração D1 futura para `bigdata_db`:
   - **Prefixação obrigatória por contexto** em tabelas, índices e políticas.

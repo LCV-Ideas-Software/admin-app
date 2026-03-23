@@ -19,7 +19,7 @@ import { CalculadoraModule } from './modules/calculadora/CalculadoraModule'
 import { MainsiteModule } from './modules/mainsite/MainsiteModule'
 import { MtastsModule } from './modules/mtasts/MtastsModule'
 
-const APP_VERSION = 'APP v01.07.00'
+const APP_VERSION = 'APP v01.08.00'
 
 type OperationalModuleStatus = {
   module: string
@@ -91,7 +91,7 @@ const moduleCards: ModuleCard[] = [
     id: 'mtasts',
     title: 'MTA-STS',
     description: 'Integridade de políticas, zonas Cloudflare e histórico operacional do serviço.',
-    status: 'planejado',
+    status: 'em-implantacao',
     endpoint: '/api/mtasts/*',
     database: 'mtasts-admin_db',
     legacyAdmin: 'mtasts-admin.lcv.app.br',
