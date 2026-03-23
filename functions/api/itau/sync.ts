@@ -191,23 +191,35 @@ export async function onRequestPost(context: Context) {
       cfAccessHeaders['CF-Access-Client-Secret'] = env.CALC_CF_ACCESS_CLIENT_SECRET
     }
 
+    const hasCfAccessToken = !!(env.CALC_CF_ACCESS_CLIENT_ID && env.CALC_CF_ACCESS_CLIENT_SECRET)
+
     const [overviewResponse, rateLimitResponse] = await Promise.all([
       fetch(`${baseUrl}/api/admin/overview`, {
         method: 'GET',
+        redirect: 'follow',
         headers: { Accept: 'application/json', ...cfAccessHeaders },
       }),
       fetch(`${baseUrl}/api/admin/rate-limit`, {
         method: 'GET',
+        redirect: 'follow',
         headers: { Accept: 'application/json', ...cfAccessHeaders },
       }),
     ])
 
-    if (!overviewResponse.ok) {
-      throw new Error(`Falha no backend legado do Calculadora (/overview): HTTP ${overviewResponse.status}`)
+    const overviewCt = overviewResponse.headers.get('Content-Type') ?? ''
+    if (!overviewResponse.ok || overviewCt.includes('text/html')) {
+      const hint = overviewCt.includes('text/html')
+        ? `CF Access bloqueou (HTML recebido, status=${overviewResponse.status}, token_presente=${hasCfAccessToken}) — verifique se a policy Service Auth do app calculadora-admin inclui o Service Token`
+        : `HTTP ${overviewResponse.status}`
+      throw new Error(`Falha no backend legado do Calculadora (/overview): ${hint}`)
     }
 
-    if (!rateLimitResponse.ok) {
-      throw new Error(`Falha no backend legado do Calculadora (/rate-limit): HTTP ${rateLimitResponse.status}`)
+    const rateLimitCt = rateLimitResponse.headers.get('Content-Type') ?? ''
+    if (!rateLimitResponse.ok || rateLimitCt.includes('text/html')) {
+      const hint = rateLimitCt.includes('text/html')
+        ? `CF Access bloqueou (HTML recebido, status=${rateLimitResponse.status}, token_presente=${hasCfAccessToken}) — verifique se a policy Service Auth do app calculadora-admin inclui o Service Token`
+        : `HTTP ${rateLimitResponse.status}`
+      throw new Error(`Falha no backend legado do Calculadora (/rate-limit): ${hint}`)
     }
 
     const overviewPayload = await overviewResponse.json() as LegacyOverviewResponse
