@@ -16,7 +16,7 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Sync manual disponível para MTA-STS em `POST /api/mtasts/sync` (history + policies auditáveis por zonas).
 - Orquestração operacional do MTA-STS já disponível no shell: `GET /api/mtasts/zones`, `GET /api/mtasts/policy` e `POST /api/mtasts/orchestrate` (policy + DNS + novo ID).
 - Convenção global de auditoria: ações administrativas críticas dos módulos (`astrologo`, `itau`, `mainsite` e `mtasts`) aceitam `X-Admin-Actor` e registram o operador na telemetria operacional (`adminapp_module_events`).
-- Convenção de rastreabilidade de resposta: endpoints administrativos retornam `request_id` e `timestamp` para correlação de logs/incidentes em suporte operacional.
+- Convenção de rastreabilidade de resposta: endpoints administrativos, de leitura híbrida e de visão operacional retornam `request_id` e `timestamp` para correlação de logs/incidentes em suporte operacional.
 - Health check ativo em `/api/health`.
 
 ## Diretivas de arquitetura

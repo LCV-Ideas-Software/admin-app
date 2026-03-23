@@ -1,4 +1,5 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
+import { createResponseTrace } from '../_lib/request-trace'
 
 type StatusResumo = 'novo' | 'analisado' | 'indisponivel'
 
@@ -150,6 +151,7 @@ const queryBigdataItems = async (
 
 export async function onRequestGet(context: Context) {
   const { request, env } = context
+  const trace = createResponseTrace(request)
   const url = new URL(request.url)
 
   const nome = (url.searchParams.get('nome') ?? '').trim()
@@ -182,6 +184,7 @@ export async function onRequestGet(context: Context) {
 
       return new Response(JSON.stringify({
         ok: true,
+        ...trace,
         total: items.length,
         fonte: 'bigdata_db',
         filtros: { nome, dataInicial, dataFinal, email },
@@ -233,6 +236,7 @@ export async function onRequestGet(context: Context) {
 
     return new Response(JSON.stringify({
       ok: true,
+      ...trace,
       total: filteredItems.length,
       fonte: 'legacy-admin',
       filtros: { nome, dataInicial, dataFinal, email },
@@ -258,6 +262,7 @@ export async function onRequestGet(context: Context) {
 
     return new Response(JSON.stringify({
       ok: false,
+      ...trace,
       error: message,
       total: 0,
       filtros: { nome, dataInicial, dataFinal, email },

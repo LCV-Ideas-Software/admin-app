@@ -90,7 +90,7 @@ export function MtastsModule() {
           'X-Admin-Actor': adminActor,
         },
       })
-      const nextPayload = await response.json() as { ok: boolean; error?: string; zones?: MtastsZone[] }
+      const nextPayload = await response.json() as { ok: boolean; error?: string; request_id?: string; zones?: MtastsZone[] }
 
       if (!response.ok || !nextPayload.ok) {
         throw new Error(nextPayload.error ?? 'Falha ao carregar zonas do MTA-STS.')
@@ -105,10 +105,11 @@ export function MtastsModule() {
       }
 
       if (shouldNotify) {
-        showNotification('Zonas do MTA-STS atualizadas.', 'success')
+        showNotification(withTrace('Zonas do MTA-STS atualizadas.', nextPayload), 'success')
       }
-    } catch {
-      showNotification('Não foi possível carregar as zonas do MTA-STS.', 'error')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível carregar as zonas do MTA-STS.'
+      showNotification(message, 'error')
     } finally {
       setZonesLoading(false)
     }
@@ -130,7 +131,7 @@ export function MtastsModule() {
           'X-Admin-Actor': adminActor,
         },
       })
-      const nextPayload = await response.json() as { ok: boolean; error?: string; policy?: MtastsPolicyResponse }
+      const nextPayload = await response.json() as { ok: boolean; error?: string; request_id?: string; policy?: MtastsPolicyResponse }
 
       if (!response.ok || !nextPayload.ok || !nextPayload.policy) {
         throw new Error(nextPayload.error ?? 'Falha ao carregar policy do domínio.')
@@ -142,10 +143,11 @@ export function MtastsModule() {
       setMxRecords(Array.isArray(nextPayload.policy.mxRecords) ? nextPayload.policy.mxRecords : [])
 
       if (shouldNotify) {
-        showNotification(`Policy carregada para ${domainValue}.`, 'success')
+        showNotification(withTrace(`Policy carregada para ${domainValue}.`, nextPayload), 'success')
       }
-    } catch {
-      showNotification('Não foi possível carregar a policy do domínio selecionado.', 'error')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível carregar a policy do domínio selecionado.'
+      showNotification(message, 'error')
     } finally {
       setPolicyLoading(false)
     }

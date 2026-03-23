@@ -1,4 +1,5 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
+import { createResponseTrace } from '../_lib/request-trace'
 
 type D1PreparedStatement = {
   bind: (...values: Array<string | number | null>) => D1PreparedStatement
@@ -162,6 +163,7 @@ const queryLegacyWorker = async (baseUrl: string, limit: number, avisos: string[
 
 export async function onRequestGet(context: Context) {
   const { request, env } = context
+  const trace = createResponseTrace(request)
   const url = new URL(request.url)
   const limit = parseLimit(url.searchParams.get('limit'))
   const avisos: string[] = []
@@ -184,7 +186,10 @@ export async function onRequestGet(context: Context) {
         // Não bloquear resposta por falha de telemetria.
       }
 
-      return new Response(JSON.stringify(payload), {
+      return new Response(JSON.stringify({
+        ...payload,
+        ...trace,
+      }), {
         headers: toResponseHeaders(),
       })
     } catch (error) {
@@ -215,7 +220,10 @@ export async function onRequestGet(context: Context) {
       }
     }
 
-    return new Response(JSON.stringify(payload), {
+    return new Response(JSON.stringify({
+      ...payload,
+      ...trace,
+    }), {
       headers: toResponseHeaders(),
     })
   } catch (error) {
@@ -237,6 +245,7 @@ export async function onRequestGet(context: Context) {
 
     return new Response(JSON.stringify({
       ok: false,
+      ...trace,
       error: message,
       filtros: { limit },
       avisos,

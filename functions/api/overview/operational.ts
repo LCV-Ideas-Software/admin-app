@@ -1,11 +1,13 @@
 import { ensureOperationalTables } from '../_lib/operational'
 import type { D1Database } from '../_lib/operational'
+import { createResponseTrace } from '../_lib/request-trace'
 
 type Env = {
   BIGDATA_DB?: D1Database
 }
 
 type Context = {
+  request: Request
   env: Env
 }
 
@@ -34,10 +36,12 @@ const toResponseHeaders = () => ({
 
 export async function onRequestGet(context: Context) {
   const { env } = context
+  const trace = createResponseTrace(context.request)
 
   if (!env.BIGDATA_DB) {
     return new Response(JSON.stringify({
       ok: true,
+      ...trace,
       source: 'no-bigdata-binding',
       modules: [],
       sync: [],
@@ -97,6 +101,7 @@ export async function onRequestGet(context: Context) {
 
     return new Response(JSON.stringify({
       ok: true,
+      ...trace,
       source: 'bigdata_db',
       generatedAt: Date.now(),
       modules,
@@ -106,6 +111,7 @@ export async function onRequestGet(context: Context) {
     const message = error instanceof Error ? error.message : 'Erro operacional desconhecido'
     return new Response(JSON.stringify({
       ok: false,
+      ...trace,
       error: message,
       modules: [],
       sync: [],

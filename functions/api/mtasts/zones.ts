@@ -1,4 +1,5 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
+import { createResponseTrace } from '../_lib/request-trace'
 import { fetchLegacyJson, normalizeDomain, type Context, type LegacyZone, toHeaders } from '../_lib/mtasts-admin'
 
 const mapZone = (zone: LegacyZone) => {
@@ -15,8 +16,9 @@ const mapZone = (zone: LegacyZone) => {
   }
 }
 
-const toError = (message: string, status = 500) => new Response(JSON.stringify({
+const toError = (message: string, trace: { request_id: string; timestamp: string }, status = 500) => new Response(JSON.stringify({
   ok: false,
+  ...trace,
   error: message,
 }), {
   status,
@@ -24,6 +26,7 @@ const toError = (message: string, status = 500) => new Response(JSON.stringify({
 })
 
 export async function onRequestGet(context: Context) {
+  const trace = createResponseTrace(context.request)
   try {
     const zones = await fetchLegacyJson<LegacyZone[]>(context.env, '/api/zones', 'Falha ao carregar zonas do legado MTA-STS')
     const payload = (Array.isArray(zones) ? zones : [])
@@ -49,6 +52,7 @@ export async function onRequestGet(context: Context) {
 
     return new Response(JSON.stringify({
       ok: true,
+      ...trace,
       zones: payload,
     }), {
       headers: toHeaders(),
@@ -73,6 +77,6 @@ export async function onRequestGet(context: Context) {
       }
     }
 
-    return toError(message, 502)
+    return toError(message, trace, 502)
   }
 }

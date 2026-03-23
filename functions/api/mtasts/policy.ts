@@ -1,4 +1,5 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
+import { createResponseTrace } from '../_lib/request-trace'
 import { fetchLegacyJson, normalizeDomain, type Context, type LegacyPolicyPayload, toHeaders } from '../_lib/mtasts-admin'
 
 type PolicyResponse = {
@@ -10,8 +11,9 @@ type PolicyResponse = {
   mxRecords: string[]
 }
 
-const toError = (message: string, status = 500) => new Response(JSON.stringify({
+const toError = (message: string, trace: { request_id: string; timestamp: string }, status = 500) => new Response(JSON.stringify({
   ok: false,
+  ...trace,
   error: message,
 }), {
   status,
@@ -30,12 +32,13 @@ const mapPolicyPayload = (payload: LegacyPolicyPayload): PolicyResponse => ({
 })
 
 export async function onRequestGet(context: Context) {
+  const trace = createResponseTrace(context.request)
   const url = new URL(context.request.url)
   const domain = normalizeDomain(url.searchParams.get('domain'))
   const zoneId = String(url.searchParams.get('zoneId') ?? '').trim()
 
   if (!domain || !zoneId) {
-    return toError('Parâmetros domain e zoneId são obrigatórios.', 400)
+    return toError('Parâmetros domain e zoneId são obrigatórios.', trace, 400)
   }
 
   try {
@@ -67,6 +70,7 @@ export async function onRequestGet(context: Context) {
 
     return new Response(JSON.stringify({
       ok: true,
+      ...trace,
       domain,
       zoneId,
       policy: mapped,
@@ -94,6 +98,6 @@ export async function onRequestGet(context: Context) {
       }
     }
 
-    return toError(message, 502)
+    return toError(message, trace, 502)
   }
 }
