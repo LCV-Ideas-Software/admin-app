@@ -7,6 +7,7 @@ import {
   upsertRateLimitPolicy,
   type Context,
 } from '../_lib/astrologo-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status,
@@ -73,6 +74,7 @@ export async function onRequestGet(context: Context) {
   }
 
   try {
+    const adminActor = resolveAdminActorFromRequest(context.request)
     const policies = await listPoliciesWithStats(context.env.ASTROLOGO_SOURCE_DB)
 
     if (context.env.BIGDATA_DB) {
@@ -85,6 +87,7 @@ export async function onRequestGet(context: Context) {
           metadata: {
             action: 'read-rate-limit',
             policies: policies.length,
+            adminActor,
           },
         })
       } catch {
@@ -92,7 +95,7 @@ export async function onRequestGet(context: Context) {
       }
     }
 
-    return json({ ok: true, policies })
+    return json({ ok: true, policies, admin_actor: adminActor })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao carregar painel de rate limit do Astrólogo'
 
@@ -122,6 +125,7 @@ export async function onRequestPost(context: Context) {
 
   try {
     const body = await context.request.json() as Record<string, unknown>
+    const adminActor = resolveAdminActorFromRequest(context.request, body)
     const route = normalizeRoute(body.route)
 
     if (!route) {
@@ -145,6 +149,7 @@ export async function onRequestPost(context: Context) {
             metadata: {
               action: 'restore-rate-limit-default',
               route,
+              adminActor,
             },
           })
         } catch {
@@ -152,7 +157,7 @@ export async function onRequestPost(context: Context) {
         }
       }
 
-      return json({ ok: true, action: 'restore_default', policies })
+      return json({ ok: true, action: 'restore_default', policies, admin_actor: adminActor })
     }
 
     const enabled = body.enabled ? 1 : 0
@@ -186,6 +191,7 @@ export async function onRequestPost(context: Context) {
             enabled: enabled === 1,
             maxRequests,
             windowMinutes,
+            adminActor,
           },
         })
       } catch {
@@ -193,7 +199,7 @@ export async function onRequestPost(context: Context) {
       }
     }
 
-    return json({ ok: true, action: 'update', policies })
+    return json({ ok: true, action: 'update', policies, admin_actor: adminActor })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao salvar painel de rate limit do Astrólogo'
 

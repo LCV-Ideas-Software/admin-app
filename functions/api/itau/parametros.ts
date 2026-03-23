@@ -1,15 +1,15 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { readLatestParams, SUPPORTED_ROUTES, toHeaders, toRate, validateRate, type Context } from '../_lib/calculadora-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status,
   headers: toHeaders(),
 })
 
-const ADMIN_ACTOR = 'admin-app'
-
 export async function onRequestGet(context: Context) {
   const { env } = context
+  const adminActor = resolveAdminActorFromRequest(context.request)
 
   if (!env.CALC_SOURCE_DB) {
     return json({ ok: false, error: 'CALC_SOURCE_DB não configurado no runtime.' }, 503)
@@ -27,6 +27,7 @@ export async function onRequestGet(context: Context) {
           ok: true,
           metadata: {
             action: 'read-parametros',
+            adminActor,
             totalCampos: Object.keys(parametros).length,
             rotasRateLimitSuportadas: SUPPORTED_ROUTES,
           },
@@ -38,7 +39,8 @@ export async function onRequestGet(context: Context) {
 
     return json({
       ok: true,
-      admin_email: ADMIN_ACTOR,
+      admin_email: adminActor,
+      admin_actor: adminActor,
       parametros_vigentes: parametros,
       parametros_form: {
         iof_cartao_percent: Number((parametros.iof_cartao * 100).toFixed(4)),
@@ -82,6 +84,7 @@ export async function onRequestPost(context: Context) {
 
   try {
     const body = await context.request.json() as Record<string, unknown>
+    const adminActor = resolveAdminActorFromRequest(context.request, body)
 
     const iofCartao = toRate(body.iof_cartao_percent)
     const iofGlobal = toRate(body.iof_global_percent)
@@ -144,7 +147,7 @@ export async function onRequestPost(context: Context) {
       `)
         .bind(
           Date.now(),
-          ADMIN_ACTOR,
+          adminActor,
           mudanca.chave,
           mudanca.valorAnterior == null ? null : String(mudanca.valorAnterior),
           String(mudanca.valorNovo),
@@ -162,6 +165,7 @@ export async function onRequestPost(context: Context) {
           ok: true,
           metadata: {
             action: 'save-parametros',
+            adminActor,
             mudancas: mudancas.length,
             chaves: mudancas.map((item) => item.chave),
           },
@@ -173,7 +177,8 @@ export async function onRequestPost(context: Context) {
 
     return json({
       ok: true,
-      admin_email: ADMIN_ACTOR,
+      admin_email: adminActor,
+      admin_actor: adminActor,
       saved_at: new Date().toISOString(),
       parametros_salvos: values,
       mudancas_registradas: mudancas.length,

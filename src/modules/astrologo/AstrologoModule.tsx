@@ -67,6 +67,7 @@ export function AstrologoModule() {
   const [dataInicial, setDataInicial] = useState('')
   const [dataFinal, setDataFinal] = useState('')
   const [email, setEmail] = useState('')
+  const [adminActor, setAdminActor] = useState('admin@app.lcv')
   const [items, setItems] = useState<MapaResumo[]>([])
   const [selectedMapa, setSelectedMapa] = useState<MapaDetalhado | null>(null)
   const [ratePolicies, setRatePolicies] = useState<RatePolicy[]>([])
@@ -81,7 +82,11 @@ export function AstrologoModule() {
   const loadRateLimit = useCallback(async (shouldNotify = false) => {
     setLoadingRateLimit(true)
     try {
-      const response = await fetch('/api/astrologo/rate-limit')
+      const response = await fetch('/api/astrologo/rate-limit', {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      })
       const payload = await response.json() as { ok: boolean; error?: string; policies?: RatePolicy[] }
 
       if (!response.ok || !payload.ok) {
@@ -97,7 +102,7 @@ export function AstrologoModule() {
     } finally {
       setLoadingRateLimit(false)
     }
-  }, [showNotification])
+  }, [adminActor, showNotification])
 
   useEffect(() => {
     void loadRateLimit()
@@ -130,8 +135,9 @@ export function AstrologoModule() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, adminActor }),
       })
 
       const payload = await response.json() as { ok: boolean; error?: string; mapa?: MapaDetalhado }
@@ -161,8 +167,9 @@ export function AstrologoModule() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, adminActor }),
       })
 
       const payload = await response.json() as { ok: boolean; error?: string }
@@ -210,6 +217,7 @@ export function AstrologoModule() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
         body: JSON.stringify({
           action,
@@ -217,6 +225,7 @@ export function AstrologoModule() {
           enabled: policy.enabled,
           max_requests: policy.max_requests,
           window_minutes: policy.window_minutes,
+          adminActor,
         }),
       })
 
@@ -255,12 +264,14 @@ export function AstrologoModule() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
         body: JSON.stringify({
           emailDestino,
           nomeConsulente,
           relatorioHtml,
           relatorioTexto,
+          adminActor,
         }),
       })
 
@@ -321,6 +332,19 @@ export function AstrologoModule() {
 
       <form className="form-card" onSubmit={handleSubmit}>
         <div className="form-grid">
+          <div className="field-group">
+            <label htmlFor="astrologo-admin-actor">Administrador responsável</label>
+            <input
+              id="astrologo-admin-actor"
+              name="astrologoAdminActor"
+              type="text"
+              autoComplete="email"
+              placeholder="admin@lcv.app.br"
+              value={adminActor}
+              onChange={(event) => setAdminActor(event.target.value)}
+            />
+          </div>
+
           <div className="field-group">
             <label htmlFor="astrologo-filtro-nome">Nome do consulente</label>
             <input

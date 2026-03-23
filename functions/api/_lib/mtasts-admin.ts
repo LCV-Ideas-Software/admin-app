@@ -74,12 +74,18 @@ export const fetchLegacyJson = async <T>(env: Env, path: string, fallback: strin
   return await response.json() as T
 }
 
-export const postLegacyJson = async <T>(env: Env, path: string, fallback: string, body: unknown) => {
+export const postLegacyJson = async <T>(env: Env, path: string, fallback: string, body: unknown, adminActor?: string) => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  if (typeof adminActor === 'string' && adminActor.trim()) {
+    headers['X-Admin-Actor'] = adminActor.trim()
+  }
+
   return await fetchLegacyJson<T>(env, path, fallback, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
 }

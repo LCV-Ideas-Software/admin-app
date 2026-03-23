@@ -1,5 +1,6 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { generateMtastsId, normalizeDomain, postLegacyJson, type Context, toHeaders } from '../_lib/mtasts-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 type OrchestratePayload = {
   domain?: unknown
@@ -29,6 +30,7 @@ const normalizeTlsRptEmail = (value: unknown) => {
 export async function onRequestPost(context: Context) {
   try {
     const body = await context.request.json() as OrchestratePayload
+    const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
 
     const domain = normalizeDomain(body.domain)
     const zoneId = String(body.zoneId ?? '').trim()
@@ -47,18 +49,21 @@ export async function onRequestPost(context: Context) {
         '/api/policy',
         `Falha ao salvar policy no legado para ${domain}`,
         { domain, policyText, tlsrptEmail },
+        adminActor,
       ),
       postLegacyJson<{ success?: boolean }>(
         context.env,
         '/api/update-mta-sts',
         `Falha ao atualizar DNS MTA-STS para ${domain}`,
         { domain, zoneId, id, tlsrptEmail },
+        adminActor,
       ),
       postLegacyJson<{ success?: boolean }>(
         context.env,
         '/api/id',
         `Falha ao registrar novo ID para ${domain}`,
         { id, domain },
+        adminActor,
       ),
     ])
 
@@ -100,6 +105,7 @@ export async function onRequestPost(context: Context) {
             zoneId,
             id,
             tlsrptEmail,
+            adminActor,
           },
         })
       } catch {
@@ -115,6 +121,7 @@ export async function onRequestPost(context: Context) {
       dnsUpdated: true,
       policySaved: true,
       historySaved: true,
+      admin_actor: adminActor,
     }), {
       headers: toHeaders(),
     })

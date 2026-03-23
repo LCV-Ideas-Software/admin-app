@@ -1,12 +1,11 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { listPoliciesWithStats, resetRateLimitPolicy, SUPPORTED_ROUTES, toHeaders, upsertRateLimitPolicy, type Context } from '../_lib/calculadora-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status,
   headers: toHeaders(),
 })
-
-const ADMIN_ACTOR = 'admin-app'
 
 const normalizeRoute = (value: unknown) => {
   const route = String(value ?? '').trim() as (typeof SUPPORTED_ROUTES)[number]
@@ -62,6 +61,8 @@ const mirrorPoliciesToBigdata = async (context: Context) => {
 }
 
 export async function onRequestGet(context: Context) {
+  const adminActor = resolveAdminActorFromRequest(context.request)
+
   if (!context.env.CALC_SOURCE_DB) {
     return json({ ok: false, error: 'CALC_SOURCE_DB não configurado no runtime.' }, 503)
   }
@@ -78,6 +79,7 @@ export async function onRequestGet(context: Context) {
           ok: true,
           metadata: {
             action: 'read-rate-limit',
+            adminActor,
             policies: policies.length,
           },
         })
@@ -88,7 +90,8 @@ export async function onRequestGet(context: Context) {
 
     return json({
       ok: true,
-      admin_email: ADMIN_ACTOR,
+      admin_email: adminActor,
+      admin_actor: adminActor,
       policies,
     })
   } catch (error) {
@@ -120,6 +123,7 @@ export async function onRequestPost(context: Context) {
 
   try {
     const body = await context.request.json() as Record<string, unknown>
+    const adminActor = resolveAdminActorFromRequest(context.request, body)
     const routeKey = normalizeRoute(body.route_key)
 
     if (!routeKey) {
@@ -129,7 +133,7 @@ export async function onRequestPost(context: Context) {
     const action = String(body.action ?? 'update').trim()
 
     if (action === 'restore_default') {
-      await resetRateLimitPolicy(context.env.CALC_SOURCE_DB, routeKey, ADMIN_ACTOR)
+      await resetRateLimitPolicy(context.env.CALC_SOURCE_DB, routeKey, adminActor)
       await mirrorPoliciesToBigdata(context)
       const policies = await listPoliciesWithStats(context.env.CALC_SOURCE_DB)
 
@@ -143,6 +147,7 @@ export async function onRequestPost(context: Context) {
             metadata: {
               action: 'restore-rate-limit-default',
               routeKey,
+              adminActor,
             },
           })
         } catch {
@@ -150,7 +155,7 @@ export async function onRequestPost(context: Context) {
         }
       }
 
-      return json({ ok: true, action: 'restore_default', policies })
+      return json({ ok: true, action: 'restore_default', policies, admin_actor: adminActor })
     }
 
     const enabled = body.enabled ? 1 : 0
@@ -166,7 +171,7 @@ export async function onRequestPost(context: Context) {
       enabled,
       maxRequests,
       windowMinutes,
-      updatedBy: ADMIN_ACTOR,
+      updatedBy: adminActor,
     })
 
     await mirrorPoliciesToBigdata(context)
@@ -185,6 +190,7 @@ export async function onRequestPost(context: Context) {
             enabled: enabled === 1,
             maxRequests,
             windowMinutes,
+            adminActor,
           },
         })
       } catch {
@@ -192,7 +198,7 @@ export async function onRequestPost(context: Context) {
       }
     }
 
-    return json({ ok: true, action: 'update', policies })
+    return json({ ok: true, action: 'update', policies, admin_actor: adminActor })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao salvar painel de rate limit do Calculadora'
 

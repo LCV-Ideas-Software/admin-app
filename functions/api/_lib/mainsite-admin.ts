@@ -84,11 +84,22 @@ export const fetchLegacyJson = async <T>(env: Env, path: string, fallback: strin
   return await response.json() as T
 }
 
-export const fetchLegacyAdminJson = async <T>(env: Env, path: string, method: 'POST' | 'PUT' | 'DELETE', fallback: string, body?: unknown) => {
+export const fetchLegacyAdminJson = async <T>(
+  env: Env,
+  path: string,
+  method: 'POST' | 'PUT' | 'DELETE',
+  fallback: string,
+  body?: unknown,
+  adminActor?: string,
+) => {
   const headers = withDefaultHeaders({
     'Content-Type': 'application/json',
     Authorization: `Bearer ${getWorkerSecret(env)}`,
   })
+
+  if (typeof adminActor === 'string' && adminActor.trim()) {
+    headers.set('X-Admin-Actor', adminActor.trim())
+  }
 
   const response = await fetch(`${resolveBaseUrl(env)}${path}`, {
     method,

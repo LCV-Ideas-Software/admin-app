@@ -1,5 +1,6 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { toHeaders, type Context } from '../_lib/astrologo-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 type AstrologoMapa = {
   id?: string
@@ -26,6 +27,7 @@ export async function onRequestPost(context: Context) {
 
   try {
     const body = await context.request.json() as Record<string, unknown>
+    const adminActor = resolveAdminActorFromRequest(context.request, body)
     const id = String(body.id ?? '').trim()
 
     if (!id) {
@@ -65,6 +67,7 @@ export async function onRequestPost(context: Context) {
           metadata: {
             action: 'read-mapa',
             mapaId: id,
+            adminActor,
           },
         })
       } catch {
@@ -75,6 +78,7 @@ export async function onRequestPost(context: Context) {
     return json({
       ok: true,
       mapa,
+      admin_actor: adminActor,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao ler mapa do Astrólogo'

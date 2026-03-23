@@ -67,6 +67,7 @@ export function MtastsModule() {
   const [orchestrating, setOrchestrating] = useState(false)
   const [domain, setDomain] = useState('')
   const [limit, setLimit] = useState('30')
+  const [adminActor, setAdminActor] = useState('admin@app.lcv')
   const [payload, setPayload] = useState<MtastsPayload>(initialPayload)
   const [zones, setZones] = useState<MtastsZone[]>([])
   const [selectedDomain, setSelectedDomain] = useState('')
@@ -81,7 +82,11 @@ export function MtastsModule() {
   const loadZones = useCallback(async (shouldNotify = false) => {
     setZonesLoading(true)
     try {
-      const response = await fetch('/api/mtasts/zones')
+      const response = await fetch('/api/mtasts/zones', {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      })
       const nextPayload = await response.json() as { ok: boolean; error?: string; zones?: MtastsZone[] }
 
       if (!response.ok || !nextPayload.ok) {
@@ -104,7 +109,7 @@ export function MtastsModule() {
     } finally {
       setZonesLoading(false)
     }
-  }, [selectedDomain, showNotification])
+  }, [adminActor, selectedDomain, showNotification])
 
   const loadPolicy = useCallback(async (domainValue: string, zoneIdValue: string, shouldNotify = false) => {
     if (!domainValue || !zoneIdValue) {
@@ -117,7 +122,11 @@ export function MtastsModule() {
 
     setPolicyLoading(true)
     try {
-      const response = await fetch(`/api/mtasts/policy?domain=${encodeURIComponent(domainValue)}&zoneId=${encodeURIComponent(zoneIdValue)}`)
+      const response = await fetch(`/api/mtasts/policy?domain=${encodeURIComponent(domainValue)}&zoneId=${encodeURIComponent(zoneIdValue)}`, {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      })
       const nextPayload = await response.json() as { ok: boolean; error?: string; policy?: MtastsPolicyResponse }
 
       if (!response.ok || !nextPayload.ok || !nextPayload.policy) {
@@ -137,7 +146,7 @@ export function MtastsModule() {
     } finally {
       setPolicyLoading(false)
     }
-  }, [showNotification])
+  }, [adminActor, showNotification])
 
   useEffect(() => {
     void loadZones()
@@ -218,12 +227,14 @@ export function MtastsModule() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
         body: JSON.stringify({
           domain: selectedDomain,
           zoneId: selectedZoneId,
           policyText: normalizedPolicy,
           tlsrptEmail: tlsrptEmail.trim().toLowerCase(),
+          adminActor,
         }),
       })
 
@@ -271,6 +282,19 @@ export function MtastsModule() {
 
       <form className="form-card" onSubmit={handleSubmit}>
         <div className="form-grid">
+          <div className="field-group">
+            <label htmlFor="mtasts-admin-actor">Administrador responsável</label>
+            <input
+              id="mtasts-admin-actor"
+              name="mtastsAdminActor"
+              type="text"
+              autoComplete="email"
+              placeholder="admin@lcv.app.br"
+              value={adminActor}
+              onChange={(event) => setAdminActor(event.target.value)}
+            />
+          </div>
+
           <div className="field-group">
             <label htmlFor="mtasts-filtro-domain">Domínio (opcional)</label>
             <input

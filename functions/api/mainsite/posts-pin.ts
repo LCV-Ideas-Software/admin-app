@@ -1,5 +1,6 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { fetchLegacyAdminJson, fetchLegacyJson, type Context, type LegacyPost, toHeaders, upsertPostsIntoBigdata } from '../_lib/mainsite-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 const parseId = (rawValue: unknown) => {
   const parsed = Number(rawValue)
@@ -20,6 +21,7 @@ const buildErrorResponse = (message: string, status = 500) => new Response(JSON.
 export async function onRequestPost(context: Context) {
   try {
     const body = await context.request.json() as { id?: unknown }
+    const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
     const id = parseId(body.id)
 
     if (!id) {
@@ -31,6 +33,8 @@ export async function onRequestPost(context: Context) {
       `/api/posts/${id}/pin`,
       'PUT',
       'Falha ao alternar fixação do post no MainSite legado',
+      undefined,
+      adminActor,
     )
 
     let syncedPosts = 0
@@ -46,6 +50,7 @@ export async function onRequestPost(context: Context) {
           ok: true,
           metadata: {
             action: 'pin-post',
+            adminActor,
             id,
             isPinned: Number(payload.is_pinned ?? 0) === 1,
             syncedPosts,
@@ -61,6 +66,7 @@ export async function onRequestPost(context: Context) {
       id,
       isPinned: Number(payload.is_pinned ?? 0) === 1,
       syncedPosts,
+      admin_actor: adminActor,
     }), {
       headers: toHeaders(),
     })

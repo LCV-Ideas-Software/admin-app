@@ -63,6 +63,7 @@ export function MainsiteModule() {
   const [savingSettings, setSavingSettings] = useState(false)
   const [actionPostId, setActionPostId] = useState<number | null>(null)
   const [limit, setLimit] = useState('20')
+  const [adminActor, setAdminActor] = useState('admin@app.lcv')
   const [payload, setPayload] = useState<OverviewPayload>(initialPayload)
   const [managedPosts, setManagedPosts] = useState<ManagedPost[]>([])
   const [editingPostId, setEditingPostId] = useState<number | null>(null)
@@ -105,7 +106,11 @@ export function MainsiteModule() {
   const loadManagedPosts = useCallback(async (shouldNotify = false) => {
     setPostsLoading(true)
     try {
-      const response = await fetch('/api/mainsite/posts')
+      const response = await fetch('/api/mainsite/posts', {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      })
       const nextPayload = await response.json() as { ok: boolean; error?: string; posts?: ManagedPost[] }
 
       if (!response.ok || !nextPayload.ok) {
@@ -122,12 +127,16 @@ export function MainsiteModule() {
     } finally {
       setPostsLoading(false)
     }
-  }, [showNotification])
+  }, [adminActor, showNotification])
 
   const loadPublicSettings = useCallback(async (shouldNotify = false) => {
     setSettingsLoading(true)
     try {
-      const response = await fetch('/api/mainsite/settings')
+      const response = await fetch('/api/mainsite/settings', {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      })
       const nextPayload = await response.json() as { ok: boolean; error?: string; settings?: MainsiteSettingsPayload }
 
       if (!response.ok || !nextPayload.ok || !nextPayload.settings) {
@@ -146,7 +155,7 @@ export function MainsiteModule() {
     } finally {
       setSettingsLoading(false)
     }
-  }, [showNotification])
+  }, [adminActor, showNotification])
 
   useEffect(() => {
     void loadManagedPosts()
@@ -168,7 +177,11 @@ export function MainsiteModule() {
   const handleEditPost = async (id: number) => {
     setActionPostId(id)
     try {
-      const response = await fetch(`/api/mainsite/posts?id=${id}`)
+      const response = await fetch(`/api/mainsite/posts?id=${id}`, {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      })
       const nextPayload = await response.json() as { ok: boolean; error?: string; post?: ManagedPost }
 
       if (!response.ok || !nextPayload.ok || !nextPayload.post) {
@@ -204,11 +217,13 @@ export function MainsiteModule() {
         method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
         body: JSON.stringify({
           id: editingPostId,
           title,
           content,
+          adminActor,
         }),
       })
 
@@ -239,8 +254,9 @@ export function MainsiteModule() {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, adminActor }),
       })
 
       const nextPayload = await response.json() as { ok: boolean; error?: string }
@@ -268,8 +284,9 @@ export function MainsiteModule() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, adminActor }),
       })
 
       const nextPayload = await response.json() as { ok: boolean; error?: string; isPinned?: boolean }
@@ -307,8 +324,12 @@ export function MainsiteModule() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
         },
-        body: JSON.stringify(nextSettings),
+        body: JSON.stringify({
+          ...nextSettings,
+          adminActor,
+        }),
       })
 
       const nextPayload = await response.json() as { ok: boolean; error?: string }
@@ -337,6 +358,19 @@ export function MainsiteModule() {
 
       <form className="form-card" onSubmit={handleSubmit}>
         <div className="form-grid">
+          <div className="field-group">
+            <label htmlFor="mainsite-admin-actor">Administrador responsável</label>
+            <input
+              id="mainsite-admin-actor"
+              name="mainsiteAdminActor"
+              type="text"
+              autoComplete="email"
+              placeholder="admin@lcv.app.br"
+              value={adminActor}
+              onChange={(event) => setAdminActor(event.target.value)}
+            />
+          </div>
+
           <div className="field-group">
             <label htmlFor="mainsite-filtro-limit">Quantidade de posts</label>
             <input

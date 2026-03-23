@@ -1,5 +1,6 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { fetchLegacyAdminJson, readLegacyPublicSettings, type Context, type MainsitePublicSettings, toHeaders, upsertPublicSettingsIntoBigdata } from '../_lib/mainsite-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -48,6 +49,7 @@ export async function onRequestGet(context: Context) {
 export async function onRequestPut(context: Context) {
   try {
     const body = await context.request.json() as Partial<MainsitePublicSettings>
+    const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
 
     if (!isRecord(body.appearance) || !isRecord(body.rotation) || !isRecord(body.disclaimers)) {
       return buildErrorResponse('Appearance, rotation e disclaimers precisam ser objetos JSON válidos.', 400)
@@ -60,9 +62,9 @@ export async function onRequestPut(context: Context) {
     }
 
     await Promise.all([
-      fetchLegacyAdminJson<{ success?: boolean }>(context.env, '/api/settings', 'PUT', 'Falha ao salvar appearance no MainSite legado', settings.appearance),
-      fetchLegacyAdminJson<{ success?: boolean }>(context.env, '/api/settings/rotation', 'PUT', 'Falha ao salvar rotation no MainSite legado', settings.rotation),
-      fetchLegacyAdminJson<{ success?: boolean }>(context.env, '/api/settings/disclaimers', 'PUT', 'Falha ao salvar disclaimers no MainSite legado', settings.disclaimers),
+      fetchLegacyAdminJson<{ success?: boolean }>(context.env, '/api/settings', 'PUT', 'Falha ao salvar appearance no MainSite legado', settings.appearance, adminActor),
+      fetchLegacyAdminJson<{ success?: boolean }>(context.env, '/api/settings/rotation', 'PUT', 'Falha ao salvar rotation no MainSite legado', settings.rotation, adminActor),
+      fetchLegacyAdminJson<{ success?: boolean }>(context.env, '/api/settings/disclaimers', 'PUT', 'Falha ao salvar disclaimers no MainSite legado', settings.disclaimers, adminActor),
     ])
 
     let settingsUpserted = 0
@@ -77,6 +79,7 @@ export async function onRequestPut(context: Context) {
           ok: true,
           metadata: {
             action: 'save-public-settings',
+            adminActor,
             settingsUpserted,
           },
         })
@@ -88,6 +91,7 @@ export async function onRequestPut(context: Context) {
     return new Response(JSON.stringify({
       ok: true,
       settingsUpserted,
+      admin_actor: adminActor,
     }), {
       headers: toHeaders(),
     })

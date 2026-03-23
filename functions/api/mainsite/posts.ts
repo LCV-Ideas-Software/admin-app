@@ -1,5 +1,6 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { deletePostFromBigdata, fetchLegacyAdminJson, fetchLegacyJson, type Context, type LegacyPost, toHeaders, upsertPostsIntoBigdata } from '../_lib/mainsite-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 const parseId = (rawValue: unknown) => {
   const parsed = Number(rawValue)
@@ -63,6 +64,7 @@ export async function onRequestGet(context: Context) {
 export async function onRequestPost(context: Context) {
   try {
     const body = await context.request.json() as { title?: unknown; content?: unknown }
+    const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
     const title = parseText(body.title)
     const content = parseText(body.content)
 
@@ -76,6 +78,7 @@ export async function onRequestPost(context: Context) {
       'POST',
       'Falha ao criar post no MainSite legado',
       { title, content },
+      adminActor,
     )
 
     let syncedPosts = 0
@@ -91,6 +94,7 @@ export async function onRequestPost(context: Context) {
           ok: true,
           metadata: {
             action: 'create-post',
+            adminActor,
             syncedPosts,
             titleLength: title.length,
           },
@@ -103,6 +107,7 @@ export async function onRequestPost(context: Context) {
     return new Response(JSON.stringify({
       ok: true,
       syncedPosts,
+      admin_actor: adminActor,
     }), {
       status: 201,
       headers: toHeaders(),
@@ -134,6 +139,7 @@ export async function onRequestPost(context: Context) {
 export async function onRequestPut(context: Context) {
   try {
     const body = await context.request.json() as { id?: unknown; title?: unknown; content?: unknown }
+    const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
     const id = parseId(body.id)
     const title = parseText(body.title)
     const content = parseText(body.content)
@@ -148,6 +154,7 @@ export async function onRequestPut(context: Context) {
       'PUT',
       'Falha ao atualizar post no MainSite legado',
       { title, content },
+      adminActor,
     )
 
     let syncedPosts = 0
@@ -163,6 +170,7 @@ export async function onRequestPut(context: Context) {
           ok: true,
           metadata: {
             action: 'update-post',
+            adminActor,
             id,
             syncedPosts,
           },
@@ -175,6 +183,7 @@ export async function onRequestPut(context: Context) {
     return new Response(JSON.stringify({
       ok: true,
       syncedPosts,
+      admin_actor: adminActor,
     }), {
       headers: toHeaders(),
     })
@@ -205,6 +214,7 @@ export async function onRequestPut(context: Context) {
 export async function onRequestDelete(context: Context) {
   try {
     const body = await context.request.json() as { id?: unknown }
+    const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
     const id = parseId(body.id)
 
     if (!id) {
@@ -216,6 +226,8 @@ export async function onRequestDelete(context: Context) {
       `/api/posts/${id}`,
       'DELETE',
       'Falha ao excluir post no MainSite legado',
+      undefined,
+      adminActor,
     )
 
     if (context.env.BIGDATA_DB) {
@@ -229,6 +241,7 @@ export async function onRequestDelete(context: Context) {
           ok: true,
           metadata: {
             action: 'delete-post',
+            adminActor,
             id,
           },
         })
@@ -240,6 +253,7 @@ export async function onRequestDelete(context: Context) {
     return new Response(JSON.stringify({
       ok: true,
       deletedId: id,
+      admin_actor: adminActor,
     }), {
       headers: toHeaders(),
     })

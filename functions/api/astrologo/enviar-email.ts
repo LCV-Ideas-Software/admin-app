@@ -1,5 +1,6 @@
 import { logModuleOperationalEvent, type D1Database } from '../_lib/operational'
 import { toHeaders } from '../_lib/astrologo-admin'
+import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 
 type Env = {
   RESEND_API_KEY?: string
@@ -23,6 +24,7 @@ export async function onRequestPost(context: Context) {
 
   try {
     const body = await request.json() as Record<string, unknown>
+    const adminActor = resolveAdminActorFromRequest(request, body)
     const emailDestino = String(body.emailDestino ?? '').trim()
     const relatorioHtml = String(body.relatorioHtml ?? '')
     const relatorioTexto = String(body.relatorioTexto ?? '')
@@ -71,6 +73,7 @@ export async function onRequestPost(context: Context) {
             metadata: {
               action: 'send-email',
               emailDestino,
+              adminActor,
             },
           })
         } catch {
@@ -91,6 +94,7 @@ export async function onRequestPost(context: Context) {
           metadata: {
             action: 'send-email',
             emailDestino,
+            adminActor,
           },
         })
       } catch {
@@ -103,6 +107,7 @@ export async function onRequestPost(context: Context) {
       message: 'E-mail enviado com sucesso!',
       provider: 'resend',
       id: resendPayload.id ?? null,
+      admin_actor: adminActor,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha interna na comunicação do e-mail.'
