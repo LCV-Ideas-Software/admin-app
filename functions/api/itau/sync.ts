@@ -1,37 +1,30 @@
 import { finishSyncRun, logModuleOperationalEvent, startSyncRun } from '../_lib/operational'
 import type { D1Database } from '../_lib/operational'
 
-type LegacyOverviewResponse = {
-  oraculo_historico?: {
-    ultimas_analises?: Array<{
-      created_at?: number
-      status?: string
-      from_cache?: boolean
-      force_refresh?: boolean
-      moeda?: string | null
-      valor_original?: number | null
-      preview?: string | null
-      error_message?: string | null
-    }>
-  }
+type ItauObservabilidadeSourceRow = {
+  created_at?: number
+  status?: string
+  from_cache?: number | boolean
+  force_refresh?: number | boolean
+  duration_ms?: number | null
+  moeda?: string | null
+  valor_original?: number | null
+  preview?: string | null
+  error_message?: string | null
 }
 
-type LegacyRateLimitResponse = {
-  policies?: Array<{
-    route_key?: string
-    enabled?: boolean
-    max_requests?: number
-    window_minutes?: number
-    updated_at?: number
-    updated_by?: string | null
-  }>
+type ItauRateLimitSourceRow = {
+  route_key?: string
+  enabled?: number | boolean
+  max_requests?: number
+  window_minutes?: number
+  updated_at?: number
+  updated_by?: string | null
 }
 
 type Env = {
   BIGDATA_DB?: D1Database
-  ITAU_ADMIN_API_BASE_URL?: string
-  ITAU_CF_ACCESS_CLIENT_ID?: string
-  ITAU_CF_ACCESS_CLIENT_SECRET?: string
+  ITAU_SOURCE_DB?: D1Database
 }
 
 type Context = {
@@ -61,10 +54,6 @@ type RateLimitPolicyRow = {
   updatedBy: string | null
 }
 
-const DEFAULT_ITAU_ADMIN_URL = 'https://admin-itau.lcv.app.br'
-
-const normalizeBaseUrl = (value: string) => value.endsWith('/') ? value.slice(0, -1) : value
-
 const parseLimit = (rawValue: string | null) => {
   const parsed = Number.parseInt(rawValue ?? '300', 10)
   if (!Number.isFinite(parsed)) {
@@ -80,10 +69,8 @@ const toHeaders = () => ({
   'Cache-Control': 'no-store',
 })
 
-const parseObservabilidadeRows = (payload: LegacyOverviewResponse, limit: number): ObservabilidadeRow[] => {
-  const source = Array.isArray(payload.oraculo_historico?.ultimas_analises)
-    ? payload.oraculo_historico?.ultimas_analises
-    : []
+const parseObservabilidadeRows = (sourceRows: ItauObservabilidadeSourceRow[], limit: number): ObservabilidadeRow[] => {
+  const source = Array.isArray(sourceRows) ? sourceRows : []
 
   const rows: ObservabilidadeRow[] = []
 
@@ -98,9 +85,9 @@ const parseObservabilidadeRows = (payload: LegacyOverviewResponse, limit: number
     rows.push({
       createdAt,
       status,
-      fromCache: item.from_cache ? 1 : 0,
-      forceRefresh: item.force_refresh ? 1 : 0,
-      durationMs: null,
+      fromCache: Number(item.from_cache) === 1 || item.from_cache === true ? 1 : 0,
+      forceRefresh: Number(item.force_refresh) === 1 || item.force_refresh === true ? 1 : 0,
+      durationMs: Number.isFinite(Number(item.duration_ms)) ? Number(item.duration_ms) : null,
       moeda: typeof item.moeda === 'string' && item.moeda.trim().length > 0 ? item.moeda.trim().toUpperCase() : null,
       valorOriginal: Number.isFinite(Number(item.valor_original)) ? Number(item.valor_original) : null,
       preview: typeof item.preview === 'string' && item.preview.trim().length > 0 ? item.preview.trim() : null,
@@ -112,8 +99,8 @@ const parseObservabilidadeRows = (payload: LegacyOverviewResponse, limit: number
   return rows
 }
 
-const parseRateLimitPolicies = (payload: LegacyRateLimitResponse): RateLimitPolicyRow[] => {
-  const source = Array.isArray(payload.policies) ? payload.policies : []
+const parseRateLimitPolicies = (sourceRows: ItauRateLimitSourceRow[]): RateLimitPolicyRow[] => {
+  const source = Array.isArray(sourceRows) ? sourceRows : []
   const now = Date.now()
 
   return source
@@ -129,7 +116,7 @@ const parseRateLimitPolicies = (payload: LegacyRateLimitResponse): RateLimitPoli
 
       return {
         routeKey,
-        enabled: item.enabled ? 1 : 0,
+        enabled: Number(item.enabled) === 1 || item.enabled === true ? 1 : 0,
         maxRequests: Math.max(1, Math.trunc(maxRequests)),
         windowMinutes: Math.max(1, Math.trunc(windowMinutes)),
         updatedAt: Number.isFinite(updatedAt) ? Math.trunc(updatedAt) : now,
@@ -170,6 +157,16 @@ export async function onRequestPost(context: Context) {
     })
   }
 
+  if (!env.ITAU_SOURCE_DB) {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: 'ITAU_SOURCE_DB não configurado no runtime.',
+    }), {
+      status: 503,
+      headers: toHeaders(),
+    })
+  }
+
   const url = new URL(request.url)
   const limit = parseLimit(url.searchParams.get('limit'))
   const dryRun = parseDryRun(url.searchParams.get('dryRun'))
@@ -183,50 +180,24 @@ export async function onRequestPost(context: Context) {
   })
 
   try {
-    const baseUrl = normalizeBaseUrl(env.ITAU_ADMIN_API_BASE_URL ?? DEFAULT_ITAU_ADMIN_URL)
-
-    const cfAccessHeaders: Record<string, string> = {}
-    if (env.ITAU_CF_ACCESS_CLIENT_ID && env.ITAU_CF_ACCESS_CLIENT_SECRET) {
-      cfAccessHeaders['CF-Access-Client-Id'] = env.ITAU_CF_ACCESS_CLIENT_ID
-      cfAccessHeaders['CF-Access-Client-Secret'] = env.ITAU_CF_ACCESS_CLIENT_SECRET
-    }
-
-    const hasCfAccessToken = !!(env.ITAU_CF_ACCESS_CLIENT_ID && env.ITAU_CF_ACCESS_CLIENT_SECRET)
-
-    const [overviewResponse, rateLimitResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/admin/overview`, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: { Accept: 'application/json', ...cfAccessHeaders },
-      }),
-      fetch(`${baseUrl}/api/admin/rate-limit`, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: { Accept: 'application/json', ...cfAccessHeaders },
-      }),
+    const [observSource, rateLimitSource] = await Promise.all([
+      env.ITAU_SOURCE_DB.prepare(`
+        SELECT created_at, status, from_cache, force_refresh, duration_ms, moeda, valor_original, preview, error_message
+        FROM oraculo_observabilidade
+        ORDER BY created_at DESC
+        LIMIT ?
+      `)
+        .bind(limit)
+        .all<ItauObservabilidadeSourceRow>(),
+      env.ITAU_SOURCE_DB.prepare(`
+        SELECT route_key, enabled, max_requests, window_minutes, updated_at, updated_by
+        FROM rate_limit_policies
+      `)
+        .all<ItauRateLimitSourceRow>(),
     ])
 
-    const overviewCt = overviewResponse.headers.get('Content-Type') ?? ''
-    if (!overviewResponse.ok || overviewCt.includes('text/html')) {
-      const hint = overviewCt.includes('text/html')
-        ? `CF Access bloqueou (HTML recebido, status=${overviewResponse.status}, token_presente=${hasCfAccessToken}) — verifique se a policy Service Auth do app itau-calculadora-admin inclui o Service Token`
-        : `HTTP ${overviewResponse.status}`
-      throw new Error(`Falha no backend legado do Itaú (/overview): ${hint}`)
-    }
-
-    const rateLimitCt = rateLimitResponse.headers.get('Content-Type') ?? ''
-    if (!rateLimitResponse.ok || rateLimitCt.includes('text/html')) {
-      const hint = rateLimitCt.includes('text/html')
-        ? `CF Access bloqueou (HTML recebido, status=${rateLimitResponse.status}, token_presente=${hasCfAccessToken}) — verifique se a policy Service Auth do app itau-calculadora-admin inclui o Service Token`
-        : `HTTP ${rateLimitResponse.status}`
-      throw new Error(`Falha no backend legado do Itaú (/rate-limit): ${hint}`)
-    }
-
-    const overviewPayload = await overviewResponse.json() as LegacyOverviewResponse
-    const rateLimitPayload = await rateLimitResponse.json() as LegacyRateLimitResponse
-
-    const observabilidadeRows = parseObservabilidadeRows(overviewPayload, limit)
-    const rateLimitRows = parseRateLimitPolicies(rateLimitPayload)
+    const observabilidadeRows = parseObservabilidadeRows(observSource.results ?? [], limit)
+    const rateLimitRows = parseRateLimitPolicies(rateLimitSource.results ?? [])
 
     let observabilidadeInserted = 0
     let rateLimitUpserted = 0
@@ -315,8 +286,8 @@ export async function onRequestPost(context: Context) {
 
     await logModuleOperationalEvent(env.BIGDATA_DB, {
       module: 'itau',
-      source: 'legacy-admin',
-      fallbackUsed: true,
+      source: 'bigdata_db',
+      fallbackUsed: false,
       ok: true,
       metadata: {
         action: 'sync',
@@ -362,8 +333,8 @@ export async function onRequestPost(context: Context) {
 
     await logModuleOperationalEvent(env.BIGDATA_DB, {
       module: 'itau',
-      source: 'legacy-admin',
-      fallbackUsed: true,
+      source: 'bigdata_db',
+      fallbackUsed: false,
       ok: false,
       errorMessage: message,
       metadata: {
