@@ -17,6 +17,7 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Orquestração operacional do MTA-STS já disponível no shell: `GET /api/mtasts/zones`, `GET /api/mtasts/policy` e `POST /api/mtasts/orchestrate` com integração direta à API Cloudflare (sem dependência de admin legado protegido por Access).
 - Diretriz de continuidade: `adminhub` e `apphub` também serão incorporados ao `admin-app` como módulos, com configurações persistidas em D1 (`bigdata_db`) durante a consolidação.
 - Configuração dos hubs já disponível no shell: `GET|PUT /api/apphub/config` e `GET|PUT /api/adminhub/config` (bootstrap via `cards.json` legado e persistência em D1).
+- UX dos hubs evoluída: AppHub/AdminHub já suportam CRUD visual de cards (adicionar, editar campos, remover e reordenar) com persistência no `bigdata_db`.
 - Convenção global de auditoria: ações administrativas críticas dos módulos (`astrologo`, `calculadora`, `mainsite` e `mtasts`) aceitam `X-Admin-Actor` e registram o operador na telemetria operacional (`adminapp_module_events`).
 - Convenção de rastreabilidade de resposta: endpoints administrativos, de leitura híbrida e de visão operacional retornam `request_id` e `timestamp` para correlação de logs/incidentes em suporte operacional.
 - Health check ativo em `/api/health`.

@@ -460,6 +460,34 @@
   font-size: 0.9rem;
 }
 
+.cards-editor-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.card-editor-item {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .sync-card {
   display: flex;
   flex-direction: column;
