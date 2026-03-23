@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Loader2, RefreshCw, Save } from 'lucide-react'
+import { ArrowDown, ArrowUp, Loader2, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
 type HubCard = {
@@ -65,7 +65,7 @@ export function HubCardsModule({
   const [saving, setSaving] = useState(false)
   const [adminActor, setAdminActor] = useState('admin@app.lcv')
   const [payload, setPayload] = useState<HubConfigPayload | null>(null)
-  const [cardsJson, setCardsJson] = useState('[]')
+  const [cards, setCards] = useState<HubCard[]>([])
 
   const disabled = useMemo(() => loading || saving, [loading, saving])
 
@@ -84,7 +84,7 @@ export function HubCardsModule({
       }
 
       setPayload(nextPayload)
-      setCardsJson(JSON.stringify(nextPayload.cards, null, 2))
+      setCards(Array.isArray(nextPayload.cards) ? nextPayload.cards : [])
 
       if (shouldNotify) {
         showNotification(withTrace(`${title} atualizado com ${nextPayload.total} card(s).`, nextPayload), 'success')
@@ -105,14 +105,66 @@ export function HubCardsModule({
     void loadConfig()
   }, [loadConfig])
 
+  const updateCardField = (index: number, field: keyof HubCard, value: string) => {
+    setCards((current) => current.map((card, cardIndex) => (
+      cardIndex === index
+        ? { ...card, [field]: value }
+        : card
+    )))
+  }
+
+  const addCard = () => {
+    setCards((current) => ([
+      ...current,
+      {
+        name: '',
+        description: '',
+        url: '',
+        icon: '',
+        badge: '',
+      },
+    ]))
+    showNotification('Novo card adicionado ao formulário.', 'info')
+  }
+
+  const removeCard = (index: number) => {
+    setCards((current) => current.filter((_, cardIndex) => cardIndex !== index))
+    showNotification('Card removido do formulário.', 'info')
+  }
+
+  const moveCard = (index: number, direction: 'up' | 'down') => {
+    setCards((current) => {
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return current
+      }
+
+      const next = [...current]
+      const [moved] = next.splice(index, 1)
+      next.splice(targetIndex, 0, moved)
+      return next
+    })
+  }
+
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    let parsedCards: HubCard[]
-    try {
-      parsedCards = JSON.parse(cardsJson) as HubCard[]
-    } catch {
-      showNotification('JSON inválido. Corrija o payload antes de salvar.', 'error')
+    const normalizedCards = cards.map((card) => ({
+      name: card.name.trim(),
+      description: card.description.trim(),
+      url: card.url.trim(),
+      icon: card.icon.trim(),
+      badge: card.badge.trim(),
+    }))
+
+    if (normalizedCards.length === 0) {
+      showNotification('Adicione pelo menos um card antes de salvar.', 'error')
+      return
+    }
+
+    const invalidCard = normalizedCards.find((card) => !card.name || !card.description || !card.url)
+    if (invalidCard) {
+      showNotification('Todos os cards devem ter nome, descrição e URL.', 'error')
       return
     }
 
@@ -125,7 +177,7 @@ export function HubCardsModule({
           'X-Admin-Actor': adminActor,
         },
         body: JSON.stringify({
-          cards: parsedCards,
+          cards: normalizedCards,
           adminActor,
         }),
       })
@@ -163,9 +215,13 @@ export function HubCardsModule({
         <div className="result-toolbar">
           <div>
             <h4><Save size={16} /> Configuração de cards</h4>
-            <p className="field-hint">Cards persistidos no `bigdata_db`; fallback do legado apenas para bootstrap inicial.</p>
+            <p className="field-hint">Cards persistidos no `bigdata_db`; edição visual com ordenação e validação por campos.</p>
           </div>
           <div className="inline-actions">
+            <button type="button" className="ghost-button" onClick={addCard} disabled={disabled}>
+              <Plus size={16} />
+              Adicionar card
+            </button>
             <button type="button" className="ghost-button" onClick={() => void loadConfig(true)} disabled={disabled}>
               {loading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
               Recarregar
@@ -199,16 +255,110 @@ export function HubCardsModule({
         </div>
 
         <div className="field-group">
-          <label htmlFor={`${adminActorFieldId}-cards-json`}>Cards (JSON)</label>
-          <textarea
-            id={`${adminActorFieldId}-cards-json`}
-            name={`${adminActorFieldName}CardsJson`}
-            className="json-textarea"
-            rows={14}
-            value={cardsJson}
-            onChange={(event) => setCardsJson(event.target.value)}
-            disabled={disabled}
-          />
+          <label>Cards do módulo</label>
+          {cards.length === 0 ? (
+            <p className="result-empty">Sem cards no formulário. Clique em “Adicionar card”.</p>
+          ) : (
+            <div className="cards-editor-grid">
+              {cards.map((card, index) => (
+                <article key={`${adminActorFieldId}-card-${index}`} className="card-editor-item">
+                  <header className="card-editor-header">
+                    <strong>Card #{index + 1}</strong>
+                    <div className="card-editor-actions">
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => moveCard(index, 'up')}
+                        disabled={disabled || index === 0}
+                      >
+                        <ArrowUp size={14} />
+                        Subir
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => moveCard(index, 'down')}
+                        disabled={disabled || index === cards.length - 1}
+                      >
+                        <ArrowDown size={14} />
+                        Descer
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => removeCard(index)}
+                        disabled={disabled}
+                      >
+                        <Trash2 size={14} />
+                        Remover
+                      </button>
+                    </div>
+                  </header>
+
+                  <div className="form-grid">
+                    <div className="field-group">
+                      <label htmlFor={`${adminActorFieldId}-name-${index}`}>Nome</label>
+                      <input
+                        id={`${adminActorFieldId}-name-${index}`}
+                        name={`${adminActorFieldName}Name${index}`}
+                        value={card.name}
+                        onChange={(event) => updateCardField(index, 'name', event.target.value)}
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className="field-group">
+                      <label htmlFor={`${adminActorFieldId}-url-${index}`}>URL</label>
+                      <input
+                        id={`${adminActorFieldId}-url-${index}`}
+                        name={`${adminActorFieldName}Url${index}`}
+                        type="url"
+                        value={card.url}
+                        onChange={(event) => updateCardField(index, 'url', event.target.value)}
+                        disabled={disabled}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="field-group">
+                    <label htmlFor={`${adminActorFieldId}-description-${index}`}>Descrição</label>
+                    <textarea
+                      id={`${adminActorFieldId}-description-${index}`}
+                      name={`${adminActorFieldName}Description${index}`}
+                      rows={3}
+                      value={card.description}
+                      onChange={(event) => updateCardField(index, 'description', event.target.value)}
+                      disabled={disabled}
+                    />
+                  </div>
+
+                  <div className="form-grid">
+                    <div className="field-group">
+                      <label htmlFor={`${adminActorFieldId}-icon-${index}`}>Ícone</label>
+                      <input
+                        id={`${adminActorFieldId}-icon-${index}`}
+                        name={`${adminActorFieldName}Icon${index}`}
+                        value={card.icon}
+                        onChange={(event) => updateCardField(index, 'icon', event.target.value)}
+                        disabled={disabled}
+                        placeholder="Ex.: 🌌"
+                      />
+                    </div>
+                    <div className="field-group">
+                      <label htmlFor={`${adminActorFieldId}-badge-${index}`}>Badge</label>
+                      <input
+                        id={`${adminActorFieldId}-badge-${index}`}
+                        name={`${adminActorFieldName}Badge${index}`}
+                        value={card.badge}
+                        onChange={(event) => updateCardField(index, 'badge', event.target.value)}
+                        disabled={disabled}
+                        placeholder="Ex.: Abrir App"
+                      />
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="form-actions">
