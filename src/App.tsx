@@ -14,9 +14,11 @@ import {
   Workflow,
   Wrench,
 } from 'lucide-react'
+import './styles/variables.css'
 import './App.css'
 import { useNotification } from './components/Notification'
 import { AstrologoModule } from './modules/astrologo/AstrologoModule'
+import { ConfigModule } from './modules/config/ConfigModule'
 import { ItauModule } from './modules/itau/ItauModule'
 import { MainsiteModule } from './modules/mainsite/MainsiteModule'
 import { MtastsModule } from './modules/mtasts/MtastsModule'
@@ -51,7 +53,7 @@ type OperationalOverviewPayload = {
   sync: OperationalSyncStatus[]
 }
 
-type ModuleId = 'overview' | 'astrologo' | 'itau' | 'mainsite' | 'mtasts' | 'apphub' | 'adminhub'
+type ModuleId = 'overview' | 'astrologo' | 'config' | 'itau' | 'mainsite' | 'mtasts' | 'apphub' | 'adminhub'
 
 type ModuleCard = {
   id: Exclude<ModuleId, 'overview'>
@@ -123,6 +125,7 @@ const moduleCards: ModuleCard[] = [
 const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
   { id: 'overview', label: 'Visão Geral', icon: PanelsTopLeft },
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
+  { id: 'config', label: 'Configurações', icon: Wrench },
   { id: 'itau', label: 'Itaú', icon: Database },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
@@ -356,6 +359,8 @@ function App() {
           </>
         ) : activeModule === 'astrologo' ? (
           <AstrologoModule />
+        ) : activeModule === 'config' ? (
+          <ConfigModule />
         ) : activeModule === 'itau' ? (
           <ItauModule />
         ) : activeModule === 'mainsite' ? (
