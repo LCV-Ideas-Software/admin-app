@@ -19,7 +19,7 @@ import { CalculadoraModule } from './modules/calculadora/CalculadoraModule'
 import { MainsiteModule } from './modules/mainsite/MainsiteModule'
 import { MtastsModule } from './modules/mtasts/MtastsModule'
 
-const APP_VERSION = 'APP v01.08.00'
+const APP_VERSION = 'APP v01.10.00'
 
 type OperationalModuleStatus = {
   module: string

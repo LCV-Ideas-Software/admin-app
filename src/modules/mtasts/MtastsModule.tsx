@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Loader2, Search, ShieldCheck } from 'lucide-react'
+import { Loader2, RefreshCw, Save, Search, ShieldCheck } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
 
@@ -29,6 +29,20 @@ type MtastsPayload = {
   }>
 }
 
+type MtastsZone = {
+  name: string
+  id: string
+}
+
+type MtastsPolicyResponse = {
+  savedPolicy: string | null
+  savedEmail: string | null
+  dnsTlsRptEmail: string | null
+  dnsMtaStsId: string | null
+  lastGeneratedId: string | null
+  mxRecords: string[]
+}
+
 const initialPayload: MtastsPayload = {
   ok: true,
   fonte: 'bigdata_db',
@@ -47,12 +61,112 @@ const initialPayload: MtastsPayload = {
 
 export function MtastsModule() {
   const { showNotification } = useNotification()
-  const [loading, setLoading] = useState(false)
+  const [overviewLoading, setOverviewLoading] = useState(false)
+  const [zonesLoading, setZonesLoading] = useState(false)
+  const [policyLoading, setPolicyLoading] = useState(false)
+  const [orchestrating, setOrchestrating] = useState(false)
   const [domain, setDomain] = useState('')
   const [limit, setLimit] = useState('30')
   const [payload, setPayload] = useState<MtastsPayload>(initialPayload)
+  const [zones, setZones] = useState<MtastsZone[]>([])
+  const [selectedDomain, setSelectedDomain] = useState('')
+  const [selectedZoneId, setSelectedZoneId] = useState('')
+  const [policyText, setPolicyText] = useState('')
+  const [tlsrptEmail, setTlsrptEmail] = useState('')
+  const [lastGeneratedId, setLastGeneratedId] = useState<string | null>(null)
+  const [mxRecords, setMxRecords] = useState<string[]>([])
 
-  const disabled = useMemo(() => loading, [loading])
+  const disabled = useMemo(() => overviewLoading, [overviewLoading])
+
+  const loadZones = useCallback(async (shouldNotify = false) => {
+    setZonesLoading(true)
+    try {
+      const response = await fetch('/api/mtasts/zones')
+      const nextPayload = await response.json() as { ok: boolean; error?: string; zones?: MtastsZone[] }
+
+      if (!response.ok || !nextPayload.ok) {
+        throw new Error(nextPayload.error ?? 'Falha ao carregar zonas do MTA-STS.')
+      }
+
+      const nextZones = Array.isArray(nextPayload.zones) ? nextPayload.zones : []
+      setZones(nextZones)
+
+      if (nextZones.length > 0 && !selectedDomain) {
+        setSelectedDomain(nextZones[0].name)
+        setSelectedZoneId(nextZones[0].id)
+      }
+
+      if (shouldNotify) {
+        showNotification('Zonas do MTA-STS atualizadas.', 'success')
+      }
+    } catch {
+      showNotification('Não foi possível carregar as zonas do MTA-STS.', 'error')
+    } finally {
+      setZonesLoading(false)
+    }
+  }, [selectedDomain, showNotification])
+
+  const loadPolicy = useCallback(async (domainValue: string, zoneIdValue: string, shouldNotify = false) => {
+    if (!domainValue || !zoneIdValue) {
+      setPolicyText('')
+      setTlsrptEmail('')
+      setLastGeneratedId(null)
+      setMxRecords([])
+      return
+    }
+
+    setPolicyLoading(true)
+    try {
+      const response = await fetch(`/api/mtasts/policy?domain=${encodeURIComponent(domainValue)}&zoneId=${encodeURIComponent(zoneIdValue)}`)
+      const nextPayload = await response.json() as { ok: boolean; error?: string; policy?: MtastsPolicyResponse }
+
+      if (!response.ok || !nextPayload.ok || !nextPayload.policy) {
+        throw new Error(nextPayload.error ?? 'Falha ao carregar policy do domínio.')
+      }
+
+      setPolicyText(nextPayload.policy.savedPolicy ?? '')
+      setTlsrptEmail(nextPayload.policy.savedEmail ?? nextPayload.policy.dnsTlsRptEmail ?? '')
+      setLastGeneratedId(nextPayload.policy.lastGeneratedId)
+      setMxRecords(Array.isArray(nextPayload.policy.mxRecords) ? nextPayload.policy.mxRecords : [])
+
+      if (shouldNotify) {
+        showNotification(`Policy carregada para ${domainValue}.`, 'success')
+      }
+    } catch {
+      showNotification('Não foi possível carregar a policy do domínio selecionado.', 'error')
+    } finally {
+      setPolicyLoading(false)
+    }
+  }, [showNotification])
+
+  useEffect(() => {
+    void loadZones()
+  }, [loadZones])
+
+  useEffect(() => {
+    if (!selectedDomain || !selectedZoneId) {
+      return
+    }
+
+    void loadPolicy(selectedDomain, selectedZoneId)
+  }, [loadPolicy, selectedDomain, selectedZoneId])
+
+  const buildPolicyFromMx = () => {
+    if (!Array.isArray(mxRecords) || mxRecords.length === 0) {
+      showNotification('Sem MX retornado para gerar policy automaticamente.', 'info')
+      return
+    }
+
+    const baseLines = [
+      'version: STSv1',
+      'mode: enforce',
+      'max_age: 604800',
+      ...mxRecords.map((record) => `mx: ${record}`),
+    ]
+
+    setPolicyText(baseLines.join('\n'))
+    showNotification('Policy regenerada a partir dos registros MX atuais.', 'success')
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -62,7 +176,7 @@ export function MtastsModule() {
       limit,
     })
 
-    setLoading(true)
+    setOverviewLoading(true)
     try {
       const response = await fetch(`/api/mtasts/overview?${query.toString()}`)
       const nextPayload = await response.json() as MtastsPayload
@@ -79,7 +193,69 @@ export function MtastsModule() {
     } catch {
       showNotification('Não foi possível carregar o módulo MTA-STS.', 'error')
     } finally {
-      setLoading(false)
+      setOverviewLoading(false)
+    }
+  }
+
+  const handleZoneChange = (nextDomain: string) => {
+    const zone = zones.find((item) => item.name === nextDomain)
+    setSelectedDomain(nextDomain)
+    setSelectedZoneId(zone?.id ?? '')
+  }
+
+  const handleOrchestrate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const normalizedPolicy = policyText.trim()
+    if (!selectedDomain || !selectedZoneId || !normalizedPolicy) {
+      showNotification('Selecione domínio/zona e informe a policy antes de sincronizar.', 'error')
+      return
+    }
+
+    setOrchestrating(true)
+    try {
+      const response = await fetch('/api/mtasts/orchestrate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain: selectedDomain,
+          zoneId: selectedZoneId,
+          policyText: normalizedPolicy,
+          tlsrptEmail: tlsrptEmail.trim().toLowerCase(),
+        }),
+      })
+
+      const nextPayload = await response.json() as { ok: boolean; error?: string; id?: string }
+      if (!response.ok || !nextPayload.ok) {
+        throw new Error(nextPayload.error ?? 'Falha ao orquestrar sincronização MTA-STS.')
+      }
+
+      setLastGeneratedId(nextPayload.id ?? null)
+      await Promise.all([
+        loadPolicy(selectedDomain, selectedZoneId),
+        (async () => {
+          const query = new URLSearchParams({
+            domain,
+            limit,
+          })
+          const overviewResponse = await fetch(`/api/mtasts/overview?${query.toString()}`)
+          if (!overviewResponse.ok) {
+            return
+          }
+          const overviewPayload = await overviewResponse.json() as MtastsPayload
+          if (overviewPayload.ok) {
+            setPayload(overviewPayload)
+          }
+        })(),
+      ])
+
+      showNotification(`MTA-STS sincronizado com sucesso para ${selectedDomain}.`, 'success')
+    } catch {
+      showNotification('Não foi possível executar a sincronização orquestrada do MTA-STS.', 'error')
+    } finally {
+      setOrchestrating(false)
     }
   }
 
@@ -124,8 +300,94 @@ export function MtastsModule() {
 
         <div className="form-actions">
           <button type="submit" className="primary-button" disabled={disabled}>
-            {loading ? <Loader2 size={18} className="spin" /> : <Search size={18} />}
+            {overviewLoading ? <Loader2 size={18} className="spin" /> : <Search size={18} />}
             Carregar overview
+          </button>
+        </div>
+      </form>
+
+      <form className="form-card" onSubmit={handleOrchestrate}>
+        <div className="result-toolbar">
+          <div>
+            <h4><ShieldCheck size={16} /> Orquestração MTA-STS</h4>
+            <p className="field-hint">Sincroniza policy no D1 legado, atualiza DNS na Cloudflare e registra novo ID em histórico.</p>
+          </div>
+          <div className="inline-actions">
+            <button type="button" className="ghost-button" onClick={() => void loadZones(true)} disabled={zonesLoading || orchestrating}>
+              {zonesLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+              Recarregar zonas
+            </button>
+            <button type="button" className="ghost-button" onClick={buildPolicyFromMx} disabled={policyLoading || orchestrating}>
+              <RefreshCw size={16} />
+              Gerar policy via MX
+            </button>
+          </div>
+        </div>
+
+        <div className="form-grid">
+          <div className="field-group">
+            <label htmlFor="mtasts-domain-operacao">Domínio alvo</label>
+            <select
+              id="mtasts-domain-operacao"
+              name="mtastsDomainOperacao"
+              value={selectedDomain}
+              onChange={(event) => handleZoneChange(event.target.value)}
+              disabled={zonesLoading || orchestrating}
+            >
+              <option value="">Selecione um domínio...</option>
+              {zones.map((zone) => (
+                <option key={zone.id} value={zone.name}>{zone.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field-group">
+            <label htmlFor="mtasts-zone-id">Zone ID</label>
+            <input
+              id="mtasts-zone-id"
+              name="mtastsZoneId"
+              value={selectedZoneId}
+              readOnly
+            />
+          </div>
+        </div>
+
+        <div className="field-group">
+          <label htmlFor="mtasts-tlsrpt-email">E-mail TLS-RPT</label>
+          <input
+            id="mtasts-tlsrpt-email"
+            name="mtastsTlsRptEmail"
+            type="email"
+            value={tlsrptEmail}
+            onChange={(event) => setTlsrptEmail(event.target.value.trim().toLowerCase())}
+            disabled={policyLoading || orchestrating}
+            placeholder="relatorios@dominio.com"
+          />
+        </div>
+
+        <div className="field-group">
+          <label htmlFor="mtasts-policy-text">Policy mta-sts.txt</label>
+          <textarea
+            id="mtasts-policy-text"
+            name="mtastsPolicyText"
+            className="json-textarea"
+            rows={8}
+            value={policyText}
+            onChange={(event) => setPolicyText(event.target.value)}
+            disabled={policyLoading || orchestrating}
+            placeholder="version: STSv1&#10;mode: enforce&#10;max_age: 604800&#10;mx: mail.exemplo.com"
+          />
+        </div>
+
+        <div className="post-row-meta">
+          <span>Último ID conhecido: <strong>{lastGeneratedId ?? '—'}</strong></span>
+          <span>MX detectados: {mxRecords.length}</span>
+        </div>
+
+        <div className="form-actions">
+          <button type="submit" className="primary-button" disabled={orchestrating || policyLoading || zonesLoading}>
+            {orchestrating ? <Loader2 size={18} className="spin" /> : <Save size={18} />}
+            Sincronizar dados + gerar ID
           </button>
         </div>
       </form>

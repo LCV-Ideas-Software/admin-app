@@ -9,9 +9,11 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Endurecimento operacional ativo: telemetria padronizada por módulo e indicadores de fallback em `/api/overview/operational`.
 - Sync manual disponível para Astrólogo em `POST /api/astrologo/sync` (mapas para `astrologo_mapas`).
 - Sync manual disponível para Calculadora em `POST /api/calculadora/sync` (observabilidade + rate limit policies).
+- Ações administrativas do Calculadora já disponíveis no shell: `GET|POST /api/calculadora/parametros` e `GET|POST /api/calculadora/rate-limit` (com persistência no `CALC_SOURCE_DB` e espelhamento de policies no `bigdata_db`).
 - Sync manual disponível para MainSite em `POST /api/mainsite/sync` (posts + settings públicos).
 - Ações administrativas do MainSite já disponíveis no shell: `GET|POST|PUT|DELETE /api/mainsite/posts`, `POST /api/mainsite/posts-pin` e `GET|PUT /api/mainsite/settings`.
 - Sync manual disponível para MTA-STS em `POST /api/mtasts/sync` (history + policies auditáveis por zonas).
+- Orquestração operacional do MTA-STS já disponível no shell: `GET /api/mtasts/zones`, `GET /api/mtasts/policy` e `POST /api/mtasts/orchestrate` (policy + DNS + novo ID).
 - Health check ativo em `/api/health`.
 
 ## Diretivas de arquitetura
