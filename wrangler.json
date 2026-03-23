@@ -8,6 +8,16 @@
       "binding": "BIGDATA_DB",
       "database_name": "bigdata_db",
       "database_id": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "binding": "ASTROLOGO_SOURCE_DB",
+      "database_name": "oraculo_astrologico_db",
+      "database_id": "7474fe8e-a56c-4a13-810a-4ec02133bc14"
+    },
+    {
+      "binding": "CALC_SOURCE_DB",
+      "database_name": "calculadora-calc-db",
+      "database_id": "db259ea6-5583-4820-b7af-c514485cfc9c"
     }
   ],
   "vars": {

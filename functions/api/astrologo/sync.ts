@@ -7,26 +7,15 @@ type LegacyMapa = {
   data_nascimento?: string
 }
 
-type LegacyListResponse = {
-  success?: boolean
-  mapas?: LegacyMapa[]
-}
-
 type Env = {
   BIGDATA_DB?: D1Database
-  ASTROLOGO_ADMIN_API_BASE_URL?: string
-  ASTROLOGO_CF_ACCESS_CLIENT_ID?: string
-  ASTROLOGO_CF_ACCESS_CLIENT_SECRET?: string
+  ASTROLOGO_SOURCE_DB?: D1Database
 }
 
 type Context = {
   request: Request
   env: Env
 }
-
-const DEFAULT_ASTROLOGO_ADMIN_URL = 'https://admin-astrologo.lcv.app.br'
-
-const normalizeBaseUrl = (value: string) => value.endsWith('/') ? value.slice(0, -1) : value
 
 const parseLimit = (rawValue: string | null) => {
   const parsed = Number.parseInt(rawValue ?? '300', 10)
@@ -72,6 +61,16 @@ export async function onRequestPost(context: Context) {
     })
   }
 
+  if (!env.ASTROLOGO_SOURCE_DB) {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: 'ASTROLOGO_SOURCE_DB não configurado no runtime.',
+    }), {
+      status: 503,
+      headers: toHeaders(),
+    })
+  }
+
   const url = new URL(request.url)
   const limit = parseLimit(url.searchParams.get('limit'))
   const dryRun = parseDryRun(url.searchParams.get('dryRun'))
@@ -85,43 +84,18 @@ export async function onRequestPost(context: Context) {
   })
 
   try {
-    const baseUrl = normalizeBaseUrl(env.ASTROLOGO_ADMIN_API_BASE_URL ?? DEFAULT_ASTROLOGO_ADMIN_URL)
-    const legacyListUrl = `${baseUrl}/api/admin/listar`
+    const source = await env.ASTROLOGO_SOURCE_DB.prepare(`
+      SELECT id, nome, data_nascimento
+      FROM mapas_astrologicos
+      ORDER BY created_at DESC
+      LIMIT ?
+    `)
+      .bind(limit)
+      .all<LegacyMapa>()
 
-    const cfAccessHeaders: Record<string, string> = {}
-    if (env.ASTROLOGO_CF_ACCESS_CLIENT_ID && env.ASTROLOGO_CF_ACCESS_CLIENT_SECRET) {
-      cfAccessHeaders['CF-Access-Client-Id'] = env.ASTROLOGO_CF_ACCESS_CLIENT_ID
-      cfAccessHeaders['CF-Access-Client-Secret'] = env.ASTROLOGO_CF_ACCESS_CLIENT_SECRET
-    }
-
-    const hasCfAccessToken = !!(env.ASTROLOGO_CF_ACCESS_CLIENT_ID && env.ASTROLOGO_CF_ACCESS_CLIENT_SECRET)
-
-    const response = await fetch(legacyListUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      headers: {
-        Accept: 'application/json',
-        ...cfAccessHeaders,
-      },
-    })
-
-    const contentType = response.headers.get('Content-Type') ?? ''
-    if (!response.ok || contentType.includes('text/html')) {
-      const hint = contentType.includes('text/html')
-        ? `CF Access bloqueou (HTML recebido, status=${response.status}, token_presente=${hasCfAccessToken}) — verifique se a policy Service Auth do app astrologo-admin inclui o Service Token`
-        : `HTTP ${response.status}`
-      throw new Error(`Falha no backend legado do Astrólogo: ${hint}`)
-    }
-
-    const payload = await response.json() as LegacyListResponse
-    if (!payload.success || !Array.isArray(payload.mapas)) {
-      throw new Error('Resposta inválida do legado em /api/admin/listar')
-    }
-
-    const rows = payload.mapas
+    const rows = (source.results ?? [])
       .map((mapa) => toSyncRow(mapa))
       .filter((item): item is NonNullable<ReturnType<typeof toSyncRow>> => item !== null)
-      .slice(0, limit)
 
     let upserted = 0
 
@@ -151,8 +125,8 @@ export async function onRequestPost(context: Context) {
 
     await logModuleOperationalEvent(env.BIGDATA_DB, {
       module: 'astrologo',
-      source: 'legacy-admin',
-      fallbackUsed: true,
+      source: 'bigdata_db',
+      fallbackUsed: false,
       ok: true,
       metadata: {
         action: 'sync',
@@ -188,8 +162,8 @@ export async function onRequestPost(context: Context) {
 
     await logModuleOperationalEvent(env.BIGDATA_DB, {
       module: 'astrologo',
-      source: 'legacy-admin',
-      fallbackUsed: true,
+      source: 'bigdata_db',
+      fallbackUsed: false,
       ok: false,
       errorMessage: message,
       metadata: {
