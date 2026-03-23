@@ -19,7 +19,7 @@ import { ItauModule } from './modules/itau/ItauModule'
 import { MainsiteModule } from './modules/mainsite/MainsiteModule'
 import { MtastsModule } from './modules/mtasts/MtastsModule'
 
-const APP_VERSION = 'APP v01.10.00'
+const APP_VERSION = 'APP v01.12.00'
 
 type OperationalModuleStatus = {
   module: string
