@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Loader2, Search, Sparkles, Telescope } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+import { SyncStatusCard } from '../../components/SyncStatusCard'
 
 type MapaResumo = {
   id: string
@@ -160,6 +161,13 @@ export function AstrologoModule() {
           </ul>
         )}
       </article>
+
+      <SyncStatusCard
+        module="astrologo"
+        endpoint="/api/astrologo/sync"
+        title="Sync manual do Astrólogo"
+        description="Replica mapas do legado para o `bigdata_db`, com dry run opcional para conferência antes da escrita."
+      />
     </section>
   )
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, Globe, Loader2, Search } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+import { SyncStatusCard } from '../../components/SyncStatusCard'
 
 type OverviewPayload = {
   ok: boolean
@@ -148,6 +149,13 @@ export function MainsiteModule() {
           </ul>
         )}
       </article>
+
+      <SyncStatusCard
+        module="mainsite"
+        endpoint="/api/mainsite/sync"
+        title="Sync manual do MainSite"
+        description="Sincroniza posts e settings públicos do worker legado para o `bigdata_db`; configs privadas permanecem protegidas até fase posterior."
+      />
     </section>
   )
 }

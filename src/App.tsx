@@ -19,7 +19,7 @@ import { CalculadoraModule } from './modules/calculadora/CalculadoraModule'
 import { MainsiteModule } from './modules/mainsite/MainsiteModule'
 import { MtastsModule } from './modules/mtasts/MtastsModule'
 
-const APP_VERSION = 'APP v01.05.00'
+const APP_VERSION = 'APP v01.07.00'
 
 type OperationalModuleStatus = {
   module: string
@@ -261,6 +261,37 @@ function App() {
                       <span>eventos: {item.totalEvents24h} · fallback: {item.fallbackEvents24h} · erros: {item.errorEvents24h}</span>
                       <span className={`badge ${item.fallbackEvents24h > 0 || !item.lastOk ? 'badge-planejado' : 'badge-em-implantacao'}`}>
                         {item.lastSource}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+
+            <article className="result-card">
+              <header className="result-header">
+                <h4><Database size={16} /> Execuções de sync</h4>
+                <span>{operationalOverview?.sync.length ?? 0} módulo(s)</span>
+              </header>
+
+              {!operationalOverview || operationalOverview.sync.length === 0 ? (
+                <p className="result-empty">
+                  Nenhum sync registrado ainda. Os módulos com ingestão manual mostrarão histórico aqui.
+                </p>
+              ) : (
+                <ul className="result-list">
+                  {operationalOverview.sync.map((item) => (
+                    <li key={item.module}>
+                      <strong>{item.module}</strong>
+                      <span>
+                        execuções: {item.totalRuns} · sucesso: {item.successRuns} · erros: {item.errorRuns}
+                      </span>
+                      <span className={`badge ${item.lastStatus === 'success' ? 'badge-em-implantacao' : 'badge-planejado'}`}>
+                        {item.lastStatus === 'success'
+                          ? 'último sync ok'
+                          : item.lastStatus === 'error'
+                            ? 'último sync com erro'
+                            : item.lastStatus}
                       </span>
                     </li>
                   ))}

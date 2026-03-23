@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Loader2, Search, ShieldCheck } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+import { SyncStatusCard } from '../../components/SyncStatusCard'
 
 type MtastsPayload = {
   ok: boolean
@@ -167,6 +168,13 @@ export function MtastsModule() {
           </ul>
         )}
       </article>
+
+      <SyncStatusCard
+        module="mtasts"
+        endpoint="/api/mtasts/sync"
+        title="Sync manual do MTA-STS"
+        description="Sincroniza histórico, zonas e policies auditáveis do legado para o `bigdata_db`, preservando o app atual até homologação completa."
+      />
     </section>
   )
 }

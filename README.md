@@ -7,9 +7,10 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Fase 1 em andamento: shell paralelo sem desligar admins legados.
 - Módulos funcionais: Astrólogo (`/api/astrologo/listar`), Calculadora (`/api/calculadora/overview`), MainSite (`/api/mainsite/overview`) e MTA-STS (`/api/mtasts/overview`) com leitura híbrida (prioriza `bigdata_db` via D1 e usa fallback legado).
 - Endurecimento operacional ativo: telemetria padronizada por módulo e indicadores de fallback em `/api/overview/operational`.
-- Sync manual inicial disponível: Astrólogo → `astrologo_mapas` em `POST /api/astrologo/sync`.
-- Sync manual inicial disponível: Astrólogo → `astrologo_mapas` em `POST /api/astrologo/sync`.
+- Sync manual disponível para Astrólogo em `POST /api/astrologo/sync` (mapas para `astrologo_mapas`).
 - Sync manual disponível para Calculadora em `POST /api/calculadora/sync` (observabilidade + rate limit policies).
+- Sync manual disponível para MainSite em `POST /api/mainsite/sync` (posts + settings públicos).
+- Sync manual disponível para MTA-STS em `POST /api/mtasts/sync` (history + policies auditáveis por zonas).
 - Health check ativo em `/api/health`.
 
 ## Diretivas de arquitetura
