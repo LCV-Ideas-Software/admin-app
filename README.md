@@ -8,6 +8,7 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Módulos funcionais: Astrólogo (`/api/astrologo/listar`), Calculadora (`/api/calculadora/overview`), MainSite (`/api/mainsite/overview`) e MTA-STS (`/api/mtasts/overview`) com leitura híbrida (prioriza `bigdata_db` via D1 e usa fallback legado).
 - Endurecimento operacional ativo: telemetria padronizada por módulo e indicadores de fallback em `/api/overview/operational`.
 - Sync manual disponível para Astrólogo em `POST /api/astrologo/sync` (mapas para `astrologo_mapas`).
+- Ações administrativas do Astrólogo já disponíveis no shell: `POST /api/astrologo/ler`, `POST /api/astrologo/excluir`, `GET|POST /api/astrologo/rate-limit` e `POST /api/astrologo/enviar-email` (com persistência no `ASTROLOGO_SOURCE_DB`, envio server-side via Resend e espelhamento de policies no `bigdata_db`).
 - Sync manual disponível para Calculadora em `POST /api/calculadora/sync` (observabilidade + rate limit policies).
 - Ações administrativas do Calculadora já disponíveis no shell: `GET|POST /api/calculadora/parametros` e `GET|POST /api/calculadora/rate-limit` (com persistência no `CALC_SOURCE_DB` e espelhamento de policies no `bigdata_db`).
 - Sync manual disponível para MainSite em `POST /api/mainsite/sync` (posts + settings públicos).
