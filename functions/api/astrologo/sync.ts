@@ -94,16 +94,23 @@ export async function onRequestPost(context: Context) {
       cfAccessHeaders['CF-Access-Client-Secret'] = env.ASTROLOGO_CF_ACCESS_CLIENT_SECRET
     }
 
+    const hasCfAccessToken = !!(env.ASTROLOGO_CF_ACCESS_CLIENT_ID && env.ASTROLOGO_CF_ACCESS_CLIENT_SECRET)
+
     const response = await fetch(legacyListUrl, {
       method: 'GET',
+      redirect: 'follow',
       headers: {
         Accept: 'application/json',
         ...cfAccessHeaders,
       },
     })
 
-    if (!response.ok) {
-      throw new Error(`Falha no backend legado do Astrólogo: HTTP ${response.status}`)
+    const contentType = response.headers.get('Content-Type') ?? ''
+    if (!response.ok || contentType.includes('text/html')) {
+      const hint = contentType.includes('text/html')
+        ? `CF Access bloqueou (HTML recebido, status=${response.status}, token_presente=${hasCfAccessToken}) — verifique se a policy Service Auth do app astrologo-admin inclui o Service Token`
+        : `HTTP ${response.status}`
+      throw new Error(`Falha no backend legado do Astrólogo: ${hint}`)
     }
 
     const payload = await response.json() as LegacyListResponse
