@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_OPTIONS: "--no-deprecation"
+  WRANGLER_VERSION: "latest"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        working-directory: ./
+
+      - run: npm run build
+        working-directory: ./
+        env:
+          VITE_PUBLIC_BRAND_ICONS_BASE_URL: ${{ vars['VITE_PUBLIC_BRAND_ICONS_BASE_URL'] }}
+
+      - run: npx wrangler@${WRANGLER_VERSION} pages deploy dist --project-name=admin-app --branch=main
+        working-directory: ./
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}

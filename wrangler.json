@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "admin-app",
+  "compatibility_date": "2026-03-23",
+  "pages_build_output_dir": "dist",
+  "d1_databases": [
+    {
+      "binding": "BIGDATA_DB",
+      "database_name": "bigdata_db",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "vars": {
+    "ASTROLOGO_ADMIN_API_BASE_URL": "https://admin-astrologo.lcv.app.br",
+    "CALC_ADMIN_API_BASE_URL": "https://admin.lcv.app.br",
+    "MAINSITE_WORKER_API_BASE_URL": "https://mainsite-app.lcv.rio.br",
+    "MTASTS_ADMIN_API_BASE_URL": "https://mtasts-admin.lcv.app.br"
+  },
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  }
+}
