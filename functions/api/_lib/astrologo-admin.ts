@@ -56,6 +56,8 @@ const DEFAULT_POLICIES = {
 
 export const SUPPORTED_ROUTES = ['calcular', 'analisar', 'enviar-email'] as const
 
+const toDbRoute = (route: string) => route.startsWith('astrologo/') ? route : `astrologo/${route}`
+
 export const toHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -68,7 +70,7 @@ const toInt = (value: unknown, fallback: number) => {
 
 export const ensureRateLimitTables = async (db: D1Database) => {
   await db.prepare(`
-    CREATE TABLE IF NOT EXISTS rate_limit_policies (
+    CREATE TABLE IF NOT EXISTS astrologo_rate_limit_policies (
       route TEXT PRIMARY KEY,
       enabled INTEGER NOT NULL DEFAULT 1,
       max_requests INTEGER NOT NULL,
@@ -78,7 +80,7 @@ export const ensureRateLimitTables = async (db: D1Database) => {
   `).run()
 
   await db.prepare(`
-    CREATE TABLE IF NOT EXISTS api_rate_limits (
+    CREATE TABLE IF NOT EXISTS astrologo_api_rate_limits (
       key TEXT PRIMARY KEY,
       route TEXT NOT NULL,
       window_start INTEGER NOT NULL,
@@ -94,10 +96,10 @@ export const ensureDefaultPolicies = async (db: D1Database) => {
   for (const route of SUPPORTED_ROUTES) {
     const policy = DEFAULT_POLICIES[route]
     await db.prepare(`
-      INSERT OR IGNORE INTO rate_limit_policies (route, enabled, max_requests, window_minutes)
+      INSERT OR IGNORE INTO astrologo_rate_limit_policies (route, enabled, max_requests, window_minutes)
       VALUES (?, ?, ?, ?)
     `)
-      .bind(policy.route, policy.enabled, policy.max_requests, policy.window_minutes)
+      .bind(toDbRoute(policy.route), policy.enabled, policy.max_requests, policy.window_minutes)
       .run()
   }
 }
@@ -110,10 +112,10 @@ const getRateLimitWindowStats = async (db: D1Database, route: string, windowMinu
     SELECT
       COALESCE(SUM(request_count), 0) AS total,
       COUNT(DISTINCT key) AS keys
-    FROM api_rate_limits
+    FROM astrologo_api_rate_limits
     WHERE route = ? AND window_start >= ?
   `)
-    .bind(route, cutoff)
+    .bind(toDbRoute(route), cutoff)
     .first<{ total?: number; keys?: number }>()
 
   return {
@@ -131,11 +133,11 @@ export const listPoliciesWithStats = async (db: D1Database): Promise<AstrologoRa
     const fallback = DEFAULT_POLICIES[route]
     const row = await db.prepare(`
       SELECT route, enabled, max_requests, window_minutes, updated_at
-      FROM rate_limit_policies
+      FROM astrologo_rate_limit_policies
       WHERE route = ?
       LIMIT 1
     `)
-      .bind(route)
+      .bind(toDbRoute(route))
       .first<D1Row>()
 
     const policy = {
@@ -170,7 +172,7 @@ export const upsertRateLimitPolicy = async (
   await ensureDefaultPolicies(db)
 
   await db.prepare(`
-    INSERT INTO rate_limit_policies (route, enabled, max_requests, window_minutes, updated_at)
+    INSERT INTO astrologo_rate_limit_policies (route, enabled, max_requests, window_minutes, updated_at)
     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(route) DO UPDATE SET
       enabled = excluded.enabled,
@@ -178,7 +180,7 @@ export const upsertRateLimitPolicy = async (
       window_minutes = excluded.window_minutes,
       updated_at = CURRENT_TIMESTAMP
   `)
-    .bind(input.route, input.enabled, input.maxRequests, input.windowMinutes)
+    .bind(toDbRoute(input.route), input.enabled, input.maxRequests, input.windowMinutes)
     .run()
 }
 

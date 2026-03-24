@@ -75,7 +75,7 @@ const mirrorPoliciesToBigdata = async (context: Context) => {
 
   const rows = await context.env.ASTROLOGO_SOURCE_DB.prepare(`
     SELECT route, enabled, max_requests, window_minutes, updated_at
-    FROM rate_limit_policies
+    FROM astrologo_rate_limit_policies
   `).all<{ route?: string; enabled?: number; max_requests?: number; window_minutes?: number; updated_at?: string | null }>()
 
   for (const item of rows.results ?? []) {

@@ -183,7 +183,7 @@ export async function onRequestPost(context: Context) {
     const [observSource, rateLimitSource] = await Promise.all([
       env.ITAU_SOURCE_DB.prepare(`
         SELECT created_at, status, from_cache, force_refresh, duration_ms, moeda, valor_original, preview, error_message
-        FROM oraculo_observabilidade
+        FROM itau_oraculo_observabilidade
         ORDER BY created_at DESC
         LIMIT ?
       `)
@@ -191,7 +191,7 @@ export async function onRequestPost(context: Context) {
         .all<ItauObservabilidadeSourceRow>(),
       env.ITAU_SOURCE_DB.prepare(`
         SELECT route_key, enabled, max_requests, window_minutes, updated_at, updated_by
-        FROM rate_limit_policies
+        FROM itau_rate_limit_policies
       `)
         .all<ItauRateLimitSourceRow>(),
     ])

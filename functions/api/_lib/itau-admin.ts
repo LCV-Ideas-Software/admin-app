@@ -91,11 +91,11 @@ export const validateRate = (name: string, rate: number | null) => {
 
 export const ensureParametrosTables = async (db: D1Database) => {
   await db.prepare(
-    'CREATE TABLE IF NOT EXISTS parametros_customizados (id INTEGER PRIMARY KEY AUTOINCREMENT, chave TEXT NOT NULL, valor TEXT NOT NULL)',
+    'CREATE TABLE IF NOT EXISTS itau_parametros_customizados (id INTEGER PRIMARY KEY AUTOINCREMENT, chave TEXT NOT NULL, valor TEXT NOT NULL)',
   ).run()
 
   await db.prepare(`
-    CREATE TABLE IF NOT EXISTS parametros_auditoria (
+    CREATE TABLE IF NOT EXISTS itau_parametros_auditoria (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       created_at INTEGER NOT NULL,
       admin_email TEXT NOT NULL,
@@ -110,7 +110,7 @@ export const ensureParametrosTables = async (db: D1Database) => {
 export const readLatestParams = async (db: D1Database) => {
   await ensureParametrosTables(db)
 
-  const rows = await db.prepare('SELECT chave, valor FROM parametros_customizados ORDER BY id DESC').all<D1Row>()
+  const rows = await db.prepare('SELECT chave, valor FROM itau_parametros_customizados ORDER BY id DESC').all<D1Row>()
   const result = { ...DEFAULT_PARAMS }
 
   for (const row of rows.results ?? []) {
@@ -130,7 +130,7 @@ export const readLatestParams = async (db: D1Database) => {
 
 export const ensureRateLimitTables = async (db: D1Database) => {
   await db.prepare(`
-    CREATE TABLE IF NOT EXISTS rate_limit_policies (
+    CREATE TABLE IF NOT EXISTS itau_rate_limit_policies (
       route_key TEXT PRIMARY KEY,
       enabled INTEGER NOT NULL,
       max_requests INTEGER NOT NULL,
@@ -141,7 +141,7 @@ export const ensureRateLimitTables = async (db: D1Database) => {
   `).run()
 
   await db.prepare(`
-    CREATE TABLE IF NOT EXISTS rate_limit_hits (
+    CREATE TABLE IF NOT EXISTS itau_rate_limit_hits (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       route_key TEXT NOT NULL,
       ip TEXT NOT NULL,
@@ -156,7 +156,7 @@ export const ensureDefaultPolicies = async (db: D1Database) => {
   for (const routeKey of SUPPORTED_ROUTES) {
     const policy = DEFAULT_POLICIES[routeKey]
     await db.prepare(`
-      INSERT OR IGNORE INTO rate_limit_policies (route_key, enabled, max_requests, window_minutes, updated_at, updated_by)
+      INSERT OR IGNORE INTO itau_rate_limit_policies (route_key, enabled, max_requests, window_minutes, updated_at, updated_by)
       VALUES (?, ?, ?, ?, ?, ?)
     `)
       .bind(policy.route_key, policy.enabled, policy.max_requests, policy.window_minutes, Date.now(), 'system-default')
@@ -170,7 +170,7 @@ const getRateLimitWindowStats = async (db: D1Database, routeKey: string, windowM
 
   const row = await db.prepare(`
     SELECT COUNT(1) AS total, COUNT(DISTINCT ip) AS ips
-    FROM rate_limit_hits
+    FROM itau_rate_limit_hits
     WHERE route_key = ? AND created_at >= ?
   `)
     .bind(routeKey, cutoff)
@@ -191,7 +191,7 @@ export const listPoliciesWithStats = async (db: D1Database): Promise<ItauRateLim
     const fallback = DEFAULT_POLICIES[routeKey]
     const row = await db.prepare(`
       SELECT route_key, enabled, max_requests, window_minutes, updated_at, updated_by
-      FROM rate_limit_policies
+      FROM itau_rate_limit_policies
       WHERE route_key = ?
       LIMIT 1
     `)
@@ -231,7 +231,7 @@ export const upsertRateLimitPolicy = async (
   await ensureDefaultPolicies(db)
 
   await db.prepare(`
-    INSERT INTO rate_limit_policies (route_key, enabled, max_requests, window_minutes, updated_at, updated_by)
+    INSERT INTO itau_rate_limit_policies (route_key, enabled, max_requests, window_minutes, updated_at, updated_by)
     VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(route_key) DO UPDATE SET
       enabled = excluded.enabled,

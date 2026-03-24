@@ -43,6 +43,18 @@ type MtastsPolicyResponse = {
   mxRecords: string[]
 }
 
+const canonicalize = (value: string | null | undefined) => String(value ?? '').trim().toLowerCase()
+
+const buildPolicyStringFromMx = (mxRecords: string[]) => {
+  const lines = [
+    'version: STSv1',
+    'mode: enforce',
+    'max_age: 604800',
+    ...mxRecords.map((mx) => `mx: ${mx}`),
+  ]
+  return lines.join('\n').trim()
+}
+
 const parseApiPayload = async <T,>(response: Response, fallback: string): Promise<T> => {
   const rawText = await response.text()
   const trimmed = rawText.trim()
@@ -150,60 +162,53 @@ export function MtastsModule() {
     }
   }, [hasUnsavedPolicyDraft, integrityIssues.length, integrityStatus, orchestrating])
 
-  const runIntegrityAudit = useCallback(() => {
-    if (zones.length === 0 && payload.policies.length === 0) {
+  const runIntegrityAudit = useCallback(async () => {
+    if (zones.length === 0) {
       setIntegrityStatus('idle')
       setIntegrityIssues([])
       return
     }
 
-    const errors: string[] = []
     const warnings: string[] = []
+    await Promise.all(zones.map(async (zone) => {
+      try {
+        const response = await fetch(`/api/mtasts/policy?domain=${encodeURIComponent(zone.name)}&zoneId=${encodeURIComponent(zone.id)}`, {
+          headers: {
+            'X-Admin-Actor': adminActor,
+          },
+        })
+        const nextPayload = await parseApiPayload<{ ok: boolean; error?: string; policy?: MtastsPolicyResponse }>(response, `Falha ao auditar domínio ${zone.name}`)
+        if (!response.ok || !nextPayload.ok || !nextPayload.policy) {
+          throw new Error(nextPayload.error ?? 'Falha ao auditar domínio')
+        }
 
-    const zoneNames = new Set(zones.map((zone) => zone.name.toLowerCase()))
-    const policyDomainMap = new Map(payload.policies.map((policy) => [policy.domain.toLowerCase(), policy]))
+        const policy = nextPayload.policy
+        const expectedPolicy = buildPolicyStringFromMx(Array.isArray(policy.mxRecords) ? policy.mxRecords : [])
 
-    for (const zone of zones) {
-      const policy = policyDomainMap.get(zone.name.toLowerCase())
-      if (!policy || !policy.policyText?.trim()) {
-        errors.push(`Domínio ${zone.name}: policy ausente no histórico salvo.`)
-      }
-    }
+        const cp = canonicalize(policy.savedPolicy)
+        const cep = canonicalize(expectedPolicy)
+        const ce = canonicalize(policy.savedEmail)
+        const cde = canonicalize(policy.dnsTlsRptEmail)
+        const cid = canonicalize(policy.lastGeneratedId)
+        const cdid = canonicalize(policy.dnsMtaStsId)
 
-    for (const policy of payload.policies) {
-      if (!zoneNames.has(policy.domain.toLowerCase())) {
-        warnings.push(`Policy órfã detectada para ${policy.domain} (não encontrada nas zonas atuais).`)
+        if (cp !== cep) {
+          warnings.push(`Domínio ${zone.name}: TXT base desatualizado.`)
+        }
+        if (ce !== cde) {
+          warnings.push(`Domínio ${zone.name}: e-mail diverge (D1:[${ce || 'vazio'}] DNS:[${cde || 'vazio'}]).`)
+        }
+        if (cid !== cdid) {
+          warnings.push(`Domínio ${zone.name}: ID diverge (D1:[${cid || 'vazio'}] DNS:[${cdid || 'vazio'}]).`)
+        }
+      } catch {
+        warnings.push(`Domínio ${zone.name}: erro de leitura da auditoria DNS/Cloudflare.`)
       }
-      if (!policy.tlsrptEmail) {
-        warnings.push(`Domínio ${policy.domain}: e-mail TLS-RPT não configurado.`)
-      }
-      if (!policy.updatedAt) {
-        warnings.push(`Domínio ${policy.domain}: sem data de atualização registrada.`)
-      }
-    }
+    }))
 
-    if (selectedDomain) {
-      if (!selectedZoneId) {
-        errors.push(`Domínio selecionado (${selectedDomain}) sem Zone ID associado.`)
-      }
-      if (!policyText.trim()) {
-        warnings.push(`Domínio selecionado (${selectedDomain}) com policy em branco no editor.`)
-      }
-      if (!tlsrptEmail.trim()) {
-        warnings.push(`Domínio selecionado (${selectedDomain}) sem e-mail TLS-RPT no editor.`)
-      }
-      if (!lastGeneratedId) {
-        warnings.push(`Domínio selecionado (${selectedDomain}) sem último ID conhecido.`)
-      }
-      if (mxRecords.length === 0) {
-        warnings.push(`Domínio selecionado (${selectedDomain}) sem MX detectado para geração automática.`)
-      }
-    }
-
-    const nextIssues = [...errors, ...warnings]
-    setIntegrityIssues(nextIssues)
-    setIntegrityStatus(errors.length > 0 ? 'error' : warnings.length > 0 ? 'warning' : 'ok')
-  }, [lastGeneratedId, mxRecords.length, payload.policies, policyText, selectedDomain, selectedZoneId, tlsrptEmail, zones])
+    setIntegrityIssues(warnings)
+    setIntegrityStatus(warnings.length > 0 ? 'warning' : 'ok')
+  }, [adminActor, zones])
 
   const loadZones = useCallback(async (shouldNotify = false) => {
     setZonesLoading(true)
@@ -291,7 +296,7 @@ export function MtastsModule() {
   }, [loadPolicy, selectedDomain, selectedZoneId])
 
   useEffect(() => {
-    runIntegrityAudit()
+    void runIntegrityAudit()
   }, [runIntegrityAudit])
 
   useEffect(() => {
@@ -514,7 +519,7 @@ export function MtastsModule() {
         <div className="result-toolbar">
           <div>
             <h4><ShieldCheck size={16} /> Orquestração MTA-STS</h4>
-            <p className="field-hint">Sincroniza policy no D1 legado, atualiza DNS na Cloudflare e registra novo ID em histórico.</p>
+            <p className="field-hint">Sincroniza policy no BIGDATA_DB, atualiza DNS na Cloudflare e registra novo ID em histórico.</p>
             {hasUnsavedPolicyDraft && (
               <span className="badge badge-planejado">Draft não salvo</span>
             )}

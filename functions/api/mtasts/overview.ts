@@ -93,7 +93,7 @@ export async function onRequestGet(context: Context) {
 
       const policyRows = domain
         ? await env.BIGDATA_DB.prepare('SELECT domain, policy_text, tlsrpt_email, updated_at FROM mtasts_mta_sts_policies WHERE domain = ? ORDER BY updated_at DESC LIMIT 10').bind(domain).all<MtastsPolicyRow>()
-        : await env.BIGDATA_DB.prepare('SELECT domain, policy_text, tlsrpt_email, updated_at FROM mtasts_mta_sts_policies ORDER BY updated_at DESC LIMIT 10').all<MtastsPolicyRow>()
+        : await env.BIGDATA_DB.prepare('SELECT domain, policy_text, tlsrpt_email, updated_at FROM mtasts_mta_sts_policies ORDER BY updated_at DESC').all<MtastsPolicyRow>()
 
       const history = (historyRows.results ?? [])
         .map((row) => mapHistoryRow(row))

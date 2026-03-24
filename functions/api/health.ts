@@ -2,7 +2,7 @@ export async function onRequestGet() {
   return new Response(JSON.stringify({
     ok: true,
     app: 'admin-app',
-    version: 'APP v01.31.00',
+    version: 'APP v01.31.02',
     phase: 'fase-1-shell',
     timestamp: new Date().toISOString(),
   }), {

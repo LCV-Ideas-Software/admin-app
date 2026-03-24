@@ -31,7 +31,7 @@ const mirrorPoliciesToBigdata = async (context: Context) => {
 
   const rows = await context.env.ITAU_SOURCE_DB.prepare(`
     SELECT route_key, enabled, max_requests, window_minutes, updated_at, updated_by
-    FROM rate_limit_policies
+    FROM itau_rate_limit_policies
   `).all<{ route_key?: string; enabled?: number; max_requests?: number; window_minutes?: number; updated_at?: number; updated_by?: string | null }>()
 
   for (const item of rows.results ?? []) {
