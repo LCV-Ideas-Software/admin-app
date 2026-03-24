@@ -8,7 +8,7 @@
 - Sincronização: botões dedicados para sync SumUp, sync MP e reindex de status SumUp.
 - Estorno/Cancelamento: modais de confirmação para estorno (total/parcial) via `PaymentRefund` e cancelamento via `Payment.cancel` (MP SDK).
 - Tabela de transações: status badges dinâmicos (25+ estados SumUp/MP), expanded details com parsing de payload, filtros (status/método/data), presets de data, exportação CSV.
-- 10 endpoints backend Pages Functions: `financeiro.ts`, `delete.ts`, `sumup-balance.ts`, `mp-balance.ts`, `sumup-sync.ts`, `mp-sync.ts`, `mp-refund.ts`, `mp-cancel.ts`, `sumup-reindex.ts`, `insights.ts`.
+- 10 endpoints backend Pages Functions: `financeiro.ts`, `delete.ts`, `sumup-balance.ts`, `mp-balance.ts`, `sumup-sync.ts`, `mp-sync.ts`, `mp-refund.ts`, `mp-cancel.ts`, `reindex-gateways.ts`, `insights.ts`.
 - Sidebar: módulo "Financeiro" integrado em ordem alfabética (Visão Geral → Astrólogo → Card Hub → **Financeiro** → Itaú → MainSite → MTA-STS → Telemetria → Configurações).
 - CSS: ~310 linhas de estilos dedicados ao módulo Financeiro (balance cards, status badges, modais, insight controls, date presets, responsive).
 

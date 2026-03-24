@@ -1460,6 +1460,16 @@
   color: #e2e8f0;
 }
 
+/* Arquivo Akáshico — scrollable list showing ~5 items */
+.astro-akashico-scroll {
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.astro-local-hint {
+  padding: 0 16px 8px;
+}
+
 @media (max-width: 768px) {
   .astro-grid--4 { grid-template-columns: repeat(2, 1fr); }
   .astro-grid--3 { grid-template-columns: repeat(2, 1fr); }
@@ -1859,9 +1869,9 @@
   gap: 4px;
   padding: 6px;
   margin: 16px 0;
-  background: rgba(30, 41, 59, 0.4);
+  background: rgba(30, 41, 59, 0.55);
   border-radius: 12px;
-  border: 1px solid rgba(71, 85, 105, 0.25);
+  border: 1px solid rgba(71, 85, 105, 0.35);
 }
 
 .telemetria-tab {
@@ -1874,24 +1884,30 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #94a3b8;
+  color: #dde3ea;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease;
 }
 
 .telemetria-tab:hover {
-  background: rgba(59, 130, 246, 0.08);
-  color: #cbd5e1;
+  background: rgba(59, 130, 246, 0.12);
+  color: #f1f5f9;
 }
 
 .telemetria-tab.active {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.25);
+  color: #93bbfd;
   box-shadow: 0 1px 4px rgba(59, 130, 246, 0.12);
 }
 
 .telemetria-refresh-btn {
   margin-left: auto;
+}
+
+/* Limit event log to ~10 visible items with scroll */
+.telemetria-event-log {
+  max-height: 520px;
+  overflow-y: auto;
 }
 
 .telemetria-loading {
@@ -2272,6 +2288,94 @@
 
 .fin-insight-result .fin-detail-group {
   margin-bottom: 10px;
+}
+
+.fin-insight-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.fin-insight-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(100, 116, 139, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.fin-insight-metric-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.fin-insight-metric-value {
+  font-size: 1.1rem;
+}
+
+.fin-insight-badge-group {
+  margin-bottom: 14px;
+}
+
+.fin-insight-group-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+
+.fin-insight-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fin-insight-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.fin-insight-count-badge strong {
+  font-size: 0.88rem;
+}
+
+.fin-insight-paging-pill {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.fin-insight-bool-pill {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.fin-bool-yes {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.fin-bool-no {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
 }
 
 .fin-json-pre {

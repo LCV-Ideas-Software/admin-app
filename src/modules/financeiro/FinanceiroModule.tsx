@@ -262,13 +262,13 @@ export function FinanceiroModule() {
   const handleReindex = async () => {
     setSyncBusy('reindex')
     try {
-      const res = await fetch('/api/financeiro/sumup-reindex', { method: 'POST', headers })
+      const res = await fetch('/api/financeiro/reindex-gateways', { method: 'POST', headers })
       const data = await res.json() as { success?: boolean; scanned?: number; updated?: number; error?: string }
       if (data.success) {
-        showNotification(`Reindex SumUp: ${data.scanned} verificados, ${data.updated} atualizados.`, 'success')
+        showNotification(`Reindex SumUp/MP: ${data.scanned} verificados, ${data.updated} atualizados.`, 'success')
         void fetchLogs(false)
       } else throw new Error(data.error)
-    } catch { showNotification('Falha no reindex SumUp.', 'error') }
+    } catch { showNotification('Falha no reindex de gateways.', 'error') }
     finally { setSyncBusy(null) }
   }
 
@@ -379,13 +379,114 @@ export function FinanceiroModule() {
     if (!insightData) return null
     if (insightData.error) return <p className="result-empty">{String(insightData.error)}</p>
 
+    // Status color mapping for insight badges
+    const statusColor = (s: string): { color: string; bg: string } => {
+      const u = s.toUpperCase()
+      if (['SUCCESSFUL', 'PAID', 'APPROVED'].includes(u)) return { color: '#10b981', bg: 'rgba(16,185,129,0.15)' }
+      if (['PENDING', 'IN_PROCESS', 'PROCESSING'].includes(u)) return { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' }
+      if (['FAILED', 'FAILURE', 'REJECTED'].includes(u)) return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)' }
+      if (['REFUNDED', 'PARTIALLY_REFUNDED'].includes(u)) return { color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' }
+      if (['CANCELLED', 'CANCELED', 'EXPIRED'].includes(u)) return { color: '#f97316', bg: 'rgba(249,115,22,0.15)' }
+      return { color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' }
+    }
+
+    // Scalar metrics to render as cards
+    const scalarKeys = ['scanned', 'limit', 'totalAmount', 'totalNetAmount', 'totalFee', 'count', 'totalFiltered', 'startDate', 'endDate']
+    const scalars = scalarKeys.filter(k => insightData[k] !== undefined)
+    // Object metrics (byStatus, byType, etc.)
+    const objectKeys = ['byStatus', 'byType', 'methods', 'types', 'paging']
+    const objects = objectKeys.filter(k => insightData[k] !== undefined)
+    // Boolean/extra
+    const boolKeys = ['hasMore']
+    const bools = boolKeys.filter(k => insightData[k] !== undefined)
+
+    const isAmount = (k: string) => ['totalAmount', 'totalNetAmount', 'totalFee'].includes(k)
+    const labelMap: Record<string, string> = {
+      scanned: 'Transações analisadas', limit: 'Limite', totalAmount: 'Valor total',
+      totalNetAmount: 'Valor líquido', totalFee: 'Total de taxas', count: 'Contagem',
+      totalFiltered: 'Filtrados', startDate: 'Início', endDate: 'Fim',
+      byStatus: 'Por Status', byType: 'Por Tipo', methods: 'Métodos', types: 'Tipos',
+      paging: 'Paginação', hasMore: 'Mais dados',
+    }
+
     return (
       <div className="fin-insight-result">
-        {Object.entries(insightData).filter(([k]) => k !== 'success').map(([key, value]) => (
-          <div key={key} className="fin-detail-group">
-            <span className="fin-detail-label">{key}</span>
-            <span className="fin-detail-value">
-              {typeof value === 'object' ? <pre className="fin-json-pre">{JSON.stringify(value, null, 2)}</pre> : String(value)}
+        {/* Scalar metrics as cards */}
+        {scalars.length > 0 && (
+          <div className="fin-insight-metrics">
+            {scalars.map(k => (
+              <div key={k} className="fin-insight-metric-card">
+                <span className="fin-insight-metric-label">{labelMap[k] || k}</span>
+                <strong className="fin-insight-metric-value">
+                  {isAmount(k) ? formatBRL(Number(insightData[k])) : String(insightData[k])}
+                </strong>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Object metrics as badge groups */}
+        {objects.map(k => {
+          const val = insightData[k]
+          if (!val || typeof val !== 'object') return null
+
+          // Arrays (methods, types)
+          if (Array.isArray(val)) {
+            return (
+              <div key={k} className="fin-insight-badge-group">
+                <span className="fin-insight-group-label">{labelMap[k] || k}</span>
+                <div className="fin-insight-badges">
+                  {(val as string[]).map((item, i) => {
+                    const c = statusColor(String(item))
+                    return <span key={i} className="fin-status-badge" style={{ color: c.color, background: c.bg }}>{String(item).toUpperCase()}</span>
+                  })}
+                  {(val as string[]).length === 0 && <span className="field-hint">Nenhum</span>}
+                </div>
+              </div>
+            )
+          }
+
+          // Paging object
+          if (k === 'paging') {
+            const p = val as Record<string, unknown>
+            return (
+              <div key={k} className="fin-insight-badge-group">
+                <span className="fin-insight-group-label">{labelMap[k]}</span>
+                <div className="fin-insight-badges">
+                  <span className="fin-insight-paging-pill">Total: {String(p.total ?? '—')}</span>
+                  <span className="fin-insight-paging-pill">Limite: {String(p.limit ?? '—')}</span>
+                  <span className="fin-insight-paging-pill">Offset: {String(p.offset ?? '—')}</span>
+                </div>
+              </div>
+            )
+          }
+
+          // Key-value objects (byStatus, byType) → colored badges with counts
+          const entries = Object.entries(val as Record<string, number>)
+          return (
+            <div key={k} className="fin-insight-badge-group">
+              <span className="fin-insight-group-label">{labelMap[k] || k}</span>
+              <div className="fin-insight-badges">
+                {entries.map(([label, count]) => {
+                  const c = statusColor(label)
+                  return (
+                    <span key={label} className="fin-insight-count-badge" style={{ color: c.color, background: c.bg }}>
+                      {label.toUpperCase()} <strong>{count}</strong>
+                    </span>
+                  )
+                })}
+                {entries.length === 0 && <span className="field-hint">Nenhum</span>}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Booleans */}
+        {bools.map(k => (
+          <div key={k} className="fin-insight-badge-group">
+            <span className="fin-insight-group-label">{labelMap[k] || k}</span>
+            <span className={`fin-insight-bool-pill ${insightData[k] ? 'fin-bool-yes' : 'fin-bool-no'}`}>
+              {insightData[k] ? 'Sim' : 'Não'}
             </span>
           </div>
         ))}
@@ -447,7 +548,7 @@ export function FinanceiroModule() {
             {syncBusy === 'mp' ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Sync Mercado Pago
           </button>
           <button type="button" className="ghost-button" onClick={() => void handleReindex()} disabled={!!syncBusy}>
-            {syncBusy === 'reindex' ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Reindex SumUp
+            {syncBusy === 'reindex' ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Reindex SumUp/Mercado Pago
           </button>
         </div>
       </article>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Copy, Loader2, RefreshCw, Search, Send, Share2, Sparkles, Telescope, Trash2 } from 'lucide-react'
+import { Copy, Loader2, RefreshCw, Search, Send, Sparkles, Telescope, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { generateAstrologicalReport } from '../../lib/astrological-report'
 import DOMPurify from 'dompurify'
@@ -79,6 +79,7 @@ export function AstrologoModule() {
   const [relatorioTexto, setRelatorioTexto] = useState('')
   const [copiedField, setCopiedField] = useState<'html' | 'texto' | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [showEmailForm, setShowEmailForm] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete | null>(null)
 
   // Dados parseados para o viewer estruturado
@@ -359,7 +360,7 @@ export function AstrologoModule() {
             Sem resultados no momento. Use os filtros e execute uma busca para validar o fluxo inicial.
           </p>
         ) : (
-          <ul className="result-list">
+          <ul className="result-list astro-akashico-scroll">
             {items.map((item) => {
               const isSelected = selectedMapa?.id === item.id
               return (
@@ -393,6 +394,7 @@ export function AstrologoModule() {
 
       {/* Viewer estruturado do mapa (paridade com astrologo-admin) */}
       {selectedMapa && (
+        <>
         <article className="result-card">
           <header className="result-header">
             <h4><Sparkles size={16} /> Ficha Oculta: {selectedMapa.nome}</h4>
@@ -400,7 +402,7 @@ export function AstrologoModule() {
           </header>
 
           {selectedMapa.local_nascimento && (
-            <p className="field-hint" style={{ padding: '0 16px 8px' }}>{selectedMapa.local_nascimento}</p>
+            <p className="field-hint astro-local-hint">{selectedMapa.local_nascimento}</p>
           )}
 
           {parsedData?.globais && (
@@ -498,73 +500,73 @@ export function AstrologoModule() {
             </div>
           )}
 
-          {/* Ações de compartilhamento (paridade com astrologo-admin) */}
+          {/* Ação de compartilhamento (paridade com astrologo-admin — apenas e-mail) */}
           <div className="astro-sharing">
-            <button type="button" className="ghost-button" onClick={() => void copyReportToClipboard('texto')} disabled={!relatorioTexto.trim()}>
-              {copiedField === 'texto' ? '✓ Copiado' : <><Copy size={16} /> Copiar Tudo</>}
-            </button>
-            <button type="button" className="ghost-button" onClick={() => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(relatorioTexto)}`, '_blank')} disabled={!relatorioTexto.trim()}>
-              <Share2 size={16} /> WhatsApp
-            </button>
             <button type="button" className="ghost-button" onClick={() => {
-              setEmailDestino('')
-              setNomeConsulente(selectedMapa.nome)
+              setShowEmailForm((prev) => !prev)
+              if (!showEmailForm) {
+                setEmailDestino('')
+                setNomeConsulente(selectedMapa.nome)
+              }
             }}>
-              <Send size={16} /> Enviar por E-mail
+              <Send size={16} /> {showEmailForm ? 'Ocultar E-mail' : 'Enviar por E-mail'}
             </button>
           </div>
         </article>
+
+        {/* Envio de e-mail (versão avançada com textareas colapsáveis) — só visível com mapa selecionado e toggle ativo */}
+          {showEmailForm && (
+            <form className="form-card" onSubmit={handleSendEmail}>
+              <div className="result-toolbar">
+                <div>
+                  <h4><Send size={16} /> Envio administrativo de e-mail</h4>
+                  <p className="field-hint">Fluxo server-side via Resend, sem expor chave no frontend.</p>
+                </div>
+              </div>
+
+              <div className="form-grid">
+                <div className="field-group">
+                  <label htmlFor="astrologo-email-destino">E-mail de destino</label>
+                  <input id="astrologo-email-destino" name="astrologoEmailDestino" type="email" autoComplete="email" placeholder="consulente@email.com" value={emailDestino} onChange={(event) => setEmailDestino(event.target.value)} disabled={sendingEmail} />
+                </div>
+                <div className="field-group">
+                  <label htmlFor="astrologo-email-nome">Nome do consulente</label>
+                  <input id="astrologo-email-nome" name="astrologoEmailNomeConsulente" type="text" autoComplete="name" placeholder="Nome para o assunto" value={nomeConsulente} onChange={(event) => setNomeConsulente(event.target.value)} disabled={sendingEmail} />
+                </div>
+              </div>
+
+              <details className="astro-email-details">
+                <summary>Editar relatório manualmente (avançado)</summary>
+                <div className="field-group">
+                  <label htmlFor="astrologo-email-html">Relatório (HTML)</label>
+                  <textarea id="astrologo-email-html" name="astrologoEmailRelatorioHtml" className="json-textarea" value={relatorioHtml} onChange={(event) => setRelatorioHtml(event.target.value)} disabled={sendingEmail} />
+                  <button type="button" className="ghost-button" onClick={() => void copyReportToClipboard('html')} disabled={sendingEmail || !relatorioHtml.trim()}>
+                    {copiedField === 'html' ? '✓ Copiado' : <><Copy size={16} /> Copiar HTML</>}
+                  </button>
+                </div>
+                <div className="field-group">
+                  <label htmlFor="astrologo-email-texto">Relatório (texto puro)</label>
+                  <textarea id="astrologo-email-texto" name="astrologoEmailRelatorioTexto" className="json-textarea" value={relatorioTexto} onChange={(event) => setRelatorioTexto(event.target.value)} disabled={sendingEmail} />
+                  <button type="button" className="ghost-button" onClick={() => void copyReportToClipboard('texto')} disabled={sendingEmail || !relatorioTexto.trim()}>
+                    {copiedField === 'texto' ? '✓ Copiado' : <><Copy size={16} /> Copiar Texto</>}
+                  </button>
+                </div>
+              </details>
+
+              <div className="form-actions">
+                <button type="submit" className="primary-button" disabled={sendingEmail}>
+                  {sendingEmail ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
+                  Enviar e-mail
+                </button>
+                <button type="button" className="ghost-button" onClick={() => restoreDefaultReport()} disabled={sendingEmail}>
+                  <RefreshCw size={16} />
+                  Restaurar padrão
+                </button>
+              </div>
+            </form>
+          )}
+        </>
       )}
-
-      {/* Envio de e-mail (versão avançada com textareas colapsáveis) */}
-      <form className="form-card" onSubmit={handleSendEmail}>
-        <div className="result-toolbar">
-          <div>
-            <h4><Send size={16} /> Envio administrativo de e-mail</h4>
-            <p className="field-hint">Fluxo server-side via Resend, sem expor chave no frontend.</p>
-          </div>
-        </div>
-
-        <div className="form-grid">
-          <div className="field-group">
-            <label htmlFor="astrologo-email-destino">E-mail de destino</label>
-            <input id="astrologo-email-destino" name="astrologoEmailDestino" type="email" autoComplete="email" placeholder="consulente@email.com" value={emailDestino} onChange={(event) => setEmailDestino(event.target.value)} disabled={sendingEmail} />
-          </div>
-          <div className="field-group">
-            <label htmlFor="astrologo-email-nome">Nome do consulente</label>
-            <input id="astrologo-email-nome" name="astrologoEmailNomeConsulente" type="text" autoComplete="name" placeholder="Nome para o assunto" value={nomeConsulente} onChange={(event) => setNomeConsulente(event.target.value)} disabled={sendingEmail} />
-          </div>
-        </div>
-
-        <details className="astro-email-details">
-          <summary>Editar relatório manualmente (avançado)</summary>
-          <div className="field-group">
-            <label htmlFor="astrologo-email-html">Relatório (HTML)</label>
-            <textarea id="astrologo-email-html" name="astrologoEmailRelatorioHtml" className="json-textarea" value={relatorioHtml} onChange={(event) => setRelatorioHtml(event.target.value)} disabled={sendingEmail} />
-            <button type="button" className="ghost-button" onClick={() => void copyReportToClipboard('html')} disabled={sendingEmail || !relatorioHtml.trim()}>
-              {copiedField === 'html' ? '✓ Copiado' : <><Copy size={16} /> Copiar HTML</>}
-            </button>
-          </div>
-          <div className="field-group">
-            <label htmlFor="astrologo-email-texto">Relatório (texto puro)</label>
-            <textarea id="astrologo-email-texto" name="astrologoEmailRelatorioTexto" className="json-textarea" value={relatorioTexto} onChange={(event) => setRelatorioTexto(event.target.value)} disabled={sendingEmail} />
-            <button type="button" className="ghost-button" onClick={() => void copyReportToClipboard('texto')} disabled={sendingEmail || !relatorioTexto.trim()}>
-              {copiedField === 'texto' ? '✓ Copiado' : <><Copy size={16} /> Copiar Texto</>}
-            </button>
-          </div>
-        </details>
-
-        <div className="form-actions">
-          <button type="submit" className="primary-button" disabled={sendingEmail}>
-            {sendingEmail ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
-            Enviar e-mail
-          </button>
-          <button type="button" className="ghost-button" onClick={() => restoreDefaultReport()} disabled={sendingEmail || !selectedMapa}>
-            <RefreshCw size={16} />
-            Restaurar padrão
-          </button>
-        </div>
-      </form>
 
     </section>
   )

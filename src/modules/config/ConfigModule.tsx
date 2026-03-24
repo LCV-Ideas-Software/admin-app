@@ -171,18 +171,6 @@ export function ConfigModule() {
         </div>
 
         <div className="form-grid">
-          <div className="field-group">
-            <label htmlFor="config-default-admin-actor">Admin actor padrão</label>
-            <input
-              id="config-default-admin-actor"
-              name="configDefaultAdminActor"
-              type="email"
-              autoComplete="email"
-              value={config.defaultAdminActor}
-              onChange={(event) => setConfig((current) => ({ ...current, defaultAdminActor: event.target.value }))}
-              disabled={saving}
-            />
-          </div>
 
           <div className="field-group">
             <label htmlFor="config-default-overview-limit">Limite padrão de overview</label>
@@ -321,31 +309,6 @@ export function ConfigModule() {
       {selectedSyncModule === 'mtasts' && (
         <SyncStatusCard module="mtasts" endpoint="/api/mtasts/sync" title="Sync manual do MTA-STS" description="Sincroniza histórico, zonas e policies no `bigdata_db`." />
       )}
-
-      <article className="result-card">
-        <header className="result-header">
-          <h4><ShieldCheck size={16} /> Referências de governança</h4>
-          <span>Diretivas vigentes</span>
-        </header>
-
-        <ul className="result-list">
-          <li>
-            <strong>Design tokens</strong>
-            <span>`src/styles/variables.css`</span>
-            <span className="badge badge-em-implantacao">ativo</span>
-          </li>
-          <li>
-            <strong>Rate limit common</strong>
-            <span>`functions/api/_lib/rate-limit-common.ts`</span>
-            <span className="badge badge-em-implantacao">ativo</span>
-          </li>
-          <li>
-            <strong>CSP e headers</strong>
-            <span>`public/_headers`</span>
-            <span className="badge badge-em-implantacao">ativo</span>
-          </li>
-        </ul>
-      </article>
     </section>
   )
 }
