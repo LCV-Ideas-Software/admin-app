@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowDown, ArrowUp, Loader2, Plus, RefreshCw, Save, Trash2, Wand2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, GripVertical, Loader2, Plus, RefreshCw, Save, Trash2, Wand2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { suggestIcon } from '../../lib/iconSuggestion'
 import { formatOperationalSourceLabel } from '../../lib/operationalSource'
@@ -87,6 +87,8 @@ export function HubCardsModule({
   const [cards, setCards] = useState<HubCard[]>([])
   const [baselineCards, setBaselineCards] = useState<HubCard[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null)
+  const [draggedPreviewIndex, setDraggedPreviewIndex] = useState<number | null>(null)
 
   const moduleToneClass = endpoint === '/api/apphub/config'
     ? 'module-shell-apphub'
@@ -332,21 +334,34 @@ export function HubCardsModule({
       return
     }
 
-    setCards((current) => ([
-      ...current,
-      {
-        name: '',
-        description: '',
-        url: '',
-        icon: '',
-        badge: '',
-      },
-    ]))
+    setCards((current) => {
+      const next = [
+        ...current,
+        {
+          name: '',
+          description: '',
+          url: '',
+          icon: '',
+          badge: '',
+        },
+      ]
+      setSelectedCardIndex(next.length - 1)
+      return next
+    })
     showNotification('Novo card adicionado ao formulário.', 'info')
   }
 
   const removeCard = (index: number) => {
-    setCards((current) => current.filter((_, cardIndex) => cardIndex !== index))
+    setCards((current) => {
+      const next = current.filter((_, cardIndex) => cardIndex !== index)
+      setSelectedCardIndex((prev) => {
+        if (prev === null) return null
+        if (prev === index) return next.length > 0 ? Math.min(index, next.length - 1) : null
+        if (prev > index) return prev - 1
+        return prev
+      })
+      return next
+    })
     showNotification('Card removido do formulário.', 'info')
   }
 
@@ -366,7 +381,43 @@ export function HubCardsModule({
 
   const restoreSnapshot = () => {
     setCards(baselineCards)
+    setSelectedCardIndex(baselineCards.length > 0 ? 0 : null)
     showNotification('Edição de cards restaurada para o último snapshot salvo.', 'info')
+  }
+
+  /* -- Drag-and-drop handlers para o Catálogo (preview) -- */
+  const handlePreviewDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedPreviewIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5'
+    }
+  }
+
+  const handlePreviewDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1'
+    }
+    setDraggedPreviewIndex(null)
+  }
+
+  const handlePreviewDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handlePreviewDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    if (draggedPreviewIndex === null || draggedPreviewIndex === dropIndex) return
+
+    setCards((current) => {
+      const next = [...current]
+      const [dragged] = next.splice(draggedPreviewIndex, 1)
+      next.splice(dropIndex, 0, dragged)
+      return next
+    })
+    setDraggedPreviewIndex(null)
+    showNotification('Ordem atualizada. Salve para persistir.', 'info')
   }
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
@@ -515,145 +566,176 @@ export function HubCardsModule({
               disabled={disabled}
             />
             <span className="cards-toolbar__meta">
-              Exibindo {filteredCardEntries.length} de {cards.length} card(s)
+              {cards.length} card(s) · {filteredCardEntries.length} visível(is)
             </span>
           </div>
 
           {cards.length === 0 ? (
-            <p className="result-empty">Sem cards no formulário. Clique em “Adicionar card”.</p>
-          ) : filteredCardEntries.length === 0 ? (
-            <p className="result-empty">Nenhum card corresponde ao filtro atual.</p>
+            <p className="result-empty">Sem cards no formulário. Clique em "Adicionar card".</p>
           ) : (
-            <div className="cards-editor-grid">
-              {filteredCardEntries.map(({ card, index }) => {
-                const errors = cardFieldErrors[index]
+            <>
+              {/* ── Seletor dropdown (padrão MTA-STS) ─────────────── */}
+              <div className="card-selector-group">
+                <div className="field-group">
+                  <label htmlFor={`${adminActorFieldId}-card-selector`}>Card ativo</label>
+                  <select
+                    id={`${adminActorFieldId}-card-selector`}
+                    name={`${adminActorFieldName}CardSelector`}
+                    value={selectedCardIndex ?? ''}
+                    onChange={(event) => {
+                      const val = event.target.value
+                      setSelectedCardIndex(val === '' ? null : Number(val))
+                    }}
+                    disabled={disabled}
+                  >
+                    <option value="">Selecione um card...</option>
+                    {filteredCardEntries.map(({ card, index }) => {
+                      const hasErrors = Object.keys(cardFieldErrors[index] ?? {}).length > 0
+                      return (
+                        <option key={`${adminActorFieldId}-opt-${index}`} value={index}>
+                          #{index + 1} — {card.name.trim() || 'Novo card'}{hasErrors ? ' ⚠️' : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+                {selectedCardIndex !== null && selectedCardIndex < cards.length && (
+                  <div className="card-selector-nav">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => setSelectedCardIndex(Math.max(0, (selectedCardIndex ?? 0) - 1))}
+                      disabled={disabled || selectedCardIndex === 0}
+                    >
+                      <ArrowUp size={14} /> Anterior
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => setSelectedCardIndex(Math.min(cards.length - 1, (selectedCardIndex ?? 0) + 1))}
+                      disabled={disabled || selectedCardIndex === cards.length - 1}
+                    >
+                      <ArrowDown size={14} /> Próximo
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Editor do card selecionado ──────────────────────── */}
+              {selectedCardIndex !== null && selectedCardIndex < cards.length && (() => {
+                const index = selectedCardIndex
+                const card = cards[index]
+                const errors = cardFieldErrors[index] ?? {}
                 const nameErrorId = `${adminActorFieldId}-name-${index}-error`
                 const urlErrorId = `${adminActorFieldId}-url-${index}-error`
                 const descriptionErrorId = `${adminActorFieldId}-description-${index}-error`
 
                 return (
-                <article key={`${adminActorFieldId}-card-${index}`} className="card-editor-item">
-                  <header className="card-editor-header">
-                    <strong>Card #{index + 1}</strong>
-                    <div className="card-editor-actions">
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => moveCard(index, 'up')}
-                        disabled={disabled || index === 0}
-                      >
-                        <ArrowUp size={14} />
-                        Subir
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => moveCard(index, 'down')}
-                        disabled={disabled || index === cards.length - 1}
-                      >
-                        <ArrowDown size={14} />
-                        Descer
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => removeCard(index)}
-                        disabled={disabled}
-                      >
-                        <Trash2 size={14} />
-                        Remover
-                      </button>
-                    </div>
-                  </header>
-
-                  <div className="form-grid">
-                    <div className="field-group">
-                      <label htmlFor={`${adminActorFieldId}-name-${index}`}>Nome</label>
-                      <input
-                        id={`${adminActorFieldId}-name-${index}`}
-                        name={`${adminActorFieldName}Name${index}`}
-                        value={card.name}
-                        onChange={(event) => handleNameChange(index, event.target.value)}
-                        disabled={disabled}
-                        className={errors.name ? 'field-input-error' : undefined}
-                        aria-describedby={errors.name ? nameErrorId : undefined}
-                      />
-                      {errors.name && <span id={nameErrorId} className="field-error">{errors.name}</span>}
-                    </div>
-                    <div className="field-group">
-                      <label htmlFor={`${adminActorFieldId}-url-${index}`}>URL</label>
-                      <input
-                        id={`${adminActorFieldId}-url-${index}`}
-                        name={`${adminActorFieldName}Url${index}`}
-                        type="url"
-                        value={card.url}
-                        onChange={(event) => updateCardField(index, 'url', event.target.value)}
-                        disabled={disabled}
-                        className={errors.url ? 'field-input-error' : undefined}
-                        aria-describedby={errors.url ? urlErrorId : undefined}
-                      />
-                      {errors.url && <span id={urlErrorId} className="field-error">{errors.url}</span>}
-                    </div>
-                  </div>
-
-                  <div className="field-group">
-                    <label htmlFor={`${adminActorFieldId}-description-${index}`}>Descrição</label>
-                    <textarea
-                      id={`${adminActorFieldId}-description-${index}`}
-                      name={`${adminActorFieldName}Description${index}`}
-                      rows={3}
-                      value={card.description}
-                      onChange={(event) => handleDescriptionChange(index, event.target.value)}
-                      disabled={disabled}
-                      className={errors.description ? 'field-input-error' : undefined}
-                      aria-describedby={errors.description ? descriptionErrorId : undefined}
-                    />
-                    {errors.description && <span id={descriptionErrorId} className="field-error">{errors.description}</span>}
-                  </div>
-
-                  <div className="form-grid">
-                    <div className="field-group">
-                      <label htmlFor={`${adminActorFieldId}-icon-${index}`}>Ícone</label>
-                      <div className="icon-field-wrapper">
-                        {card.icon && (
-                          <span className="icon-preview" aria-hidden="true">{card.icon}</span>
-                        )}
-                        <input
-                          id={`${adminActorFieldId}-icon-${index}`}
-                          name={`${adminActorFieldName}Icon${index}`}
-                          value={card.icon}
-                          onChange={(event) => updateCardField(index, 'icon', event.target.value)}
-                          disabled={disabled}
-                          placeholder="Ex.: 🌌"
-                          className="icon-input"
-                        />
-                        <button
-                          type="button"
-                          className="icon-suggest-btn"
-                          onClick={() => handleSuggestIcon(index)}
-                          disabled={disabled || !card.name.trim()}
-                          title="Sugerir ícone com base no nome e descrição do card"
-                          aria-label="Sugerir ícone automaticamente"
-                        >
-                          <Wand2 size={15} />
+                  <article className="card-editor-item">
+                    <header className="card-editor-header">
+                      <strong>Card #{index + 1}{card.name.trim() ? ` — ${card.name.trim()}` : ''}</strong>
+                      <div className="card-editor-actions">
+                        <button type="button" className="ghost-button" onClick={() => moveCard(index, 'up')} disabled={disabled || index === 0}>
+                          <ArrowUp size={14} /> Subir
+                        </button>
+                        <button type="button" className="ghost-button" onClick={() => moveCard(index, 'down')} disabled={disabled || index === cards.length - 1}>
+                          <ArrowDown size={14} /> Descer
+                        </button>
+                        <button type="button" className="ghost-button" onClick={() => removeCard(index)} disabled={disabled}>
+                          <Trash2 size={14} /> Remover
                         </button>
                       </div>
+                    </header>
+
+                    <div className="form-grid">
+                      <div className="field-group">
+                        <label htmlFor={`${adminActorFieldId}-name-${index}`}>Nome</label>
+                        <input
+                          id={`${adminActorFieldId}-name-${index}`}
+                          name={`${adminActorFieldName}Name${index}`}
+                          value={card.name}
+                          onChange={(event) => handleNameChange(index, event.target.value)}
+                          disabled={disabled}
+                          className={errors.name ? 'field-input-error' : undefined}
+                          aria-describedby={errors.name ? nameErrorId : undefined}
+                        />
+                        {errors.name && <span id={nameErrorId} className="field-error">{errors.name}</span>}
+                      </div>
+                      <div className="field-group">
+                        <label htmlFor={`${adminActorFieldId}-url-${index}`}>URL</label>
+                        <input
+                          id={`${adminActorFieldId}-url-${index}`}
+                          name={`${adminActorFieldName}Url${index}`}
+                          type="url"
+                          value={card.url}
+                          onChange={(event) => updateCardField(index, 'url', event.target.value)}
+                          disabled={disabled}
+                          className={errors.url ? 'field-input-error' : undefined}
+                          aria-describedby={errors.url ? urlErrorId : undefined}
+                        />
+                        {errors.url && <span id={urlErrorId} className="field-error">{errors.url}</span>}
+                      </div>
                     </div>
+
                     <div className="field-group">
-                      <label htmlFor={`${adminActorFieldId}-badge-${index}`}>Badge</label>
-                      <input
-                        id={`${adminActorFieldId}-badge-${index}`}
-                        name={`${adminActorFieldName}Badge${index}`}
-                        value={card.badge}
-                        onChange={(event) => updateCardField(index, 'badge', event.target.value)}
+                      <label htmlFor={`${adminActorFieldId}-description-${index}`}>Descrição</label>
+                      <textarea
+                        id={`${adminActorFieldId}-description-${index}`}
+                        name={`${adminActorFieldName}Description${index}`}
+                        rows={3}
+                        value={card.description}
+                        onChange={(event) => handleDescriptionChange(index, event.target.value)}
                         disabled={disabled}
-                        placeholder="Ex.: Abrir App"
+                        className={errors.description ? 'field-input-error' : undefined}
+                        aria-describedby={errors.description ? descriptionErrorId : undefined}
                       />
+                      {errors.description && <span id={descriptionErrorId} className="field-error">{errors.description}</span>}
                     </div>
-                  </div>
-                </article>
-              )})}
-            </div>
+
+                    <div className="form-grid">
+                      <div className="field-group">
+                        <label htmlFor={`${adminActorFieldId}-icon-${index}`}>Ícone</label>
+                        <div className="icon-field-wrapper">
+                          {card.icon && (
+                            <span className="icon-preview" aria-hidden="true">{card.icon}</span>
+                          )}
+                          <input
+                            id={`${adminActorFieldId}-icon-${index}`}
+                            name={`${adminActorFieldName}Icon${index}`}
+                            value={card.icon}
+                            onChange={(event) => updateCardField(index, 'icon', event.target.value)}
+                            disabled={disabled}
+                            placeholder="Ex.: 🌌"
+                            className="icon-input"
+                          />
+                          <button
+                            type="button"
+                            className="icon-suggest-btn"
+                            onClick={() => handleSuggestIcon(index)}
+                            disabled={disabled || !card.name.trim()}
+                            title="Sugerir ícone com base no nome e descrição do card"
+                            aria-label="Sugerir ícone automaticamente"
+                          >
+                            <Wand2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="field-group">
+                        <label htmlFor={`${adminActorFieldId}-badge-${index}`}>Badge</label>
+                        <input
+                          id={`${adminActorFieldId}-badge-${index}`}
+                          name={`${adminActorFieldName}Badge${index}`}
+                          value={card.badge}
+                          onChange={(event) => updateCardField(index, 'badge', event.target.value)}
+                          disabled={disabled}
+                          placeholder="Ex.: Abrir App"
+                        />
+                      </div>
+                    </div>
+                  </article>
+                )
+              })()}
+            </>
           )}
         </div>
 
@@ -685,11 +767,11 @@ export function HubCardsModule({
 
       <article className="result-card">
         <header className="result-header">
-          <h4><RefreshCw size={16} /> Catálogo (paridade visual)</h4>
-          <span>{payload?.cards?.length ?? 0} item(ns)</span>
+          <h4><GripVertical size={16} /> Catálogo (paridade visual — arraste para reordenar)</h4>
+          <span>{cards.length} item(ns)</span>
         </header>
 
-        {!payload || payload.cards.length === 0 ? (
+        {cards.length === 0 ? (
           <p className="result-empty">Sem cards carregados para este módulo.</p>
         ) : (
           <section className="legacy-hub-preview" aria-labelledby={previewSectionId}>
@@ -698,11 +780,23 @@ export function HubCardsModule({
               <span className={`status-dot ${previewLevel}`} />
               {previewSectionLabel}
             </h6>
-            <div className="card-grid">
-            {payload.cards.map((card, index) => (
-              <article key={`${card.name}-${index}`} className="card" data-level={previewLevel}>
+            <div className="card-grid card-grid-draggable">
+            {cards.map((card, index) => (
+              <article
+                key={`preview-${card.name}-${index}`}
+                className={`card ${draggedPreviewIndex === index ? 'card--dragging' : ''}`}
+                data-level={previewLevel}
+                draggable
+                onDragStart={(e) => handlePreviewDragStart(e, index)}
+                onDragEnd={handlePreviewDragEnd}
+                onDragOver={handlePreviewDragOver}
+                onDrop={(e) => handlePreviewDrop(e, index)}
+              >
+                <div className="card-drag-handle" title="Arrastar para reordenar">
+                  <GripVertical size={16} />
+                </div>
                 <div className="card-icon">{card.icon || '🧩'}</div>
-                <h5 className="card-title">{card.name}</h5>
+                <h5 className="card-title">{card.name || 'Sem nome'}</h5>
                 <p className="card-desc">{card.description || 'Sem descrição cadastrada.'}</p>
                 <p className="field-hint">{card.url}</p>
                 <span className="card-badge">{card.badge || 'Abrir'}</span>
