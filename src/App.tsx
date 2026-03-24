@@ -25,7 +25,7 @@ import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
 import { formatOperationalSourceLabel, isLegacyOperationalSource } from './lib/operationalSource'
 
-const APP_VERSION = 'APP v01.32.00'
+const APP_VERSION = 'APP v01.33.00'
 
 type OperationalModuleStatus = {
   module: string
@@ -188,10 +188,7 @@ function App() {
       <aside className="sidebar">
         <div className="brand-card">
           <div className="brand-icon"><Workflow size={24} /></div>
-          <div>
-            <p className="eyebrow">Cloudflare Access + Pages</p>
-            <h1>Admin LCV</h1>
-          </div>
+          <h1>Admin LCV</h1>
         </div>
 
         <nav className="nav-list" aria-label="Módulos administrativos">

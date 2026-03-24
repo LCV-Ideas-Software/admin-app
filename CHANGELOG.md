@@ -1,5 +1,18 @@
 # Changelog — Admin App
 
+## [v01.33.00] — 2026-03-24
+### Alterado
+- Módulo Astrólogo: viewer estruturado com grids de Tatwas, Numerologia, Astrologia Tropical (4 colunas), Astronômico Constelacional (4 colunas), Umbanda (3 colunas) e Síntese da IA — substitui textarea de JSON bruto.
+- Módulo Astrólogo: diálogo de confirmação estilizado (`.confirm-dialog`) substitui `globalThis.confirm()`.
+- Módulo Astrólogo: toolbar de compartilhamento com Copiar Tudo, WhatsApp e Enviar por E-mail.
+- Módulo Astrólogo: textareas de relatório HTML/texto colapsadas sob `<details>` (avançado).
+- Módulo Astrólogo: item selecionado na lista destacado com borda azul (`.post-row--selected`).
+- Brand card: texto "Cloudflare Access + Pages" removido do sidebar.
+
+### Adicionado
+- Dependências: `dompurify`, `@types/dompurify` para sanitização da IA.
+- CSS: 260+ linhas para astro viewer, confirmation dialog, list selection e sharing toolbar.
+
 ## [v01.32.00] — 2026-03-24
 ### Removido
 - Status badges (`Access protegido`, `bigdata_db reservado`) do topbar em `App.tsx`.
