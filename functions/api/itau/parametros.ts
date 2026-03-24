@@ -139,14 +139,14 @@ export async function onRequestPost(context: Context) {
       }))
 
     for (const [chave, valor] of Object.entries(values)) {
-      await env.CALC_SOURCE_DB.prepare('INSERT INTO parametros_customizados (chave, valor) VALUES (?, ?)')
+      await env.CALC_SOURCE_DB.prepare('INSERT INTO calc_parametros_customizados (chave, valor) VALUES (?, ?)')
         .bind(chave, String(valor))
         .run()
     }
 
     for (const mudanca of mudancas) {
       await env.CALC_SOURCE_DB.prepare(`
-        INSERT INTO parametros_auditoria (created_at, admin_email, chave, valor_anterior, valor_novo, origem)
+        INSERT INTO calc_parametros_auditoria (created_at, admin_email, chave, valor_anterior, valor_novo, origem)
         VALUES (?, ?, ?, ?, ?, ?)
       `)
         .bind(

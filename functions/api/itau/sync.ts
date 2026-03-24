@@ -183,7 +183,7 @@ export async function onRequestPost(context: Context) {
     const [observSource, rateLimitSource] = await Promise.all([
       env.CALC_SOURCE_DB.prepare(`
         SELECT created_at, status, from_cache, force_refresh, duration_ms, moeda, valor_original, preview, error_message
-        FROM oraculo_observabilidade
+        FROM calc_oraculo_observabilidade
         ORDER BY created_at DESC
         LIMIT ?
       `)
@@ -191,7 +191,7 @@ export async function onRequestPost(context: Context) {
         .all<CalculadoraObservabilidadeSourceRow>(),
       env.CALC_SOURCE_DB.prepare(`
         SELECT route_key, enabled, max_requests, window_minutes, updated_at, updated_by
-        FROM rate_limit_policies
+        FROM calc_rate_limit_policies
       `)
         .all<CalculadoraRateLimitSourceRow>(),
     ])

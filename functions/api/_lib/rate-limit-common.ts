@@ -148,7 +148,7 @@ export async function loadRateLimitPolicies(params: {
 
     const query = `
       SELECT route, enabled, max_requests, window_minutes
-      FROM rate_limit_policies
+      FROM adminapp_rate_limit_policies
       WHERE context = ? AND admin_actor = ?
       ORDER BY route ASC
     `
@@ -200,13 +200,13 @@ export async function saveRateLimitPolicies(params: {
 
     // Delete existing policies for this admin
     await db
-      .prepare('DELETE FROM rate_limit_policies WHERE context = ? AND admin_actor = ?')
+      .prepare('DELETE FROM adminapp_rate_limit_policies WHERE context = ? AND admin_actor = ?')
       .bind(module, adminActor)
       .run()
 
     // Insert new policies
     const insertQuery = `
-      INSERT INTO rate_limit_policies (context, admin_actor, route, enabled, max_requests, window_minutes)
+      INSERT INTO adminapp_rate_limit_policies (context, admin_actor, route, enabled, max_requests, window_minutes)
       VALUES (?, ?, ?, ?, ?, ?)
     `
 
@@ -274,7 +274,7 @@ export async function mirrorPoliciesFromSourceDb(params: {
   try {
     const query = `
       SELECT route, enabled, max_requests, window_minutes
-      FROM rate_limit_policies
+      FROM adminapp_rate_limit_policies
       WHERE admin_actor = ?
       ORDER BY route ASC
     `
