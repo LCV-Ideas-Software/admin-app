@@ -12,8 +12,6 @@ export type HubCard = {
 
 export type HubEnv = {
   BIGDATA_DB?: D1Database
-  APPHUB_PUBLIC_BASE_URL?: string
-  ADMINHUB_PUBLIC_BASE_URL?: string
 }
 
 type HubTable = 'apphub_cards' | 'adminhub_cards'
@@ -26,9 +24,6 @@ type HubConfigRow = {
   badge?: string | null
   display_order?: number
 }
-
-const APPHUB_DEFAULT_BASE_URL = 'https://apphub.lcv.app.br'
-const ADMINHUB_DEFAULT_BASE_URL = 'https://adminhub.lcv.app.br'
 
 const HUB_CARDS_LIMITS = {
   maxCards: 100,
@@ -108,8 +103,6 @@ const ADMINHUB_DEFAULT_CARDS: HubCard[] = [
   },
 ]
 
-const toSource = (module: HubModule) => module === 'apphub' ? 'legacy-worker' : 'legacy-admin'
-
 export const toHubHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -118,16 +111,6 @@ export const toHubHeaders = () => ({
 const toTable = (module: HubModule): HubTable => module === 'apphub' ? 'apphub_cards' : 'adminhub_cards'
 
 const toDefaultCards = (module: HubModule) => module === 'apphub' ? APPHUB_DEFAULT_CARDS : ADMINHUB_DEFAULT_CARDS
-
-const normalizeBaseUrl = (value: string) => value.endsWith('/') ? value.slice(0, -1) : value
-
-const resolveCardsBaseUrl = (env: HubEnv, module: HubModule) => {
-  if (module === 'apphub') {
-    return normalizeBaseUrl(env.APPHUB_PUBLIC_BASE_URL ?? APPHUB_DEFAULT_BASE_URL)
-  }
-
-  return normalizeBaseUrl(env.ADMINHUB_PUBLIC_BASE_URL ?? ADMINHUB_DEFAULT_BASE_URL)
-}
 
 const sanitizeCard = (raw: Partial<HubCard>): HubCard | null => {
   const name = String(raw.name ?? '').trim()
@@ -221,55 +204,6 @@ const mapRowToCard = (row: HubConfigRow) => sanitizeCard({
   badge: row.badge ?? '',
 })
 
-const parseLegacyCards = (raw: unknown) => {
-  const payload = raw as { cards?: Partial<HubCard>[] }
-  const cards = Array.isArray(payload?.cards) ? payload.cards : []
-
-  return cards
-    .map((item) => sanitizeCard(item))
-    .filter((item): item is HubCard => item !== null)
-}
-
-const parseJsonOrThrow = <T>(rawText: string, fallback: string, response: Response): T => {
-  const trimmed = rawText.trim()
-  if (!trimmed) {
-    throw new Error(`${fallback}: corpo vazio inesperado (HTTP ${response.status}).`)
-  }
-
-  const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')
-  if (looksLikeHtml) {
-    throw new Error(`${fallback}: resposta HTML inesperada (HTTP ${response.status}).`)
-  }
-
-  try {
-    return JSON.parse(trimmed) as T
-  } catch {
-    throw new Error(`${fallback}: resposta não-JSON (HTTP ${response.status}).`)
-  }
-}
-
-const fetchLegacyCards = async (env: HubEnv, module: HubModule) => {
-  const baseUrl = resolveCardsBaseUrl(env, module)
-  const response = await fetch(`${baseUrl}/cards.json`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(`Falha ao consultar cards do legado ${module}: HTTP ${response.status}`)
-  }
-
-  const rawText = await response.text()
-  const payload = parseJsonOrThrow<{ cards?: Partial<HubCard>[] }>(rawText, `Falha ao interpretar cards do legado ${module}`, response)
-  const cards = parseLegacyCards(payload)
-  if (cards.length === 0) {
-    throw new Error(`Legado ${module} retornou cards vazios ou inválidos.`)
-  }
-
-  return cards
-}
 
 export const ensureHubTables = async (db: D1Database) => {
   await db.prepare(`
@@ -348,6 +282,7 @@ export const saveCardsToDb = async (
 
 export const resolveHubConfig = async (env: HubEnv, module: HubModule) => {
   const db = env.BIGDATA_DB
+  const defaultCards = toDefaultCards(module)
 
   if (db) {
     const existingCards = await loadCardsFromDb(db, module)
@@ -358,27 +293,19 @@ export const resolveHubConfig = async (env: HubEnv, module: HubModule) => {
         warnings: [] as string[],
       }
     }
-  }
 
-  const warnings: string[] = []
-  let cards: HubCard[] = []
-
-  try {
-    cards = await fetchLegacyCards(env, module)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : `Falha ao consultar legado ${module}`
-    warnings.push(message)
-    cards = toDefaultCards(module)
-  }
-
-  if (db) {
-    await saveCardsToDb(db, module, cards, 'bootstrap@admin-app')
+    await saveCardsToDb(db, module, defaultCards, 'bootstrap@admin-app')
+    return {
+      source: 'bootstrap-default' as const,
+      cards: defaultCards,
+      warnings: ['BIGDATA_DB sem registros; bootstrap local aplicado sem chamadas entre domínios.'],
+    }
   }
 
   return {
-    source: toSource(module),
-    cards,
-    warnings,
+    source: 'bootstrap-default' as const,
+    cards: defaultCards,
+    warnings: ['BIGDATA_DB indisponível; retornando defaults locais sem chamadas a apps via URL pública.'],
   }
 }
 
@@ -399,7 +326,7 @@ export const logHubEvent = async (
   input: {
     module: HubModule
     action: string
-    source: 'bigdata_db' | 'legacy-admin' | 'legacy-worker'
+    source: 'bigdata_db' | 'bootstrap-default'
     ok: boolean
     fallbackUsed: boolean
     errorMessage?: string

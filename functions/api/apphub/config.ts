@@ -14,8 +14,7 @@ type Context = {
   request: Request
   env: {
     BIGDATA_DB?: D1Database
-    APPHUB_PUBLIC_BASE_URL?: string
-    ADMINHUB_PUBLIC_BASE_URL?: string
+    APPHUB_BEARER_TOKEN?: string
   }
 }
 
