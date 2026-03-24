@@ -675,20 +675,6 @@ export function ConfigModule() {
             </button>
           </div>
         </div>
-
-        {/* Filtro por palavras-chave */}
-        <div className="field-group">
-          <label htmlFor="news-keywords">Filtrar por palavras-chave (separadas por vírgula)</label>
-          <input
-            id="news-keywords"
-            name="newsKeywords"
-            type="text"
-            className="news-settings__keywords"
-            placeholder="Ex.: tecnologia, economia, política"
-            value={newsSettings.keywords}
-            onChange={e => updateNewsSettings({ keywords: e.target.value })}
-          />
-        </div>
       </article>
     </section>
   )
