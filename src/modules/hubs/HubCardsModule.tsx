@@ -29,6 +29,15 @@ type HubCardsModuleProps = {
   adminActorFieldName: string
 }
 
+const HUB_CARDS_LIMITS = {
+  maxCards: 100,
+  nameMaxLength: 120,
+  descriptionMaxLength: 600,
+  urlMaxLength: 2048,
+  iconMaxLength: 32,
+  badgeMaxLength: 80,
+} as const
+
 const parseApiPayload = async <T,>(response: Response, fallback: string): Promise<T> => {
   const rawText = await response.text()
   const trimmed = rawText.trim()
@@ -108,16 +117,22 @@ export function HubCardsModule({
 
     if (!normalizedName) {
       errors.name = 'Nome é obrigatório.'
+    } else if (normalizedName.length > HUB_CARDS_LIMITS.nameMaxLength) {
+      errors.name = `Nome deve ter no máximo ${HUB_CARDS_LIMITS.nameMaxLength} caracteres.`
     } else if ((duplicateStats.nameCounts.get(normalizedNameKey) ?? 0) > 1) {
       errors.name = 'Nome duplicado no formulário.'
     }
 
     if (!normalizedDescription) {
       errors.description = 'Descrição é obrigatória.'
+    } else if (normalizedDescription.length > HUB_CARDS_LIMITS.descriptionMaxLength) {
+      errors.description = `Descrição deve ter no máximo ${HUB_CARDS_LIMITS.descriptionMaxLength} caracteres.`
     }
 
     if (!normalizedUrl) {
       errors.url = 'URL é obrigatória.'
+    } else if (normalizedUrl.length > HUB_CARDS_LIMITS.urlMaxLength) {
+      errors.url = `URL deve ter no máximo ${HUB_CARDS_LIMITS.urlMaxLength} caracteres.`
     } else {
       try {
         const parsed = new URL(normalizedUrl)
@@ -232,6 +247,11 @@ export function HubCardsModule({
   }
 
   const addCard = () => {
+    if (cards.length >= HUB_CARDS_LIMITS.maxCards) {
+      showNotification(`Limite atingido: máximo de ${HUB_CARDS_LIMITS.maxCards} cards por módulo.`, 'error')
+      return
+    }
+
     setCards((current) => ([
       ...current,
       {
@@ -277,6 +297,11 @@ export function HubCardsModule({
 
     if (normalizedCards.length === 0) {
       showNotification('Adicione pelo menos um card antes de salvar.', 'error')
+      return
+    }
+
+    if (normalizedCards.length > HUB_CARDS_LIMITS.maxCards) {
+      showNotification(`Limite excedido: máximo de ${HUB_CARDS_LIMITS.maxCards} cards por módulo.`, 'error')
       return
     }
 

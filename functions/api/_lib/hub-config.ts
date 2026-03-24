@@ -30,6 +30,15 @@ type HubConfigRow = {
 const APPHUB_DEFAULT_BASE_URL = 'https://apphub.lcv.app.br'
 const ADMINHUB_DEFAULT_BASE_URL = 'https://adminhub.lcv.app.br'
 
+const HUB_CARDS_LIMITS = {
+  maxCards: 100,
+  nameMaxLength: 120,
+  descriptionMaxLength: 600,
+  urlMaxLength: 2048,
+  iconMaxLength: 32,
+  badgeMaxLength: 80,
+} as const
+
 const APPHUB_DEFAULT_CARDS: HubCard[] = [
   {
     name: 'Divagações Filosóficas',
@@ -137,6 +146,70 @@ const sanitizeCard = (raw: Partial<HubCard>): HubCard | null => {
     url,
     icon,
     badge,
+  }
+}
+
+const isValidHttpUrl = (value: string) => {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const validateCards = (cards: HubCard[]) => {
+  if (cards.length === 0) {
+    throw new Error('Informe ao menos um card válido (name, description e url são obrigatórios).')
+  }
+
+  if (cards.length > HUB_CARDS_LIMITS.maxCards) {
+    throw new Error(`Limite excedido: máximo de ${HUB_CARDS_LIMITS.maxCards} cards por módulo.`)
+  }
+
+  const seenNames = new Set<string>()
+  const seenUrls = new Set<string>()
+
+  for (const [index, card] of cards.entries()) {
+    const position = index + 1
+
+    if (card.name.length > HUB_CARDS_LIMITS.nameMaxLength) {
+      throw new Error(`Card #${position}: nome excede ${HUB_CARDS_LIMITS.nameMaxLength} caracteres.`)
+    }
+
+    if (card.description.length > HUB_CARDS_LIMITS.descriptionMaxLength) {
+      throw new Error(`Card #${position}: descrição excede ${HUB_CARDS_LIMITS.descriptionMaxLength} caracteres.`)
+    }
+
+    if (card.url.length > HUB_CARDS_LIMITS.urlMaxLength) {
+      throw new Error(`Card #${position}: URL excede ${HUB_CARDS_LIMITS.urlMaxLength} caracteres.`)
+    }
+
+    if (card.icon.length > HUB_CARDS_LIMITS.iconMaxLength) {
+      throw new Error(`Card #${position}: ícone excede ${HUB_CARDS_LIMITS.iconMaxLength} caracteres.`)
+    }
+
+    if (card.badge.length > HUB_CARDS_LIMITS.badgeMaxLength) {
+      throw new Error(`Card #${position}: badge excede ${HUB_CARDS_LIMITS.badgeMaxLength} caracteres.`)
+    }
+
+    if (!isValidHttpUrl(card.url)) {
+      throw new Error(`Card #${position}: URL inválida. Use http:// ou https://.`)
+    }
+
+    const normalizedName = card.name.trim().toLowerCase()
+    const normalizedUrl = card.url.trim().toLowerCase()
+
+    if (seenNames.has(normalizedName)) {
+      throw new Error(`Card #${position}: nome duplicado no payload.`)
+    }
+
+    if (seenUrls.has(normalizedUrl)) {
+      throw new Error(`Card #${position}: URL duplicada no payload.`)
+    }
+
+    seenNames.add(normalizedName)
+    seenUrls.add(normalizedUrl)
   }
 }
 
@@ -316,9 +389,7 @@ export const parseCardsFromBody = (body: unknown) => {
     .map((item) => sanitizeCard(item))
     .filter((item): item is HubCard => item !== null)
 
-  if (cards.length === 0) {
-    throw new Error('Informe ao menos um card válido (name, description e url são obrigatórios).')
-  }
+  validateCards(cards)
 
   return cards
 }

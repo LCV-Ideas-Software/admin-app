@@ -20,6 +20,8 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - UX dos hubs evoluída: AppHub/AdminHub já suportam CRUD visual de cards (adicionar, editar campos, remover e reordenar) com persistência no `bigdata_db`.
 - Edição avançada dos hubs: busca/filtro de cards por texto livre, validação inline por campo (nome/descrição/URL), detecção de duplicidade (`nome` e `URL`) e banner de qualidade para prontidão de publicação.
 - Acessibilidade no editor de cards: mensagens de erro inline com associação semântica via `aria-describedby` para leitura assistiva consistente.
+- Hardening backend dos hubs: endpoints `PUT /api/apphub/config` e `PUT /api/adminhub/config` validam server-side URL (`http/https`) e bloqueiam duplicidade de `nome`/`url`, impedindo persistência inválida por bypass de frontend.
+- Limites operacionais dos hubs: máximo de 100 cards por módulo; validação de tamanho server-side para campos (`name`, `description`, `url`, `icon`, `badge`) com rejeição explícita de payload fora do contrato.
 - Convenção global de auditoria: ações administrativas críticas dos módulos (`astrologo`, `itau`, `mainsite` e `mtasts`) aceitam `X-Admin-Actor` e registram o operador na telemetria operacional (`adminapp_module_events`).
 - Convenção de rastreabilidade de resposta: endpoints administrativos, de leitura híbrida e de visão operacional retornam `request_id` e `timestamp` para correlação de logs/incidentes em suporte operacional.
 - Health check ativo em `/api/health`.
