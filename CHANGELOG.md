@@ -1,5 +1,19 @@
 # Changelog — Admin App
 
+## [v01.40.00] — 2026-03-24
+### Adicionado (WCAG 2.1 AA + eMAG)
+- **CSS — focus-visible**: indicadores de foco visíveis para navegação por teclado em todos os elementos interativos.
+- **CSS — sr-only**: classe utilitária para conteúdo acessível apenas a leitores de tela.
+- **CSS — skip-link**: link "Ir para conteúdo principal" para pular navegação lateral.
+- **CSS — prefers-reduced-motion**: desabilita animações para usuários com sensibilidade a movimento.
+- **CSS — forced-colors**: suporte a modo de alto contraste (Windows).
+- **App.tsx — landmarks**: `aria-current="page"` no nav ativo, `aria-label` no botão pin, `role="main"` + `id` no `<main>`.
+- **Modais — dialog ARIA**: `role="dialog"` + `aria-modal="true"` + `aria-label` em todos os 5 modais (MainSite, Astrólogo, Telemetria, Financeiro).
+
+### Melhorado
+- **Contraste — eyebrow**: cor ajustada de `#94a3b8` para `#64748b` na área de conteúdo (ratio ≥4.5:1).
+- **MainSite — scroll disclaimers**: lista de disclaimers encapsulada com barra de rolagem.
+
 ## [v01.39.00] — 2026-03-24
 ### Removido
 - **Calculadora — telemetria**: card "Telemetria e últimas observações do backtest" removido (centralizado no módulo Telemetria).

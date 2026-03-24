@@ -681,7 +681,7 @@ export function FinanceiroModule() {
 
       {/* ── Modal de confirmação ── */}
       {modal && (
-        <div className="fin-modal-overlay" onClick={() => { if (!actionBusy) setModal(null) }}>
+        <div className="fin-modal-overlay" role="dialog" aria-modal="true" aria-label="Confirmar operação financeira" onClick={() => { if (!actionBusy) setModal(null) }}>
           <div className="fin-modal-content" onClick={e => e.stopPropagation()}>
             <AlertCircle size={40} color={modal.type === 'delete' ? 'var(--semantic-error)' : modal.type === 'cancel' ? 'var(--semantic-warning, #f59e0b)' : '#8b5cf6'} />
             <h3 className="fin-modal-title">

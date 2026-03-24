@@ -710,7 +710,7 @@ export function MainsiteModule() {
 
       {/* ── Diálogo de confirmação ────────────────────── */}
       {confirmDelete.show && (
-        <div className="confirm-overlay">
+        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
           <div className="confirm-dialog">
             <div className="confirm-dialog__icon">
               <AlertTriangle size={28} />
@@ -812,7 +812,7 @@ export function MainsiteModule() {
             <div className="tiptap-toolbar">
               {/* Universal prompt modal (link / image URL / youtube / caption) */}
               {promptModal.show && (
-                <div className="confirm-overlay">
+                <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Entrada de dados">
                   <div className="confirm-dialog">
                     <h4>{promptModal.title}</h4>
                     <div className="field-group">
@@ -1021,7 +1021,7 @@ export function MainsiteModule() {
           </label>
 
           {disclaimers.enabled && (
-            <div className="disclaimers-list">
+            <div className="disclaimers-list astro-akashico-scroll">
               {disclaimers.items.map((item, idx) => (
                 <div key={item.id} className="disclaimer-card">
                   <div className="disclaimer-card__header">

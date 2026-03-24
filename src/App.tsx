@@ -28,7 +28,7 @@ const CardHubModule = lazy(() => import('./modules/hubs/CardHubModule').then(m =
 const TelemetriaModule = lazy(() => import('./modules/telemetria/TelemetriaModule').then(m => ({ default: m.TelemetriaModule })))
 const FinanceiroModule = lazy(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
 
-const APP_VERSION = 'APP v01.39.00'
+const APP_VERSION = 'APP v01.40.00'
 
 
 
@@ -63,6 +63,7 @@ function App() {
 
   return (
     <div className={`app-shell${sidebarPinned ? '' : ' sidebar-collapsed'}`}>
+      <a href="#main-content" className="skip-link">Ir para conteúdo principal</a>
       <aside
         className={`sidebar${sidebarPinned ? '' : ' collapsed'}`}
         onMouseEnter={() => { if (!sidebarPinned) document.querySelector('.sidebar')?.classList.add('hovered') }}
@@ -74,6 +75,7 @@ function App() {
           <button
             type="button"
             className="pin-toggle"
+            aria-label={sidebarPinned ? 'Recolher menu lateral' : 'Fixar menu lateral'}
             title={sidebarPinned ? 'Recolher menu' : 'Fixar menu'}
             onClick={() => {
               setSidebarPinned(!sidebarPinned)
@@ -91,6 +93,7 @@ function App() {
               type="button"
               className={`nav-item ${activeModule === id ? 'nav-item-active' : ''}`}
               onClick={() => handleModuleClick(id)}
+              aria-current={activeModule === id ? 'page' : undefined}
               title={label}
             >
               <Icon size={18} />
@@ -101,7 +104,7 @@ function App() {
 
       </aside>
 
-      <main className="content">
+      <main id="main-content" className="content" role="main" aria-label="Conteúdo do módulo ativo">
         <header className="topbar">
           <div>
             <p className="eyebrow">Painel administrativo unificado</p>

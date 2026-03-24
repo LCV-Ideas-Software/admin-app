@@ -1,3 +1,107 @@
+/* ═══════════════════════════════════════════════════════════════
+   WCAG 2.1 AA + eMAG — Accessibility Baseline
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Skip-link (WCAG 2.4.1) ──
+   Allows keyboard users to jump directly to main content. */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 9999;
+  padding: 12px 24px;
+  background: #1e40af;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 0 0 12px 12px;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ── Screen-reader only utility (WCAG 1.3.1) ── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Focus-visible indicators (WCAG 2.4.7) ──
+   Visible outlines only for keyboard navigation, not mouse clicks. */
+:focus-visible {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Sidebar nav buttons keep rounded corners */
+.nav-item:focus-visible {
+  outline-offset: -2px;
+  border-radius: 16px;
+}
+
+/* Primary/ghost buttons match their border-radius */
+.primary-button:focus-visible,
+.ghost-button:focus-visible {
+  outline-offset: 0;
+  border-radius: 16px;
+}
+
+/* High-contrast ring for inputs */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #3b82f6;
+  outline-offset: 0;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+/* Color inputs (pickers) */
+input[type="color"]:focus-visible {
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Reduced motion (WCAG 2.3.3) ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .spin {
+    animation: none !important;
+  }
+}
+
+/* ── Forced high contrast (Windows Accessibility) ── */
+@media (forced-colors: active) {
+  .primary-button,
+  .ghost-button,
+  .nav-item-active {
+    border: 2px solid ButtonText;
+  }
+
+  .status-pill,
+  .badge {
+    border: 1px solid ButtonText;
+  }
+}
+
 /* Suspense fallback for lazy-loaded modules */
 .module-loading {
   display: flex;
@@ -124,6 +228,9 @@
   text-transform: uppercase;
   color: #94a3b8;
 }
+
+/* WCAG AA contrast fix — eyebrow on light content background needs ≥4.5:1 */
+.content .eyebrow { color: #64748b; }
 
 .nav-list {
   display: flex;

@@ -423,7 +423,7 @@ export function TelemetriaModule() {
 
       {/* ── Confirmation dialog ── */}
       {confirmDelete.show && (
-        <div className="confirm-overlay">
+        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
           <div className="confirm-dialog">
             <div className="confirm-dialog__icon"><AlertTriangle size={28} /></div>
             <h4>Excluir registro</h4>

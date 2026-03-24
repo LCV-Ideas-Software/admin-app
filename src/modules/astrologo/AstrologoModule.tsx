@@ -312,7 +312,7 @@ export function AstrologoModule() {
 
       {/* Dialog de confirmação de exclusão */}
       {confirmDelete?.show && (
-        <div className="confirm-overlay">
+        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
           <article className="confirm-dialog">
             <div className="confirm-dialog__icon"><Trash2 size={28} /></div>
             <h4>Atenção Crítica</h4>
