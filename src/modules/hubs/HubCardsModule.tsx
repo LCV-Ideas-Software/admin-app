@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowDown, ArrowUp, Loader2, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Loader2, Plus, RefreshCw, Save, Trash2, Wand2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+import { suggestIcon } from '../../lib/iconSuggestion'
 
 type HubCard = {
   name: string
@@ -282,6 +283,48 @@ export function HubCardsModule({
     )))
   }
 
+  /**
+   * Atualiza o nome do card e, se o ícone estiver vazio, auto-sugere semanticamente.
+   */
+  const handleNameChange = (index: number, value: string) => {
+    setCards((current) => current.map((card, cardIndex) => {
+      if (cardIndex !== index) return card
+      const updated = { ...card, name: value }
+      if (!card.icon.trim()) {
+        const suggested = suggestIcon(value, card.description)
+        if (suggested) updated.icon = suggested
+      }
+      return updated
+    }))
+  }
+
+  /**
+   * Atualiza a descrição do card e, se o ícone estiver vazio, auto-sugere semanticamente.
+   */
+  const handleDescriptionChange = (index: number, value: string) => {
+    setCards((current) => current.map((card, cardIndex) => {
+      if (cardIndex !== index) return card
+      const updated = { ...card, description: value }
+      if (!card.icon.trim()) {
+        const suggested = suggestIcon(card.name, value)
+        if (suggested) updated.icon = suggested
+      }
+      return updated
+    }))
+  }
+
+  /**
+   * Força a re-sugestão de ícone com base no nome + descrição atuais do card.
+   * Sobrescreve qualquer ícone existente.
+   */
+  const handleSuggestIcon = (index: number) => {
+    setCards((current) => current.map((card, cardIndex) => {
+      if (cardIndex !== index) return card
+      const suggested = suggestIcon(card.name, card.description)
+      return suggested ? { ...card, icon: suggested } : card
+    }))
+  }
+
   const addCard = () => {
     if (cards.length >= HUB_CARDS_LIMITS.maxCards) {
       showNotification(`Limite atingido: máximo de ${HUB_CARDS_LIMITS.maxCards} cards por módulo.`, 'error')
@@ -529,7 +572,7 @@ export function HubCardsModule({
                         id={`${adminActorFieldId}-name-${index}`}
                         name={`${adminActorFieldName}Name${index}`}
                         value={card.name}
-                        onChange={(event) => updateCardField(index, 'name', event.target.value)}
+                        onChange={(event) => handleNameChange(index, event.target.value)}
                         disabled={disabled}
                         className={errors.name ? 'field-input-error' : undefined}
                         aria-describedby={errors.name ? nameErrorId : undefined}
@@ -559,7 +602,7 @@ export function HubCardsModule({
                       name={`${adminActorFieldName}Description${index}`}
                       rows={3}
                       value={card.description}
-                      onChange={(event) => updateCardField(index, 'description', event.target.value)}
+                      onChange={(event) => handleDescriptionChange(index, event.target.value)}
                       disabled={disabled}
                       className={errors.description ? 'field-input-error' : undefined}
                       aria-describedby={errors.description ? descriptionErrorId : undefined}
@@ -570,14 +613,30 @@ export function HubCardsModule({
                   <div className="form-grid">
                     <div className="field-group">
                       <label htmlFor={`${adminActorFieldId}-icon-${index}`}>Ícone</label>
-                      <input
-                        id={`${adminActorFieldId}-icon-${index}`}
-                        name={`${adminActorFieldName}Icon${index}`}
-                        value={card.icon}
-                        onChange={(event) => updateCardField(index, 'icon', event.target.value)}
-                        disabled={disabled}
-                        placeholder="Ex.: 🌌"
-                      />
+                      <div className="icon-field-wrapper">
+                        {card.icon && (
+                          <span className="icon-preview" aria-hidden="true">{card.icon}</span>
+                        )}
+                        <input
+                          id={`${adminActorFieldId}-icon-${index}`}
+                          name={`${adminActorFieldName}Icon${index}`}
+                          value={card.icon}
+                          onChange={(event) => updateCardField(index, 'icon', event.target.value)}
+                          disabled={disabled}
+                          placeholder="Ex.: 🌌"
+                          className="icon-input"
+                        />
+                        <button
+                          type="button"
+                          className="icon-suggest-btn"
+                          onClick={() => handleSuggestIcon(index)}
+                          disabled={disabled || !card.name.trim()}
+                          title="Sugerir ícone com base no nome e descrição do card"
+                          aria-label="Sugerir ícone automaticamente"
+                        >
+                          <Wand2 size={15} />
+                        </button>
+                      </div>
                     </div>
                     <div className="field-group">
                       <label htmlFor={`${adminActorFieldId}-badge-${index}`}>Badge</label>
