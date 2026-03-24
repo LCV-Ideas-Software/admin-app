@@ -1,5 +1,5 @@
 import { logModuleOperationalEvent } from '../_lib/operational'
-import { fetchLegacyAdminJson, fetchLegacyJson, toHeaders, type Context } from '../_lib/mainsite-admin'
+import { toHeaders, type Context } from '../_lib/mainsite-admin'
 import { resolveAdminActorFromRequest } from '../_lib/admin-actor'
 import { createResponseTrace } from '../_lib/request-trace'
 
@@ -14,6 +14,10 @@ type LegacyRateLimitBucket = {
 type LegacyRateLimitConfig = {
   chatbot?: LegacyRateLimitBucket
   email?: LegacyRateLimitBucket
+}
+
+type MainsiteSettingsRow = {
+  payload?: string
 }
 
 type ModuleRateLimitPolicy = {
@@ -116,56 +120,60 @@ const toClientPolicies = (config: ReturnType<typeof normalizeConfig>): ModuleRat
   }
 })
 
-const getWorkerSecret = (context: Context) => {
-  const secret = context.env.MAINSITE_WORKER_API_SECRET?.trim()
-  if (!secret) {
-    throw new Error('MAINSITE_WORKER_API_SECRET não configurado no runtime do admin-app.')
-  }
-  return secret
-}
-
 const loadLegacyRateLimit = async (context: Context) => {
-  const secret = getWorkerSecret(context)
+  const db = context.env.BIGDATA_DB
+  if (!db) {
+    return normalizeConfig(null)
+  }
 
-  const payload = await fetchLegacyJson<LegacyRateLimitConfig>(
-    context.env,
-    '/api/settings/ratelimit',
-    'Falha ao carregar rate limit do MainSite legado',
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${secret}`,
-      },
-    },
-  )
+  const row = await db
+    .prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1')
+    .bind('mainsite/ratelimit')
+    .first<MainsiteSettingsRow>()
 
-  return normalizeConfig(payload)
+  if (!row?.payload) {
+    return normalizeConfig(null)
+  }
+
+  try {
+    const payload = JSON.parse(row.payload) as LegacyRateLimitConfig
+    return normalizeConfig(payload)
+  } catch {
+    return normalizeConfig(null)
+  }
 }
 
 const saveLegacyRateLimit = async (
   context: Context,
   config: ReturnType<typeof normalizeConfig>,
-  adminActor: string,
 ) => {
-  await fetchLegacyAdminJson<{ success?: boolean }>(
-    context.env,
-    '/api/settings/ratelimit',
-    'PUT',
-    'Falha ao salvar rate limit no MainSite legado',
-    {
-      chatbot: {
-        enabled: config.chatbot.enabled,
-        maxRequests: config.chatbot.maxRequests,
-        windowMinutes: config.chatbot.windowMinutes,
-      },
-      email: {
-        enabled: config.email.enabled,
-        maxRequests: config.email.maxRequests,
-        windowMinutes: config.email.windowMinutes,
-      },
+  const db = context.env.BIGDATA_DB
+  if (!db) {
+    throw new Error('BIGDATA_DB não configurado no runtime do admin-app.')
+  }
+
+  const payload = JSON.stringify({
+    chatbot: {
+      enabled: config.chatbot.enabled,
+      maxRequests: config.chatbot.maxRequests,
+      windowMinutes: config.chatbot.windowMinutes,
     },
-    adminActor,
-  )
+    email: {
+      enabled: config.email.enabled,
+      maxRequests: config.email.maxRequests,
+      windowMinutes: config.email.windowMinutes,
+    },
+  })
+
+  await db.prepare(`
+    INSERT INTO mainsite_settings (id, payload, updated_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      payload = excluded.payload,
+      updated_at = CURRENT_TIMESTAMP
+  `)
+    .bind('mainsite/ratelimit', payload)
+    .run()
 }
 
 const normalizeRoute = (value: unknown): PolicyRoute | null => {
@@ -187,7 +195,7 @@ export async function onRequestGet(context: Context) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'mainsite',
-          source: 'legacy-admin',
+          source: 'bigdata_db',
           fallbackUsed: false,
           ok: true,
           metadata: {
@@ -209,7 +217,7 @@ export async function onRequestGet(context: Context) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'mainsite',
-          source: 'legacy-admin',
+          source: 'bigdata_db',
           fallbackUsed: false,
           ok: false,
           errorMessage: message,
@@ -268,14 +276,14 @@ export async function onRequestPost(context: Context) {
       }
     }
 
-    await saveLegacyRateLimit(context, nextConfig, adminActor)
+    await saveLegacyRateLimit(context, nextConfig)
     const policies = toClientPolicies(await loadLegacyRateLimit(context))
 
     if (context.env.BIGDATA_DB) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'mainsite',
-          source: 'legacy-admin',
+          source: 'bigdata_db',
           fallbackUsed: false,
           ok: true,
           metadata: {
@@ -297,7 +305,7 @@ export async function onRequestPost(context: Context) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'mainsite',
-          source: 'legacy-admin',
+          source: 'bigdata_db',
           fallbackUsed: false,
           ok: false,
           errorMessage: message,
