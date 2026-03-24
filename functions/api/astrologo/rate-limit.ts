@@ -33,6 +33,41 @@ const toPositiveInt = (value: unknown, fallback: number) => {
 
 const toBigdataRoute = (route: string) => route.startsWith('astrologo/') ? route : `astrologo/${route}`
 
+const buildFallbackPolicies = () => ([
+  {
+    route: 'calcular',
+    label: 'Cálculo de Mapa',
+    enabled: true,
+    max_requests: 10,
+    window_minutes: 10,
+    updated_at: null,
+    defaults: { enabled: true, max_requests: 10, window_minutes: 10 },
+    stats: { total_requests_window: 0, distinct_keys_window: 0 },
+  },
+  {
+    route: 'analisar',
+    label: 'Análise IA',
+    enabled: true,
+    max_requests: 6,
+    window_minutes: 15,
+    updated_at: null,
+    defaults: { enabled: true, max_requests: 6, window_minutes: 15 },
+    stats: { total_requests_window: 0, distinct_keys_window: 0 },
+  },
+  {
+    route: 'enviar-email',
+    label: 'Envio de E-mail',
+    enabled: true,
+    max_requests: 4,
+    window_minutes: 60,
+    updated_at: null,
+    defaults: { enabled: true, max_requests: 4, window_minutes: 60 },
+    stats: { total_requests_window: 0, distinct_keys_window: 0 },
+  },
+])
+
+const resolveRateLimitDb = (context: Context) => context.env.ASTROLOGO_SOURCE_DB ?? context.env.BIGDATA_DB
+
 const mirrorPoliciesToBigdata = async (context: Context) => {
   if (!context.env.BIGDATA_DB || !context.env.ASTROLOGO_SOURCE_DB) {
     return
@@ -71,14 +106,15 @@ const mirrorPoliciesToBigdata = async (context: Context) => {
 
 export async function onRequestGet(context: Context) {
   const trace = createResponseTrace(context.request)
+  const db = resolveRateLimitDb(context)
 
-  if (!context.env.ASTROLOGO_SOURCE_DB) {
-    return json({ ok: false, error: 'ASTROLOGO_SOURCE_DB não configurado no runtime.', ...trace }, 503)
+  if (!db) {
+    return json({ ok: false, error: 'Nenhum binding D1 disponível (ASTROLOGO_SOURCE_DB/BIGDATA_DB).', ...trace }, 503)
   }
 
   try {
     const adminActor = resolveAdminActorFromRequest(context.request)
-    const policies = await listPoliciesWithStats(context.env.ASTROLOGO_SOURCE_DB)
+    const policies = await listPoliciesWithStats(db)
 
     if (context.env.BIGDATA_DB) {
       try {
@@ -101,6 +137,7 @@ export async function onRequestGet(context: Context) {
     return json({ ok: true, policies, admin_actor: adminActor, ...trace })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao carregar painel de rate limit do Astrólogo'
+    const fallbackPolicies = buildFallbackPolicies()
 
     if (context.env.BIGDATA_DB) {
       try {
@@ -117,15 +154,21 @@ export async function onRequestGet(context: Context) {
       }
     }
 
-    return json({ ok: false, error: message, ...trace }, 500)
+    return json({
+      ok: true,
+      warnings: [message, 'Fallback de políticas padrão aplicado para evitar indisponibilidade do painel.'],
+      policies: fallbackPolicies,
+      ...trace,
+    }, 200)
   }
 }
 
 export async function onRequestPost(context: Context) {
   const trace = createResponseTrace(context.request)
+  const db = resolveRateLimitDb(context)
 
-  if (!context.env.ASTROLOGO_SOURCE_DB) {
-    return json({ ok: false, error: 'ASTROLOGO_SOURCE_DB não configurado no runtime.', ...trace }, 503)
+  if (!db) {
+    return json({ ok: false, error: 'Nenhum binding D1 disponível (ASTROLOGO_SOURCE_DB/BIGDATA_DB).', ...trace }, 503)
   }
 
   try {
@@ -140,9 +183,9 @@ export async function onRequestPost(context: Context) {
     const action = String(body.action ?? 'update').trim()
 
     if (action === 'restore_default') {
-      await resetRateLimitPolicy(context.env.ASTROLOGO_SOURCE_DB, route)
+      await resetRateLimitPolicy(db, route)
       await mirrorPoliciesToBigdata(context)
-      const policies = await listPoliciesWithStats(context.env.ASTROLOGO_SOURCE_DB)
+      const policies = await listPoliciesWithStats(db)
 
       if (context.env.BIGDATA_DB) {
         try {
@@ -173,7 +216,7 @@ export async function onRequestPost(context: Context) {
       return json({ ok: false, error: 'Parâmetros fora da faixa permitida.', ...trace }, 400)
     }
 
-    await upsertRateLimitPolicy(context.env.ASTROLOGO_SOURCE_DB, {
+    await upsertRateLimitPolicy(db, {
       route,
       enabled,
       maxRequests,
@@ -181,7 +224,7 @@ export async function onRequestPost(context: Context) {
     })
 
     await mirrorPoliciesToBigdata(context)
-    const policies = await listPoliciesWithStats(context.env.ASTROLOGO_SOURCE_DB)
+    const policies = await listPoliciesWithStats(db)
 
     if (context.env.BIGDATA_DB) {
       try {
