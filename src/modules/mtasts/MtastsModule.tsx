@@ -359,7 +359,7 @@ export function MtastsModule() {
   }
 
   return (
-    <section className="detail-panel">
+    <section className="detail-panel module-shell module-shell-mtasts">
       <div className="detail-header">
         <div className="detail-icon"><ShieldCheck size={22} /></div>
         <div>

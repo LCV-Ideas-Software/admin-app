@@ -12,7 +12,9 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Sync manual disponível para Calculadora em `POST /api/calculadora/sync` (observabilidade + rate limit policies).
 - Ações administrativas do Calculadora já disponíveis no shell: `GET|POST /api/calculadora/parametros` e `GET|POST /api/calculadora/rate-limit` (com persistência no `CALC_SOURCE_DB` e espelhamento de policies no `bigdata_db`).
 - Sync manual disponível para MainSite em `POST /api/mainsite/sync` (posts + settings públicos).
-- Ações administrativas do MainSite já disponíveis no shell: `GET|POST|PUT|DELETE /api/mainsite/posts`, `POST /api/mainsite/posts-pin` e `GET|PUT /api/mainsite/settings`.
+- Ações administrativas do MainSite já disponíveis no shell: `GET|POST|PUT|DELETE /api/mainsite/posts`, `POST /api/mainsite/posts-pin`, `GET|PUT /api/mainsite/settings` e `GET|POST /api/mainsite/rate-limit` (proxy autenticado para `/api/settings/ratelimit` do worker legado via `MAINSITE_WORKER_API_SECRET`).
+- Paridade visual em avanço: módulos do `admin-app` agora usam superfície `module-shell` com acentuação por domínio (`astrologo`, `calculadora`, `mainsite`, `mtasts`, `apphub`, `adminhub`, `config`) para aproximar linguagem visual dos admins legados.
+- MainSite com paridade funcional ampliada no rate limit: detecção de alterações não salvas, restauração local de padrões (por rota e em lote) e botão de salvar painel completo.
 - Sync manual disponível para MTA-STS em `POST /api/mtasts/sync` (history + policies auditáveis por zonas).
 - Orquestração operacional do MTA-STS já disponível no shell: `GET /api/mtasts/zones`, `GET /api/mtasts/policy` e `POST /api/mtasts/orchestrate` com integração direta à API Cloudflare (sem dependência de admin legado protegido por Access).
 - Diretriz de continuidade: `adminhub` e `apphub` também serão incorporados ao `admin-app` como módulos, com configurações persistidas em D1 (`bigdata_db`) durante a consolidação.
@@ -32,6 +34,7 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Segredos reais: **somente server-side** (Cloudflare Secrets).
 - Diretriz global de integração: como toda a operação roda em Cloudflare, priorizar APIs nativas da plataforma (D1, DNS/Zone API, Workers/Pages bindings) antes de depender de endpoints administrativos legados protegidos por Access.
 - Para habilitar CRUD e save de settings públicos do MainSite, configurar o secret `MAINSITE_WORKER_API_SECRET` no runtime do `admin-app`.
+- CSP hardening em produção: o build foi ajustado para não injetar polyfill inline de `modulepreload` (Vite), reduzindo violações de `script-src` em ambientes com política estrita.
 - Para operações DNS/auditoria do MTA-STS, configurar no runtime um dos tokens: `CLOUDFLARE_API_TOKEN` (preferencial) ou `CLOUDFLARE_DNS`.
 - Variáveis client-side públicas: prefixo `VITE_`.
 - Migração D1 futura para `bigdata_db`:

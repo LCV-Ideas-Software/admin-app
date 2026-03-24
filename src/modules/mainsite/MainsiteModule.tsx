@@ -55,6 +55,15 @@ const initialPayload: OverviewPayload = {
   ultimosPosts: [],
 }
 
+const normalizePoliciesForCompare = (items: RateLimitPolicy[]) => [...items]
+  .sort((a, b) => a.route.localeCompare(b.route))
+  .map((policy) => ({
+    route: policy.route,
+    enabled: Boolean(policy.enabled),
+    max_requests: Number(policy.max_requests),
+    window_minutes: Number(policy.window_minutes),
+  }))
+
 export function MainsiteModule() {
   const { showNotification } = useNotification()
   const withTrace = (message: string, payload?: { request_id?: string }) => (
@@ -79,6 +88,11 @@ export function MainsiteModule() {
   const [rotationJson, setRotationJson] = useState('')
   const [disclaimersJson, setDisclaimersJson] = useState('')
   const [ratePolicies, setRatePolicies] = useState<RateLimitPolicy[]>([])
+  const [baselineRatePolicies, setBaselineRatePolicies] = useState<RateLimitPolicy[]>([])
+
+  const hasUnsavedRatePolicies = useMemo(() => (
+    JSON.stringify(normalizePoliciesForCompare(ratePolicies)) !== JSON.stringify(normalizePoliciesForCompare(baselineRatePolicies))
+  ), [baselineRatePolicies, ratePolicies])
 
   const disabled = useMemo(() => overviewLoading, [overviewLoading])
 
@@ -96,7 +110,9 @@ export function MainsiteModule() {
         throw new Error(payload.error ?? 'Falha ao carregar rate limit do MainSite.')
       }
 
-      setRatePolicies(Array.isArray(payload.policies) ? payload.policies : [])
+      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
+      setRatePolicies(nextPolicies)
+      setBaselineRatePolicies(nextPolicies)
       if (shouldNotify) {
         showNotification('Rate limit do MainSite recarregado.', 'success')
       }
@@ -106,6 +122,20 @@ export function MainsiteModule() {
       setLoadingRateLimit(false)
     }
   }, [adminActor, showNotification])
+
+  useEffect(() => {
+    if (!hasUnsavedRatePolicies) {
+      return
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedRatePolicies])
 
   const handleRatePolicyChange = (
     route: RateLimitPolicy['route'],
@@ -154,12 +184,91 @@ export function MainsiteModule() {
         throw new Error(payload.error ?? 'Falha ao salvar policy de rate limit do MainSite.')
       }
 
-      setRatePolicies(Array.isArray(payload.policies) ? payload.policies : [])
+      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
+      setRatePolicies(nextPolicies)
+      setBaselineRatePolicies(nextPolicies)
       showNotification(action === 'restore_default'
         ? `Policy ${route} restaurada para padrão.`
         : `Policy ${route} atualizada com sucesso.`, 'success')
     } catch {
       showNotification('Não foi possível salvar a policy de rate limit do MainSite.', 'error')
+    } finally {
+      setUpdatingRateRoute(null)
+    }
+  }
+
+  const restoreRatePolicyLocal = (route: RateLimitPolicy['route']) => {
+    setRatePolicies((current) => current.map((policy) => {
+      if (policy.route !== route) {
+        return policy
+      }
+
+      return {
+        ...policy,
+        enabled: policy.defaults.enabled,
+        max_requests: policy.defaults.max_requests,
+        window_minutes: policy.defaults.window_minutes,
+      }
+    }))
+  }
+
+  const restoreAllRatePoliciesLocal = () => {
+    setRatePolicies((current) => current.map((policy) => ({
+      ...policy,
+      enabled: policy.defaults.enabled,
+      max_requests: policy.defaults.max_requests,
+      window_minutes: policy.defaults.window_minutes,
+    })))
+    showNotification('Padrões de rate limit restaurados localmente.', 'info')
+  }
+
+  const saveAllRatePolicies = async () => {
+    if (!hasUnsavedRatePolicies) {
+      showNotification('Nenhuma alteração pendente no rate limit.', 'info')
+      return
+    }
+
+    setUpdatingRateRoute('__all__')
+    try {
+      const baselineMap = new Map(baselineRatePolicies.map((policy) => [policy.route, policy]))
+      const dirtyPolicies = ratePolicies.filter((policy) => {
+        const baseline = baselineMap.get(policy.route)
+        if (!baseline) {
+          return true
+        }
+
+        return baseline.enabled !== policy.enabled
+          || baseline.max_requests !== policy.max_requests
+          || baseline.window_minutes !== policy.window_minutes
+      })
+
+      for (const policy of dirtyPolicies) {
+        const response = await fetch('/api/mainsite/rate-limit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Actor': adminActor,
+          },
+          body: JSON.stringify({
+            action: 'update',
+            route: policy.route,
+            enabled: policy.enabled,
+            max_requests: policy.max_requests,
+            window_minutes: policy.window_minutes,
+            adminActor,
+          }),
+        })
+
+        const payload = await response.json() as { ok: boolean; error?: string }
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error ?? `Falha ao salvar policy ${policy.route} do MainSite.`)
+        }
+      }
+
+      await loadRateLimit()
+      showNotification('Painel de rate limit do MainSite salvo com sucesso.', 'success')
+    } catch {
+      showNotification('Não foi possível salvar todas as policies de rate limit do MainSite.', 'error')
     } finally {
       setUpdatingRateRoute(null)
     }
@@ -438,7 +547,7 @@ export function MainsiteModule() {
   }
 
   return (
-    <section className="detail-panel">
+    <section className="detail-panel module-shell module-shell-mainsite">
       <div className="detail-header">
         <div className="detail-icon"><Globe size={22} /></div>
         <div>
@@ -707,11 +816,22 @@ export function MainsiteModule() {
           <div>
             <h4><Save size={16} /> Painel de rate limit</h4>
             <p className="field-hint">Políticas por rota com atualização em tempo real e opção de restaurar padrão.</p>
+            {hasUnsavedRatePolicies && (
+              <span className="badge badge-planejado">Alterações não salvas</span>
+            )}
           </div>
           <div className="inline-actions">
             <button type="button" className="ghost-button" onClick={() => void loadRateLimit(true)} disabled={loadingRateLimit || updatingRateRoute !== null}>
               {loadingRateLimit ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
               Recarregar rate limit
+            </button>
+            <button type="button" className="ghost-button" onClick={restoreAllRatePoliciesLocal} disabled={loadingRateLimit || updatingRateRoute !== null || ratePolicies.length === 0}>
+              <RefreshCw size={16} />
+              Restaurar padrão (todas)
+            </button>
+            <button type="button" className="primary-button" onClick={() => void saveAllRatePolicies()} disabled={loadingRateLimit || updatingRateRoute !== null || !hasUnsavedRatePolicies}>
+              {updatingRateRoute === '__all__' ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
+              Salvar painel
             </button>
           </div>
         </div>
@@ -782,9 +902,9 @@ export function MainsiteModule() {
                       {isBusy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
                       Salvar policy
                     </button>
-                    <button type="button" className="ghost-button" onClick={() => void persistRatePolicy(policy.route, 'restore_default')} disabled={isBusy}>
-                      {isBusy ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-                      Restaurar padrão
+                    <button type="button" className="ghost-button" onClick={() => restoreRatePolicyLocal(policy.route)} disabled={isBusy}>
+                      <RefreshCw size={16} />
+                      Restaurar local
                     </button>
                   </div>
                 </li>

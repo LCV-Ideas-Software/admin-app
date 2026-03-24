@@ -286,6 +286,110 @@
   gap: 18px;
 }
 
+.module-shell {
+  --module-accent: #2563eb;
+  --module-accent-rgb: 37, 99, 235;
+  --module-accent-soft: rgba(37, 99, 235, 0.12);
+  --module-accent-border: rgba(37, 99, 235, 0.3);
+  padding: 24px;
+  border-radius: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    radial-gradient(circle at top right, var(--module-accent-soft), transparent 40%),
+    rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  backdrop-filter: blur(24px) saturate(145%);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.12);
+}
+
+.module-shell .detail-header {
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--module-accent-border);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.84));
+}
+
+.module-shell .detail-icon,
+.module-shell .metric-icon {
+  background: linear-gradient(135deg, var(--module-accent-soft), rgba(255, 255, 255, 0.5));
+  color: var(--module-accent);
+}
+
+.module-shell .primary-button {
+  background: linear-gradient(135deg, var(--module-accent), rgba(var(--module-accent-rgb), 0.86));
+  border: 1px solid rgba(var(--module-accent-rgb), 0.6);
+  box-shadow: 0 8px 24px rgba(var(--module-accent-rgb), 0.28);
+}
+
+.module-shell .ghost-button {
+  background: rgba(var(--module-accent-rgb), 0.1);
+  color: var(--module-accent);
+  border: 1px solid rgba(var(--module-accent-rgb), 0.24);
+}
+
+.module-shell .form-card,
+.module-shell .result-card,
+.module-shell .metric-card {
+  border-radius: 24px;
+  border: 1px solid rgba(var(--module-accent-rgb), 0.2);
+}
+
+.module-shell .field-group input:focus,
+.module-shell .field-group select:focus,
+.module-shell .field-group textarea:focus {
+  outline: 2px solid rgba(var(--module-accent-rgb), 0.34);
+  border-color: rgba(var(--module-accent-rgb), 0.6);
+}
+
+.module-shell-astrologo {
+  --module-accent: #4f46e5;
+  --module-accent-rgb: 79, 70, 229;
+  --module-accent-soft: rgba(99, 102, 241, 0.14);
+  --module-accent-border: rgba(99, 102, 241, 0.34);
+}
+
+.module-shell-calculadora {
+  --module-accent: #1d4ed8;
+  --module-accent-rgb: 29, 78, 216;
+  --module-accent-soft: rgba(37, 99, 235, 0.14);
+  --module-accent-border: rgba(37, 99, 235, 0.32);
+}
+
+.module-shell-mainsite {
+  --module-accent: #0f766e;
+  --module-accent-rgb: 15, 118, 110;
+  --module-accent-soft: rgba(20, 184, 166, 0.14);
+  --module-accent-border: rgba(20, 184, 166, 0.34);
+}
+
+.module-shell-mtasts {
+  --module-accent: #7c3aed;
+  --module-accent-rgb: 124, 58, 237;
+  --module-accent-soft: rgba(124, 58, 237, 0.14);
+  --module-accent-border: rgba(124, 58, 237, 0.34);
+}
+
+.module-shell-apphub {
+  --module-accent: #0ea5e9;
+  --module-accent-rgb: 14, 165, 233;
+  --module-accent-soft: rgba(14, 165, 233, 0.14);
+  --module-accent-border: rgba(14, 165, 233, 0.34);
+}
+
+.module-shell-adminhub {
+  --module-accent: #c2410c;
+  --module-accent-rgb: 194, 65, 12;
+  --module-accent-soft: rgba(249, 115, 22, 0.14);
+  --module-accent-border: rgba(249, 115, 22, 0.34);
+}
+
+.module-shell-config {
+  --module-accent: #475569;
+  --module-accent-rgb: 71, 85, 105;
+  --module-accent-soft: rgba(100, 116, 139, 0.14);
+  --module-accent-border: rgba(100, 116, 139, 0.34);
+}
+
 .detail-header {
   display: flex;
   align-items: center;

@@ -26,7 +26,7 @@ export function ConfigModule() {
 
   return (
     <div className="module-container">
-      <section className="detail-panel">
+      <section className="detail-panel module-shell module-shell-config">
         <div className="detail-header">
           <div className="detail-icon">⚙️</div>
           <div>

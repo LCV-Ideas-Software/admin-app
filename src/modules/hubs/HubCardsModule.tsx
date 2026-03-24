@@ -77,6 +77,10 @@ export function HubCardsModule({
   const [cards, setCards] = useState<HubCard[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
+  const moduleToneClass = endpoint === '/api/apphub/config'
+    ? 'module-shell-apphub'
+    : 'module-shell-adminhub'
+
   const disabled = useMemo(() => loading || saving, [loading, saving])
 
   const duplicateStats = useMemo(() => {
@@ -345,7 +349,7 @@ export function HubCardsModule({
   }
 
   return (
-    <section className="detail-panel">
+    <section className={`detail-panel module-shell ${moduleToneClass}`}>
       <div className="detail-header">
         <div className="detail-icon"><Save size={22} /></div>
         <div>
