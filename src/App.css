@@ -1294,7 +1294,7 @@
   background: linear-gradient(135deg, #b91c1c, #991b1b);
 }
 
-/* ── Viewer estruturado do Astrólogo ───────────────────────────── */
+/* ── Viewer estruturado do Astrólogo (light theme — paridade com astrologo-admin) ── */
 .astro-section {
   padding: 16px;
   border-top: 1px solid rgba(148, 163, 184, 0.15);
@@ -1305,15 +1305,15 @@
   font-weight: 800;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .astro-section__title--tropical {
-  color: #f97316;
+  color: #ea580c;
 }
 
 .astro-section__title--astronomica {
-  color: #818cf8;
+  color: #6366f1;
 }
 
 .astro-grid {
@@ -1330,19 +1330,21 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* Astrologia cards — light background, dark text */
 .astro-card {
-  background: rgba(30, 41, 59, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .astro-card__label {
   font-size: 0.65rem;
-  color: #bcc5d0;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -1351,12 +1353,13 @@
 .astro-card__value {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #e2e8f0;
+  color: #1e293b;
 }
 
+/* Umbanda cards — light background, centered layout */
 .astro-umbanda-card {
-  background: rgba(30, 41, 59, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 12px 8px;
   display: flex;
@@ -1364,6 +1367,7 @@
   align-items: center;
   text-align: center;
   gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .astro-umbanda-card__simbolo {
@@ -1372,7 +1376,7 @@
 
 .astro-umbanda-card__posicao {
   font-size: 0.6rem;
-  color: #bcc5d0;
+  color: #475569;
   font-weight: 700;
   text-transform: uppercase;
   line-height: 1.3;
@@ -1389,17 +1393,18 @@
 }
 
 .astro-umbanda-card__orixa--tropical {
-  background: rgba(249, 115, 22, 0.12);
-  color: #f97316;
-  border: 1px solid rgba(249, 115, 22, 0.2);
+  background: rgba(249, 115, 22, 0.10);
+  color: #ea580c;
+  border: 1px solid rgba(249, 115, 22, 0.25);
 }
 
 .astro-umbanda-card__orixa--astronomica {
-  background: rgba(129, 140, 248, 0.12);
-  color: #818cf8;
-  border: 1px solid rgba(129, 140, 248, 0.2);
+  background: rgba(99, 102, 241, 0.10);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.25);
 }
 
+/* Forças Globais key-value pairs */
 .astro-kv-list {
   display: flex;
   flex-direction: column;
@@ -1411,14 +1416,15 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .astro-kv__label {
   font-size: 0.7rem;
-  color: #bcc5d0;
+  color: #64748b;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1426,23 +1432,24 @@
 
 .astro-kv strong {
   font-size: 0.85rem;
-  color: #e2e8f0;
+  color: #1e293b;
 }
 
+/* Síntese do Mestre (IA) — dark text on light background */
 .astro-ia-content {
   font-size: 0.85rem;
   line-height: 1.7;
-  color: #e2e8f0;
+  color: #334155;
   padding: 0 4px;
 }
 
 .astro-ia-content p { margin-bottom: 12px; text-align: justify; text-indent: 2em; }
-.astro-ia-content strong { color: #e2e8f0; }
+.astro-ia-content strong { color: #1e293b; }
 .astro-ia-content ul { list-style: disc; padding-left: 20px; }
 .astro-ia-content li { margin-bottom: 4px; }
 .astro-ia-content h1,
 .astro-ia-content h2,
-.astro-ia-content h3 { color: #818cf8; margin-bottom: 8px; font-weight: 700; }
+.astro-ia-content h3 { color: #4f46e5; margin-bottom: 8px; font-weight: 700; }
 
 .astro-sharing {
   display: flex;
@@ -2293,6 +2300,11 @@
 
 .fin-insight-result {
   padding: 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 .fin-insight-result .fin-detail-group {
@@ -2304,6 +2316,7 @@
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
+  width: 100%;
 }
 
 .fin-insight-metric-card {
@@ -2328,7 +2341,9 @@
 }
 
 .fin-insight-badge-group {
-  margin-bottom: 14px;
+  margin-bottom: 0;
+  text-align: center;
+  min-width: 120px;
 }
 
 .fin-insight-group-label {

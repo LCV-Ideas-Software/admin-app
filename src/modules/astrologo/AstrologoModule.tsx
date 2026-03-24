@@ -135,6 +135,12 @@ export function AstrologoModule() {
         throw new Error(payload.error ?? 'Falha ao ler mapa do Astrólogo.')
       }
 
+      // Limpar estado dependente do mapa anterior antes de definir o novo
+      setShowEmailForm(false)
+      setNomeConsulente(payload.mapa.nome)
+      setRelatorioHtml('')
+      setRelatorioTexto('')
+
       setSelectedMapa(payload.mapa)
       
       // Auto-generate astrological reports

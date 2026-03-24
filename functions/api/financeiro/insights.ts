@@ -5,7 +5,6 @@
 
 // @ts-expect-error — SumUp SDK default export
 import SumUp from '@sumup/sdk'
-import { MercadoPagoConfig, Payment, PaymentMethod } from 'mercadopago'
 
 interface Env {
   SUMUP_API_KEY_PRIVATE: string
@@ -161,18 +160,33 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // ── Mercado Pago Insights ──
+  // ── Mercado Pago Insights (via REST API v1 — SDK incompatível com Workers runtime) ──
   if (provider === 'mp') {
     const token = context.env.MP_ACCESS_TOKEN
     if (!token) return Response.json({ error: 'MP_ACCESS_TOKEN ausente.' }, { status: 503 })
 
-    const client = new MercadoPagoConfig({ accessToken: token })
+    const mpHeaders: Record<string, string> = { Authorization: `Bearer ${token}` }
+
+    // Helper: lê corpo de erro da API MP para diagnóstico
+    const readMpError = async (res: globalThis.Response, fallback: string): Promise<string> => {
+      try {
+        const body = await res.text()
+        const parsed = JSON.parse(body) as { message?: string; error?: string }
+        return parsed.message || parsed.error || `MP API ${res.status}: ${body.slice(0, 200)}`
+      } catch {
+        return `MP API ${res.status}: ${fallback}`
+      }
+    }
 
     // MP: Payment Methods
     if (type === 'payment-methods') {
       try {
-        const paymentMethodApi = new PaymentMethod(client)
-        const methodsRaw: AnyRecord[] = (await paymentMethodApi.get() as AnyRecord[]) || []
+        const res = await fetch('https://api.mercadopago.com/v1/payment_methods', { headers: mpHeaders })
+        if (!res.ok) {
+          const errMsg = await readMpError(res, res.statusText)
+          return Response.json({ error: errMsg }, { status: res.status })
+        }
+        const methodsRaw = (await res.json()) as AnyRecord[]
         const methods = [...new Set(methodsRaw.map((m) => m?.id).filter(Boolean))]
         const types = [...new Set(methodsRaw.map((m) => m?.payment_type_id).filter(Boolean))]
 
@@ -190,10 +204,21 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         const begin_date = getStartIsoWithCutoff(url.searchParams.get('begin_date') || url.searchParams.get('start_date'))
         const end_date = url.searchParams.get('end_date') ? new Date(url.searchParams.get('end_date')!).toISOString() : new Date().toISOString()
 
-        const paymentApi = new Payment(client)
-        const payload = await paymentApi.search({
-          options: { sort: 'date_created', criteria: 'desc', range: 'date_created', begin_date, end_date, limit, offset: 0 },
-        }) as AnyRecord
+        const searchUrl = new URL('https://api.mercadopago.com/v1/payments/search')
+        searchUrl.searchParams.set('sort', 'date_created')
+        searchUrl.searchParams.set('criteria', 'desc')
+        searchUrl.searchParams.set('range', 'date_created')
+        searchUrl.searchParams.set('begin_date', begin_date)
+        searchUrl.searchParams.set('end_date', end_date)
+        searchUrl.searchParams.set('limit', String(limit))
+        searchUrl.searchParams.set('offset', '0')
+
+        const res = await fetch(searchUrl.toString(), { headers: mpHeaders })
+        if (!res.ok) {
+          const errMsg = await readMpError(res, res.statusText)
+          return Response.json({ error: errMsg }, { status: res.status })
+        }
+        const payload = (await res.json()) as AnyRecord
 
         const items: AnyRecord[] = Array.isArray(payload?.results) ? payload.results : []
         const byStatus: Record<string, number> = {}

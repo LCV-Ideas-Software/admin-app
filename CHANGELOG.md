@@ -19,6 +19,17 @@
 ### CSS adicionado
 - `.module-loading` (Suspense fallback), `.astro-akashico-scroll`, `.astro-local-hint`.
 
+## [v01.38.02] — 2026-03-24
+### Corrigido
+- **Astrólogo — contraste**: todo o viewer estruturado reescrito com fundo branco/claro e texto escuro (`#1e293b`), em paridade visual com o `astrologo-admin` original. Cards astrologia/umbanda, key-value pairs e síntese IA agora legíveis.
+- **Astrólogo — troca de registro**: `handleReadMapa` agora limpa estado dependente (`showEmailForm`, `nomeConsulente`, `relatorioHtml`, `relatorioTexto`) ao selecionar outro registro, garantindo que a visualização atualize corretamente.
+
+## [v01.38.01] — 2026-03-24
+### Corrigido
+- **Insights MP — `response.headers.raw`**: SDK `mercadopago` substituído por chamadas REST diretas (`fetch`) no `insights.ts` para compatibilidade com Cloudflare Workers runtime.
+- **Insights MP — erro handling**: Helper `readMpError` adicionado para surfacear mensagens de erro da API Mercado Pago.
+- **Insights — layout**: seções de resultado (Por Status, Por Tipo, Mais Dados) agora renderizadas lado a lado e centralizadas horizontalmente (`flex-wrap`, `justify-content: center`).
+
 ## [v01.37.00] — 2026-03-24
 ### Adicionado
 - **Módulo Financeiro completo**: painel consolidado com suporte a SumUp e Mercado Pago via SDKs oficiais.

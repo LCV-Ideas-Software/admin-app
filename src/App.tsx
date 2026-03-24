@@ -28,7 +28,7 @@ const CardHubModule = lazy(() => import('./modules/hubs/CardHubModule').then(m =
 const TelemetriaModule = lazy(() => import('./modules/telemetria/TelemetriaModule').then(m => ({ default: m.TelemetriaModule })))
 const FinanceiroModule = lazy(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
 
-const APP_VERSION = 'APP v01.38.00'
+const APP_VERSION = 'APP v01.38.02'
 
 
 
