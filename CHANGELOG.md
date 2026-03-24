@@ -1,5 +1,24 @@
 # Changelog — Admin App
 
+## [v01.38.00] — 2026-03-24
+### Alterado
+- **Code-splitting**: todos os 8 módulos convertidos para `React.lazy` + `Suspense`, eliminando o warning de chunks >500kB. Cada módulo agora é um chunk separado carregado sob demanda.
+- **Astrólogo — e-mail condicional**: formulário de envio de e-mail agora só aparece quando um mapa está selecionado e o botão "Enviar por E-mail" é acionado (toggle), em paridade com `astrologo-admin`.
+- **Astrólogo — Arquivo Akáshico**: lista encapsulada com barra de rolagem mostrando ~5 itens visíveis (`.astro-akashico-scroll`).
+- **Visão Geral**: tela inicial simplificada — apenas card de link para Telemetria. `MODULE_LABELS` substitui `moduleCards` array para o header.
+
+### Removido
+- **Module cards**: removidos da tela Visão Geral (`ModuleCard` type, `moduleCards` array, `module-grid` section, seção fallback `detail-panel`).
+- **Astrólogo — Copiar Tudo / WhatsApp**: removidos. Apenas "Enviar por E-mail" permanece, em paridade com o original.
+- **App.tsx dead code**: `useMemo`, `selectedModule`, `showNotification` no `handleModuleClick`, imports `Activity`, `AlertTriangle`, `useNotification`.
+
+### Corrigido
+- **ConfigModule**: import `ShieldCheck` restaurado (usado no header Rate Limit).
+- **AstrologoModule**: inline style `padding: '0 16px 8px'` extraído para CSS class `.astro-local-hint`.
+
+### CSS adicionado
+- `.module-loading` (Suspense fallback), `.astro-akashico-scroll`, `.astro-local-hint`.
+
 ## [v01.37.00] — 2026-03-24
 ### Adicionado
 - **Módulo Financeiro completo**: painel consolidado com suporte a SumUp e Mercado Pago via SDKs oficiais.

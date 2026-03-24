@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import {
   ArrowUpRight,
   BarChart3,
@@ -6,6 +6,7 @@ import {
   DollarSign,
   Globe,
   LayoutGrid,
+  Loader2,
   PanelsTopLeft,
   Pin,
   PinOff,
@@ -16,16 +17,18 @@ import {
 } from 'lucide-react'
 import './styles/variables.css'
 import './App.css'
-import { AstrologoModule } from './modules/astrologo/AstrologoModule'
-import { ConfigModule } from './modules/config/ConfigModule'
-import { ItauModule } from './modules/itau/ItauModule'
-import { MainsiteModule } from './modules/mainsite/MainsiteModule'
-import { MtastsModule } from './modules/mtasts/MtastsModule'
-import { CardHubModule } from './modules/hubs/CardHubModule'
-import { TelemetriaModule } from './modules/telemetria/TelemetriaModule'
-import { FinanceiroModule } from './modules/financeiro/FinanceiroModule'
 
-const APP_VERSION = 'APP v01.37.00'
+/* Lazy-loaded modules — cada módulo vira um chunk separado */
+const AstrologoModule = lazy(() => import('./modules/astrologo/AstrologoModule').then(m => ({ default: m.AstrologoModule })))
+const ConfigModule = lazy(() => import('./modules/config/ConfigModule').then(m => ({ default: m.ConfigModule })))
+const ItauModule = lazy(() => import('./modules/itau/ItauModule').then(m => ({ default: m.ItauModule })))
+const MainsiteModule = lazy(() => import('./modules/mainsite/MainsiteModule').then(m => ({ default: m.MainsiteModule })))
+const MtastsModule = lazy(() => import('./modules/mtasts/MtastsModule').then(m => ({ default: m.MtastsModule })))
+const CardHubModule = lazy(() => import('./modules/hubs/CardHubModule').then(m => ({ default: m.CardHubModule })))
+const TelemetriaModule = lazy(() => import('./modules/telemetria/TelemetriaModule').then(m => ({ default: m.TelemetriaModule })))
+const FinanceiroModule = lazy(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
+
+const APP_VERSION = 'APP v01.38.00'
 
 
 
@@ -109,6 +112,7 @@ function App() {
           </div>
         </header>
 
+        <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
         {activeModule === 'overview' ? (
           <article className="result-card telemetria-overview-link">
             <header className="result-header">
@@ -138,6 +142,7 @@ function App() {
         ) : activeModule === 'telemetria' ? (
           <TelemetriaModule />
         ) : null}
+        </Suspense>
       </main>
     </div>
   )

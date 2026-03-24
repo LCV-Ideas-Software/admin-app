@@ -1,3 +1,12 @@
+/* Suspense fallback for lazy-loaded modules */
+.module-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 0;
+  color: var(--color-text-tertiary, #94a3b8);
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 320px 1fr;
