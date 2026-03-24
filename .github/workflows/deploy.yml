@@ -32,8 +32,6 @@ jobs:
 
       - run: npm run build
         working-directory: ./
-        env:
-          VITE_PUBLIC_BRAND_ICONS_BASE_URL: ${{ vars['VITE_PUBLIC_BRAND_ICONS_BASE_URL'] }}
 
       - run: npx wrangler@${WRANGLER_VERSION} pages deploy dist --project-name=admin-app --branch=main
         working-directory: ./
