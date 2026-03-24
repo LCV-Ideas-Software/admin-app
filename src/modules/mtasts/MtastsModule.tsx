@@ -99,8 +99,65 @@ export function MtastsModule() {
   const [tlsrptEmail, setTlsrptEmail] = useState('')
   const [lastGeneratedId, setLastGeneratedId] = useState<string | null>(null)
   const [mxRecords, setMxRecords] = useState<string[]>([])
+  const [integrityStatus, setIntegrityStatus] = useState<'idle' | 'ok' | 'warning' | 'error'>('idle')
+  const [integrityIssues, setIntegrityIssues] = useState<string[]>([])
 
   const disabled = useMemo(() => overviewLoading, [overviewLoading])
+
+  const runIntegrityAudit = useCallback(() => {
+    if (zones.length === 0 && payload.policies.length === 0) {
+      setIntegrityStatus('idle')
+      setIntegrityIssues([])
+      return
+    }
+
+    const errors: string[] = []
+    const warnings: string[] = []
+
+    const zoneNames = new Set(zones.map((zone) => zone.name.toLowerCase()))
+    const policyDomainMap = new Map(payload.policies.map((policy) => [policy.domain.toLowerCase(), policy]))
+
+    for (const zone of zones) {
+      const policy = policyDomainMap.get(zone.name.toLowerCase())
+      if (!policy || !policy.policyText?.trim()) {
+        errors.push(`Domínio ${zone.name}: policy ausente no histórico salvo.`)
+      }
+    }
+
+    for (const policy of payload.policies) {
+      if (!zoneNames.has(policy.domain.toLowerCase())) {
+        warnings.push(`Policy órfã detectada para ${policy.domain} (não encontrada nas zonas atuais).`)
+      }
+      if (!policy.tlsrptEmail) {
+        warnings.push(`Domínio ${policy.domain}: e-mail TLS-RPT não configurado.`)
+      }
+      if (!policy.updatedAt) {
+        warnings.push(`Domínio ${policy.domain}: sem data de atualização registrada.`)
+      }
+    }
+
+    if (selectedDomain) {
+      if (!selectedZoneId) {
+        errors.push(`Domínio selecionado (${selectedDomain}) sem Zone ID associado.`)
+      }
+      if (!policyText.trim()) {
+        warnings.push(`Domínio selecionado (${selectedDomain}) com policy em branco no editor.`)
+      }
+      if (!tlsrptEmail.trim()) {
+        warnings.push(`Domínio selecionado (${selectedDomain}) sem e-mail TLS-RPT no editor.`)
+      }
+      if (!lastGeneratedId) {
+        warnings.push(`Domínio selecionado (${selectedDomain}) sem último ID conhecido.`)
+      }
+      if (mxRecords.length === 0) {
+        warnings.push(`Domínio selecionado (${selectedDomain}) sem MX detectado para geração automática.`)
+      }
+    }
+
+    const nextIssues = [...errors, ...warnings]
+    setIntegrityIssues(nextIssues)
+    setIntegrityStatus(errors.length > 0 ? 'error' : warnings.length > 0 ? 'warning' : 'ok')
+  }, [lastGeneratedId, mxRecords.length, payload.policies, policyText, selectedDomain, selectedZoneId, tlsrptEmail, zones])
 
   const loadZones = useCallback(async (shouldNotify = false) => {
     setZonesLoading(true)
@@ -184,6 +241,10 @@ export function MtastsModule() {
 
     void loadPolicy(selectedDomain, selectedZoneId)
   }, [loadPolicy, selectedDomain, selectedZoneId])
+
+  useEffect(() => {
+    runIntegrityAudit()
+  }, [runIntegrityAudit])
 
   const buildPolicyFromMx = () => {
     if (!Array.isArray(mxRecords) || mxRecords.length === 0) {
@@ -306,6 +367,26 @@ export function MtastsModule() {
           <p>Consulta híbrida no shell: prioriza `bigdata_db` e recua para legado quando necessário.</p>
         </div>
       </div>
+
+      {integrityStatus !== 'idle' && (
+        <article className={`integrity-banner integrity-banner--${integrityStatus}`}>
+          <header className="integrity-banner__header">
+            <ShieldCheck size={16} />
+            <strong>
+              {integrityStatus === 'ok' && 'Auditoria de integridade: sem divergências detectadas.'}
+              {integrityStatus === 'warning' && `Auditoria de integridade: ${integrityIssues.length} alerta(s) detectado(s).`}
+              {integrityStatus === 'error' && `Auditoria de integridade: ${integrityIssues.length} inconsistência(s) crítica(s).`}
+            </strong>
+          </header>
+          {integrityIssues.length > 0 && (
+            <ul className="integrity-banner__list">
+              {integrityIssues.map((issue, index) => (
+                <li key={`${issue}-${index}`}>{issue}</li>
+              ))}
+            </ul>
+          )}
+        </article>
+      )}
 
       <form className="form-card" onSubmit={handleSubmit}>
         <div className="form-grid">

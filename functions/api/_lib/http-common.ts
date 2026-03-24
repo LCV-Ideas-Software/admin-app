@@ -50,7 +50,7 @@ export const SECURE_HEADERS: Record<string, string> = {
 export const CACHEABLE_HEADERS: Record<string, string> = {
   ...STANDARD_JSON_HEADERS,
   'Cache-Control': 'public, max-age=3600, s-maxage=86400',
-  'ETag': undefined as any, // Will be set dynamically per response
+  // Note: ETag is set dynamically per response - not included as a static header
 }
 
 // ============================================================================

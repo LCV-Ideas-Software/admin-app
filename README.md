@@ -28,7 +28,7 @@ Shell administrativo unificado da LCV em `admin.lcv.app.br`, desenvolvido com Re
 - Segredos reais: **somente server-side** (Cloudflare Secrets).
 - Diretriz global de integração: como toda a operação roda em Cloudflare, priorizar APIs nativas da plataforma (D1, DNS/Zone API, Workers/Pages bindings) antes de depender de endpoints administrativos legados protegidos por Access.
 - Para habilitar CRUD e save de settings públicos do MainSite, configurar o secret `MAINSITE_WORKER_API_SECRET` no runtime do `admin-app`.
-- Para operações DNS/auditoria do MTA-STS, configurar no runtime um dos tokens: `CF_API_TOKEN` (preferencial), `CLOUDFLARE_DNS` ou `CLOUDFLARE_API_TOKEN`.
+- Para operações DNS/auditoria do MTA-STS, configurar no runtime um dos tokens: `CLOUDFLARE_API_TOKEN` (preferencial) ou `CLOUDFLARE_DNS`.
 - Variáveis client-side públicas: prefixo `VITE_`.
 - Migração D1 futura para `bigdata_db`:
   - **Prefixação obrigatória por contexto** em tabelas, índices e políticas.

@@ -58,7 +58,7 @@ export interface UseFormReturn<T> {
 /**
  * useForm Hook - Unified form state + validation management
  */
-export function useForm<T extends Record<string, any>>({
+export function useForm<T extends Record<string, unknown>>({
   initialValues,
   validate,
   onSubmit,

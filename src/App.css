@@ -531,6 +531,48 @@
   gap: 12px;
 }
 
+.integrity-banner {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.86);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.integrity-banner__header {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f172a;
+}
+
+.integrity-banner__list {
+  margin: 0;
+  padding-left: 20px;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.integrity-banner--ok {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(236, 253, 245, 0.9);
+}
+
+.integrity-banner--warning {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(255, 251, 235, 0.92);
+}
+
+.integrity-banner--error {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(254, 242, 242, 0.92);
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }

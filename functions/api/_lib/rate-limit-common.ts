@@ -13,6 +13,32 @@
 import { toPositiveInt } from '../../../src/lib/validation'
 
 // ============================================================================
+// CLOUDFLARE D1 TYPES (minimal interfaces — no external @cloudflare/workers-types required)
+// ============================================================================
+
+interface D1PreparedStatement {
+  bind(...values: unknown[]): D1PreparedStatement
+  run(): Promise<{ success: boolean }>
+  first<T = Record<string, unknown>>(): Promise<T | null>
+  all<T = Record<string, unknown>>(): Promise<{ success: boolean; results: T[] }>
+}
+
+interface D1Database {
+  prepare(query: string): D1PreparedStatement
+}
+
+interface RateLimitEnv {
+  BIGDATA_DB?: D1Database
+}
+
+interface D1RateLimitRow {
+  route: string
+  enabled: number
+  max_requests: number
+  window_minutes: number
+}
+
+// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -107,7 +133,7 @@ export function createDefaultRateLimitPolicy(
  */
  
 export async function loadRateLimitPolicies(params: {
-  env: any
+  env: RateLimitEnv
   module: string
   adminActor: string
 }): Promise<RateLimitConfig | null> {
@@ -127,7 +153,7 @@ export async function loadRateLimitPolicies(params: {
       ORDER BY route ASC
     `
 
-    const result = await db.prepare(query).bind(module, adminActor).all()
+    const result = await db.prepare(query).bind(module, adminActor).all<D1RateLimitRow>()
 
     if (!result.results || result.results.length === 0) {
       return null
@@ -159,7 +185,7 @@ export async function loadRateLimitPolicies(params: {
  */
  
 export async function saveRateLimitPolicies(params: {
-  env: any
+  env: RateLimitEnv
   module: string
   adminActor: string
   config: RateLimitConfig
@@ -208,7 +234,7 @@ export async function saveRateLimitPolicies(params: {
  */
  
 export async function restoreDefaultRateLimitPolicies(params: {
-  env: any
+  env: RateLimitEnv
   module: string
   adminActor: string
   defaultConfig: RateLimitConfig
@@ -238,8 +264,8 @@ export async function restoreDefaultRateLimitPolicies(params: {
  */
  
 export async function mirrorPoliciesFromSourceDb(params: {
-  env: any
-  sourceDb: any
+  env: RateLimitEnv
+  sourceDb: D1Database
   module: string
   adminActor: string
 }): Promise<boolean> {
@@ -253,7 +279,7 @@ export async function mirrorPoliciesFromSourceDb(params: {
       ORDER BY route ASC
     `
 
-    const result = await sourceDb.prepare(query).bind(adminActor).all()
+    const result = await sourceDb.prepare(query).bind(adminActor).all<D1RateLimitRow>()
 
     if (!result.results || result.results.length === 0) {
       return false

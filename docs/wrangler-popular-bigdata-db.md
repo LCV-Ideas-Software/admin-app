@@ -15,6 +15,12 @@ Este guia aplica as migrations do `admin-app` no banco unificado `bigdata_db`.
 - acesso Cloudflare configurado para o projeto
 - autenticação Wrangler concluída
 
+### Token de API (obrigatório para execução não interativa)
+
+- Use **apenas** `CLOUDFLARE_API_TOKEN`
+- **Não** use o nome legado `CF_API_TOKEN`
+- O valor deve ser somente o token (sem prefixo `Bearer `)
+
 ## 1) Entrar no projeto
 
 ```powershell

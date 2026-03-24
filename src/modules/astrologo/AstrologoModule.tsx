@@ -158,7 +158,7 @@ export function AstrologoModule() {
         const report = generateAstrologicalReport(payload.mapa, 'completo')
         setRelatorioHtml(report.html)
         setRelatorioTexto(report.text)
-      } catch (err) {
+      } catch {
         showNotification('Aviso: falha ao gerar relatório automático, preencha manualmente.', 'info')
       }
       

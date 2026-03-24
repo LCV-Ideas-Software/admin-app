@@ -51,19 +51,19 @@ const DEFAULT_CONFIG = {
 /**
  * Validates configuration object
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-function validateConfig(config: any): { valid: boolean; error?: string } {
+function validateConfig(config: unknown): { valid: boolean; error?: string } {
   if (!config || typeof config !== 'object') {
     return { valid: false, error: 'Configuration must be an object' }
   }
 
-  const cfg = config as Record<string, any>
+  const cfg = config as Record<string, unknown>
 
   // Validate theme section
-  if (cfg.theme) {
-    if (cfg.theme.colors) {
-      const colors = cfg.theme.colors
-      if (colors.primary && !colors.primary.match(/^#[0-9a-f]{6}$/i)) {
+  if (cfg.theme && typeof cfg.theme === 'object') {
+    const theme = cfg.theme as Record<string, unknown>
+    if (theme.colors && typeof theme.colors === 'object') {
+      const colors = theme.colors as Record<string, unknown>
+      if (colors.primary && typeof colors.primary === 'string' && !colors.primary.match(/^#[0-9a-f]{6}$/i)) {
         return { valid: false, error: 'Invalid primary color format' }
       }
     }
@@ -71,13 +71,13 @@ function validateConfig(config: any): { valid: boolean; error?: string } {
 
   // Validate rate limits
   if (cfg.rateLimits && typeof cfg.rateLimits === 'object') {
-    for (const [route, policy] of Object.entries(cfg.rateLimits)) {
+    for (const [route, policy] of Object.entries(cfg.rateLimits as Record<string, unknown>)) {
       if (policy && typeof policy === 'object') {
-        const p = policy as Record<string, any>
-        if (p.max_requests && (p.max_requests < 1 || p.max_requests > 500)) {
+        const p = policy as Record<string, unknown>
+        if (typeof p.max_requests === 'number' && (p.max_requests < 1 || p.max_requests > 500)) {
           return { valid: false, error: `Invalid max_requests for ${route}` }
         }
-        if (p.window_minutes && (p.window_minutes < 1 || p.window_minutes > 1440)) {
+        if (typeof p.window_minutes === 'number' && (p.window_minutes < 1 || p.window_minutes > 1440)) {
           return { valid: false, error: `Invalid window_minutes for ${route}` }
         }
       }
@@ -90,8 +90,7 @@ function validateConfig(config: any): { valid: boolean; error?: string } {
 /**
  * GET /api/config - Retrieve configuration
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
-async function handleGet(_request: Request, _env: any): Promise<Response> {
+async function handleGet(): Promise<Response> {
   try {
     // In a real implementation, fetch from D1 database
     // const db = env.BIGDATA_DB
@@ -109,8 +108,7 @@ async function handleGet(_request: Request, _env: any): Promise<Response> {
 /**
  * POST /api/config - Update configuration
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-async function handlePost(request: Request, env: any): Promise<Response> {
+async function handlePost(request: Request): Promise<Response> {
   try {
     const body = await request.json()
 
@@ -175,7 +173,7 @@ async function handleDelete(_request: Request, _env: any): Promise<Response> {
  
 export async function onRequest(context: {
   request: Request
-  env: any
+  env: Record<string, unknown>
   params: Record<string, string>
 }): Promise<Response> {
   const { request, env } = context
@@ -196,9 +194,9 @@ export async function onRequest(context: {
   try {
     switch (request.method) {
       case 'GET':
-        return await handleGet(request, env)
+        return await handleGet()
       case 'POST':
-        return await handlePost(request, env)
+        return await handlePost(request)
       case 'DELETE':
         return await handleDelete(request, env)
       default:

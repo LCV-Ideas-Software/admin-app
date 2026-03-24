@@ -250,12 +250,12 @@ export function FormField({
         {/* Input or Textarea */}
         {type === 'textarea' ? (
           <textarea
-            {...(commonProps as any)}
+            {...(commonProps as unknown as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
             rows={rows}
           />
         ) : (
           <input
-            {...(commonProps as any)}
+            {...(commonProps as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
             type={type}
             inputMode={inputMode}
             pattern={type === 'email' || type === 'url' || type === 'tel' ? pattern : undefined}
