@@ -727,7 +727,7 @@ export function MainsiteModule() {
 
       <form className="form-card" onSubmit={handleSubmit}>
         <div className="overview-inline-form">
-          <div className="field-group" style={{ flex: '0 0 120px' }}>
+          <div className="field-group field-group--fixed-120">
             <label htmlFor="mainsite-filtro-limit">Qtd. posts</label>
             <input
               id="mainsite-filtro-limit"
@@ -739,7 +739,7 @@ export function MainsiteModule() {
               onChange={(event) => setLimit(event.target.value)}
             />
           </div>
-          <button type="submit" className="primary-button" disabled={disabled} style={{ alignSelf: 'flex-end' }}>
+          <button type="submit" className="primary-button button--align-end" disabled={disabled}>
             {overviewLoading ? <Loader2 size={18} className="spin" /> : <Search size={18} />}
             Carregar overview
           </button>
@@ -954,17 +954,16 @@ export function MainsiteModule() {
               return (
                 <li
                   key={post.id}
-                  className={`post-row${isSelected ? ' post-row--selected' : ''}`}
+                  className={`post-row post-draggable${draggedPostIndex === index ? ' post-draggable--dragging' : ''}${isSelected ? ' post-row--selected' : ''}`}
                   draggable
                   onDragStart={() => handlePostDragStart(index)}
                   onDragEnd={handlePostDragEnd}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => void handlePostDrop(index)}
-                  style={{ opacity: draggedPostIndex === index ? 0.4 : 1, cursor: 'grab' }}
                 >
                   <div className="post-row-main">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <GripVertical size={14} style={{ color: '#64748b', flexShrink: 0 }} />
+                    <div className="flex-row-center">
+                      <GripVertical size={14} className="grip-icon" />
                       <strong>{post.title}</strong>
                     </div>
                     <p className="field-hint">{post.content.length > 220 ? `${post.content.slice(0, 220)}…` : post.content}</p>

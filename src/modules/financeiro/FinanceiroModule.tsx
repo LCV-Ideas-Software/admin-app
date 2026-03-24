@@ -438,7 +438,7 @@ export function FinanceiroModule() {
                 <div className="fin-insight-badges">
                   {(val as string[]).map((item, i) => {
                     const c = statusColor(String(item))
-                    return <span key={i} className="fin-status-badge" style={{ color: c.color, background: c.bg }}>{String(item).toUpperCase()}</span>
+                    return <span key={i} className="fin-status-badge" style={{ '--badge-color': c.color, '--badge-bg': c.bg } as React.CSSProperties}>{String(item).toUpperCase()}</span>
                   })}
                   {(val as string[]).length === 0 && <span className="field-hint">Nenhum</span>}
                 </div>
@@ -470,7 +470,7 @@ export function FinanceiroModule() {
                 {entries.map(([label, count]) => {
                   const c = statusColor(label)
                   return (
-                    <span key={label} className="fin-insight-count-badge" style={{ color: c.color, background: c.bg }}>
+                    <span key={label} className="fin-insight-count-badge" style={{ '--badge-color': c.color, '--badge-bg': c.bg } as React.CSSProperties}>
                       {label.toUpperCase()} <strong>{count}</strong>
                     </span>
                   )
@@ -637,7 +637,7 @@ export function FinanceiroModule() {
                   <li key={log.id} className="post-row">
                     <div className="post-row-main fin-row-clickable" onClick={() => setExpandedRow(isExp ? null : log.id)}>
                       <div className="fin-row-header">
-                        <span className="fin-status-badge" style={{ color: cfg.color, background: cfg.bg }}>{cfg.label}</span>
+                        <span className="fin-status-badge" style={{ '--badge-color': cfg.color, '--badge-bg': cfg.bg } as React.CSSProperties}>{cfg.label}</span>
                         <strong className="fin-amount">{formatBRL(log.amount)}</strong>
                         <span className="fin-method">{log.method ?? '—'}</span>
                         <span className="fin-date">{formatDateBR(log.created_at)}</span>
@@ -693,7 +693,7 @@ export function FinanceiroModule() {
                 : `Estorno do pagamento ${modal.log.payment_id} (${formatBRL(modal.log.amount)}) no Mercado Pago.`}
             </p>
             {modal.type === 'refund' && (
-              <div className="field-group" style={{ marginTop: '12px' }}>
+              <div className="field-group field-group--mt">
                 <label htmlFor="fin-refund-amount">Valor do estorno (vazio = total)</label>
                 <input id="fin-refund-amount" name="finRefundAmount" type="number" step="0.01" min="0.01" max={modal.log.amount}
                   placeholder={`Máximo: ${modal.log.amount}`} value={refundAmount} onChange={e => setRefundAmount(e.target.value)} />

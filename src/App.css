@@ -2712,3 +2712,50 @@ input[type="color"]:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Utility classes — inline style replacements
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Dynamic badge colors via CSS custom properties (Financeiro) */
+.fin-insight-count-badge {
+  color: var(--badge-color);
+  background: var(--badge-bg);
+}
+
+/* Field-group fixed-width variant (MainSite post form) */
+.field-group--fixed-120 {
+  flex: 0 0 120px;
+}
+
+/* Button aligned to the end of a flex row */
+.button--align-end {
+  align-self: flex-end;
+}
+
+/* Post drag-and-drop states (MainSite) */
+.post-draggable {
+  cursor: grab;
+  transition: opacity 0.15s ease;
+}
+.post-draggable--dragging {
+  opacity: 0.4;
+}
+
+/* Inline flex row helper (MainSite post header) */
+.flex-row-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Grip icon color (MainSite post drag handle) */
+.grip-icon {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+/* Field-group with top margin (Financeiro modal) */
+.field-group--mt {
+  margin-top: 12px;
+}
