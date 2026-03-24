@@ -8,6 +8,7 @@ import {
   type HubCard,
 } from '../_lib/hub-config'
 import { createResponseTrace, type ResponseTrace } from '../_lib/request-trace'
+import { validatePutAuth, unauthorizedResponse } from '../_lib/auth'
 
 type Context = {
   request: Request
@@ -84,6 +85,12 @@ export async function onRequestGet(context: Context) {
 
 export async function onRequestPut(context: Context) {
   const trace = createResponseTrace(context.request)
+
+  // Validate authentication for PUT operations
+  const authContext = validatePutAuth(context.request, context.env.ADMINHUB_BEARER_TOKEN)
+  if (!authContext.isAuthenticated) {
+    return unauthorizedResponse(authContext.error || 'No authentication provided')
+  }
 
   if (!context.env.BIGDATA_DB) {
     return buildErrorResponse('BIGDATA_DB não configurado no runtime.', trace, 503)
