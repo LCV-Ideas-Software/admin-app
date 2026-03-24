@@ -628,7 +628,7 @@ export function FinanceiroModule() {
         {loading && logs.length === 0 ? <p className="result-empty"><Loader2 size={16} className="spin" /> Carregando...</p>
           : logs.length === 0 ? <p className="result-empty">Nenhum registro financeiro encontrado.</p>
           : (
-            <ul className="result-list">
+            <ul className="result-list astro-akashico-scroll">
               {logs.map(log => {
                 const cfg = resolveStatusConfig(log)
                 const isExp = expandedRow === log.id

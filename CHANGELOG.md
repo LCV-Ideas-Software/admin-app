@@ -1,5 +1,20 @@
 # Changelog — Admin App
 
+## [v01.42.00] — 2026-03-24
+### Corrigido
+- **Astrólogo — Ler detalhes**: registros "NOVO" (sem dados de análise) agora mostram mensagem vazia em vez de tela em branco.
+- **Astrólogo — E-mail**: botão "E-mail" movido para a listagem (ao lado de "Ler detalhes"), abre modal simples pedindo apenas o endereço de e-mail (paridade com `astrologo-frontend`).
+
+### Removido
+- **Astrólogo — formulário de e-mail**: formulário avançado com textareas de HTML/texto e botões "Copiar", "Restaurar padrão" substituído por modal simplificado.
+- **Dead code**: `useEffect` de relatório default, `copyReportToClipboard`, `restoreDefaultReport`, `Copy`, `RefreshCw` imports.
+
+## [v01.41.00] — 2026-03-24
+### Performance
+- **Code-splitting**: TipTap editor extraído para `PostEditor.tsx` como sub-componente lazy-loaded via `React.lazy` + `Suspense`.
+- **MainsiteModule**: ~200 linhas de código inline do editor removidas; chunk principal reduzido de ~598 kB para ~38 kB.
+- **PostEditor chunk**: 583.86 kB (gzip: 194.50 kB), carregado somente ao clicar "Novo Post" ou "Editar".
+
 ## [v01.40.00] — 2026-03-24
 ### Adicionado (WCAG 2.1 AA + eMAG)
 - **CSS — focus-visible**: indicadores de foco visíveis para navegação por teclado em todos os elementos interativos.

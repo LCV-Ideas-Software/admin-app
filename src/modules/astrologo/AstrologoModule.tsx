@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Copy, Loader2, RefreshCw, Search, Send, Sparkles, Telescope, Trash2 } from 'lucide-react'
+import { Loader2, Mail, Search, Send, Sparkles, Telescope, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { generateAstrologicalReport } from '../../lib/astrological-report'
 import DOMPurify from 'dompurify'
@@ -73,14 +73,12 @@ export function AstrologoModule() {
   const [adminActor] = useState('admin@app.lcv')
   const [items, setItems] = useState<MapaResumo[]>([])
   const [selectedMapa, setSelectedMapa] = useState<MapaDetalhado | null>(null)
-  const [emailDestino, setEmailDestino] = useState('')
   const [nomeConsulente, setNomeConsulente] = useState('')
   const [relatorioHtml, setRelatorioHtml] = useState('')
   const [relatorioTexto, setRelatorioTexto] = useState('')
-  const [copiedField, setCopiedField] = useState<'html' | 'texto' | null>(null)
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [showEmailForm, setShowEmailForm] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete | null>(null)
+  const [emailModalMapaId, setEmailModalMapaId] = useState<string | null>(null)
+  const [emailModalInput, setEmailModalInput] = useState('')
 
   // Dados parseados para o viewer estruturado
   const parsedData = useMemo(() => {
@@ -97,25 +95,7 @@ export function AstrologoModule() {
 
   const disabled = useMemo(() => loading, [loading])
 
-  useEffect(() => {
-    if (!selectedMapa) {
-      return
-    }
 
-    if (!nomeConsulente.trim()) {
-      setNomeConsulente(selectedMapa.nome)
-    }
-
-    if (!relatorioTexto.trim()) {
-      const textoBase = `Olá ${selectedMapa.nome},\n\nSeu relatório astrológico foi preparado pela equipe administrativa.`
-      setRelatorioTexto(textoBase)
-    }
-
-    if (!relatorioHtml.trim()) {
-      const htmlBase = `<p>Olá <strong>${selectedMapa.nome}</strong>,</p><p>Seu relatório astrológico foi preparado pela equipe administrativa.</p>`
-      setRelatorioHtml(htmlBase)
-    }
-  }, [selectedMapa, nomeConsulente, relatorioTexto, relatorioHtml])
 
   const handleReadMapa = async (id: string) => {
     setLoadingMapaId(id)
@@ -136,10 +116,8 @@ export function AstrologoModule() {
       }
 
       // Limpar estado dependente do mapa anterior antes de definir o novo
-      setShowEmailForm(false)
+      setEmailModalMapaId(null)
       setNomeConsulente(payload.mapa.nome)
-      setRelatorioHtml('')
-      setRelatorioTexto('')
 
       setSelectedMapa(payload.mapa)
       
@@ -157,6 +135,56 @@ export function AstrologoModule() {
       showNotification('Não foi possível carregar os detalhes do mapa.', 'error')
     } finally {
       setLoadingMapaId(null)
+    }
+  }
+
+  /** Open email modal for a specific mapa (loads its data first if not already selected) */
+  const handleOpenEmailModal = async (id: string, nome: string) => {
+    // If this record isn't already loaded, load it first
+    if (!selectedMapa || selectedMapa.id !== id) {
+      await handleReadMapa(id)
+    }
+    setNomeConsulente(nome)
+    setEmailModalInput('')
+    setEmailModalMapaId(id)
+  }
+
+  /** Send email using the simple modal (only asks for email address) */
+  const handleSendEmailFromModal = async () => {
+    const email = emailModalInput.trim()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showNotification('Informe um e-mail válido.', 'error')
+      return
+    }
+
+    setSendingEmail(true)
+    try {
+      const response = await fetch('/api/astrologo/enviar-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
+        },
+        body: JSON.stringify({
+          emailDestino: email,
+          nomeConsulente,
+          relatorioHtml,
+          relatorioTexto,
+          adminActor,
+        }),
+      })
+
+      const payload = await response.json() as { ok: boolean; error?: string; request_id?: string }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? 'Falha ao enviar e-mail do Astrólogo.')
+      }
+
+      setEmailModalMapaId(null)
+      showNotification(withTrace('E-mail enviado com sucesso para o consulente.', payload), 'success')
+    } catch {
+      showNotification('Não foi possível enviar o e-mail do Astrólogo.', 'error')
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -192,81 +220,9 @@ export function AstrologoModule() {
     }
   }
 
-  const handleSendEmail = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const [sendingEmail, setSendingEmail] = useState(false)
 
-    if (!emailDestino.trim()) {
-      showNotification('Informe o e-mail de destino antes de enviar.', 'error')
-      return
-    }
 
-    if (!relatorioHtml.trim() && !relatorioTexto.trim()) {
-      showNotification('Preencha o relatório em HTML ou texto.', 'error')
-      return
-    }
-
-    setSendingEmail(true)
-    try {
-      const response = await fetch('/api/astrologo/enviar-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Actor': adminActor,
-        },
-        body: JSON.stringify({
-          emailDestino,
-          nomeConsulente,
-          relatorioHtml,
-          relatorioTexto,
-          adminActor,
-        }),
-      })
-
-      const payload = await response.json() as { ok: boolean; error?: string; request_id?: string }
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao enviar e-mail do Astrólogo.')
-      }
-
-      showNotification(withTrace('E-mail enviado com sucesso para o consulente.', payload), 'success')
-    } catch {
-      showNotification('Não foi possível enviar o e-mail do Astrólogo.', 'error')
-    } finally {
-      setSendingEmail(false)
-    }
-  }
-
-  const copyReportToClipboard = async (field: 'html' | 'texto') => {
-    const text = field === 'html' ? relatorioHtml : relatorioTexto
-    if (!text.trim()) {
-      showNotification(`Relatório em ${field} está vazio.`, 'error')
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedField(field)
-      showNotification(`Relatório (${field}) copiado para clipboard.`, 'success')
-      setTimeout(() => setCopiedField(null), 2000)
-    } catch {
-      showNotification('Falha ao copiar para clipboard.', 'error')
-    }
-  }
-
-  const restoreDefaultReport = () => {
-    if (!selectedMapa) {
-      showNotification('Selecione um mapa antes de restaurar o padrão.', 'error')
-      return
-    }
-
-    try {
-      const report = generateAstrologicalReport(selectedMapa, 'completo')
-      setRelatorioHtml(report.html)
-      setRelatorioTexto(report.text)
-      showNotification('Relatórios restaurados para padrão.', 'success')
-    } catch {
-      showNotification('Falha ao restaurar relatório padrão.', 'error')
-    }
-  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -382,6 +338,10 @@ export function AstrologoModule() {
                   </div>
 
                   <div className="post-row-actions">
+                    <button type="button" className="ghost-button" onClick={() => void handleOpenEmailModal(item.id, item.nome)} disabled={loadingMapaId === item.id || deletingMapaId === item.id || sendingEmail}>
+                      <Mail size={16} />
+                      E-mail
+                    </button>
                     <button type="button" className="ghost-button" onClick={() => void handleReadMapa(item.id)} disabled={loadingMapaId === item.id || deletingMapaId === item.id}>
                       {loadingMapaId === item.id ? <Loader2 size={16} className="spin" /> : <Telescope size={16} />}
                       Ler detalhes
@@ -409,6 +369,11 @@ export function AstrologoModule() {
 
           {selectedMapa.local_nascimento && (
             <p className="field-hint astro-local-hint">{selectedMapa.local_nascimento}</p>
+          )}
+
+          {/* Empty state for unanalyzed records */}
+          {!parsedData?.globais && !parsedData?.tropical && !parsedData?.astronomica && !selectedMapa.analise_ia && (
+            <p className="result-empty">Este registro ainda não foi analisado pelo motor astrológico. Os dados brutos de cálculo ainda não estão disponíveis.</p>
           )}
 
           {parsedData?.globais && (
@@ -506,71 +471,37 @@ export function AstrologoModule() {
             </div>
           )}
 
-          {/* Ação de compartilhamento (paridade com astrologo-admin — apenas e-mail) */}
-          <div className="astro-sharing">
-            <button type="button" className="ghost-button" onClick={() => {
-              setShowEmailForm((prev) => !prev)
-              if (!showEmailForm) {
-                setEmailDestino('')
-                setNomeConsulente(selectedMapa.nome)
-              }
-            }}>
-              <Send size={16} /> {showEmailForm ? 'Ocultar E-mail' : 'Enviar por E-mail'}
-            </button>
-          </div>
         </article>
 
-        {/* Envio de e-mail (versão avançada com textareas colapsáveis) — só visível com mapa selecionado e toggle ativo */}
-          {showEmailForm && (
-            <form className="form-card" onSubmit={handleSendEmail}>
-              <div className="result-toolbar">
-                <div>
-                  <h4><Send size={16} /> Envio administrativo de e-mail</h4>
-                  <p className="field-hint">Fluxo server-side via Resend, sem expor chave no frontend.</p>
-                </div>
+        {/* Simple email modal (paridade com astrologo-frontend EmailModal) */}
+        {emailModalMapaId && (
+          <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Enviar e-mail">
+            <div className="confirm-dialog">
+              <h4><Mail size={16} /> Enviar Dossiê Celestial</h4>
+              <p className="field-hint">Insira o endereço de e-mail para receber o relatório astrológico completo.</p>
+              <div className="field-group">
+                <label htmlFor="astrologo-email-modal">E-mail de destino</label>
+                <input
+                  id="astrologo-email-modal"
+                  name="astrologoEmailModal"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="consulente@email.com"
+                  value={emailModalInput}
+                  onChange={(e) => setEmailModalInput(e.target.value)}
+                  disabled={sendingEmail}
+                />
               </div>
-
-              <div className="form-grid">
-                <div className="field-group">
-                  <label htmlFor="astrologo-email-destino">E-mail de destino</label>
-                  <input id="astrologo-email-destino" name="astrologoEmailDestino" type="email" autoComplete="email" placeholder="consulente@email.com" value={emailDestino} onChange={(event) => setEmailDestino(event.target.value)} disabled={sendingEmail} />
-                </div>
-                <div className="field-group">
-                  <label htmlFor="astrologo-email-nome">Nome do consulente</label>
-                  <input id="astrologo-email-nome" name="astrologoEmailNomeConsulente" type="text" autoComplete="name" placeholder="Nome para o assunto" value={nomeConsulente} onChange={(event) => setNomeConsulente(event.target.value)} disabled={sendingEmail} />
-                </div>
-              </div>
-
-              <details className="astro-email-details">
-                <summary>Editar relatório manualmente (avançado)</summary>
-                <div className="field-group">
-                  <label htmlFor="astrologo-email-html">Relatório (HTML)</label>
-                  <textarea id="astrologo-email-html" name="astrologoEmailRelatorioHtml" className="json-textarea" value={relatorioHtml} onChange={(event) => setRelatorioHtml(event.target.value)} disabled={sendingEmail} />
-                  <button type="button" className="ghost-button" onClick={() => void copyReportToClipboard('html')} disabled={sendingEmail || !relatorioHtml.trim()}>
-                    {copiedField === 'html' ? '✓ Copiado' : <><Copy size={16} /> Copiar HTML</>}
-                  </button>
-                </div>
-                <div className="field-group">
-                  <label htmlFor="astrologo-email-texto">Relatório (texto puro)</label>
-                  <textarea id="astrologo-email-texto" name="astrologoEmailRelatorioTexto" className="json-textarea" value={relatorioTexto} onChange={(event) => setRelatorioTexto(event.target.value)} disabled={sendingEmail} />
-                  <button type="button" className="ghost-button" onClick={() => void copyReportToClipboard('texto')} disabled={sendingEmail || !relatorioTexto.trim()}>
-                    {copiedField === 'texto' ? '✓ Copiado' : <><Copy size={16} /> Copiar Texto</>}
-                  </button>
-                </div>
-              </details>
-
-              <div className="form-actions">
-                <button type="submit" className="primary-button" disabled={sendingEmail}>
-                  {sendingEmail ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
-                  Enviar e-mail
-                </button>
-                <button type="button" className="ghost-button" onClick={() => restoreDefaultReport()} disabled={sendingEmail}>
-                  <RefreshCw size={16} />
-                  Restaurar padrão
+              <div className="confirm-dialog__actions">
+                <button type="button" className="ghost-button" onClick={() => setEmailModalMapaId(null)} disabled={sendingEmail}>Cancelar</button>
+                <button type="button" className="primary-button" onClick={() => void handleSendEmailFromModal()} disabled={sendingEmail || !emailModalInput.trim()}>
+                  {sendingEmail ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+                  Disparar E-mail
                 </button>
               </div>
-            </form>
-          )}
+            </div>
+          </div>
+        )}
         </>
       )}
 
