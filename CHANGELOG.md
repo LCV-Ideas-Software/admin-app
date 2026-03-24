@@ -1,5 +1,28 @@
 # Changelog — Admin App
 
+## [v01.35.01] — 2026-03-24
+### Alterado
+- "Admin LCV" fonte restaurada para `1.1rem` (era `0.65rem`).
+- Menu lateral colapsável: recolhe para 72px (ícones), expande no hover (320px overlay), botão Pin/PinOff para fixar/recolher estado.
+- Acessibilidade: atributos `title` adicionados ao color picker e select de fonte do TipTap.
+
+## [v01.35.00] — 2026-03-24
+### Adicionado
+- Editor TipTap WYSIWYG completo no módulo MainSite (34 botões na toolbar: formatação, alinhamento, headings, listas, tabelas, task lists, links, color picker, font family/size).
+- Barra de status com contagem de caracteres/palavras.
+- Modal de inserção de link com suporte a texto de exibição.
+- Settings estruturados: rotação (toggle + intervalo), modo automático (toggle), paletas de cores dark/light (6 color pickers), configurações globais de fonte, disclaimers (CRUD com gatilho de doação).
+- 317 linhas de CSS: `.tiptap-container/toolbar/editor/status-bar`, `.settings-fieldset`, `.theme-color-grid`, `.color-label`, `.disclaimers-list`, `.disclaimer-card`, `.donation-trigger`, `.post-row--selected`.
+
+### Alterado
+- Overview form compactado: input + botão em linha horizontal (`.overview-inline-form`).
+- "fonte: bigdata_db" renderizado como badge estilizado (`.source-badge`, teal pill).
+- JSON textareas (appearance/rotation/disclaimers) substituídos por formulários estruturados.
+- Textarea de conteúdo de post substituído por editor TipTap com suporte a Markdown na colagem.
+
+### Dependências
+- 22 pacotes TipTap instalados: `@tiptap/react`, `@tiptap/starter-kit`, extensões de formatação, tabela, task-list, link, placeholder, character-count, color, font-family, typography, dropcursor, `tiptap-markdown`.
+
 ## [v01.34.00] — 2026-03-24
 ### Corrigido
 - Endpoints `sync.ts`, `ler.ts`, `excluir.ts` do Astrólogo: referência a tabela legado `mapas_astrologicos` corrigida para `astrologo_mapas` (prefixada).

@@ -1,9 +1,62 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Activity, AlertTriangle, FilePlus2, Globe, GripVertical, Loader2, Pencil, Pin, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
+import {
+  Activity, AlertTriangle, AlignCenter, AlignJustify, AlignLeft, AlignRight,
+  Bold, CheckSquare, Code, FilePlus2, Globe, GripVertical,
+  Heading1, Heading2, Highlighter, Italic, List, ListOrdered,
+  Loader2, Minus, Palette, Pencil, Pin, Quote, RefreshCw,
+  Save, Search, Strikethrough, Trash2, Type,
+  Underline as UnderlineIcon, WrapText, X,
+  Link as LinkIcon, Unlink,
+  Subscript as SubIcon, Superscript as SuperIcon,
+  Table as TableIcon,
+} from 'lucide-react'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import { Underline } from '@tiptap/extension-underline'
+import { Highlight } from '@tiptap/extension-highlight'
+import TextAlign from '@tiptap/extension-text-align'
+import LinkExtension from '@tiptap/extension-link'
+import { Placeholder } from '@tiptap/extension-placeholder'
+import { CharacterCount } from '@tiptap/extension-character-count'
+import { Color } from '@tiptap/extension-color'
+import { TextStyle } from '@tiptap/extension-text-style'
+import { FontFamily } from '@tiptap/extension-font-family'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TaskList } from '@tiptap/extension-task-list'
+import { TaskItem } from '@tiptap/extension-task-item'
+import { Subscript } from '@tiptap/extension-subscript'
+import { Superscript } from '@tiptap/extension-superscript'
+import { Typography } from '@tiptap/extension-typography'
+import { Dropcursor } from '@tiptap/extension-dropcursor'
+import { Markdown } from 'tiptap-markdown'
 import { useNotification } from '../../components/Notification'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
 import type { RateLimitPolicy } from '../../lib/rate-limit-common'
+
+// ── TipTap extensions ─────────────────────────────────────────
+const TIPTAP_EXTENSIONS = [
+  StarterKit.configure({ dropcursor: false, link: false }),
+  Markdown,
+  Underline,
+  Highlight,
+  Subscript,
+  Superscript,
+  TextStyle,
+  Color,
+  FontFamily,
+  Typography,
+  TextAlign.configure({ types: ['heading', 'paragraph'], defaultAlignment: 'justify' }),
+  Table.configure({ resizable: true }), TableRow, TableHeader, TableCell,
+  TaskList, TaskItem.configure({ nested: true }),
+  Dropcursor.configure({ color: '#3b82f6', width: 2 }),
+  CharacterCount,
+  Placeholder.configure({ placeholder: 'Comece a escrever o conteúdo do post...' }),
+  LinkExtension.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
+]
 
 type OverviewPayload = {
   ok: boolean
@@ -48,6 +101,42 @@ type MainsiteSettingsPayload = {
   disclaimers: Record<string, unknown>
 }
 
+// ── Structured settings types ─────────────────────────────────
+type AppearanceSettings = {
+  allowAutoMode: boolean
+  light: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
+  dark: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
+  shared: { fontSize: string; titleFontSize: string; fontFamily: string }
+}
+
+type RotationSettings = {
+  enabled: boolean
+  interval: number
+}
+
+type DisclaimerItem = {
+  id: string
+  title: string
+  text: string
+  buttonText: string
+  isDonationTrigger: boolean
+}
+
+type DisclaimersSettings = {
+  enabled: boolean
+  items: DisclaimerItem[]
+}
+
+const DEFAULT_APPEARANCE: AppearanceSettings = {
+  allowAutoMode: true,
+  light: { bgColor: '#f8f9fa', bgImage: '', fontColor: '#202124', titleColor: '#1a73e8' },
+  dark: { bgColor: '#131314', bgImage: '', fontColor: '#e3e3e3', titleColor: '#8ab4f8' },
+  shared: { fontSize: '1rem', titleFontSize: '1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif' },
+}
+
+const DEFAULT_ROTATION: RotationSettings = { enabled: false, interval: 60 }
+const DEFAULT_DISCLAIMERS: DisclaimersSettings = { enabled: true, items: [] }
+
 const initialPayload: OverviewPayload = {
   ok: true,
   fonte: 'bigdata_db',
@@ -91,14 +180,21 @@ export function MainsiteModule() {
   const [editingPostId, setEditingPostId] = useState<number | null>(null)
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
   const [postTitle, setPostTitle] = useState('')
-  const [postContent, setPostContent] = useState('')
-  const [appearanceJson, setAppearanceJson] = useState('')
-  const [rotationJson, setRotationJson] = useState('')
-  const [disclaimersJson, setDisclaimersJson] = useState('')
+  // Structured settings state
+  const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE)
+  const [rotation, setRotation] = useState<RotationSettings>(DEFAULT_ROTATION)
+  const [disclaimers, setDisclaimers] = useState<DisclaimersSettings>(DEFAULT_DISCLAIMERS)
   const [ratePolicies, setRatePolicies] = useState<RateLimitPolicy[]>([])
   const [baselineRatePolicies, setBaselineRatePolicies] = useState<RateLimitPolicy[]>([])
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' })
   const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null)
+  const [linkPrompt, setLinkPrompt] = useState<{ show: boolean; url: string; text: string }>({ show: false, url: '', text: '' })
+
+  // TipTap editor instance
+  const editor = useEditor({
+    extensions: TIPTAP_EXTENSIONS,
+    content: '',
+  })
 
   const hasUnsavedRatePolicies = useMemo(() => (
     JSON.stringify(normalizePoliciesForCompare(ratePolicies)) !== JSON.stringify(normalizePoliciesForCompare(baselineRatePolicies))
@@ -352,9 +448,9 @@ export function MainsiteModule() {
         throw new Error(nextPayload.error ?? 'Falha ao carregar os settings públicos do MainSite.')
       }
 
-      setAppearanceJson(JSON.stringify(nextPayload.settings.appearance, null, 2))
-      setRotationJson(JSON.stringify(nextPayload.settings.rotation, null, 2))
-      setDisclaimersJson(JSON.stringify(nextPayload.settings.disclaimers, null, 2))
+      setAppearance(nextPayload.settings.appearance as AppearanceSettings ?? DEFAULT_APPEARANCE)
+      setRotation(nextPayload.settings.rotation as RotationSettings ?? DEFAULT_ROTATION)
+      setDisclaimers(nextPayload.settings.disclaimers as DisclaimersSettings ?? DEFAULT_DISCLAIMERS)
 
       if (shouldNotify) {
         showNotification('Settings públicos do MainSite recarregados.', 'success')
@@ -375,7 +471,7 @@ export function MainsiteModule() {
   const resetPostEditor = () => {
     setEditingPostId(null)
     setPostTitle('')
-    setPostContent('')
+    editor?.commands.clearContent()
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -400,7 +496,7 @@ export function MainsiteModule() {
 
       setEditingPostId(nextPayload.post.id)
       setPostTitle(nextPayload.post.title)
-      setPostContent(nextPayload.post.content)
+      editor?.commands.setContent(nextPayload.post.content)
       showNotification(`Post #${nextPayload.post.id} carregado para edição.`, 'info')
     } catch {
       showNotification('Não foi possível carregar o post selecionado.', 'error')
@@ -413,9 +509,9 @@ export function MainsiteModule() {
     event.preventDefault()
 
     const title = postTitle.trim()
-    const content = postContent.trim()
+    const content = editor?.getHTML()?.trim() ?? ''
 
-    if (!title || !content) {
+    if (!title || !content || content === '<p></p>') {
       showNotification('Título e conteúdo são obrigatórios para salvar o post.', 'error')
       return
     }
@@ -554,12 +650,12 @@ export function MainsiteModule() {
     let nextSettings: MainsiteSettingsPayload
     try {
       nextSettings = {
-        appearance: JSON.parse(appearanceJson) as Record<string, unknown>,
-        rotation: JSON.parse(rotationJson) as Record<string, unknown>,
-        disclaimers: JSON.parse(disclaimersJson) as Record<string, unknown>,
+        appearance: appearance as unknown as Record<string, unknown>,
+        rotation: rotation as unknown as Record<string, unknown>,
+        disclaimers: disclaimers as unknown as Record<string, unknown>,
       }
     } catch {
-      showNotification('Os JSONs de settings públicos precisam estar válidos antes de salvar.', 'error')
+      showNotification('Dados de settings inválidos.', 'error')
       return
     }
 
@@ -619,10 +715,9 @@ export function MainsiteModule() {
       )}
 
       <form className="form-card" onSubmit={handleSubmit}>
-        <div className="form-grid">
-
-          <div className="field-group">
-            <label htmlFor="mainsite-filtro-limit">Quantidade de posts</label>
+        <div className="overview-inline-form">
+          <div className="field-group" style={{ flex: '0 0 120px' }}>
+            <label htmlFor="mainsite-filtro-limit">Qtd. posts</label>
             <input
               id="mainsite-filtro-limit"
               name="mainsiteFiltroLimit"
@@ -633,10 +728,7 @@ export function MainsiteModule() {
               onChange={(event) => setLimit(event.target.value)}
             />
           </div>
-        </div>
-
-        <div className="form-actions">
-          <button type="submit" className="primary-button" disabled={disabled}>
+          <button type="submit" className="primary-button" disabled={disabled} style={{ alignSelf: 'flex-end' }}>
             {overviewLoading ? <Loader2 size={18} className="spin" /> : <Search size={18} />}
             Carregar overview
           </button>
@@ -647,7 +739,7 @@ export function MainsiteModule() {
       <article className="result-card">
         <header className="result-header">
           <h4><Activity size={16} /> Últimos posts</h4>
-          <span>fonte: {payload.fonte}</span>
+          <span className="source-badge">{payload.fonte}</span>
         </header>
 
         {payload.ultimosPosts.length === 0 ? (
@@ -703,16 +795,94 @@ export function MainsiteModule() {
           </div>
         </div>
 
-        <div className="field-group">
-          <label htmlFor="mainsite-post-content">Conteúdo</label>
-          <textarea
-            id="mainsite-post-content"
-            name="mainsitePostContent"
-            value={postContent}
-            onChange={(event) => setPostContent(event.target.value)}
-            disabled={savingPost}
-            rows={10}
-          />
+        {/* ── TipTap Editor ────────────────────────────────────────────── */}
+        <div className="tiptap-container">
+          {editor && (
+            <div className="tiptap-toolbar">
+              {/* Link insert modal */}
+              {linkPrompt.show && (
+                <div className="confirm-overlay">
+                  <div className="confirm-dialog">
+                    <h4>Inserir Link</h4>
+                    <div className="field-group">
+                      <label htmlFor="tiptap-link-url">URL</label>
+                      <input id="tiptap-link-url" name="tiptapLinkUrl" value={linkPrompt.url} onChange={(e) => setLinkPrompt({ ...linkPrompt, url: e.target.value })} placeholder="https://..." />
+                    </div>
+                    {editor.state.selection.empty && (
+                      <div className="field-group">
+                        <label htmlFor="tiptap-link-text">Texto</label>
+                        <input id="tiptap-link-text" name="tiptapLinkText" value={linkPrompt.text} onChange={(e) => setLinkPrompt({ ...linkPrompt, text: e.target.value })} placeholder="Texto de exibição" />
+                      </div>
+                    )}
+                    <div className="confirm-dialog__actions">
+                      <button type="button" className="ghost-button" onClick={() => setLinkPrompt({ show: false, url: '', text: '' })}>Cancelar</button>
+                      <button type="button" className="primary-button" onClick={() => {
+                        const url = linkPrompt.url.trim()
+                        if (!url) { editor.chain().focus().extendMarkRange('link').unsetLink().run() }
+                        else if (editor.state.selection.empty && linkPrompt.text) {
+                          editor.chain().focus().insertContent(`<a href="${url}" target="_blank" rel="noopener noreferrer">${linkPrompt.text}</a>`).run()
+                        } else {
+                          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+                        }
+                        setLinkPrompt({ show: false, url: '', text: '' })
+                      }}>Inserir</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button type="button" title="Negrito" className={editor.isActive('bold') ? 'active' : ''} onClick={() => editor.chain().focus().toggleBold().run()}><Bold size={15} /></button>
+              <button type="button" title="Itálico" className={editor.isActive('italic') ? 'active' : ''} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={15} /></button>
+              <button type="button" title="Sublinhado" className={editor.isActive('underline') ? 'active' : ''} onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon size={15} /></button>
+              <button type="button" title="Tachado" className={editor.isActive('strike') ? 'active' : ''} onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough size={15} /></button>
+              <button type="button" title="Marca-texto" className={editor.isActive('highlight') ? 'active' : ''} onClick={() => editor.chain().focus().toggleHighlight().run()}><Highlighter size={15} /></button>
+              <span className="tiptap-divider" />
+              <button type="button" title="Subscrito" className={editor.isActive('subscript') ? 'active' : ''} onClick={() => editor.chain().focus().toggleSubscript().run()}><SubIcon size={15} /></button>
+              <button type="button" title="Sobrescrito" className={editor.isActive('superscript') ? 'active' : ''} onClick={() => editor.chain().focus().toggleSuperscript().run()}><SuperIcon size={15} /></button>
+              <button type="button" title="Bloco de código" className={editor.isActive('codeBlock') ? 'active' : ''} onClick={() => editor.chain().focus().toggleCodeBlock().run()}><Code size={15} /></button>
+              <button type="button" title="Citação" className={editor.isActive('blockquote') ? 'active' : ''} onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote size={15} /></button>
+              <span className="tiptap-divider" />
+              <button type="button" title="Esquerda" className={editor.isActive({ textAlign: 'left' }) ? 'active' : ''} onClick={() => editor.chain().focus().setTextAlign('left').run()}><AlignLeft size={15} /></button>
+              <button type="button" title="Centro" className={editor.isActive({ textAlign: 'center' }) ? 'active' : ''} onClick={() => editor.chain().focus().setTextAlign('center').run()}><AlignCenter size={15} /></button>
+              <button type="button" title="Direita" className={editor.isActive({ textAlign: 'right' }) ? 'active' : ''} onClick={() => editor.chain().focus().setTextAlign('right').run()}><AlignRight size={15} /></button>
+              <button type="button" title="Justificar" className={editor.isActive({ textAlign: 'justify' }) ? 'active' : ''} onClick={() => editor.chain().focus().setTextAlign('justify').run()}><AlignJustify size={15} /></button>
+              <span className="tiptap-divider" />
+              <button type="button" title="Título 1" className={editor.isActive('heading', { level: 1 }) ? 'active' : ''} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}><Heading1 size={15} /></button>
+              <button type="button" title="Título 2" className={editor.isActive('heading', { level: 2 }) ? 'active' : ''} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 size={15} /></button>
+              <button type="button" title="Marcadores" className={editor.isActive('bulletList') ? 'active' : ''} onClick={() => editor.chain().focus().toggleBulletList().run()}><List size={15} /></button>
+              <button type="button" title="Numeração" className={editor.isActive('orderedList') ? 'active' : ''} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered size={15} /></button>
+              <button type="button" title="Tarefas" className={editor.isActive('taskList') ? 'active' : ''} onClick={() => editor.chain().focus().toggleTaskList().run()}><CheckSquare size={15} /></button>
+              <button type="button" title="Linha" onClick={() => editor.chain().focus().setHorizontalRule().run()}><Minus size={15} /></button>
+              <button type="button" title="Tabela" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><TableIcon size={15} /></button>
+              <button type="button" title="Quebra" onClick={() => editor.chain().focus().setHardBreak().run()}><WrapText size={15} /></button>
+              <span className="tiptap-divider" />
+              <button type="button" title="Link" className={editor.isActive('link') ? 'active' : ''} onClick={() => {
+                const prev = editor.getAttributes('link').href || ''
+                setLinkPrompt({ show: true, url: prev as string, text: '' })
+              }}><LinkIcon size={15} /></button>
+              <button type="button" title="Remover Link" onClick={() => editor.chain().focus().unsetLink().run()} disabled={!editor.isActive('link')} className={!editor.isActive('link') ? 'disabled' : ''}><Unlink size={15} /></button>
+              <span className="tiptap-divider" />
+              <div className="tiptap-color-group">
+                <Palette size={14} />
+                <input id="tiptap-text-color" name="tiptapTextColor" type="color" title="Cor do texto" onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()} value={(editor.getAttributes('textStyle').color as string) || '#000000'} />
+              </div>
+              <div className="tiptap-select-group">
+                <Type size={14} />
+                <select id="tiptap-font-family" name="tiptapFontFamily" title="Família da fonte" onChange={(e) => editor.chain().focus().setFontFamily(e.target.value).run()} value={(editor.getAttributes('textStyle').fontFamily as string) || 'inherit'}>
+                  <option value="inherit">Padrão</option>
+                  <option value="monospace">Monospace</option>
+                  <option value="Arial">Arial</option>
+                  <option value="'Times New Roman', Times, serif">Times</option>
+                </select>
+              </div>
+            </div>
+          )}
+          <EditorContent editor={editor} className="tiptap-editor" />
+          {editor && (
+            <div className="tiptap-status-bar">
+              {editor.storage.characterCount.characters()} caracteres &middot; {editor.storage.characterCount.words()} palavras
+            </div>
+          )}
         </div>
 
         <div className="form-actions">
@@ -800,54 +970,149 @@ export function MainsiteModule() {
         <div className="result-toolbar">
           <div>
             <h4><Save size={16} /> Sistema — settings públicos do MainSite</h4>
-            <p className="field-hint">Appearance, rotation e disclaimers são editáveis diretamente no `bigdata_db`. `ratelimit` permanece no painel dedicado.</p>
+            <p className="field-hint">Configurações visuais, rotação e disclaimers. `ratelimit` permanece no painel dedicado.</p>
           </div>
           <div className="inline-actions">
             <button type="button" className="ghost-button" onClick={() => void loadPublicSettings(true)} disabled={settingsLoading || savingSettings}>
               {settingsLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-              Recarregar settings
+              Recarregar
             </button>
           </div>
         </div>
 
-        <div className="field-group">
-          <label htmlFor="mainsite-settings-appearance">Appearance (JSON)</label>
-          <textarea
-            id="mainsite-settings-appearance"
-            name="mainsiteSettingsAppearance"
-            className="json-textarea"
-            value={appearanceJson}
-            onChange={(event) => setAppearanceJson(event.target.value)}
-            disabled={savingSettings}
-            rows={10}
-          />
-        </div>
+        {/* ── Rotação Autônoma ────────────────────────────────── */}
+        <fieldset className="settings-fieldset">
+          <legend>Engenharia de Automação</legend>
+          <label className="toggle-row">
+            <input id="rotation-enabled" name="rotationEnabled" type="checkbox" checked={rotation.enabled} onChange={(e) => setRotation({ ...rotation, enabled: e.target.checked })} />
+            Habilitar Rotação Autônoma da Fila de Textos
+          </label>
+          <div className="form-grid">
+            <div className="field-group">
+              <label htmlFor="rotation-interval">Intervalo (minutos)</label>
+              <input id="rotation-interval" name="rotationInterval" type="number" min={1} value={rotation.interval} onChange={(e) => setRotation({ ...rotation, interval: parseInt(e.target.value) || 60 })} disabled={!rotation.enabled} />
+            </div>
+          </div>
+        </fieldset>
 
-        <div className="field-group">
-          <label htmlFor="mainsite-settings-rotation">Rotation (JSON)</label>
-          <textarea
-            id="mainsite-settings-rotation"
-            name="mainsiteSettingsRotation"
-            className="json-textarea"
-            value={rotationJson}
-            onChange={(event) => setRotationJson(event.target.value)}
-            disabled={savingSettings}
-            rows={8}
-          />
-        </div>
+        {/* ── Modo Automático ────────────────────────────────── */}
+        <fieldset className="settings-fieldset">
+          <legend>Customização Visual: Multi-Tema</legend>
+          <label className="toggle-row">
+            <input id="allow-auto-mode" name="allowAutoMode" type="checkbox" checked={appearance.allowAutoMode} onChange={(e) => setAppearance({ ...appearance, allowAutoMode: e.target.checked })} />
+            Habilitar Modo Automático (Sincroniza com o SO do Leitor)
+          </label>
+        </fieldset>
 
-        <div className="field-group">
-          <label htmlFor="mainsite-settings-disclaimers">Disclaimers (JSON)</label>
-          <textarea
-            id="mainsite-settings-disclaimers"
-            name="mainsiteSettingsDisclaimers"
-            className="json-textarea"
-            value={disclaimersJson}
-            onChange={(event) => setDisclaimersJson(event.target.value)}
-            disabled={savingSettings}
-            rows={10}
-          />
-        </div>
+        {/* ── Configurações Globais ──────────────────────────── */}
+        <fieldset className="settings-fieldset">
+          <legend>Configurações Globais (Ambos os Temas)</legend>
+          <div className="form-grid">
+            <div className="field-group">
+              <label htmlFor="shared-font-size">Tamanho da Fonte Base</label>
+              <input id="shared-font-size" name="sharedFontSize" value={appearance.shared.fontSize} onChange={(e) => setAppearance({ ...appearance, shared: { ...appearance.shared, fontSize: e.target.value } })} placeholder="1rem" />
+            </div>
+            <div className="field-group">
+              <label htmlFor="shared-title-font-size">Tamanho Títulos (H1)</label>
+              <input id="shared-title-font-size" name="sharedTitleFontSize" value={appearance.shared.titleFontSize} onChange={(e) => setAppearance({ ...appearance, shared: { ...appearance.shared, titleFontSize: e.target.value } })} placeholder="1.5rem" />
+            </div>
+            <div className="field-group">
+              <label htmlFor="shared-font-family">Família da Fonte</label>
+              <select id="shared-font-family" name="sharedFontFamily" value={appearance.shared.fontFamily} onChange={(e) => setAppearance({ ...appearance, shared: { ...appearance.shared, fontFamily: e.target.value } })}>
+                <option value="system-ui, -apple-system, sans-serif">System UI</option>
+                <option value="sans-serif">Sans-Serif</option>
+                <option value="serif">Serif</option>
+                <option value="monospace">Monospace</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+
+        {/* ── Paleta Dark ──────────────────────────────────── */}
+        <fieldset className="settings-fieldset">
+          <legend>Paleta Tema Escuro</legend>
+          <div className="theme-color-grid">
+            <label className="color-label">Cor de Fundo <input id="dark-bg-color" name="darkBgColor" type="color" value={appearance.dark.bgColor} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, bgColor: e.target.value } })} /></label>
+            <label className="color-label">Cor do Texto <input id="dark-font-color" name="darkFontColor" type="color" value={appearance.dark.fontColor} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, fontColor: e.target.value } })} /></label>
+            <label className="color-label">Cor dos Títulos <input id="dark-title-color" name="darkTitleColor" type="color" value={appearance.dark.titleColor} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, titleColor: e.target.value } })} /></label>
+          </div>
+          <div className="field-group">
+            <label htmlFor="dark-bg-image">Imagem de Fundo (URL)</label>
+            <input id="dark-bg-image" name="darkBgImage" value={appearance.dark.bgImage} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, bgImage: e.target.value } })} placeholder="https://..." />
+          </div>
+        </fieldset>
+
+        {/* ── Paleta Light ─────────────────────────────────── */}
+        <fieldset className="settings-fieldset">
+          <legend>Paleta Tema Claro</legend>
+          <div className="theme-color-grid">
+            <label className="color-label">Cor de Fundo <input id="light-bg-color" name="lightBgColor" type="color" value={appearance.light.bgColor} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, bgColor: e.target.value } })} /></label>
+            <label className="color-label">Cor do Texto <input id="light-font-color" name="lightFontColor" type="color" value={appearance.light.fontColor} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, fontColor: e.target.value } })} /></label>
+            <label className="color-label">Cor dos Títulos <input id="light-title-color" name="lightTitleColor" type="color" value={appearance.light.titleColor} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, titleColor: e.target.value } })} /></label>
+          </div>
+          <div className="field-group">
+            <label htmlFor="light-bg-image">Imagem de Fundo (URL)</label>
+            <input id="light-bg-image" name="lightBgImage" value={appearance.light.bgImage} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, bgImage: e.target.value } })} placeholder="https://..." />
+          </div>
+        </fieldset>
+
+        {/* ── Disclaimers ─────────────────────────────────── */}
+        <fieldset className="settings-fieldset">
+          <legend>Janelas de Aviso (Disclaimers)</legend>
+          <label className="toggle-row">
+            <input id="disclaimers-enabled" name="disclaimersEnabled" type="checkbox" checked={disclaimers.enabled} onChange={(e) => setDisclaimers({ ...disclaimers, enabled: e.target.checked })} />
+            Exibir Janelas de Aviso antes da leitura dos fragmentos
+          </label>
+
+          {disclaimers.enabled && (
+            <div className="disclaimers-list">
+              {disclaimers.items.map((item, idx) => (
+                <div key={item.id} className="disclaimer-card">
+                  <div className="disclaimer-card__header">
+                    <span className="disclaimer-card__index">AVISO {idx + 1}</span>
+                    <button type="button" className="ghost-button danger" onClick={() => {
+                      const next = [...disclaimers.items]
+                      next.splice(idx, 1)
+                      setDisclaimers({ ...disclaimers, items: next })
+                    }}><Trash2 size={14} /> Remover</button>
+                  </div>
+                  <div className="form-grid">
+                    <div className="field-group">
+                      <label htmlFor={`disc-title-${idx}`}>Título</label>
+                      <input id={`disc-title-${idx}`} name={`discTitle_${idx}`} placeholder="Ex: Termos de Leitura" value={item.title} onChange={(e) => {
+                        const next = [...disclaimers.items]; next[idx] = { ...next[idx], title: e.target.value }; setDisclaimers({ ...disclaimers, items: next })
+                      }} />
+                    </div>
+                    <div className="field-group">
+                      <label htmlFor={`disc-btn-${idx}`}>Texto do Botão</label>
+                      <input id={`disc-btn-${idx}`} name={`discBtn_${idx}`} placeholder="Concordo" value={item.buttonText} onChange={(e) => {
+                        const next = [...disclaimers.items]; next[idx] = { ...next[idx], buttonText: e.target.value }; setDisclaimers({ ...disclaimers, items: next })
+                      }} />
+                    </div>
+                  </div>
+                  <div className="field-group">
+                    <label htmlFor={`disc-text-${idx}`}>Texto do aviso</label>
+                    <textarea id={`disc-text-${idx}`} name={`discText_${idx}`} rows={3} value={item.text} onChange={(e) => {
+                      const next = [...disclaimers.items]; next[idx] = { ...next[idx], text: e.target.value }; setDisclaimers({ ...disclaimers, items: next })
+                    }} />
+                  </div>
+                  <label className="toggle-row donation-trigger">
+                    <input id={`disc-trigger-${idx}`} name={`discTrigger_${idx}`} type="checkbox" checked={item.isDonationTrigger} onChange={(e) => {
+                      const next = [...disclaimers.items]; next[idx] = { ...next[idx], isDonationTrigger: e.target.checked }; setDisclaimers({ ...disclaimers, items: next })
+                    }} />
+                    Gatilho de Doação (Mercado Pago)
+                  </label>
+                </div>
+              ))}
+              <button type="button" className="ghost-button" onClick={() => setDisclaimers({
+                ...disclaimers,
+                items: [...disclaimers.items, { id: crypto.randomUUID(), title: '', text: '', buttonText: 'Concordo', isDonationTrigger: false }],
+              })}>
+                <FilePlus2 size={16} /> Adicionar Novo Aviso
+              </button>
+            </div>
+          )}
+        </fieldset>
 
         <div className="form-actions">
           <button type="submit" className="primary-button" disabled={savingSettings}>

@@ -8,6 +8,8 @@ import {
   FolderKanban,
   Globe,
   PanelsTopLeft,
+  Pin,
+  PinOff,
   ShieldCheck,
   Sparkles,
   Workflow,
@@ -25,7 +27,7 @@ import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
 import { formatOperationalSourceLabel, isLegacyOperationalSource } from './lib/operationalSource'
 
-const APP_VERSION = 'APP v01.34.00'
+const APP_VERSION = 'APP v01.35.01'
 
 type OperationalModuleStatus = {
   module: string
@@ -183,12 +185,29 @@ function App() {
     }
   }, [activeModule])
 
+  const [sidebarPinned, setSidebarPinned] = useState(true)
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell${sidebarPinned ? '' : ' sidebar-collapsed'}`}>
+      <aside
+        className={`sidebar${sidebarPinned ? '' : ' collapsed'}`}
+        onMouseEnter={() => { if (!sidebarPinned) document.querySelector('.sidebar')?.classList.add('hovered') }}
+        onMouseLeave={() => { if (!sidebarPinned) document.querySelector('.sidebar')?.classList.remove('hovered') }}
+      >
         <div className="brand-card">
           <div className="brand-icon"><Workflow size={24} /></div>
-          <h1>Admin LCV</h1>
+          <h1 className="sidebar-label">Admin LCV</h1>
+          <button
+            type="button"
+            className="pin-toggle"
+            title={sidebarPinned ? 'Recolher menu' : 'Fixar menu'}
+            onClick={() => {
+              setSidebarPinned(!sidebarPinned)
+              document.querySelector('.sidebar')?.classList.remove('hovered')
+            }}
+          >
+            {sidebarPinned ? <PinOff size={14} /> : <Pin size={14} />}
+          </button>
         </div>
 
         <nav className="nav-list" aria-label="Módulos administrativos">
@@ -198,9 +217,10 @@ function App() {
               type="button"
               className={`nav-item ${activeModule === id ? 'nav-item-active' : ''}`}
               onClick={() => handleModuleClick(id)}
+              title={label}
             >
               <Icon size={18} />
-              <span>{label}</span>
+              <span className="sidebar-label">{label}</span>
             </button>
           ))}
         </nav>

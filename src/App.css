@@ -2,6 +2,11 @@
   display: grid;
   grid-template-columns: 320px 1fr;
   min-height: 100vh;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 72px 1fr;
 }
 
 .sidebar {
@@ -12,7 +17,29 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  transition: width 0.25s ease, padding 0.25s ease;
+  overflow: hidden;
+  position: relative;
+  z-index: 20;
 }
+
+.sidebar.collapsed {
+  padding: 16px 12px;
+  width: 72px;
+}
+
+.sidebar.collapsed.hovered {
+  width: 320px;
+  padding: 24px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar.collapsed .sidebar-label { opacity: 0; width: 0; overflow: hidden; white-space: nowrap; }
+.sidebar.collapsed.hovered .sidebar-label { opacity: 1; width: auto; }
 
 .brand-card,
 .sidebar-card,
@@ -37,8 +64,34 @@
 }
 
 .brand-card h1 {
-  font-size: 0.65rem;
+  font-size: 1.1rem;
+  transition: opacity 0.2s ease;
 }
+
+.pin-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.pin-toggle:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.sidebar.collapsed .pin-toggle { display: none; }
+.sidebar.collapsed.hovered .pin-toggle { display: inline-flex; }
 
 .brand-icon,
 .metric-icon,
@@ -1415,4 +1468,317 @@
 @media (max-width: 480px) {
   .astro-grid--4,
   .astro-grid--3 { grid-template-columns: 1fr; }
+}
+
+/* ── Overview Inline Form ──────────────────────── */
+.overview-inline-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ── Source Badge ───────────────────────────────── */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #0f766e;
+  background: rgba(20, 184, 166, 0.1);
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+/* ── TipTap Editor ─────────────────────────────── */
+.tiptap-container {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.tiptap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 10px;
+  background: rgba(241, 245, 249, 0.7);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  align-items: center;
+}
+
+.tiptap-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tiptap-toolbar button:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+}
+
+.tiptap-toolbar button.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+.tiptap-toolbar button.disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tiptap-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(148, 163, 184, 0.3);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.tiptap-color-group,
+.tiptap-select-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+.tiptap-color-group input[type="color"] {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+}
+
+.tiptap-select-group select {
+  font-size: 0.75rem;
+  padding: 4px;
+  background: transparent;
+  color: inherit;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tiptap-editor {
+  min-height: 260px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.tiptap-editor .tiptap {
+  padding: 16px 20px;
+  min-height: 240px;
+  outline: none;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #1e293b;
+}
+
+.tiptap-editor .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.tiptap-editor .tiptap h1 { font-size: 1.6rem; font-weight: 700; margin: 0.4em 0; }
+.tiptap-editor .tiptap h2 { font-size: 1.3rem; font-weight: 700; margin: 0.3em 0; }
+
+.tiptap-editor .tiptap blockquote {
+  border-left: 3px solid #3b82f6;
+  padding-left: 16px;
+  margin: 12px 0;
+  color: #64748b;
+  font-style: italic;
+}
+
+.tiptap-editor .tiptap code {
+  background: rgba(100, 116, 139, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.875em;
+}
+
+.tiptap-editor .tiptap pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.tiptap-editor .tiptap pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.tiptap-editor .tiptap mark { background: #fef08a; border-radius: 2px; }
+
+.tiptap-editor .tiptap hr {
+  border: none;
+  border-top: 2px solid rgba(148, 163, 184, 0.2);
+  margin: 24px 0;
+}
+
+.tiptap-editor .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.tiptap-editor .tiptap th,
+.tiptap-editor .tiptap td {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.tiptap-editor .tiptap th {
+  background: rgba(241, 245, 249, 0.7);
+  font-weight: 700;
+}
+
+.tiptap-editor .tiptap ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+.tiptap-editor .tiptap ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 8px; }
+.tiptap-editor .tiptap ul[data-type="taskList"] li label { flex-shrink: 0; margin-top: 3px; }
+
+.tiptap-editor .tiptap a { color: #2563eb; text-decoration: underline; cursor: pointer; }
+
+.tiptap-status-bar {
+  padding: 6px 16px;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  background: rgba(241, 245, 249, 0.5);
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  text-align: right;
+}
+
+/* ── Structured Settings ───────────────────────── */
+.settings-fieldset {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+  background: rgba(248, 250, 252, 0.5);
+}
+
+.settings-fieldset legend {
+  color: #334155;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0 8px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #0f766e;
+}
+
+.theme-color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.color-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.color-label input[type="color"] {
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+}
+
+/* ── Disclaimer Cards ──────────────────────────── */
+.disclaimers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.disclaimer-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.disclaimer-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.disclaimer-card__index {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #94a3b8;
+}
+
+.donation-trigger {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #ec4899;
+  background: rgba(236, 72, 153, 0.05);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(236, 72, 153, 0.15);
+}
+
+.donation-trigger input[type="checkbox"] {
+  accent-color: #ec4899;
+}
+
+/* ── Post Row Selected ─────────────────────────── */
+.post-row--selected {
+  border-left: 3px solid #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.04);
 }
