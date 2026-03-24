@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.30.01] — 2026-03-24
+### Alterado
+- `public/_headers` migrado para CSP estável em runtime (`script-src` com `'unsafe-inline'`) para eliminar regressões recorrentes por hash inline volátil em build/deploy.
+- `functions/api/_lib/auth.ts` ajustado para confiar na sessão do Cloudflare Access quando `ADMINHUB_BEARER_TOKEN` não está configurado, removendo falso-positivo de 401 em operações PUT no módulo de cards.
+
+### Corrigido
+- Erro de bloqueio CSP de script inline no `admin-app` após deploy.
+- Erro `401 Unauthorized` no `PUT /api/adminhub/config` em cenários protegidos por Cloudflare Access sem token bearer explícito.
+
 ## [v01.30.00] — 2026-03-24
 ### Alterado
 - Diretriz global de integração interna Cloudflare aplicada no código e nas diretivas do workspace.
