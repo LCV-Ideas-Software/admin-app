@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Loader2, RefreshCw, Save, Search, ShieldCheck } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
+import { formatOperationalSourceLabel } from '../../lib/operationalSource'
 
 type MtastsPayload = {
   ok: boolean
@@ -621,7 +622,7 @@ export function MtastsModule() {
         </article>
         <article className="metric-card">
           <div className="metric-icon"><ShieldCheck size={20} /></div>
-          <strong>{payload.fonte}</strong>
+          <strong>{formatOperationalSourceLabel(payload.fonte)}</strong>
           <span>Fonte atual de dados.</span>
         </article>
       </section>
@@ -651,7 +652,7 @@ export function MtastsModule() {
         module="mtasts"
         endpoint="/api/mtasts/sync"
         title="Sync manual do MTA-STS"
-        description="Sincroniza histórico, zonas e policies auditáveis do legado para o `bigdata_db`, preservando o app atual até homologação completa."
+        description="Sincroniza histórico, zonas e policies auditáveis no `bigdata_db`, com rastreabilidade operacional no cockpit unificado."
       />
     </section>
   )

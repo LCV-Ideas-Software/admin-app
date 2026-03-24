@@ -1,5 +1,23 @@
 # Changelog — Admin App
 
+## [v01.31.12] — 2026-03-24
+### Alterado
+- Higienizadas descrições de sync nos módulos `Itaú` e `MTA-STS` para remover referência textual a migração legada já superada em operação interna.
+- Mensagens agora descrevem sincronização diretamente no `bigdata_db`, mantendo o contexto de observabilidade do cockpit.
+- Versão da aplicação incrementada para `APP v01.31.12` em `src/App.tsx`.
+
+## [v01.31.11] — 2026-03-24
+### Alterado
+- Padronizada a exibição de `fonte` operacional nos módulos `Itaú`, `MTA-STS` e `HubCards` via `formatOperationalSourceLabel` em `src/lib/operationalSource.ts`.
+- Eliminada apresentação crua de valores de source no frontend dos módulos, mantendo consistência visual com a `Visão Geral`.
+- Versão da aplicação incrementada para `APP v01.31.11` em `src/App.tsx`.
+
+## [v01.31.10] — 2026-03-24
+### Alterado
+- Extraída a normalização de `source` operacional para utilitário compartilhado em `src/lib/operationalSource.ts` (`formatOperationalSourceLabel` e `isLegacyOperationalSource`).
+- `src/App.tsx` passou a consumir o utilitário central, eliminando duplicação local de mapeamento de fontes de telemetria.
+- Versão da aplicação incrementada para `APP v01.31.10`.
+
 ## [v01.31.09] — 2026-03-24
 ### Corrigido
 - Alinhados contratos de `fonte` no frontend para refletir o estado operacional atual sem ponte legada nos módulos `Itaú` e `MTA-STS`.
