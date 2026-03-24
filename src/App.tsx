@@ -24,8 +24,9 @@ import { MainsiteModule } from './modules/mainsite/MainsiteModule'
 import { MtastsModule } from './modules/mtasts/MtastsModule'
 import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
+import { formatOperationalSourceLabel, isLegacyOperationalSource } from './lib/operationalSource'
 
-const APP_VERSION = 'APP v01.31.09'
+const APP_VERSION = 'APP v01.31.12'
 
 type OperationalModuleStatus = {
   module: string
@@ -133,23 +134,6 @@ const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft 
   { id: 'config', label: 'Configurações', icon: Wrench },
 ]
 
-const formatTelemetrySourceLabel = (source: string) => {
-  switch (source) {
-    case 'bigdata_db':
-      return 'BIGDATA_DB'
-    case 'bootstrap-default':
-      return 'BOOTSTRAP-DEFAULT (local)'
-    case 'legacy-admin':
-      return 'LEGACY-ADMIN (ponte)'
-    case 'legacy-worker':
-      return 'LEGACY-WORKER (ponte)'
-    default:
-      return source.toUpperCase()
-  }
-}
-
-const isLegacySource = (source: string) => source === 'legacy-admin' || source === 'legacy-worker'
-
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleId>('overview')
   const [operationalOverview, setOperationalOverview] = useState<OperationalOverviewPayload | null>(null)
@@ -254,7 +238,7 @@ function App() {
             <article className="result-card">
               <header className="result-header">
                 <h4><Activity size={16} /> Telemetria operacional (24h)</h4>
-                <span>fonte da consulta: {formatTelemetrySourceLabel(operationalOverview?.source ?? 'sem dados')}</span>
+                <span>fonte da consulta: {formatOperationalSourceLabel(operationalOverview?.source ?? 'sem dados')}</span>
               </header>
 
               {!operationalOverview || operationalOverview.modules.length === 0 ? (
@@ -272,8 +256,8 @@ function App() {
                           último evento: {item.lastOk ? 'sucesso' : 'falha'}
                         </span>
                       </div>
-                      <span className={`badge ${(item.fallbackEvents24h > 0 || !item.lastOk || isLegacySource(item.lastSource)) ? 'badge-planejado' : 'badge-em-implantacao'}`}>
-                        {formatTelemetrySourceLabel(item.lastSource)}
+                      <span className={`badge ${(item.fallbackEvents24h > 0 || !item.lastOk || isLegacyOperationalSource(item.lastSource)) ? 'badge-planejado' : 'badge-em-implantacao'}`}>
+                        {formatOperationalSourceLabel(item.lastSource)}
                       </span>
                     </li>
                   ))}

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ArrowDown, ArrowUp, Loader2, Plus, RefreshCw, Save, Trash2, Wand2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { suggestIcon } from '../../lib/iconSuggestion'
+import { formatOperationalSourceLabel } from '../../lib/operationalSource'
 
 type HubCard = {
   name: string
@@ -482,7 +483,7 @@ export function HubCardsModule({
             <input
               id={`${adminActorFieldId}-fonte`}
               name={`${adminActorFieldName}Fonte`}
-              value={payload?.fonte ?? '—'}
+              value={payload?.fonte ? formatOperationalSourceLabel(payload.fonte) : '—'}
               readOnly
             />
           </div>
@@ -672,7 +673,7 @@ export function HubCardsModule({
         </article>
         <article className="metric-card">
           <div className="metric-icon"><RefreshCw size={20} /></div>
-          <strong>{payload?.fonte ?? '—'}</strong>
+          <strong>{payload?.fonte ? formatOperationalSourceLabel(payload.fonte) : '—'}</strong>
           <span>Fonte dos dados carregados.</span>
         </article>
         <article className="metric-card">

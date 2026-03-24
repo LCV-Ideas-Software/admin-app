@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Activity, AlertTriangle, Database, Loader2, RefreshCw, Save, Search } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
+import { formatOperationalSourceLabel } from '../../lib/operationalSource'
 
 type Resumo = {
   totalObservacoes: number
@@ -476,7 +477,7 @@ export function CalculadoraModule() {
       <article className="result-card">
         <header className="result-header">
           <h4><Activity size={16} /> Telemetria e últimas observações do backtest</h4>
-          <span>fonte: {fonte}</span>
+          <span>fonte: {formatOperationalSourceLabel(fonte)}</span>
         </header>
 
         <p className="result-empty">
@@ -664,7 +665,7 @@ export function CalculadoraModule() {
         module="calculadora"
         endpoint="/api/calculadora/sync"
         title="Sync manual do Calculadora"
-        description="Sincroniza observabilidade e policies de rate limit do legado para o `bigdata_db`, com execução real ou dry run."
+        description="Sincroniza observabilidade e policies de rate limit no `bigdata_db`, com execução real ou dry run."
       />
     </section>
   )
