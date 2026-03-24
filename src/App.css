@@ -480,7 +480,18 @@ input[type="color"]:focus-visible {
   border-radius: 20px;
   border: 1px solid var(--module-accent-border);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.84));
-  justify-content: space-between;
+}
+
+/* Text block fills available space next to icon; buttons align right via auto-margin */
+.module-shell .detail-header > div:not(.detail-icon) {
+  flex: 1;
+  min-width: 0;
+}
+
+.module-shell .detail-header > button,
+.module-shell .detail-header > .primary-button {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .module-shell .detail-icon,
