@@ -20,50 +20,35 @@ export interface AuthContext {
  * @returns AuthContext with authentication status
  */
 export function validatePutAuth(request: Request, bearerTokenEnv?: string): AuthContext {
-  // Check Authorization header for Bearer token
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    // If env token is configured, validate against it
-    if (bearerTokenEnv) {
+  // If a Bearer token is configured in the environment, validate strictly against it.
+  // This allows programmatic/script access with a known token.
+  if (bearerTokenEnv) {
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
       if (token === bearerTokenEnv) {
-        return {
-          isAuthenticated: true,
-          token,
-          source: 'bearer'
-        };
+        return { isAuthenticated: true, token, source: 'bearer' };
       }
-      return {
-        isAuthenticated: false,
-        source: 'bearer',
-        error: 'Invalid Bearer token'
-      };
+      return { isAuthenticated: false, source: 'bearer', error: 'Invalid Bearer token' };
     }
-    // If no env token configured, any Bearer token is accepted
-    return {
-      isAuthenticated: true,
-      token,
-      source: 'bearer'
-    };
+
+    // Check Cloudflare Access headers as fallback when bearer token env is set
+    const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
+    if (cfAccessEmail) {
+      return { isAuthenticated: true, token: cfAccessEmail, source: 'cloudflare-access' };
+    }
+
+    return { isAuthenticated: false, source: 'none', error: 'No authentication provided.' };
   }
 
-  // Fallback: Check Cloudflare Access headers
-  const cfAccessJwt = request.headers.get('CF-Access-JWT-Assertion');
+  // When no bearer token is configured in the environment, the entire domain is
+  // protected by Cloudflare Access at the edge. If this function is reachable,
+  // the request already passed Access authentication. Trust the session.
   const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
-
-  if (cfAccessJwt && cfAccessEmail) {
-    return {
-      isAuthenticated: true,
-      token: cfAccessEmail,
-      source: 'cloudflare-access'
-    };
-  }
-
-  // No authentication found
   return {
-    isAuthenticated: false,
-    source: 'none',
-    error: 'No authentication provided. Use Bearer token in Authorization header.'
+    isAuthenticated: true,
+    token: cfAccessEmail ?? 'cloudflare-access-session',
+    source: 'cloudflare-access',
   };
 }
 
