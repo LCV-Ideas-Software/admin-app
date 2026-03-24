@@ -1,5 +1,16 @@
 # Changelog — Admin App
 
+## [v01.31.09] — 2026-03-24
+### Corrigido
+- Alinhados contratos de `fonte` no frontend para refletir o estado operacional atual sem ponte legada nos módulos `Calculadora` e `MTA-STS`.
+- `src/modules/hubs/HubCardsModule.tsx` atualizado para refletir fontes reais do backend (`bigdata_db` e `bootstrap-default`).
+- `functions/api/calculadora/overview.ts` teve a tipagem de payload ajustada para origem exclusiva em `bigdata_db`.
+- `functions/api/mtasts/overview.ts` corrigido para remover referência a tipo legado inexistente no mapper de histórico.
+
+### Alterado
+- `src/App.tsx` passou a rotular `bootstrap-default` como `BOOTSTRAP-DEFAULT (local)` na telemetria operacional.
+- Versão da aplicação incrementada para `APP v01.31.09` em `src/App.tsx`.
+
 ## [v01.31.08] — 2026-03-24
 ### Corrigido
 - Removidas emissões de telemetria com `source: legacy-admin` nos endpoints do `admin-app` auditados nesta etapa.

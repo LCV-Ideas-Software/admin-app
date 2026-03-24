@@ -24,7 +24,7 @@ type Observacao = {
 type ApiResponse = {
   ok: boolean
   error?: string
-  fonte: 'bigdata_db' | 'legacy-admin'
+  fonte: 'bigdata_db'
   filtros: {
     moeda: string
     dias: number
@@ -109,7 +109,7 @@ export function CalculadoraModule() {
   const [moeda, setMoeda] = useState('')
   const [dias, setDias] = useState('7')
   const [adminActor, setAdminActor] = useState('admin@app.lcv')
-  const [fonte, setFonte] = useState<'bigdata_db' | 'legacy-admin'>('bigdata_db')
+  const [fonte, setFonte] = useState<'bigdata_db'>('bigdata_db')
   const [resumo, setResumo] = useState<Resumo>(initialResumo)
   const [ultimasObservacoes, setUltimasObservacoes] = useState<Observacao[]>([])
   const [parametrosForm, setParametrosForm] = useState<ParametrosForm>(initialParametrosForm)
@@ -401,7 +401,7 @@ export function CalculadoraModule() {
         <div className="detail-icon"><Database size={22} /></div>
         <div>
           <h3>Calculadora Financeira — Admin</h3>
-          <p>Leitura híbrida no shell unificado: prioriza `bigdata_db` com fallback seguro para legado.</p>
+          <p>Leitura operacional interna no shell unificado via `bigdata_db`.</p>
         </div>
       </div>
 

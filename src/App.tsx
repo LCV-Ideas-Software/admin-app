@@ -25,7 +25,7 @@ import { MtastsModule } from './modules/mtasts/MtastsModule'
 import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
 
-const APP_VERSION = 'APP v01.31.08'
+const APP_VERSION = 'APP v01.31.09'
 
 type OperationalModuleStatus = {
   module: string
@@ -137,6 +137,8 @@ const formatTelemetrySourceLabel = (source: string) => {
   switch (source) {
     case 'bigdata_db':
       return 'BIGDATA_DB'
+    case 'bootstrap-default':
+      return 'BOOTSTRAP-DEFAULT (local)'
     case 'legacy-admin':
       return 'LEGACY-ADMIN (ponte)'
     case 'legacy-worker':

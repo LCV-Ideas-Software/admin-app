@@ -7,7 +7,7 @@ import { SyncStatusCard } from '../../components/SyncStatusCard'
 type MtastsPayload = {
   ok: boolean
   error?: string
-  fonte: 'bigdata_db' | 'legacy-admin'
+  fonte: 'bigdata_db'
   filtros: {
     domain: string
     limit: number

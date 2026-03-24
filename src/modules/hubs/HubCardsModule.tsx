@@ -23,7 +23,7 @@ const normalizeCardsForCompare = (items: HubCard[]) => items.map((card) => ({
 type HubConfigPayload = {
   ok: boolean
   error?: string
-  fonte: 'bigdata_db' | 'legacy-admin' | 'legacy-worker'
+  fonte: 'bigdata_db' | 'bootstrap-default'
   avisos: string[]
   total: number
   cards: HubCard[]

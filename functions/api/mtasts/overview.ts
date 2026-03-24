@@ -49,7 +49,7 @@ const parseLimit = (rawValue: string | null) => {
 
 const normalizeDomain = (rawValue: string | null) => String(rawValue ?? '').trim().toLowerCase()
 
-const mapHistoryRow = (row: MtastsHistoryRow | LegacyHistoryRow) => {
+const mapHistoryRow = (row: MtastsHistoryRow) => {
   const geradoEm = String(row.gerado_em ?? '').trim()
   if (!geradoEm) {
     return null
