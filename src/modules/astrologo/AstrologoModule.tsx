@@ -262,7 +262,6 @@ export function AstrologoModule() {
         <div className="detail-icon"><Sparkles size={22} /></div>
         <div>
           <h3>Câmara do Mestre — Astrólogo</h3>
-          <p>Arquivo Akáshico, leitura operacional e governança no shell unificado.</p>
         </div>
       </div>
 

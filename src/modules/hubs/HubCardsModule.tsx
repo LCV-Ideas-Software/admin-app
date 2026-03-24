@@ -67,13 +67,8 @@ const parseApiPayload = async <T,>(response: Response, fallback: string): Promis
   }
 }
 
-export function HubCardsModule({
-  title,
-  description,
-  endpoint,
-  adminActorFieldId,
-  adminActorFieldName,
-}: HubCardsModuleProps) {
+export function HubCardsModule(props: HubCardsModuleProps) {
+  const { title, endpoint, adminActorFieldId, adminActorFieldName } = props
   const { showNotification } = useNotification()
   const withTrace = (message: string, payload?: { request_id?: string }) => (
     payload?.request_id ? `${message} (req ${payload.request_id})` : message
@@ -479,7 +474,6 @@ export function HubCardsModule({
         <div className="detail-icon"><Save size={22} /></div>
         <div>
           <h3>{title}</h3>
-          <p>{description}</p>
         </div>
       </div>
 

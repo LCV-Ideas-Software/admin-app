@@ -413,7 +413,6 @@ export function TelemetriaModule() {
         <div className="detail-icon"><BarChart3 size={22} /></div>
         <div>
           <h3>Telemetria — Painel Unificado</h3>
-          <p>Todos os logs operacionais, contatos, compartilhamentos, chatbot e auditoria IA.</p>
         </div>
         <button type="button" className="primary-button telemetria-refresh-btn" onClick={() => void fetchTelemetry()} disabled={loading}>
           {loading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}

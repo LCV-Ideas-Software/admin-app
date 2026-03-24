@@ -1,6 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
 import {
-  ArrowUpRight,
   BarChart3,
   Database,
   DollarSign,
@@ -27,6 +26,7 @@ const MtastsModule = lazy(() => import('./modules/mtasts/MtastsModule').then(m =
 const CardHubModule = lazy(() => import('./modules/hubs/CardHubModule').then(m => ({ default: m.CardHubModule })))
 const TelemetriaModule = lazy(() => import('./modules/telemetria/TelemetriaModule').then(m => ({ default: m.TelemetriaModule })))
 const FinanceiroModule = lazy(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
+const NewsPanel = lazy(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 
 const APP_VERSION = 'APP v01.42.00'
 
@@ -117,17 +117,7 @@ function App() {
 
         <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
         {activeModule === 'overview' ? (
-          <article className="result-card telemetria-overview-link">
-            <header className="result-header">
-              <h4><BarChart3 size={16} /> Telemetria centralizada</h4>
-            </header>
-            <p className="result-empty">
-              Todos os dados de telemetria operacional, contatos, compartilhamentos, chatbot e auditoria IA foram centralizados no painel <strong>Telemetria</strong>.
-            </p>
-            <button type="button" className="ghost-button" onClick={() => handleModuleClick('telemetria')}>
-              Abrir painel Telemetria <ArrowUpRight size={16} />
-            </button>
-          </article>
+          <NewsPanel />
         ) : activeModule === 'astrologo' ? (
           <AstrologoModule />
         ) : activeModule === 'config' ? (

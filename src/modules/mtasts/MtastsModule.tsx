@@ -435,8 +435,7 @@ export function MtastsModule() {
       <div className="detail-header">
         <div className="detail-icon"><ShieldCheck size={22} /></div>
         <div>
-          <h3>Orquestrador MTA-STS</h3>
-          <p>Gestão de Identidades e Segurança de Mensageria no cockpit unificado.</p>
+          <h3>MTA-STS — Identidades e Segurança</h3>
         </div>
         <span className={`ops-status-chip ops-status-chip--${operationalStatus.tone}`}>
           <span className="ops-status-chip__dot" />

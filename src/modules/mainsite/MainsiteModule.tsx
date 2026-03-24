@@ -402,8 +402,7 @@ export function MainsiteModule() {
       <div className="detail-header">
         <div className="detail-icon"><Globe size={22} /></div>
         <div>
-          <h3>MainSite Admin — Sistema, Auditoria e Financeiro</h3>
-          <p>Operação interna no shell unificado: leitura e escrita diretas em `bigdata_db`.</p>
+          <h3>MainSite — Posts e Conteúdo</h3>
         </div>
       </div>
 
@@ -424,7 +423,7 @@ export function MainsiteModule() {
         </div>
       )}
 
-      <form className="form-card" onSubmit={handleSubmit}>
+      <form className="form-card form-card--compact" onSubmit={handleSubmit}>
         <div className="overview-inline-form">
           <div className="field-group field-group--fixed-120">
             <label htmlFor="mainsite-filtro-limit">Qtd. posts</label>

@@ -236,7 +236,6 @@ export function ConfigModule() {
         <div className="detail-icon"><Settings2 size={22} /></div>
         <div>
           <h3>Configurações Globais</h3>
-          <p>Painel operacional local para preferências de execução e governança do cockpit unificado.</p>
         </div>
       </div>
 
