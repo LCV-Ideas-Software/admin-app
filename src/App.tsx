@@ -25,7 +25,7 @@ import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
 import { formatOperationalSourceLabel, isLegacyOperationalSource } from './lib/operationalSource'
 
-const APP_VERSION = 'APP v01.31.14'
+const APP_VERSION = 'APP v01.32.00'
 
 type OperationalModuleStatus = {
   module: string
@@ -214,7 +214,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Painel administrativo unificado</p>
-            <h2>{activeModule === 'overview' ? 'Visão Geral da Fase 1' : selectedModule?.title}</h2>
+            <h2>{activeModule === 'overview' ? 'Visão Geral' : selectedModule?.title}</h2>
           </div>
           <div className="status-cluster">
             <span className="status-pill">{APP_VERSION}</span>

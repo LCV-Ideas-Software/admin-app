@@ -91,10 +91,6 @@ export function HubCardsModule({
   const moduleToneClass = endpoint === '/api/apphub/config'
     ? 'module-shell-apphub'
     : 'module-shell-adminhub'
-  const previewLevel = endpoint === '/api/apphub/config' ? 'open' : 'restricted'
-  const previewSectionId = endpoint === '/api/apphub/config' ? 'section-open-title' : 'section-admin-title'
-  const previewSectionLabel = endpoint === '/api/apphub/config' ? 'Acesso Liberado' : 'Ferramentas & Gestão'
-  const previewPortalTitle = endpoint === '/api/apphub/config' ? 'Portal de Apps' : 'Painel Administrativo'
 
   const disabled = useMemo(() => loading || saving, [loading, saving])
   const hasUnsavedCards = useMemo(() => (
@@ -730,36 +726,25 @@ export function HubCardsModule({
         {cards.length === 0 ? (
           <p className="result-empty">Sem cards carregados para este módulo.</p>
         ) : (
-          <section className="legacy-hub-preview" aria-labelledby={previewSectionId}>
-            <h5 className="legacy-hub-preview__title">{previewPortalTitle}</h5>
-            <h6 id={previewSectionId} className="legacy-hub-preview__section-heading">
-              <span className={`status-dot ${previewLevel}`} />
-              {previewSectionLabel}
-            </h6>
-            <div className="card-grid card-grid-draggable">
+          <div className="catalog-grid">
             {cards.map((card, index) => (
-              <article
+              <div
                 key={`preview-${card.name}-${index}`}
-                className={`card ${draggedPreviewIndex === index ? 'card--dragging' : ''}`}
-                data-level={previewLevel}
+                className={`catalog-row ${draggedPreviewIndex === index ? 'catalog-row--dragging' : ''}`}
                 draggable
                 onDragStart={(e) => handlePreviewDragStart(e, index)}
                 onDragEnd={handlePreviewDragEnd}
                 onDragOver={handlePreviewDragOver}
                 onDrop={(e) => handlePreviewDrop(e, index)}
               >
-                <div className="card-drag-handle" title="Arrastar para reordenar">
+                <span className="catalog-row__icon">{card.icon || '🧩'}</span>
+                <span className="catalog-row__name">{card.name || 'Sem nome'}</span>
+                <span className="catalog-row__grip" title="Arrastar para reordenar">
                   <GripVertical size={16} />
-                </div>
-                <div className="card-icon">{card.icon || '🧩'}</div>
-                <h5 className="card-title">{card.name || 'Sem nome'}</h5>
-                <p className="card-desc">{card.description || 'Sem descrição cadastrada.'}</p>
-                <p className="field-hint">{card.url}</p>
-                <span className="card-badge">{card.badge || 'Abrir'}</span>
-              </article>
+                </span>
+              </div>
             ))}
-            </div>
-          </section>
+          </div>
         )}
       </article>
     </section>

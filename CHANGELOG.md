@@ -1,5 +1,19 @@
 # Changelog — Admin App
 
+## [v01.32.00] — 2026-03-24
+### Removido
+- Status badges (`Access protegido`, `bigdata_db reservado`) do topbar em `App.tsx`.
+- Metrics-grid de `MtastsModule`, `MainsiteModule`, `ItauModule`, `HubCardsModule`, `ConfigModule`.
+- Campo "Administrador responsável" de `MtastsModule`, `MainsiteModule`, `ItauModule`, `HubCardsModule`, `AstrologoModule`.
+- Campo "Fonte atual" de `HubCardsModule`.
+- Métricas Estrito/Ligado/Sincronizado de `ConfigModule`.
+- Imports e state não utilizados (`Lock`, `AlertTriangle`, `formatOperationalSourceLabel`, `setAdminActor`, `payload` em HubCards).
+
+### Alterado
+- Catálogo (paridade visual) nos módulos AdminHub e AppHub redesenhado: cards compactos exibindo apenas ícone, nome e handle de drag-and-drop, organizados em 3 colunas com empilhamento vertical.
+- Título do topbar alterado de "Visão Geral da Fase 1" para "Visão Geral".
+- Versão da aplicação incrementada para `APP v01.32.00`.
+
 ## [v01.31.14] — 2026-03-24
 ### Corrigido
 - Eliminada emissão de `source: legacy-admin` nos endpoints auditados de `astrologo` e `itau`, com padronização para `bigdata_db`.
