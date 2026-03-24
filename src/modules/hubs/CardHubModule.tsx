@@ -9,7 +9,7 @@ export function CardHubModule() {
     <div className="card-hub-stack">
       <HubCardsModule
         title="AdminHub — Catálogo Administrativo"
-        description="Configuração centralizada dos cards administrativos do AdminHub, com persistência em D1 no admin-app."
+        description="Gerencie os cards exibidos no painel administrativo."
         endpoint="/api/adminhub/config"
         adminActorFieldId="adminhub-admin-actor"
         adminActorFieldName="adminhubAdminActor"
@@ -17,7 +17,7 @@ export function CardHubModule() {
 
       <HubCardsModule
         title="AppHub — Catálogo de Apps"
-        description="Configuração centralizada dos cards públicos do AppHub, com persistência em D1 no admin-app."
+        description="Gerencie os cards exibidos no hub público de aplicativos."
         endpoint="/api/apphub/config"
         adminActorFieldId="apphub-admin-actor"
         adminActorFieldName="apphubAdminActor"

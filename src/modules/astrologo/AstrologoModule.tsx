@@ -350,6 +350,48 @@ export function AstrologoModule() {
                       Excluir
                     </button>
                   </div>
+
+                  {/* Inline email form — appears right below the row */}
+                  {emailModalMapaId === item.id && (
+                    <div className="astro-email-inline">
+                      <div className="astro-email-inline__header">
+                        <Mail size={14} />
+                        <strong>Enviar Dossiê Celestial</strong>
+                      </div>
+                      <p className="astro-email-inline__hint">Insira o endereço de e-mail para receber o relatório astrológico completo.</p>
+                      <div className="astro-email-inline__row">
+                        <input
+                          id={`astrologo-email-inline-${item.id}`}
+                          name="astrologoEmailInline"
+                          type="email"
+                          autoComplete="email"
+                          placeholder="consulente@email.com"
+                          value={emailModalInput}
+                          onChange={(e) => setEmailModalInput(e.target.value)}
+                          disabled={sendingEmail}
+                          className="astro-email-inline__input"
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleSendEmailFromModal() } }}
+                        />
+                        <button
+                          type="button"
+                          className="primary-button"
+                          onClick={() => void handleSendEmailFromModal()}
+                          disabled={sendingEmail || !emailModalInput.trim()}
+                        >
+                          {sendingEmail ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+                          Enviar
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() => setEmailModalMapaId(null)}
+                          disabled={sendingEmail}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               )
             })}
@@ -467,35 +509,7 @@ export function AstrologoModule() {
 
         </article>
 
-        {/* Simple email modal (paridade com astrologo-frontend EmailModal) */}
-        {emailModalMapaId && (
-          <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Enviar e-mail">
-            <div className="confirm-dialog">
-              <h4><Mail size={16} /> Enviar Dossiê Celestial</h4>
-              <p className="field-hint">Insira o endereço de e-mail para receber o relatório astrológico completo.</p>
-              <div className="field-group">
-                <label htmlFor="astrologo-email-modal">E-mail de destino</label>
-                <input
-                  id="astrologo-email-modal"
-                  name="astrologoEmailModal"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="consulente@email.com"
-                  value={emailModalInput}
-                  onChange={(e) => setEmailModalInput(e.target.value)}
-                  disabled={sendingEmail}
-                />
-              </div>
-              <div className="confirm-dialog__actions">
-                <button type="button" className="ghost-button" onClick={() => setEmailModalMapaId(null)} disabled={sendingEmail}>Cancelar</button>
-                <button type="button" className="primary-button" onClick={() => void handleSendEmailFromModal()} disabled={sendingEmail || !emailModalInput.trim()}>
-                  {sendingEmail ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-                  Disparar E-mail
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
         </>
       )}
 

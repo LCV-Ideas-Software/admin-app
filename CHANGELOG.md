@@ -1,5 +1,34 @@
 # Changelog — Admin App
 
+## [v01.44.00] — 2026-03-24
+### Adicionado
+- **News Panel — Configurações**: seção completa no módulo Configurações para ajustar fontes, atualização automática, máx. notícias e filtro por palavras-chave.
+- **[NEW] `src/lib/newsSettings.ts`**: utilitário compartilhado de configurações do painel de notícias (localStorage + evento customizado).
+- **Backend — encoding fix**: `ArrayBuffer` + `TextDecoder` com detecção automática de charset (UTF-8/Latin-1) para feeds brasileiros.
+- **CSP**: `img-src` ampliado para `'self' data: https:` (permite thumbnails de notícias HTTPS).
+
+### Alterado
+- **News Panel**: reescrito com layout de lista scrollável (5 notícias visíveis) substituindo carousel. Controles movidos para o módulo Configurações.
+- **UX — Remoção de jargão técnico**: ~25 textos técnicos removidos de 11 módulos (bigdata_db, SDK, D1, DNS, Cloudflare, cockpit, etc.) substituídos por linguagem amigável.
+- **ConfigModule**: notificações e descrições de sync substituídas por linguagem amigável.
+- **Telemetria**: badge "bigdata_db" substituído por "operacional".
+
+## [v01.43.00] — 2026-03-24
+### Adicionado
+- **News Panel**: painel de notícias estilo Google News na tela "Visão Geral" com carousel automático (10s), auto-refresh (5min), pause on hover, barra de progresso e navegação manual.
+- **Backend `/api/news/feed`**: Pages Function que busca RSS de G1, Folha, BBC Brasil e TechCrunch em paralelo, com cache Cloudflare (10min).
+- **CSS `.form-card--compact`**: variante de formulário com padding vertical reduzido em 50%.
+
+### Removido
+- **Headers descritivos**: removido `<p>` explicativo de todos os 7 módulos (Telemetria, Astrólogo, MTA-STS, MainSite, Calculadora, Config, HubCards).
+- **Card "Telemetria centralizada"**: removido da tela principal (overview).
+- **Empty-state fabricado (Astrólogo)**: removida mensagem "motor astrológico" inexistente no admin original.
+- **Dead code**: imports `ArrowUpRight` de `App.tsx`, função `extractThumbnail` de `feed.ts`.
+
+### Alterado
+- **Títulos de módulos**: MTA-STS → "MTA-STS — Identidades e Segurança", MainSite → "MainSite — Posts e Conteúdo", Calculadora → "Calculadora — Calculadora Administrativa".
+- **Qtd. posts (MainSite)**: espessura do formulário reduzida em 50%.
+
 ## [v01.42.00] — 2026-03-24
 ### Corrigido
 - **Astrólogo — Ler detalhes**: registros "NOVO" (sem dados de análise) agora mostram mensagem vazia em vez de tela em branco.

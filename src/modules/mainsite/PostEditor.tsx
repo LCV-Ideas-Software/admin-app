@@ -190,7 +190,7 @@ export default function PostEditor({
     const file = event.target.files?.[0]
     if (!file) return
     setIsUploading(true)
-    showNotification('Enviando arquivo para o Cloudflare R2...', 'info')
+    showNotification('Enviando arquivo...', 'info')
     const formData = new FormData()
     formData.append('file', file)
     try {
@@ -368,7 +368,7 @@ export default function PostEditor({
       <div className="result-toolbar">
         <div>
           <h4>{editingPostId ? `Editar post #${editingPostId}` : 'Novo post (NOVO)'}</h4>
-          <p className="field-hint">Cria e altera posts diretamente no `bigdata_db` com persistência imediata.</p>
+          <p className="field-hint">Crie e edite posts com salvamento imediato.</p>
         </div>
         <div className="inline-actions">
           <button type="button" className="ghost-button" onClick={handleClear} disabled={savingPost}>

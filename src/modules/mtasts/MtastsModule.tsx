@@ -505,7 +505,7 @@ export function MtastsModule() {
         <div className="result-toolbar">
           <div>
             <h4><ShieldCheck size={16} /> Orquestração MTA-STS</h4>
-            <p className="field-hint">Sincroniza policy no BIGDATA_DB, atualiza DNS na Cloudflare e registra novo ID em histórico.</p>
+            <p className="field-hint">Aplica a política de segurança de e-mail, atualiza os registros e salva no histórico.</p>
             {hasUnsavedPolicyDraft && (
               <span className="badge badge-planejado">Draft não salvo</span>
             )}

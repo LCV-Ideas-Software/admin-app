@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Database, Globe, Loader2, RefreshCw, Save, Settings2, ShieldCheck } from 'lucide-react'
+import { Database, Globe, Loader2, Newspaper, RefreshCw, Save, Settings2, ShieldCheck } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { RateLimitPanel } from '../../components/RateLimitPanel'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
+import {
+  loadNewsSettings, saveNewsSettings, dispatchNewsSettingsChange,
+  AVAILABLE_SOURCES, type NewsSettings
+} from '../../lib/newsSettings'
 
 type AdminRuntimeConfig = {
   defaultAdminActor: string
@@ -90,6 +94,27 @@ export function ConfigModule() {
   const [msSavingSettings, setMsSavingSettings] = useState(false)
   const [adminActor] = useState('admin@app.lcv')
 
+  // ── News panel settings ──
+  const [newsSettings, setNewsSettings] = useState<NewsSettings>(loadNewsSettings)
+
+  const updateNewsSettings = useCallback((patch: Partial<NewsSettings>) => {
+    setNewsSettings(prev => {
+      const next = { ...prev, ...patch }
+      saveNewsSettings(next)
+      dispatchNewsSettingsChange()
+      return next
+    })
+  }, [])
+
+  const handleNewsSourceToggle = useCallback((sourceId: string) => {
+    const current = newsSettings.enabledSources
+    const next = current.includes(sourceId)
+      ? current.filter(id => id !== sourceId)
+      : [...current, sourceId]
+    if (next.length === 0) return
+    updateNewsSettings({ enabledSources: next })
+  }, [newsSettings.enabledSources, updateNewsSettings])
+
   const hasUnsavedChanges = useMemo(() => (
     JSON.stringify(config) !== JSON.stringify(baselineConfig)
   ), [baselineConfig, config])
@@ -132,7 +157,7 @@ export function ConfigModule() {
       setMsRotation(payload.settings.rotation as RotationSettings ?? DEFAULT_ROTATION)
 
       if (shouldNotify) {
-        showNotification('Ajustes do MainSite recarregados do bigdata_db.', 'success')
+        showNotification('Ajustes do MainSite recarregados com sucesso.', 'success')
       }
     } catch {
       showNotification('Não foi possível carregar os ajustes do MainSite.', 'error')
@@ -176,7 +201,7 @@ export function ConfigModule() {
       }
 
       await loadMainsiteSettings()
-      showNotification('Ajustes do MainSite salvos no bigdata_db.', 'success')
+      showNotification('Ajustes do MainSite salvos com sucesso.', 'success')
     } catch {
       showNotification('Não foi possível salvar os ajustes do MainSite.', 'error')
     } finally {
@@ -343,12 +368,12 @@ export function ConfigModule() {
         </div>
       </form>
 
-      {/* ── Ajustes do MainSite (appearance + rotation via bigdata_db) ── */}
+      {/* ── Ajustes do MainSite (aparência + rotação) ── */}
       <form className="form-card" onSubmit={handleSaveMainsiteSettings}>
         <div className="result-toolbar">
           <div>
             <h4><Globe size={16} /> Ajustes do MainSite</h4>
-            <p className="field-hint">Configurações visuais e rotação do site principal. Leitura e escrita no `bigdata_db`.</p>
+            <p className="field-hint">Configurações visuais e rotação do site principal.</p>
           </div>
           <div className="inline-actions">
             <button type="button" className="ghost-button" onClick={() => void loadMainsiteSettings(true)} disabled={msSettingsLoading || msSavingSettings}>
@@ -491,17 +516,96 @@ export function ConfigModule() {
       </article>
 
       {selectedSyncModule === 'astrologo' && (
-        <SyncStatusCard module="astrologo" endpoint="/api/astrologo/sync" title="Sync manual do Astrólogo" description="Replica mapas do legado para o `bigdata_db`, com dry run opcional." />
+        <SyncStatusCard module="astrologo" endpoint="/api/astrologo/sync" title="Sincronização do Astrólogo" description="Replica mapas pendentes com verificação prévia opcional." />
       )}
       {selectedSyncModule === 'calculadora' && (
-        <SyncStatusCard module="calculadora" endpoint="/api/calculadora/sync" title="Sync manual do Calculadora" description="Sincroniza observabilidade e policies de rate limit no `bigdata_db`." />
+        <SyncStatusCard module="calculadora" endpoint="/api/calculadora/sync" title="Sincronização da Calculadora" description="Atualiza parâmetros de observabilidade e limites de uso." />
       )}
       {selectedSyncModule === 'mainsite' && (
-        <SyncStatusCard module="mainsite" endpoint="/api/mainsite/sync" title="Sync manual do MainSite" description="Validação e saneamento de posts/settings no `bigdata_db` com dry run." />
+        <SyncStatusCard module="mainsite" endpoint="/api/mainsite/sync" title="Sincronização do MainSite" description="Validação e saneamento de posts e configurações com verificação prévia." />
       )}
       {selectedSyncModule === 'mtasts' && (
-        <SyncStatusCard module="mtasts" endpoint="/api/mtasts/sync" title="Sync manual do MTA-STS" description="Sincroniza histórico, zonas e policies no `bigdata_db`." />
+        <SyncStatusCard module="mtasts" endpoint="/api/mtasts/sync" title="Sincronização do MTA-STS" description="Atualiza histórico, domínios e políticas de segurança de e-mail." />
       )}
+
+      {/* ══════════════ Painel de Notícias ══════════════ */}
+      <article className="form-card">
+        <div className="result-toolbar">
+          <div>
+            <h4><Newspaper size={16} /> Painel de Notícias</h4>
+            <p className="field-hint">Configure as fontes, frequência de atualização e filtros do painel de notícias exibido na Visão Geral.</p>
+          </div>
+        </div>
+
+        <div className="form-grid">
+          {/* Intervalo de atualização */}
+          <div className="field-group">
+            <label htmlFor="news-refresh-interval">Atualização automática (minutos)</label>
+            <div className="news-settings__slider-group">
+              <input
+                id="news-refresh-interval"
+                name="newsRefreshInterval"
+                type="range"
+                min={1}
+                max={30}
+                value={newsSettings.refreshMinutes}
+                onChange={e => updateNewsSettings({ refreshMinutes: Number(e.target.value) })}
+              />
+              <span className="news-settings__value">{newsSettings.refreshMinutes}min</span>
+            </div>
+          </div>
+
+          {/* Máx. notícias */}
+          <div className="field-group">
+            <label htmlFor="news-max-items">Número máximo de notícias</label>
+            <div className="news-settings__slider-group">
+              <input
+                id="news-max-items"
+                name="newsMaxItems"
+                type="range"
+                min={5}
+                max={50}
+                step={5}
+                value={newsSettings.maxItems}
+                onChange={e => updateNewsSettings({ maxItems: Number(e.target.value) })}
+              />
+              <span className="news-settings__value">{newsSettings.maxItems}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Fontes */}
+        <div className="field-group">
+          <label>Fontes de notícias ativas</label>
+          <div className="news-settings__sources">
+            {AVAILABLE_SOURCES.map(source => (
+              <label key={source.id} className="news-settings__source-toggle">
+                <input
+                  type="checkbox"
+                  checked={newsSettings.enabledSources.includes(source.id)}
+                  onChange={() => handleNewsSourceToggle(source.id)}
+                />
+                <span>{source.name}</span>
+                <span className="news-settings__source-cat">{source.category}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Filtro por palavras-chave */}
+        <div className="field-group">
+          <label htmlFor="news-keywords">Filtrar por palavras-chave (separadas por vírgula)</label>
+          <input
+            id="news-keywords"
+            name="newsKeywords"
+            type="text"
+            className="news-settings__keywords"
+            placeholder="Ex.: tecnologia, economia, política"
+            value={newsSettings.keywords}
+            onChange={e => updateNewsSettings({ keywords: e.target.value })}
+          />
+        </div>
+      </article>
     </section>
   )
 }

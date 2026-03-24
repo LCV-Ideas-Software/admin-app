@@ -508,7 +508,7 @@ export function FinanceiroModule() {
   return (
     <section className="module-section">
       <h2><DollarSign size={20} /> Financeiro</h2>
-      <p className="section-intro">Painel financeiro consolidado com suporte a <strong>SumUp</strong> e <strong>Mercado Pago</strong>. Leitura de logs via <code>bigdata_db</code> + operações via SDKs oficiais.</p>
+      <p className="section-intro">Painel financeiro consolidado com suporte a <strong>SumUp</strong> e <strong>Mercado Pago</strong>.</p>
 
       {/* ── Balance Cards ── */}
       <div className="fin-balance-row">

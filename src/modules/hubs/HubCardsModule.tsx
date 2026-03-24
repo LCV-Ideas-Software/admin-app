@@ -481,7 +481,7 @@ export function HubCardsModule(props: HubCardsModuleProps) {
         <div className="result-toolbar">
           <div>
             <h4><Save size={16} /> Configuração de cards</h4>
-            <p className="field-hint">Cards persistidos no `bigdata_db`; edição visual com ordenação e validação por campos.</p>
+            <p className="field-hint">Edite, ordene e configure os cards exibidos neste hub.</p>
             {hasUnsavedCards && (
               <span className="badge badge-planejado">Alterações não salvas</span>
             )}

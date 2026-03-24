@@ -123,7 +123,7 @@ export function CalculadoraModule() {
         <div className="result-toolbar">
           <div>
             <h4><Save size={16} /> Parâmetros vigentes</h4>
-            <p className="field-hint">Ajuste de IOF, spreads, calibragem e limites de MAPE com persistência no `BIGDATA_DB`.</p>
+            <p className="field-hint">Ajuste de IOF, spreads, calibragem e limites de MAPE.</p>
           </div>
           <div className="inline-actions">
             <button type="button" className="ghost-button" onClick={() => void loadParametros(true)} disabled={loadingParametros || savingParametros}>

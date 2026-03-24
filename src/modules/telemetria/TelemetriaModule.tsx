@@ -182,7 +182,7 @@ export function TelemetriaModule() {
       <article className="result-card">
         <header className="result-header">
           <h4><Activity size={16} /> Eventos operacionais (24 h)</h4>
-          <span className="source-badge">bigdata_db</span>
+          <span className="source-badge">operacional</span>
         </header>
         {modules.length === 0 ? (
           <p className="result-empty">Sem eventos operacionais registrados ainda.</p>

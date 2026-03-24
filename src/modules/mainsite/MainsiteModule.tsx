@@ -492,7 +492,7 @@ export function MainsiteModule() {
         <div className="result-toolbar">
           <div>
             <h4><Globe size={16} /> Arquivo de posts operacionais</h4>
-            <p className="field-hint">Lista operacional do `bigdata_db` para edição, fixação e exclusão sem sair do cockpit.</p>
+            <p className="field-hint">Gerencie, edite, fixe e exclua posts diretamente por aqui.</p>
           </div>
           <div className="inline-actions">
             <button type="button" className="ghost-button" onClick={() => void loadManagedPosts(true)} disabled={postsLoading}>
@@ -507,7 +507,7 @@ export function MainsiteModule() {
         </div>
 
         {managedPosts.length === 0 ? (
-          <p className="result-empty">Nenhum post encontrado no `bigdata_db`.</p>
+          <p className="result-empty">Nenhum post encontrado.</p>
         ) : (
           <ul className="result-list astro-akashico-scroll">
             {managedPosts.map((post, index) => {
@@ -564,7 +564,7 @@ export function MainsiteModule() {
         <div className="result-toolbar">
           <div>
             <h4><Save size={16} /> Janelas de Aviso (Disclaimers)</h4>
-            <p className="field-hint">Gerenciamento de disclaimers do MainSite. Leitura e escrita no `bigdata_db`.</p>
+            <p className="field-hint">Gerencie os avisos legais exibidos no site principal.</p>
           </div>
           <div className="inline-actions">
             <button type="button" className="ghost-button" onClick={() => void loadPublicSettings(true)} disabled={settingsLoading || savingSettings}>
