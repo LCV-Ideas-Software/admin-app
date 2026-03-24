@@ -6,6 +6,7 @@ export default defineConfig({
   build: {
     target: 'esnext',
     cssCodeSplit: false,
+    chunkSizeWarningLimit: 800,
     modulePreload: {
       polyfill: false,
     },

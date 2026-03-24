@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Database, Loader2, RefreshCw, Save, Settings2, ShieldCheck } from 'lucide-react'
+import { Database, Globe, Loader2, RefreshCw, Save, Settings2, ShieldCheck } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { RateLimitPanel } from '../../components/RateLimitPanel'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
@@ -13,6 +13,28 @@ type AdminRuntimeConfig = {
   strictValidationMode: boolean
   requireConfirmBeforeDelete: boolean
 }
+
+// ── MainSite settings types (appearance + rotation) ──────────
+type AppearanceSettings = {
+  allowAutoMode: boolean
+  light: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
+  dark: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
+  shared: { fontSize: string; titleFontSize: string; fontFamily: string }
+}
+
+type RotationSettings = {
+  enabled: boolean
+  interval: number
+}
+
+const DEFAULT_APPEARANCE: AppearanceSettings = {
+  allowAutoMode: true,
+  light: { bgColor: '#f8f9fa', bgImage: '', fontColor: '#202124', titleColor: '#1a73e8' },
+  dark: { bgColor: '#131314', bgImage: '', fontColor: '#e3e3e3', titleColor: '#8ab4f8' },
+  shared: { fontSize: '1rem', titleFontSize: '1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif' },
+}
+
+const DEFAULT_ROTATION: RotationSettings = { enabled: false, interval: 60 }
 
 const STORAGE_KEY = 'admin-app/runtime-config/v1'
 
@@ -61,6 +83,13 @@ export function ConfigModule() {
   const [selectedRateModule, setSelectedRateModule] = useState('')
   const [selectedSyncModule, setSelectedSyncModule] = useState('')
 
+  // ── MainSite settings (appearance + rotation) state ──
+  const [msAppearance, setMsAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE)
+  const [msRotation, setMsRotation] = useState<RotationSettings>(DEFAULT_ROTATION)
+  const [msSettingsLoading, setMsSettingsLoading] = useState(false)
+  const [msSavingSettings, setMsSavingSettings] = useState(false)
+  const [adminActor] = useState('admin@app.lcv')
+
   const hasUnsavedChanges = useMemo(() => (
     JSON.stringify(config) !== JSON.stringify(baselineConfig)
   ), [baselineConfig, config])
@@ -85,6 +114,75 @@ export function ConfigModule() {
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [hasUnsavedChanges])
+
+  // ── MainSite settings: load from bigdata_db ──
+  const loadMainsiteSettings = useCallback(async (shouldNotify = false) => {
+    setMsSettingsLoading(true)
+    try {
+      const response = await fetch('/api/mainsite/settings', {
+        headers: { 'X-Admin-Actor': adminActor },
+      })
+      const payload = await response.json() as { ok: boolean; error?: string; settings?: Record<string, unknown> }
+
+      if (!response.ok || !payload.ok || !payload.settings) {
+        throw new Error(payload.error ?? 'Falha ao carregar ajustes do MainSite.')
+      }
+
+      setMsAppearance(payload.settings.appearance as AppearanceSettings ?? DEFAULT_APPEARANCE)
+      setMsRotation(payload.settings.rotation as RotationSettings ?? DEFAULT_ROTATION)
+
+      if (shouldNotify) {
+        showNotification('Ajustes do MainSite recarregados do bigdata_db.', 'success')
+      }
+    } catch {
+      showNotification('Não foi possível carregar os ajustes do MainSite.', 'error')
+    } finally {
+      setMsSettingsLoading(false)
+    }
+  }, [adminActor, showNotification])
+
+  useEffect(() => {
+    void loadMainsiteSettings()
+  }, [loadMainsiteSettings])
+
+  // ── MainSite settings: merge-save to bigdata_db ──
+  // Reads current settings first to preserve disclaimers (managed by MainSite module)
+  const handleSaveMainsiteSettings = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setMsSavingSettings(true)
+    try {
+      // 1. Fetch current full settings to preserve disclaimers
+      const currentRes = await fetch('/api/mainsite/settings', {
+        headers: { 'X-Admin-Actor': adminActor },
+      })
+      const currentPayload = await currentRes.json() as { ok: boolean; settings?: Record<string, unknown> }
+      const currentDisclaimers = currentPayload.settings?.disclaimers ?? { enabled: true, items: [] }
+
+      // 2. Merge: update appearance + rotation, preserve disclaimers
+      const response = await fetch('/api/mainsite/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+        body: JSON.stringify({
+          appearance: msAppearance,
+          rotation: msRotation,
+          disclaimers: currentDisclaimers,
+          adminActor,
+        }),
+      })
+
+      const result = await response.json() as { ok: boolean; error?: string }
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error ?? 'Falha ao salvar ajustes do MainSite.')
+      }
+
+      await loadMainsiteSettings()
+      showNotification('Ajustes do MainSite salvos no bigdata_db.', 'success')
+    } catch {
+      showNotification('Não foi possível salvar os ajustes do MainSite.', 'error')
+    } finally {
+      setMsSavingSettings(false)
+    }
+  }
 
   const saveConfig = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -244,6 +342,102 @@ export function ConfigModule() {
             </select>
           </div>
         </div>
+      </form>
+
+      {/* ── Ajustes do MainSite (appearance + rotation via bigdata_db) ── */}
+      <form className="form-card" onSubmit={handleSaveMainsiteSettings}>
+        <div className="result-toolbar">
+          <div>
+            <h4><Globe size={16} /> Ajustes do MainSite</h4>
+            <p className="field-hint">Configurações visuais e rotação do site principal. Leitura e escrita no `bigdata_db`.</p>
+          </div>
+          <div className="inline-actions">
+            <button type="button" className="ghost-button" onClick={() => void loadMainsiteSettings(true)} disabled={msSettingsLoading || msSavingSettings}>
+              {msSettingsLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+              Recarregar
+            </button>
+            <button type="submit" className="primary-button" disabled={msSavingSettings}>
+              {msSavingSettings ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
+              Salvar ajustes
+            </button>
+          </div>
+        </div>
+
+        {/* Rotação Autônoma */}
+        <fieldset className="settings-fieldset">
+          <legend>Engenharia de Automação</legend>
+          <label className="toggle-row">
+            <input id="cfg-rotation-enabled" name="cfgRotationEnabled" type="checkbox" checked={msRotation.enabled} onChange={(e) => setMsRotation({ ...msRotation, enabled: e.target.checked })} />
+            Habilitar Rotação Autônoma da Fila de Textos
+          </label>
+          <div className="form-grid">
+            <div className="field-group">
+              <label htmlFor="cfg-rotation-interval">Intervalo (minutos)</label>
+              <input id="cfg-rotation-interval" name="cfgRotationInterval" type="number" min={1} value={msRotation.interval} onChange={(e) => setMsRotation({ ...msRotation, interval: parseInt(e.target.value) || 60 })} disabled={!msRotation.enabled} />
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Modo Automático */}
+        <fieldset className="settings-fieldset">
+          <legend>Customização Visual: Multi-Tema</legend>
+          <label className="toggle-row">
+            <input id="cfg-allow-auto-mode" name="cfgAllowAutoMode" type="checkbox" checked={msAppearance.allowAutoMode} onChange={(e) => setMsAppearance({ ...msAppearance, allowAutoMode: e.target.checked })} />
+            Habilitar Modo Automático (Sincroniza com o SO do Leitor)
+          </label>
+        </fieldset>
+
+        {/* Configurações Globais */}
+        <fieldset className="settings-fieldset">
+          <legend>Configurações Globais (Ambos os Temas)</legend>
+          <div className="form-grid">
+            <div className="field-group">
+              <label htmlFor="cfg-shared-font-size">Tamanho da Fonte Base</label>
+              <input id="cfg-shared-font-size" name="cfgSharedFontSize" value={msAppearance.shared.fontSize} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, fontSize: e.target.value } })} placeholder="1rem" />
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-title-font-size">Tamanho Títulos (H1)</label>
+              <input id="cfg-shared-title-font-size" name="cfgSharedTitleFontSize" value={msAppearance.shared.titleFontSize} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, titleFontSize: e.target.value } })} placeholder="1.5rem" />
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-font-family">Família da Fonte</label>
+              <select id="cfg-shared-font-family" name="cfgSharedFontFamily" value={msAppearance.shared.fontFamily} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, fontFamily: e.target.value } })}>
+                <option value="system-ui, -apple-system, sans-serif">System UI</option>
+                <option value="sans-serif">Sans-Serif</option>
+                <option value="serif">Serif</option>
+                <option value="monospace">Monospace</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Paleta Dark */}
+        <fieldset className="settings-fieldset">
+          <legend>Paleta Tema Escuro</legend>
+          <div className="theme-color-grid">
+            <label className="color-label">Cor de Fundo <input id="cfg-dark-bg-color" name="cfgDarkBgColor" type="color" value={msAppearance.dark.bgColor} onChange={(e) => setMsAppearance({ ...msAppearance, dark: { ...msAppearance.dark, bgColor: e.target.value } })} /></label>
+            <label className="color-label">Cor do Texto <input id="cfg-dark-font-color" name="cfgDarkFontColor" type="color" value={msAppearance.dark.fontColor} onChange={(e) => setMsAppearance({ ...msAppearance, dark: { ...msAppearance.dark, fontColor: e.target.value } })} /></label>
+            <label className="color-label">Cor dos Títulos <input id="cfg-dark-title-color" name="cfgDarkTitleColor" type="color" value={msAppearance.dark.titleColor} onChange={(e) => setMsAppearance({ ...msAppearance, dark: { ...msAppearance.dark, titleColor: e.target.value } })} /></label>
+          </div>
+          <div className="field-group">
+            <label htmlFor="cfg-dark-bg-image">Imagem de Fundo (URL)</label>
+            <input id="cfg-dark-bg-image" name="cfgDarkBgImage" value={msAppearance.dark.bgImage} onChange={(e) => setMsAppearance({ ...msAppearance, dark: { ...msAppearance.dark, bgImage: e.target.value } })} placeholder="https://..." />
+          </div>
+        </fieldset>
+
+        {/* Paleta Light */}
+        <fieldset className="settings-fieldset">
+          <legend>Paleta Tema Claro</legend>
+          <div className="theme-color-grid">
+            <label className="color-label">Cor de Fundo <input id="cfg-light-bg-color" name="cfgLightBgColor" type="color" value={msAppearance.light.bgColor} onChange={(e) => setMsAppearance({ ...msAppearance, light: { ...msAppearance.light, bgColor: e.target.value } })} /></label>
+            <label className="color-label">Cor do Texto <input id="cfg-light-font-color" name="cfgLightFontColor" type="color" value={msAppearance.light.fontColor} onChange={(e) => setMsAppearance({ ...msAppearance, light: { ...msAppearance.light, fontColor: e.target.value } })} /></label>
+            <label className="color-label">Cor dos Títulos <input id="cfg-light-title-color" name="cfgLightTitleColor" type="color" value={msAppearance.light.titleColor} onChange={(e) => setMsAppearance({ ...msAppearance, light: { ...msAppearance.light, titleColor: e.target.value } })} /></label>
+          </div>
+          <div className="field-group">
+            <label htmlFor="cfg-light-bg-image">Imagem de Fundo (URL)</label>
+            <input id="cfg-light-bg-image" name="cfgLightBgImage" value={msAppearance.light.bgImage} onChange={(e) => setMsAppearance({ ...msAppearance, light: { ...msAppearance.light, bgImage: e.target.value } })} placeholder="https://..." />
+          </div>
+        </fieldset>
       </form>
 
       <article className="result-card">

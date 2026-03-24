@@ -1,6 +1,19 @@
 # Changelog — Admin App
 
-## [v01.38.00] — 2026-03-24
+## [v01.39.00] — 2026-03-24
+### Removido
+- **Calculadora — telemetria**: card "Telemetria e últimas observações do backtest" removido (centralizado no módulo Telemetria).
+- **Calculadora — dead code**: tipos `Resumo`, `Observacao`, `ApiResponse`, estado `fonte`/`resumo`/`ultimasObservacoes`, imports `Activity`/`Search`/`formatOperationalSourceLabel`, form de overview removidos.
+- **MainSite — settings visuais migrados**: seções Rotação Autônoma, Multi-Tema, Configurações Globais, Paleta Dark/Light removidas do módulo MainSite (migradas para ConfigModule).
+
+### Adicionado
+- **ConfigModule — Ajustes do MainSite**: nova seção com appearance + rotation, leitura/escrita no `bigdata_db` via merge-save (preserva disclaimers).
+
+### Melhorado
+- **MainSite — scroll**: listas "Últimos posts" e "Arquivo de posts operacionais" encapsuladas com barra de rolagem (~5 itens visíveis).
+- **MainSite — disclaimers**: seção "Janelas de Aviso" agora é o único settings form no MainSite, com merge-save para preservar appearance/rotation.
+- **Build — chunk warning**: `chunkSizeWarningLimit` ajustado para 800kB no `vite.config.ts`.
+
 ### Alterado
 - **Code-splitting**: todos os 8 módulos convertidos para `React.lazy` + `Suspense`, eliminando o warning de chunks >500kB. Cada módulo agora é um chunk separado carregado sob demanda.
 - **Astrólogo — e-mail condicional**: formulário de envio de e-mail agora só aparece quando um mapa está selecionado e o botão "Enviar por E-mail" é acionado (toggle), em paridade com `astrologo-admin`.

@@ -1,38 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Activity, Database, Loader2, RefreshCw, Save, Search } from 'lucide-react'
+import { Database, Loader2, RefreshCw, Save } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
-import { formatOperationalSourceLabel } from '../../lib/operationalSource'
-
-type Resumo = {
-  totalObservacoes: number
-  observacoesJanela: number
-  mapeJanelaPercent: number | null
-  telemetriaTotal: number
-  telemetriaErros: number
-  telemetriaCacheHits: number
-  telemetriaAvgDurationMs: number | null
-  isPlantao: boolean | null
-}
-
-type Observacao = {
-  createdAt: number
-  moeda: string
-  erroPercentual: number
-}
-
-type ApiResponse = {
-  ok: boolean
-  error?: string
-  fonte: 'bigdata_db'
-  filtros: {
-    moeda: string
-    dias: number
-  }
-  avisos: string[]
-  resumo: Resumo
-  ultimasObservacoes: Observacao[]
-}
 
 type ParametrosForm = {
   iof_cartao_percent: number
@@ -45,7 +14,6 @@ type ParametrosForm = {
   backtest_mape_atencao_percent: number
 }
 
-
 const initialParametrosForm: ParametrosForm = {
   iof_cartao_percent: 3.5,
   iof_global_percent: 3.5,
@@ -57,35 +25,16 @@ const initialParametrosForm: ParametrosForm = {
   backtest_mape_atencao_percent: 2,
 }
 
-const initialResumo: Resumo = {
-  totalObservacoes: 0,
-  observacoesJanela: 0,
-  mapeJanelaPercent: null,
-  telemetriaTotal: 0,
-  telemetriaErros: 0,
-  telemetriaCacheHits: 0,
-  telemetriaAvgDurationMs: null,
-  isPlantao: null,
-}
-
 export function CalculadoraModule() {
   const { showNotification } = useNotification()
   const withTrace = (message: string, payload?: { request_id?: string }) => (
     payload?.request_id ? `${message} (req ${payload.request_id})` : message
   )
 
-  const [loading, setLoading] = useState(false)
   const [loadingParametros, setLoadingParametros] = useState(false)
   const [savingParametros, setSavingParametros] = useState(false)
-  const [moeda, setMoeda] = useState('')
-  const [dias, setDias] = useState('7')
   const [adminActor] = useState('admin@app.lcv')
-  const [fonte, setFonte] = useState<'bigdata_db'>('bigdata_db')
-  const [resumo, setResumo] = useState<Resumo>(initialResumo)
-  const [ultimasObservacoes, setUltimasObservacoes] = useState<Observacao[]>([])
   const [parametrosForm, setParametrosForm] = useState<ParametrosForm>(initialParametrosForm)
-
-  const disabled = useMemo(() => loading, [loading])
 
   const loadParametros = useCallback(async (shouldNotify = false) => {
     setLoadingParametros(true)
@@ -157,37 +106,7 @@ export function CalculadoraModule() {
 
 
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
 
-    const query = new URLSearchParams({
-      moeda,
-      dias,
-    })
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/calculadora/overview?${query.toString()}`)
-      const payload = await response.json() as ApiResponse
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao consultar o módulo Calculadora.')
-      }
-
-      setResumo(payload.resumo)
-      setFonte(payload.fonte)
-      setUltimasObservacoes(payload.ultimasObservacoes)
-
-      showNotification(`Calculadora atualizado com ${payload.resumo.observacoesJanela} observação(ões) na janela.`, 'success')
-      if (Array.isArray(payload.avisos) && payload.avisos.length > 0) {
-        showNotification(payload.avisos[0], 'info')
-      }
-    } catch {
-      showNotification('Não foi possível carregar o módulo Calculadora.', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <section className="detail-panel module-shell module-shell-calculadora">
@@ -199,71 +118,7 @@ export function CalculadoraModule() {
         </div>
       </div>
 
-      <form className="form-card" onSubmit={handleSubmit}>
-        <div className="form-grid">
 
-          <div className="field-group">
-            <label htmlFor="calculadora-filtro-moeda">Moeda (opcional)</label>
-            <input
-              id="calculadora-filtro-moeda"
-              name="calculadoraFiltroMoeda"
-              type="text"
-              autoComplete="off"
-              placeholder="Ex.: USD"
-              value={moeda}
-              onChange={(event) => setMoeda(event.target.value.toUpperCase())}
-            />
-          </div>
-
-          <div className="field-group">
-            <label htmlFor="calculadora-filtro-dias">Janela em dias</label>
-            <input
-              id="calculadora-filtro-dias"
-              name="calculadoraFiltroDias"
-              type="number"
-              min={1}
-              max={90}
-              value={dias}
-              onChange={(event) => setDias(event.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="form-actions">
-          <button type="submit" className="primary-button" disabled={disabled}>
-            {loading ? <Loader2 size={18} className="spin" /> : <Search size={18} />}
-            Carregar overview
-          </button>
-        </div>
-      </form>
-
-
-      <article className="result-card">
-        <header className="result-header">
-          <h4><Activity size={16} /> Telemetria e últimas observações do backtest</h4>
-          <span>fonte: {formatOperationalSourceLabel(fonte)}</span>
-        </header>
-
-        <p className="result-empty">
-          Telemetria: total {resumo.telemetriaTotal}, erros {resumo.telemetriaErros}, cache hits {resumo.telemetriaCacheHits},
-          avg duration {resumo.telemetriaAvgDurationMs == null ? '—' : `${resumo.telemetriaAvgDurationMs}ms`},
-          plantão {resumo.isPlantao == null ? 'indisponível' : (resumo.isPlantao ? 'sim' : 'não')}.
-        </p>
-
-        {ultimasObservacoes.length === 0 ? (
-          <p className="result-empty">Sem observações recentes para os filtros atuais.</p>
-        ) : (
-          <ul className="result-list">
-            {ultimasObservacoes.map((item, index) => (
-              <li key={`${item.createdAt}-${item.moeda}-${index}`}>
-                <strong>{item.moeda}</strong>
-                <span>{new Date(item.createdAt).toLocaleString('pt-BR')}</span>
-                <span className="badge badge-em-implantacao">erro: {Number((item.erroPercentual * 100).toFixed(4))}%</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </article>
 
       <form className="form-card" onSubmit={handleSaveParametros}>
         <div className="result-toolbar">

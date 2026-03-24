@@ -159,25 +159,6 @@ type ConfirmDeleteState = {
   title: string
 }
 
-type MainsiteSettingsPayload = {
-  appearance: Record<string, unknown>
-  rotation: Record<string, unknown>
-  disclaimers: Record<string, unknown>
-}
-
-// ── Structured settings types ─────────────────────────────────
-type AppearanceSettings = {
-  allowAutoMode: boolean
-  light: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
-  dark: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
-  shared: { fontSize: string; titleFontSize: string; fontFamily: string }
-}
-
-type RotationSettings = {
-  enabled: boolean
-  interval: number
-}
-
 type DisclaimerItem = {
   id: string
   title: string
@@ -191,14 +172,6 @@ type DisclaimersSettings = {
   items: DisclaimerItem[]
 }
 
-const DEFAULT_APPEARANCE: AppearanceSettings = {
-  allowAutoMode: true,
-  light: { bgColor: '#f8f9fa', bgImage: '', fontColor: '#202124', titleColor: '#1a73e8' },
-  dark: { bgColor: '#131314', bgImage: '', fontColor: '#e3e3e3', titleColor: '#8ab4f8' },
-  shared: { fontSize: '1rem', titleFontSize: '1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif' },
-}
-
-const DEFAULT_ROTATION: RotationSettings = { enabled: false, interval: 60 }
 const DEFAULT_DISCLAIMERS: DisclaimersSettings = { enabled: true, items: [] }
 
 const initialPayload: OverviewPayload = {
@@ -234,9 +207,7 @@ export function MainsiteModule() {
   const [editingPostId, setEditingPostId] = useState<number | null>(null)
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
   const [postTitle, setPostTitle] = useState('')
-  // Structured settings state
-  const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE)
-  const [rotation, setRotation] = useState<RotationSettings>(DEFAULT_ROTATION)
+  // Structured settings state — only disclaimers (appearance+rotation moved to ConfigModule)
   const [disclaimers, setDisclaimers] = useState<DisclaimersSettings>(DEFAULT_DISCLAIMERS)
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' })
   const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null)
@@ -487,25 +458,21 @@ export function MainsiteModule() {
     setSettingsLoading(true)
     try {
       const response = await fetch('/api/mainsite/settings', {
-        headers: {
-          'X-Admin-Actor': adminActor,
-        },
+        headers: { 'X-Admin-Actor': adminActor },
       })
-      const nextPayload = await response.json() as { ok: boolean; error?: string; settings?: MainsiteSettingsPayload }
+      const nextPayload = await response.json() as { ok: boolean; error?: string; settings?: Record<string, unknown> }
 
       if (!response.ok || !nextPayload.ok || !nextPayload.settings) {
-        throw new Error(nextPayload.error ?? 'Falha ao carregar os settings públicos do MainSite.')
+        throw new Error(nextPayload.error ?? 'Falha ao carregar disclaimers do MainSite.')
       }
 
-      setAppearance(nextPayload.settings.appearance as AppearanceSettings ?? DEFAULT_APPEARANCE)
-      setRotation(nextPayload.settings.rotation as RotationSettings ?? DEFAULT_ROTATION)
       setDisclaimers(nextPayload.settings.disclaimers as DisclaimersSettings ?? DEFAULT_DISCLAIMERS)
 
       if (shouldNotify) {
-        showNotification('Settings públicos do MainSite recarregados.', 'success')
+        showNotification('Disclaimers do MainSite recarregados.', 'success')
       }
     } catch {
-      showNotification('Não foi possível carregar os settings públicos do MainSite.', 'error')
+      showNotification('Não foi possível carregar disclaimers do MainSite.', 'error')
     } finally {
       setSettingsLoading(false)
     }
@@ -692,44 +659,40 @@ export function MainsiteModule() {
     }
   }
 
+  // Merge-save: fetch current settings to preserve appearance+rotation (managed by ConfigModule)
   const handleSaveSettings = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
-    let nextSettings: MainsiteSettingsPayload
-    try {
-      nextSettings = {
-        appearance: appearance as unknown as Record<string, unknown>,
-        rotation: rotation as unknown as Record<string, unknown>,
-        disclaimers: disclaimers as unknown as Record<string, unknown>,
-      }
-    } catch {
-      showNotification('Dados de settings inválidos.', 'error')
-      return
-    }
-
     setSavingSettings(true)
     try {
+      // 1. Fetch current full settings to preserve appearance + rotation
+      const currentRes = await fetch('/api/mainsite/settings', {
+        headers: { 'X-Admin-Actor': adminActor },
+      })
+      const currentPayload = await currentRes.json() as { ok: boolean; settings?: Record<string, unknown> }
+      const currentAppearance = currentPayload.settings?.appearance ?? {}
+      const currentRotation = currentPayload.settings?.rotation ?? {}
+
+      // 2. Merge: preserve appearance + rotation, update disclaimers
       const response = await fetch('/api/mainsite/settings', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Actor': adminActor,
-        },
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
         body: JSON.stringify({
-          ...nextSettings,
+          appearance: currentAppearance,
+          rotation: currentRotation,
+          disclaimers,
           adminActor,
         }),
       })
 
       const nextPayload = await response.json() as { ok: boolean; error?: string; request_id?: string }
       if (!response.ok || !nextPayload.ok) {
-        throw new Error(nextPayload.error ?? 'Falha ao salvar os settings públicos do MainSite.')
+        throw new Error(nextPayload.error ?? 'Falha ao salvar disclaimers do MainSite.')
       }
 
-      await Promise.all([loadPublicSettings(), loadOverview()])
-      showNotification(withTrace('Settings públicos do MainSite salvos com sucesso.', nextPayload), 'success')
+      await loadPublicSettings()
+      showNotification(withTrace('Disclaimers do MainSite salvos com sucesso.', nextPayload), 'success')
     } catch {
-      showNotification('Não foi possível salvar os settings públicos do MainSite.', 'error')
+      showNotification('Não foi possível salvar disclaimers do MainSite.', 'error')
     } finally {
       setSavingSettings(false)
     }
@@ -793,7 +756,7 @@ export function MainsiteModule() {
         {payload.ultimosPosts.length === 0 ? (
           <p className="result-empty">Sem posts para os filtros atuais.</p>
         ) : (
-          <ul className="result-list">
+          <ul className="result-list astro-akashico-scroll">
             {payload.ultimosPosts.map((post) => (
               <li key={post.id}>
                 <strong>{post.title}</strong>
@@ -983,7 +946,7 @@ export function MainsiteModule() {
         {managedPosts.length === 0 ? (
           <p className="result-empty">Nenhum post encontrado no `bigdata_db`.</p>
         ) : (
-          <ul className="result-list">
+          <ul className="result-list astro-akashico-scroll">
             {managedPosts.map((post, index) => {
               const isPinned = Number(post.is_pinned) === 1 || post.is_pinned === true
               const isBusy = actionPostId === post.id
@@ -1038,8 +1001,8 @@ export function MainsiteModule() {
       <form className="form-card" onSubmit={handleSaveSettings}>
         <div className="result-toolbar">
           <div>
-            <h4><Save size={16} /> Sistema — settings públicos do MainSite</h4>
-            <p className="field-hint">Configurações visuais, rotação e disclaimers. `ratelimit` permanece no painel dedicado.</p>
+            <h4><Save size={16} /> Janelas de Aviso (Disclaimers)</h4>
+            <p className="field-hint">Gerenciamento de disclaimers do MainSite. Leitura e escrita no `bigdata_db`.</p>
           </div>
           <div className="inline-actions">
             <button type="button" className="ghost-button" onClick={() => void loadPublicSettings(true)} disabled={settingsLoading || savingSettings}>
@@ -1048,82 +1011,6 @@ export function MainsiteModule() {
             </button>
           </div>
         </div>
-
-        {/* ── Rotação Autônoma ────────────────────────────────── */}
-        <fieldset className="settings-fieldset">
-          <legend>Engenharia de Automação</legend>
-          <label className="toggle-row">
-            <input id="rotation-enabled" name="rotationEnabled" type="checkbox" checked={rotation.enabled} onChange={(e) => setRotation({ ...rotation, enabled: e.target.checked })} />
-            Habilitar Rotação Autônoma da Fila de Textos
-          </label>
-          <div className="form-grid">
-            <div className="field-group">
-              <label htmlFor="rotation-interval">Intervalo (minutos)</label>
-              <input id="rotation-interval" name="rotationInterval" type="number" min={1} value={rotation.interval} onChange={(e) => setRotation({ ...rotation, interval: parseInt(e.target.value) || 60 })} disabled={!rotation.enabled} />
-            </div>
-          </div>
-        </fieldset>
-
-        {/* ── Modo Automático ────────────────────────────────── */}
-        <fieldset className="settings-fieldset">
-          <legend>Customização Visual: Multi-Tema</legend>
-          <label className="toggle-row">
-            <input id="allow-auto-mode" name="allowAutoMode" type="checkbox" checked={appearance.allowAutoMode} onChange={(e) => setAppearance({ ...appearance, allowAutoMode: e.target.checked })} />
-            Habilitar Modo Automático (Sincroniza com o SO do Leitor)
-          </label>
-        </fieldset>
-
-        {/* ── Configurações Globais ──────────────────────────── */}
-        <fieldset className="settings-fieldset">
-          <legend>Configurações Globais (Ambos os Temas)</legend>
-          <div className="form-grid">
-            <div className="field-group">
-              <label htmlFor="shared-font-size">Tamanho da Fonte Base</label>
-              <input id="shared-font-size" name="sharedFontSize" value={appearance.shared.fontSize} onChange={(e) => setAppearance({ ...appearance, shared: { ...appearance.shared, fontSize: e.target.value } })} placeholder="1rem" />
-            </div>
-            <div className="field-group">
-              <label htmlFor="shared-title-font-size">Tamanho Títulos (H1)</label>
-              <input id="shared-title-font-size" name="sharedTitleFontSize" value={appearance.shared.titleFontSize} onChange={(e) => setAppearance({ ...appearance, shared: { ...appearance.shared, titleFontSize: e.target.value } })} placeholder="1.5rem" />
-            </div>
-            <div className="field-group">
-              <label htmlFor="shared-font-family">Família da Fonte</label>
-              <select id="shared-font-family" name="sharedFontFamily" value={appearance.shared.fontFamily} onChange={(e) => setAppearance({ ...appearance, shared: { ...appearance.shared, fontFamily: e.target.value } })}>
-                <option value="system-ui, -apple-system, sans-serif">System UI</option>
-                <option value="sans-serif">Sans-Serif</option>
-                <option value="serif">Serif</option>
-                <option value="monospace">Monospace</option>
-              </select>
-            </div>
-          </div>
-        </fieldset>
-
-        {/* ── Paleta Dark ──────────────────────────────────── */}
-        <fieldset className="settings-fieldset">
-          <legend>Paleta Tema Escuro</legend>
-          <div className="theme-color-grid">
-            <label className="color-label">Cor de Fundo <input id="dark-bg-color" name="darkBgColor" type="color" value={appearance.dark.bgColor} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, bgColor: e.target.value } })} /></label>
-            <label className="color-label">Cor do Texto <input id="dark-font-color" name="darkFontColor" type="color" value={appearance.dark.fontColor} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, fontColor: e.target.value } })} /></label>
-            <label className="color-label">Cor dos Títulos <input id="dark-title-color" name="darkTitleColor" type="color" value={appearance.dark.titleColor} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, titleColor: e.target.value } })} /></label>
-          </div>
-          <div className="field-group">
-            <label htmlFor="dark-bg-image">Imagem de Fundo (URL)</label>
-            <input id="dark-bg-image" name="darkBgImage" value={appearance.dark.bgImage} onChange={(e) => setAppearance({ ...appearance, dark: { ...appearance.dark, bgImage: e.target.value } })} placeholder="https://..." />
-          </div>
-        </fieldset>
-
-        {/* ── Paleta Light ─────────────────────────────────── */}
-        <fieldset className="settings-fieldset">
-          <legend>Paleta Tema Claro</legend>
-          <div className="theme-color-grid">
-            <label className="color-label">Cor de Fundo <input id="light-bg-color" name="lightBgColor" type="color" value={appearance.light.bgColor} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, bgColor: e.target.value } })} /></label>
-            <label className="color-label">Cor do Texto <input id="light-font-color" name="lightFontColor" type="color" value={appearance.light.fontColor} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, fontColor: e.target.value } })} /></label>
-            <label className="color-label">Cor dos Títulos <input id="light-title-color" name="lightTitleColor" type="color" value={appearance.light.titleColor} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, titleColor: e.target.value } })} /></label>
-          </div>
-          <div className="field-group">
-            <label htmlFor="light-bg-image">Imagem de Fundo (URL)</label>
-            <input id="light-bg-image" name="lightBgImage" value={appearance.light.bgImage} onChange={(e) => setAppearance({ ...appearance, light: { ...appearance.light, bgImage: e.target.value } })} placeholder="https://..." />
-          </div>
-        </fieldset>
 
         {/* ── Disclaimers ─────────────────────────────────── */}
         <fieldset className="settings-fieldset">
@@ -1186,7 +1073,7 @@ export function MainsiteModule() {
         <div className="form-actions">
           <button type="submit" className="primary-button" disabled={savingSettings}>
             {savingSettings ? <Loader2 size={18} className="spin" /> : <Save size={18} />}
-            Salvar settings públicos
+            Salvar disclaimers
           </button>
         </div>
       </form>
