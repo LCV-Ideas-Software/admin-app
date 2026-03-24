@@ -21,9 +21,7 @@
     }
   ],
   "vars": {
-    "MAINSITE_WORKER_API_BASE_URL": "https://mainsite-app.lcv.rio.br",
-    "APPHUB_PUBLIC_BASE_URL": "https://apphub.lcv.app.br",
-    "ADMINHUB_PUBLIC_BASE_URL": "https://adminhub.lcv.app.br"
+    "MAINSITE_WORKER_API_BASE_URL": "https://mainsite-app.lcv.rio.br"
   },
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
