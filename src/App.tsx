@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
-  AppWindow,
   ArrowUpRight,
+  BarChart3,
   Database,
-  FolderKanban,
+  DollarSign,
   Globe,
+  LayoutGrid,
   PanelsTopLeft,
   Pin,
   PinOff,
@@ -23,39 +24,15 @@ import { ConfigModule } from './modules/config/ConfigModule'
 import { ItauModule } from './modules/itau/ItauModule'
 import { MainsiteModule } from './modules/mainsite/MainsiteModule'
 import { MtastsModule } from './modules/mtasts/MtastsModule'
-import { ApphubModule } from './modules/hubs/ApphubModule'
-import { AdminhubModule } from './modules/hubs/AdminhubModule'
-import { formatOperationalSourceLabel, isLegacyOperationalSource } from './lib/operationalSource'
+import { CardHubModule } from './modules/hubs/CardHubModule'
+import { TelemetriaModule } from './modules/telemetria/TelemetriaModule'
+import { FinanceiroModule } from './modules/financeiro/FinanceiroModule'
 
-const APP_VERSION = 'APP v01.36.00'
+const APP_VERSION = 'APP v01.37.00'
 
-type OperationalModuleStatus = {
-  module: string
-  totalEvents24h: number
-  fallbackEvents24h: number
-  errorEvents24h: number
-  lastSource: string
-  lastOk: boolean
-}
 
-type OperationalSyncStatus = {
-  module: string
-  totalRuns: number
-  successRuns: number
-  errorRuns: number
-  lastStatus: string
-  lastFinishedAt: number | null
-}
 
-type OperationalOverviewPayload = {
-  ok: boolean
-  source: string
-  generatedAt: number
-  modules: OperationalModuleStatus[]
-  sync: OperationalSyncStatus[]
-}
-
-type ModuleId = 'overview' | 'astrologo' | 'config' | 'itau' | 'mainsite' | 'mtasts' | 'apphub' | 'adminhub'
+type ModuleId = 'overview' | 'astrologo' | 'config' | 'financeiro' | 'itau' | 'mainsite' | 'mtasts' | 'cardhub' | 'telemetria'
 
 type ModuleCard = {
   id: Exclude<ModuleId, 'overview'>
@@ -105,39 +82,39 @@ const moduleCards: ModuleCard[] = [
     legacyAdmin: 'mtasts-admin.lcv.app.br',
   },
   {
-    id: 'apphub',
-    title: 'AppHub',
-    description: 'Catálogo público de apps, agora consolidado como módulo configurável no admin-app.',
+    id: 'cardhub',
+    title: 'Card Hub',
+    description: 'Catálogo unificado de cards (AdminHub + AppHub), com persistência em D1.',
     status: 'em-implantacao',
-    endpoint: '/api/apphub/config',
-    database: 'bigdata_db (apphub_cards)',
-    legacyAdmin: 'apphub.lcv.app.br',
+    endpoint: '/api/adminhub/config + /api/apphub/config',
+    database: 'bigdata_db (adminhub_cards + apphub_cards)',
+    legacyAdmin: 'adminhub.lcv.app.br / apphub.lcv.app.br',
   },
   {
-    id: 'adminhub',
-    title: 'AdminHub',
-    description: 'Catálogo administrativo consolidado no cockpit com persistência de configuração em D1.',
+    id: 'financeiro',
+    title: 'Financeiro',
+    description: 'Logs financeiros, balanço SumUp/MP, insights, sync, estornos e cancelamentos.',
     status: 'em-implantacao',
-    endpoint: '/api/adminhub/config',
-    database: 'bigdata_db (adminhub_cards)',
-    legacyAdmin: 'adminhub.lcv.app.br',
+    endpoint: '/api/financeiro/*',
+    database: 'bigdata_db (mainsite_financial_logs)',
+    legacyAdmin: 'admin-site.lcv.rio.br (FinancialPanel)',
   },
 ]
 
 const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
   { id: 'overview', label: 'Visão Geral', icon: PanelsTopLeft },
-  { id: 'adminhub', label: 'AdminHub', icon: FolderKanban },
-  { id: 'apphub', label: 'AppHub', icon: AppWindow },
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
+  { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
+  { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
   { id: 'itau', label: 'Itaú', icon: Database },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
+  { id: 'telemetria', label: 'Telemetria', icon: BarChart3 },
   { id: 'config', label: 'Configurações', icon: Wrench },
 ]
 
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleId>('overview')
-  const [operationalOverview, setOperationalOverview] = useState<OperationalOverviewPayload | null>(null)
   const { showNotification } = useNotification()
 
   const selectedModule = useMemo(
@@ -154,36 +131,6 @@ function App() {
       }
     }
   }
-
-  useEffect(() => {
-    if (activeModule !== 'overview') {
-      return
-    }
-
-    let cancelled = false
-
-    const loadOperationalOverview = async () => {
-      try {
-        const response = await fetch('/api/overview/operational')
-        if (!response.ok) {
-          return
-        }
-
-        const payload = await response.json() as OperationalOverviewPayload
-        if (!cancelled) {
-          setOperationalOverview(payload)
-        }
-      } catch {
-        // Visão geral operacional é complementar; falha não deve bloquear UX.
-      }
-    }
-
-    void loadOperationalOverview()
-
-    return () => {
-      cancelled = true
-    }
-  }, [activeModule])
 
   const [sidebarPinned, setSidebarPinned] = useState(true)
 
@@ -240,72 +187,16 @@ function App() {
 
         {activeModule === 'overview' ? (
           <>
-            <article className="result-card">
+            <article className="result-card telemetria-overview-link">
               <header className="result-header">
-                <h4><Activity size={16} /> Telemetria operacional (24h)</h4>
-                <span>fonte da consulta: {formatOperationalSourceLabel(operationalOverview?.source ?? 'sem dados')}</span>
+                <h4><BarChart3 size={16} /> Telemetria centralizada</h4>
               </header>
-
-              {!operationalOverview || operationalOverview.modules.length === 0 ? (
-                <p className="result-empty">
-                  Sem eventos operacionais registrados ainda. Os indicadores aparecerão após tráfego nos módulos.
-                </p>
-              ) : (
-                <ul className="result-list">
-                  {operationalOverview.modules.map((item) => (
-                    <li key={item.module}>
-                      <strong>{item.module}</strong>
-                      <div className="telemetry-metrics">
-                        <span>24h: {item.totalEvents24h} evento(s) · fallback: {item.fallbackEvents24h} · falhas: {item.errorEvents24h}</span>
-                        <span className={`telemetry-status ${item.lastOk ? 'telemetry-status-ok' : 'telemetry-status-error'}`}>
-                          último evento: {item.lastOk ? 'sucesso' : 'falha'}
-                        </span>
-                      </div>
-                      <span className={`badge ${(item.fallbackEvents24h > 0 || !item.lastOk || isLegacyOperationalSource(item.lastSource)) ? 'badge-planejado' : 'badge-em-implantacao'}`}>
-                        {formatOperationalSourceLabel(item.lastSource)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {operationalOverview && operationalOverview.modules.length > 0 ? (
-                <p className="telemetry-note">
-                  Observação: o badge à direita mostra a <strong>fonte do último evento</strong> de cada módulo.
-                  O baseline operacional vigente é <strong>BIGDATA_DB</strong> para todos os módulos do cockpit.
-                </p>
-              ) : null}
-            </article>
-
-            <article className="result-card">
-              <header className="result-header">
-                <h4><Database size={16} /> Execuções de sync</h4>
-                <span>{operationalOverview?.sync.length ?? 0} módulo(s)</span>
-              </header>
-
-              {!operationalOverview || operationalOverview.sync.length === 0 ? (
-                <p className="result-empty">
-                  Nenhum sync registrado ainda. Os módulos com ingestão manual mostrarão histórico aqui.
-                </p>
-              ) : (
-                <ul className="result-list">
-                  {operationalOverview.sync.map((item) => (
-                    <li key={item.module}>
-                      <strong>{item.module}</strong>
-                      <span>
-                        execuções: {item.totalRuns} · sucesso: {item.successRuns} · erros: {item.errorRuns}
-                      </span>
-                      <span className={`badge ${item.lastStatus === 'success' ? 'badge-em-implantacao' : 'badge-planejado'}`}>
-                        {item.lastStatus === 'success'
-                          ? 'último sync ok'
-                          : item.lastStatus === 'error'
-                            ? 'último sync com erro'
-                            : item.lastStatus}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p className="result-empty">
+                Todos os dados de telemetria operacional, contatos, compartilhamentos, chatbot e auditoria IA foram centralizados no painel <strong>Telemetria</strong>.
+              </p>
+              <button type="button" className="ghost-button" onClick={() => handleModuleClick('telemetria')}>
+                Abrir painel Telemetria <ArrowUpRight size={16} />
+              </button>
             </article>
 
             <section className="module-grid">
@@ -349,10 +240,12 @@ function App() {
           <MainsiteModule />
         ) : activeModule === 'mtasts' ? (
           <MtastsModule />
-        ) : activeModule === 'apphub' ? (
-          <ApphubModule />
-        ) : activeModule === 'adminhub' ? (
-          <AdminhubModule />
+        ) : activeModule === 'cardhub' ? (
+          <CardHubModule />
+        ) : activeModule === 'financeiro' ? (
+          <FinanceiroModule />
+        ) : activeModule === 'telemetria' ? (
+          <TelemetriaModule />
         ) : (
           <section className="detail-panel">
             <div className="detail-header">

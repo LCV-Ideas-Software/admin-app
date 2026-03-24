@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Copy, Loader2, RefreshCw, Save, Search, Send, Share2, Sparkles, Telescope, Trash2 } from 'lucide-react'
+import { Copy, Loader2, RefreshCw, Search, Send, Share2, Sparkles, Telescope, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
-import { SyncStatusCard } from '../../components/SyncStatusCard'
 import { generateAstrologicalReport } from '../../lib/astrological-report'
 import DOMPurify from 'dompurify'
 
@@ -58,32 +57,6 @@ const formatarData = (dataStr: string): string => {
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dataStr
 }
 
-type RatePolicy = {
-  route: 'calcular' | 'analisar' | 'enviar-email'
-  label: string
-  enabled: boolean
-  max_requests: number
-  window_minutes: number
-  updated_at: string | null
-  defaults: {
-    enabled: boolean
-    max_requests: number
-    window_minutes: number
-  }
-  stats: {
-    total_requests_window: number
-    distinct_keys_window: number
-  }
-}
-
-const normalizePoliciesForCompare = (items: RatePolicy[]) => [...items]
-  .sort((a, b) => a.route.localeCompare(b.route))
-  .map((policy) => ({
-    route: policy.route,
-    enabled: Boolean(policy.enabled),
-    max_requests: Number(policy.max_requests),
-    window_minutes: Number(policy.window_minutes),
-  }))
 
 export function AstrologoModule() {
   const { showNotification } = useNotification()
@@ -91,8 +64,6 @@ export function AstrologoModule() {
     payload?.request_id ? `${message} (req ${payload.request_id})` : message
   )
   const [loading, setLoading] = useState(false)
-  const [loadingRateLimit, setLoadingRateLimit] = useState(false)
-  const [updatingRateRoute, setUpdatingRateRoute] = useState<string | null>(null)
   const [loadingMapaId, setLoadingMapaId] = useState<string | null>(null)
   const [deletingMapaId, setDeletingMapaId] = useState<string | null>(null)
   const [nome, setNome] = useState('')
@@ -102,8 +73,6 @@ export function AstrologoModule() {
   const [adminActor] = useState('admin@app.lcv')
   const [items, setItems] = useState<MapaResumo[]>([])
   const [selectedMapa, setSelectedMapa] = useState<MapaDetalhado | null>(null)
-  const [ratePolicies, setRatePolicies] = useState<RatePolicy[]>([])
-  const [baselineRatePolicies, setBaselineRatePolicies] = useState<RatePolicy[]>([])
   const [emailDestino, setEmailDestino] = useState('')
   const [nomeConsulente, setNomeConsulente] = useState('')
   const [relatorioHtml, setRelatorioHtml] = useState('')
@@ -125,56 +94,7 @@ export function AstrologoModule() {
     }
   }, [selectedMapa])
 
-  const hasUnsavedRatePolicies = useMemo(() => (
-    JSON.stringify(normalizePoliciesForCompare(ratePolicies)) !== JSON.stringify(normalizePoliciesForCompare(baselineRatePolicies))
-  ), [baselineRatePolicies, ratePolicies])
-
   const disabled = useMemo(() => loading, [loading])
-
-  const loadRateLimit = useCallback(async (shouldNotify = false) => {
-    setLoadingRateLimit(true)
-    try {
-      const response = await fetch('/api/astrologo/rate-limit', {
-        headers: {
-          'X-Admin-Actor': adminActor,
-        },
-      })
-      const payload = await response.json() as { ok: boolean; error?: string; policies?: RatePolicy[] }
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao carregar rate limit do Astrólogo.')
-      }
-
-      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
-      setRatePolicies(nextPolicies)
-      setBaselineRatePolicies(nextPolicies)
-      if (shouldNotify) {
-        showNotification('Painel de rate limit do Astrólogo atualizado.', 'success')
-      }
-    } catch {
-      showNotification('Não foi possível carregar o painel de rate limit do Astrólogo.', 'error')
-    } finally {
-      setLoadingRateLimit(false)
-    }
-  }, [adminActor, showNotification])
-
-  useEffect(() => {
-    if (!hasUnsavedRatePolicies) {
-      return
-    }
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [hasUnsavedRatePolicies])
-
-  useEffect(() => {
-    void loadRateLimit()
-  }, [loadRateLimit])
 
   useEffect(() => {
     if (!selectedMapa) {
@@ -262,143 +182,6 @@ export function AstrologoModule() {
       showNotification('Não foi possível excluir o mapa selecionado.', 'error')
     } finally {
       setDeletingMapaId(null)
-    }
-  }
-
-  const handleRatePolicyChange = (
-    route: RatePolicy['route'],
-    field: 'enabled' | 'max_requests' | 'window_minutes',
-    value: boolean | number,
-  ) => {
-    setRatePolicies((current) => current.map((policy) => {
-      if (policy.route !== route) {
-        return policy
-      }
-
-      return {
-        ...policy,
-        [field]: value,
-      }
-    }))
-  }
-
-  const persistRatePolicy = async (route: RatePolicy['route'], action: 'update' | 'restore_default') => {
-    const policy = ratePolicies.find((item) => item.route === route)
-    if (!policy) {
-      showNotification('Policy de rate limit não encontrada para atualização.', 'error')
-      return
-    }
-
-    setUpdatingRateRoute(route)
-    try {
-      const response = await fetch('/api/astrologo/rate-limit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Actor': adminActor,
-        },
-        body: JSON.stringify({
-          action,
-          route,
-          enabled: policy.enabled,
-          max_requests: policy.max_requests,
-          window_minutes: policy.window_minutes,
-          adminActor,
-        }),
-      })
-
-      const payload = await response.json() as { ok: boolean; error?: string; policies?: RatePolicy[]; request_id?: string }
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao salvar policy de rate limit do Astrólogo.')
-      }
-
-      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
-      setRatePolicies(nextPolicies)
-      setBaselineRatePolicies(nextPolicies)
-      showNotification(withTrace(action === 'restore_default'
-        ? `Policy ${route} restaurada para padrão.`
-        : `Policy ${route} atualizada com sucesso.`, payload), 'success')
-    } catch {
-      showNotification('Não foi possível salvar a policy de rate limit do Astrólogo.', 'error')
-    } finally {
-      setUpdatingRateRoute(null)
-    }
-  }
-
-  const restoreRatePolicyLocal = (route: RatePolicy['route']) => {
-    setRatePolicies((current) => current.map((policy) => {
-      if (policy.route !== route) {
-        return policy
-      }
-
-      return {
-        ...policy,
-        enabled: policy.defaults.enabled,
-        max_requests: policy.defaults.max_requests,
-        window_minutes: policy.defaults.window_minutes,
-      }
-    }))
-  }
-
-  const restoreAllRatePoliciesLocal = () => {
-    setRatePolicies((current) => current.map((policy) => ({
-      ...policy,
-      enabled: policy.defaults.enabled,
-      max_requests: policy.defaults.max_requests,
-      window_minutes: policy.defaults.window_minutes,
-    })))
-    showNotification('Padrões de rate limit restaurados localmente.', 'info')
-  }
-
-  const saveAllRatePolicies = async () => {
-    if (!hasUnsavedRatePolicies) {
-      showNotification('Nenhuma alteração pendente no rate limit.', 'info')
-      return
-    }
-
-    setUpdatingRateRoute('__all__')
-    try {
-      const baselineMap = new Map(baselineRatePolicies.map((policy) => [policy.route, policy]))
-      const dirtyPolicies = ratePolicies.filter((policy) => {
-        const baseline = baselineMap.get(policy.route)
-        if (!baseline) {
-          return true
-        }
-
-        return baseline.enabled !== policy.enabled
-          || baseline.max_requests !== policy.max_requests
-          || baseline.window_minutes !== policy.window_minutes
-      })
-
-      for (const policy of dirtyPolicies) {
-        const response = await fetch('/api/astrologo/rate-limit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Actor': adminActor,
-          },
-          body: JSON.stringify({
-            action: 'update',
-            route: policy.route,
-            enabled: policy.enabled,
-            max_requests: policy.max_requests,
-            window_minutes: policy.window_minutes,
-            adminActor,
-          }),
-        })
-
-        const payload = await response.json() as { ok: boolean; error?: string }
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error ?? `Falha ao salvar policy ${policy.route} do Astrólogo.`)
-        }
-      }
-
-      await loadRateLimit()
-      showNotification('Painel de rate limit do Astrólogo salvo com sucesso.', 'success')
-    } catch {
-      showNotification('Não foi possível salvar todas as policies de rate limit do Astrólogo.', 'error')
-    } finally {
-      setUpdatingRateRoute(null)
     }
   }
 
@@ -783,89 +566,6 @@ export function AstrologoModule() {
         </div>
       </form>
 
-      <article className="result-card">
-        <div className="result-toolbar">
-          <div>
-            <h4><Save size={16} /> Segurança e Custos (Limitação de API)</h4>
-            <p className="field-hint">Políticas por rota com atualização em tempo real e opção de restaurar padrão.</p>
-            {hasUnsavedRatePolicies && (
-              <span className="badge badge-planejado">Alterações não salvas</span>
-            )}
-          </div>
-          <div className="inline-actions">
-            <button type="button" className="ghost-button" onClick={() => void loadRateLimit(true)} disabled={loadingRateLimit || updatingRateRoute !== null}>
-              {loadingRateLimit ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-              Atualizar painel
-            </button>
-            <button type="button" className="ghost-button" onClick={restoreAllRatePoliciesLocal} disabled={loadingRateLimit || updatingRateRoute !== null || ratePolicies.length === 0}>
-              <RefreshCw size={16} />
-              Restaurar padrão (todas)
-            </button>
-            <button type="button" className="primary-button" onClick={() => void saveAllRatePolicies()} disabled={loadingRateLimit || updatingRateRoute !== null || !hasUnsavedRatePolicies}>
-              {updatingRateRoute === '__all__' ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
-              Salvar painel
-            </button>
-          </div>
-        </div>
-
-        {ratePolicies.length === 0 ? (
-          <p className="result-empty">Sem policies de rate limit carregadas.</p>
-        ) : (
-          <ul className="result-list">
-            {ratePolicies.map((policy) => {
-              const isBusy = updatingRateRoute === policy.route
-              return (
-                <li key={policy.route} className="post-row">
-                  <div className="post-row-main">
-                    <strong>{policy.label}</strong>
-                    <div className="post-row-meta">
-                      <span>rota: {policy.route}</span>
-                      <span>janela atual: {policy.stats.total_requests_window} req / {policy.stats.distinct_keys_window} chaves</span>
-                      <span>updated at: {policy.updated_at ?? '—'}</span>
-                    </div>
-                  </div>
-
-                  <div className="form-grid">
-                    <div className="field-group">
-                      <label htmlFor={`astrologo-rate-enabled-${policy.route}`}>Escudo habilitado</label>
-                      <select id={`astrologo-rate-enabled-${policy.route}`} name={`astrologoRateEnabled${policy.route}`} value={policy.enabled ? '1' : '0'} onChange={(event) => handleRatePolicyChange(policy.route, 'enabled', event.target.value === '1')} disabled={isBusy}>
-                        <option value="1">Ativo</option>
-                        <option value="0">Inativo</option>
-                      </select>
-                    </div>
-                    <div className="field-group">
-                      <label htmlFor={`astrologo-rate-max-${policy.route}`}>Máx. requisições/IP</label>
-                      <input id={`astrologo-rate-max-${policy.route}`} name={`astrologoRateMax${policy.route}`} type="number" min={1} max={500} value={policy.max_requests} onChange={(event) => handleRatePolicyChange(policy.route, 'max_requests', Number(event.target.value))} disabled={isBusy} />
-                    </div>
-                    <div className="field-group">
-                      <label htmlFor={`astrologo-rate-window-${policy.route}`}>Janela (min)</label>
-                      <input id={`astrologo-rate-window-${policy.route}`} name={`astrologoRateWindow${policy.route}`} type="number" min={1} max={1440} value={policy.window_minutes} onChange={(event) => handleRatePolicyChange(policy.route, 'window_minutes', Number(event.target.value))} disabled={isBusy} />
-                    </div>
-                  </div>
-
-                  <div className="post-row-actions">
-                    <button type="button" className="ghost-button" onClick={() => void persistRatePolicy(policy.route, 'update')} disabled={isBusy}>
-                      {isBusy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
-                      Salvar policy
-                    </button>
-                    <button type="button" className="ghost-button" onClick={() => restoreRatePolicyLocal(policy.route)} disabled={isBusy}>
-                      <RefreshCw size={16} />
-                      Restaurar local
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </article>
-
-      <SyncStatusCard
-        module="astrologo"
-        endpoint="/api/astrologo/sync"
-        title="Sync manual do Astrólogo"
-        description="Replica mapas do legado para o `bigdata_db`, com dry run opcional para conferência antes da escrita."
-      />
     </section>
   )
 }

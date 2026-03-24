@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, Database, Loader2, RefreshCw, Save, Search } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
-import { SyncStatusCard } from '../../components/SyncStatusCard'
 import { formatOperationalSourceLabel } from '../../lib/operationalSource'
 
 type Resumo = {
@@ -46,33 +45,6 @@ type ParametrosForm = {
   backtest_mape_atencao_percent: number
 }
 
-type RatePolicy = {
-  route_key: 'oraculo_ia' | 'enviar_email'
-  label: string
-  enabled: boolean
-  max_requests: number
-  window_minutes: number
-  updated_at: number
-  updated_by: string | null
-  defaults: {
-    enabled: boolean
-    max_requests: number
-    window_minutes: number
-  }
-  stats: {
-    total_requests_window: number
-    distinct_ips_window: number
-  }
-}
-
-const normalizePoliciesForCompare = (items: RatePolicy[]) => [...items]
-  .sort((a, b) => a.route_key.localeCompare(b.route_key))
-  .map((policy) => ({
-    route_key: policy.route_key,
-    enabled: Boolean(policy.enabled),
-    max_requests: Number(policy.max_requests),
-    window_minutes: Number(policy.window_minutes),
-  }))
 
 const initialParametrosForm: ParametrosForm = {
   iof_cartao_percent: 3.5,
@@ -105,8 +77,6 @@ export function ItauModule() {
   const [loading, setLoading] = useState(false)
   const [loadingParametros, setLoadingParametros] = useState(false)
   const [savingParametros, setSavingParametros] = useState(false)
-  const [loadingRateLimit, setLoadingRateLimit] = useState(false)
-  const [updatingRateRoute, setUpdatingRateRoute] = useState<string | null>(null)
   const [moeda, setMoeda] = useState('')
   const [dias, setDias] = useState('7')
   const [adminActor] = useState('admin@app.lcv')
@@ -114,13 +84,8 @@ export function ItauModule() {
   const [resumo, setResumo] = useState<Resumo>(initialResumo)
   const [ultimasObservacoes, setUltimasObservacoes] = useState<Observacao[]>([])
   const [parametrosForm, setParametrosForm] = useState<ParametrosForm>(initialParametrosForm)
-  const [ratePolicies, setRatePolicies] = useState<RatePolicy[]>([])
-  const [baselineRatePolicies, setBaselineRatePolicies] = useState<RatePolicy[]>([])
 
   const disabled = useMemo(() => loading, [loading])
-  const hasUnsavedRatePolicies = useMemo(() => (
-    JSON.stringify(normalizePoliciesForCompare(ratePolicies)) !== JSON.stringify(normalizePoliciesForCompare(baselineRatePolicies))
-  ), [baselineRatePolicies, ratePolicies])
 
   const loadParametros = useCallback(async (shouldNotify = false) => {
     setLoadingParametros(true)
@@ -147,51 +112,9 @@ export function ItauModule() {
     }
   }, [adminActor, showNotification])
 
-  const loadRateLimit = useCallback(async (shouldNotify = false) => {
-    setLoadingRateLimit(true)
-    try {
-      const response = await fetch('/api/itau/rate-limit', {
-        headers: {
-          'X-Admin-Actor': adminActor,
-        },
-      })
-      const payload = await response.json() as { ok: boolean; error?: string; policies?: RatePolicy[] }
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao carregar rate limit do Itaú.')
-      }
-
-      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
-      setRatePolicies(nextPolicies)
-      setBaselineRatePolicies(nextPolicies)
-      if (shouldNotify) {
-        showNotification('Painel de rate limit do Itaú atualizado.', 'success')
-      }
-    } catch {
-      showNotification('Não foi possível carregar o painel de rate limit do Itaú.', 'error')
-    } finally {
-      setLoadingRateLimit(false)
-    }
-  }, [adminActor, showNotification])
-
-  useEffect(() => {
-    if (!hasUnsavedRatePolicies) {
-      return
-    }
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [hasUnsavedRatePolicies])
-
   useEffect(() => {
     void loadParametros()
-    void loadRateLimit()
-  }, [loadParametros, loadRateLimit])
+  }, [loadParametros])
 
   const handleParametroChange = (field: keyof ParametrosForm, value: string) => {
     const parsed = Number(value)
@@ -232,137 +155,7 @@ export function ItauModule() {
     }
   }
 
-  const handleRatePolicyChange = (routeKey: RatePolicy['route_key'], field: 'enabled' | 'max_requests' | 'window_minutes', value: boolean | number) => {
-    setRatePolicies((current) => current.map((policy) => {
-      if (policy.route_key !== routeKey) {
-        return policy
-      }
-      return {
-        ...policy,
-        [field]: value,
-      }
-    }))
-  }
 
-  const persistRatePolicy = async (routeKey: RatePolicy['route_key'], action: 'update' | 'restore_default') => {
-    const policy = ratePolicies.find((item) => item.route_key === routeKey)
-    if (!policy) {
-      showNotification('Policy de rate limit não encontrada para atualização.', 'error')
-      return
-    }
-
-    setUpdatingRateRoute(routeKey)
-    try {
-      const response = await fetch('/api/itau/rate-limit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Actor': adminActor,
-        },
-        body: JSON.stringify({
-          action,
-          route_key: routeKey,
-          enabled: policy.enabled,
-          max_requests: policy.max_requests,
-          window_minutes: policy.window_minutes,
-          adminActor,
-        }),
-      })
-
-      const payload = await response.json() as { ok: boolean; error?: string; policies?: RatePolicy[]; request_id?: string }
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao salvar policy de rate limit do Itaú.')
-      }
-
-      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
-      setRatePolicies(nextPolicies)
-      setBaselineRatePolicies(nextPolicies)
-      showNotification(withTrace(action === 'restore_default'
-        ? `Policy ${routeKey} restaurada para padrão.`
-        : `Policy ${routeKey} atualizada com sucesso.`, payload), 'success')
-    } catch {
-      showNotification('Não foi possível salvar a policy de rate limit do Itaú.', 'error')
-    } finally {
-      setUpdatingRateRoute(null)
-    }
-  }
-
-  const restoreRatePolicyLocal = (routeKey: RatePolicy['route_key']) => {
-    setRatePolicies((current) => current.map((policy) => {
-      if (policy.route_key !== routeKey) {
-        return policy
-      }
-
-      return {
-        ...policy,
-        enabled: policy.defaults.enabled,
-        max_requests: policy.defaults.max_requests,
-        window_minutes: policy.defaults.window_minutes,
-      }
-    }))
-  }
-
-  const restoreAllRatePoliciesLocal = () => {
-    setRatePolicies((current) => current.map((policy) => ({
-      ...policy,
-      enabled: policy.defaults.enabled,
-      max_requests: policy.defaults.max_requests,
-      window_minutes: policy.defaults.window_minutes,
-    })))
-    showNotification('Padrões de rate limit restaurados localmente.', 'info')
-  }
-
-  const saveAllRatePolicies = async () => {
-    if (!hasUnsavedRatePolicies) {
-      showNotification('Nenhuma alteração pendente no rate limit.', 'info')
-      return
-    }
-
-    setUpdatingRateRoute('__all__')
-    try {
-      const baselineMap = new Map(baselineRatePolicies.map((policy) => [policy.route_key, policy]))
-      const dirtyPolicies = ratePolicies.filter((policy) => {
-        const baseline = baselineMap.get(policy.route_key)
-        if (!baseline) {
-          return true
-        }
-
-        return baseline.enabled !== policy.enabled
-          || baseline.max_requests !== policy.max_requests
-          || baseline.window_minutes !== policy.window_minutes
-      })
-
-      for (const policy of dirtyPolicies) {
-        const response = await fetch('/api/itau/rate-limit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Actor': adminActor,
-          },
-          body: JSON.stringify({
-            action: 'update',
-            route_key: policy.route_key,
-            enabled: policy.enabled,
-            max_requests: policy.max_requests,
-            window_minutes: policy.window_minutes,
-            adminActor,
-          }),
-        })
-
-        const payload = await response.json() as { ok: boolean; error?: string }
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error ?? `Falha ao salvar policy ${policy.route_key} do Itaú.`)
-        }
-      }
-
-      await loadRateLimit()
-      showNotification('Painel de rate limit do Itaú salvo com sucesso.', 'success')
-    } catch {
-      showNotification('Não foi possível salvar todas as policies de rate limit do Itaú.', 'error')
-    } finally {
-      setUpdatingRateRoute(null)
-    }
-  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -529,115 +322,6 @@ export function ItauModule() {
         </div>
       </form>
 
-      <article className="result-card">
-        <div className="result-toolbar">
-          <div>
-            <h4><Database size={16} /> Painel de controle de rate limit</h4>
-            <p className="field-hint">Políticas por rota com atualização em tempo real e opção de restaurar padrão.</p>
-            {hasUnsavedRatePolicies && (
-              <span className="badge badge-planejado">Alterações não salvas</span>
-            )}
-          </div>
-          <div className="inline-actions">
-            <button type="button" className="ghost-button" onClick={() => void loadRateLimit(true)} disabled={loadingRateLimit || updatingRateRoute !== null}>
-              {loadingRateLimit ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-              Atualizar painel
-            </button>
-            <button type="button" className="ghost-button" onClick={restoreAllRatePoliciesLocal} disabled={loadingRateLimit || updatingRateRoute !== null || ratePolicies.length === 0}>
-              <RefreshCw size={16} />
-              Restaurar padrão (todas)
-            </button>
-            <button type="button" className="primary-button" onClick={() => void saveAllRatePolicies()} disabled={loadingRateLimit || updatingRateRoute !== null || !hasUnsavedRatePolicies}>
-              {updatingRateRoute === '__all__' ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
-              Salvar painel
-            </button>
-          </div>
-        </div>
-
-        {ratePolicies.length === 0 ? (
-          <p className="result-empty">Sem policies de rate limit carregadas.</p>
-        ) : (
-          <ul className="result-list">
-            {ratePolicies.map((policy) => {
-              const isBusy = updatingRateRoute === policy.route_key
-              return (
-                <li key={policy.route_key} className="post-row">
-                  <div className="post-row-main">
-                    <strong>{policy.label}</strong>
-                    <div className="post-row-meta">
-                      <span>rota: {policy.route_key}</span>
-                      <span>janela atual: {policy.stats.total_requests_window} req / {policy.stats.distinct_ips_window} IPs</span>
-                      <span>updated by: {policy.updated_by ?? '—'}</span>
-                    </div>
-                  </div>
-
-                  <div className="form-grid">
-                    <div className="field-group">
-                      <label htmlFor={`itau-rate-enabled-${policy.route_key}`}>Escudo habilitado</label>
-                      <select
-                        id={`itau-rate-enabled-${policy.route_key}`}
-                        name={`itauRateEnabled${policy.route_key}`}
-                        value={policy.enabled ? '1' : '0'}
-                        onChange={(event) => handleRatePolicyChange(policy.route_key, 'enabled', event.target.value === '1')}
-                        disabled={isBusy}
-                      >
-                        <option value="1">Ativo</option>
-                        <option value="0">Inativo</option>
-                      </select>
-                    </div>
-
-                    <div className="field-group">
-                      <label htmlFor={`itau-rate-max-${policy.route_key}`}>Máx. requisições/IP</label>
-                      <input
-                        id={`itau-rate-max-${policy.route_key}`}
-                        name={`itauRateMax${policy.route_key}`}
-                        type="number"
-                        min={1}
-                        max={5000}
-                        value={policy.max_requests}
-                        onChange={(event) => handleRatePolicyChange(policy.route_key, 'max_requests', Number(event.target.value))}
-                        disabled={isBusy}
-                      />
-                    </div>
-
-                    <div className="field-group">
-                      <label htmlFor={`itau-rate-window-${policy.route_key}`}>Janela (min)</label>
-                      <input
-                        id={`itau-rate-window-${policy.route_key}`}
-                        name={`itauRateWindow${policy.route_key}`}
-                        type="number"
-                        min={1}
-                        max={1440}
-                        value={policy.window_minutes}
-                        onChange={(event) => handleRatePolicyChange(policy.route_key, 'window_minutes', Number(event.target.value))}
-                        disabled={isBusy}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="post-row-actions">
-                    <button type="button" className="ghost-button" onClick={() => void persistRatePolicy(policy.route_key, 'update')} disabled={isBusy}>
-                      {isBusy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
-                      Salvar policy
-                    </button>
-                    <button type="button" className="ghost-button" onClick={() => restoreRatePolicyLocal(policy.route_key)} disabled={isBusy}>
-                      <RefreshCw size={16} />
-                      Restaurar local
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </article>
-
-      <SyncStatusCard
-        module="itau"
-        endpoint="/api/itau/sync"
-        title="Sync manual do Itaú"
-        description="Sincroniza observabilidade e policies de rate limit no `bigdata_db`, com execução real ou dry run."
-      />
     </section>
   )
 }

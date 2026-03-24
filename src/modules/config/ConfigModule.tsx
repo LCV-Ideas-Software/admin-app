@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Loader2, RefreshCw, Save, Settings2, ShieldCheck } from 'lucide-react'
+import { Database, Loader2, RefreshCw, Save, Settings2, ShieldCheck } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+import { RateLimitPanel } from '../../components/RateLimitPanel'
+import { SyncStatusCard } from '../../components/SyncStatusCard'
 
 type AdminRuntimeConfig = {
   defaultAdminActor: string
@@ -56,6 +58,8 @@ export function ConfigModule() {
   const [saving, setSaving] = useState(false)
   const [config, setConfig] = useState<AdminRuntimeConfig>(DEFAULT_CONFIG)
   const [baselineConfig, setBaselineConfig] = useState<AdminRuntimeConfig>(DEFAULT_CONFIG)
+  const [selectedRateModule, setSelectedRateModule] = useState('')
+  const [selectedSyncModule, setSelectedSyncModule] = useState('')
 
   const hasUnsavedChanges = useMemo(() => (
     JSON.stringify(config) !== JSON.stringify(baselineConfig)
@@ -253,6 +257,70 @@ export function ConfigModule() {
           </div>
         </div>
       </form>
+
+      <article className="result-card">
+        <header className="result-header">
+          <h4><ShieldCheck size={16} /> Rate Limit — Controles por módulo</h4>
+        </header>
+        <div className="field-group">
+          <label htmlFor="config-ratelimit-module">Selecione o módulo</label>
+          <select
+            id="config-ratelimit-module"
+            name="configRateLimitModule"
+            value={selectedRateModule}
+            onChange={(e) => setSelectedRateModule(e.target.value)}
+          >
+            <option value="">— Escolha um módulo —</option>
+            <option value="astrologo">Astrólogo</option>
+            <option value="itau">Itaú</option>
+            <option value="mainsite">MainSite</option>
+          </select>
+        </div>
+      </article>
+
+      {selectedRateModule === 'astrologo' && (
+        <RateLimitPanel moduleLabel="Astrólogo" endpoint="/api/astrologo/rate-limit" idPrefix="config-ast" />
+      )}
+      {selectedRateModule === 'itau' && (
+        <RateLimitPanel moduleLabel="Itaú" endpoint="/api/itau/rate-limit" idPrefix="config-itau" />
+      )}
+      {selectedRateModule === 'mainsite' && (
+        <RateLimitPanel moduleLabel="MainSite" endpoint="/api/mainsite/rate-limit" idPrefix="config-mainsite" />
+      )}
+
+      <article className="result-card">
+        <header className="result-header">
+          <h4><Database size={16} /> Sync Manual — Controles por módulo</h4>
+        </header>
+        <div className="field-group">
+          <label htmlFor="config-sync-module">Selecione o módulo</label>
+          <select
+            id="config-sync-module"
+            name="configSyncModule"
+            value={selectedSyncModule}
+            onChange={(e) => setSelectedSyncModule(e.target.value)}
+          >
+            <option value="">— Escolha um módulo —</option>
+            <option value="astrologo">Astrólogo</option>
+            <option value="itau">Itaú</option>
+            <option value="mainsite">MainSite</option>
+            <option value="mtasts">MTA-STS</option>
+          </select>
+        </div>
+      </article>
+
+      {selectedSyncModule === 'astrologo' && (
+        <SyncStatusCard module="astrologo" endpoint="/api/astrologo/sync" title="Sync manual do Astrólogo" description="Replica mapas do legado para o `bigdata_db`, com dry run opcional." />
+      )}
+      {selectedSyncModule === 'itau' && (
+        <SyncStatusCard module="itau" endpoint="/api/itau/sync" title="Sync manual do Itaú" description="Sincroniza observabilidade e policies de rate limit no `bigdata_db`." />
+      )}
+      {selectedSyncModule === 'mainsite' && (
+        <SyncStatusCard module="mainsite" endpoint="/api/mainsite/sync" title="Sync manual do MainSite" description="Validação e saneamento de posts/settings no `bigdata_db` com dry run." />
+      )}
+      {selectedSyncModule === 'mtasts' && (
+        <SyncStatusCard module="mtasts" endpoint="/api/mtasts/sync" title="Sync manual do MTA-STS" description="Sincroniza histórico, zonas e policies no `bigdata_db`." />
+      )}
 
       <article className="result-card">
         <header className="result-header">

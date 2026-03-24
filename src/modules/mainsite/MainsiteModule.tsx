@@ -37,8 +37,6 @@ import Image from '@tiptap/extension-image'
 import YoutubeExtension from '@tiptap/extension-youtube'
 import { Markdown } from 'tiptap-markdown'
 import { useNotification } from '../../components/Notification'
-import { SyncStatusCard } from '../../components/SyncStatusCard'
-import type { RateLimitPolicy } from '../../lib/rate-limit-common'
 
 // ── Media utilities (ported from mainsite-admin EditorPanel.jsx) ──
 
@@ -217,14 +215,6 @@ const initialPayload: OverviewPayload = {
   ultimosPosts: [],
 }
 
-const normalizePoliciesForCompare = (items: RateLimitPolicy[]) => [...items]
-  .sort((a, b) => a.route.localeCompare(b.route))
-  .map((policy) => ({
-    route: policy.route,
-    enabled: Boolean(policy.enabled),
-    max_requests: Number(policy.max_requests),
-    window_minutes: Number(policy.window_minutes),
-  }))
 
 export function MainsiteModule() {
   const { showNotification } = useNotification()
@@ -234,8 +224,6 @@ export function MainsiteModule() {
   const [overviewLoading, setOverviewLoading] = useState(false)
   const [postsLoading, setPostsLoading] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
-  const [loadingRateLimit, setLoadingRateLimit] = useState(false)
-  const [updatingRateRoute, setUpdatingRateRoute] = useState<string | null>(null)
   const [savingPost, setSavingPost] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [actionPostId, setActionPostId] = useState<number | null>(null)
@@ -250,8 +238,6 @@ export function MainsiteModule() {
   const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE)
   const [rotation, setRotation] = useState<RotationSettings>(DEFAULT_ROTATION)
   const [disclaimers, setDisclaimers] = useState<DisclaimersSettings>(DEFAULT_DISCLAIMERS)
-  const [ratePolicies, setRatePolicies] = useState<RateLimitPolicy[]>([])
-  const [baselineRatePolicies, setBaselineRatePolicies] = useState<RateLimitPolicy[]>([])
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' })
   const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null)
   const [promptModal, setPromptModal] = useState<PromptModalState>(PROMPT_MODAL_INITIAL)
@@ -441,189 +427,7 @@ export function MainsiteModule() {
     })
   }, [editor, showNotification, insertCaptionBlock])
 
-  const hasUnsavedRatePolicies = useMemo(() => (
-    JSON.stringify(normalizePoliciesForCompare(ratePolicies)) !== JSON.stringify(normalizePoliciesForCompare(baselineRatePolicies))
-  ), [baselineRatePolicies, ratePolicies])
-
   const disabled = useMemo(() => overviewLoading, [overviewLoading])
-
-  const loadRateLimit = useCallback(async (shouldNotify = false) => {
-    setLoadingRateLimit(true)
-    try {
-      const response = await fetch('/api/mainsite/rate-limit', {
-        headers: {
-          'X-Admin-Actor': adminActor,
-        },
-      })
-      const payload = await response.json() as { ok: boolean; error?: string; policies?: RateLimitPolicy[] }
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao carregar rate limit do MainSite.')
-      }
-
-      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
-      setRatePolicies(nextPolicies)
-      setBaselineRatePolicies(nextPolicies)
-      if (shouldNotify) {
-        showNotification('Rate limit do MainSite recarregado.', 'success')
-      }
-    } catch {
-      showNotification('Não foi possível carregar rate limit do MainSite.', 'error')
-    } finally {
-      setLoadingRateLimit(false)
-    }
-  }, [adminActor, showNotification])
-
-  useEffect(() => {
-    if (!hasUnsavedRatePolicies) {
-      return
-    }
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [hasUnsavedRatePolicies])
-
-  const handleRatePolicyChange = (
-    route: RateLimitPolicy['route'],
-    field: 'enabled' | 'max_requests' | 'window_minutes',
-    value: boolean | number,
-  ) => {
-    setRatePolicies((current) => current.map((policy) => {
-      if (policy.route !== route) {
-        return policy
-      }
-
-      return {
-        ...policy,
-        [field]: value,
-      }
-    }))
-  }
-
-  const persistRatePolicy = async (route: RateLimitPolicy['route'], action: 'update' | 'restore_default') => {
-    const policy = ratePolicies.find((item) => item.route === route)
-    if (!policy) {
-      showNotification('Policy de rate limit não encontrada para atualização.', 'error')
-      return
-    }
-
-    setUpdatingRateRoute(route)
-    try {
-      const response = await fetch('/api/mainsite/rate-limit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Actor': adminActor,
-        },
-        body: JSON.stringify({
-          action,
-          route,
-          enabled: policy.enabled,
-          max_requests: policy.max_requests,
-          window_minutes: policy.window_minutes,
-          adminActor,
-        }),
-      })
-
-      const payload = await response.json() as { ok: boolean; error?: string; policies?: RateLimitPolicy[]; request_id?: string }
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Falha ao salvar policy de rate limit do MainSite.')
-      }
-
-      const nextPolicies = Array.isArray(payload.policies) ? payload.policies : []
-      setRatePolicies(nextPolicies)
-      setBaselineRatePolicies(nextPolicies)
-      showNotification(action === 'restore_default'
-        ? `Policy ${route} restaurada para padrão.`
-        : `Policy ${route} atualizada com sucesso.`, 'success')
-    } catch {
-      showNotification('Não foi possível salvar a policy de rate limit do MainSite.', 'error')
-    } finally {
-      setUpdatingRateRoute(null)
-    }
-  }
-
-  const restoreRatePolicyLocal = (route: RateLimitPolicy['route']) => {
-    setRatePolicies((current) => current.map((policy) => {
-      if (policy.route !== route) {
-        return policy
-      }
-
-      return {
-        ...policy,
-        enabled: policy.defaults.enabled,
-        max_requests: policy.defaults.max_requests,
-        window_minutes: policy.defaults.window_minutes,
-      }
-    }))
-  }
-
-  const restoreAllRatePoliciesLocal = () => {
-    setRatePolicies((current) => current.map((policy) => ({
-      ...policy,
-      enabled: policy.defaults.enabled,
-      max_requests: policy.defaults.max_requests,
-      window_minutes: policy.defaults.window_minutes,
-    })))
-    showNotification('Padrões de rate limit restaurados localmente.', 'info')
-  }
-
-  const saveAllRatePolicies = async () => {
-    if (!hasUnsavedRatePolicies) {
-      showNotification('Nenhuma alteração pendente no rate limit.', 'info')
-      return
-    }
-
-    setUpdatingRateRoute('__all__')
-    try {
-      const baselineMap = new Map(baselineRatePolicies.map((policy) => [policy.route, policy]))
-      const dirtyPolicies = ratePolicies.filter((policy) => {
-        const baseline = baselineMap.get(policy.route)
-        if (!baseline) {
-          return true
-        }
-
-        return baseline.enabled !== policy.enabled
-          || baseline.max_requests !== policy.max_requests
-          || baseline.window_minutes !== policy.window_minutes
-      })
-
-      for (const policy of dirtyPolicies) {
-        const response = await fetch('/api/mainsite/rate-limit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Actor': adminActor,
-          },
-          body: JSON.stringify({
-            action: 'update',
-            route: policy.route,
-            enabled: policy.enabled,
-            max_requests: policy.max_requests,
-            window_minutes: policy.window_minutes,
-            adminActor,
-          }),
-        })
-
-        const payload = await response.json() as { ok: boolean; error?: string }
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error ?? `Falha ao salvar policy ${policy.route} do MainSite.`)
-        }
-      }
-
-      await loadRateLimit()
-      showNotification('Painel de rate limit do MainSite salvo com sucesso.', 'success')
-    } catch {
-      showNotification('Não foi possível salvar todas as policies de rate limit do MainSite.', 'error')
-    } finally {
-      setUpdatingRateRoute(null)
-    }
-  }
 
   const loadOverview = useCallback(async (shouldNotify = false) => {
     const query = new URLSearchParams({ limit })
@@ -710,8 +514,7 @@ export function MainsiteModule() {
   useEffect(() => {
     void loadManagedPosts()
     void loadPublicSettings()
-    void loadRateLimit()
-  }, [loadManagedPosts, loadPublicSettings, loadRateLimit])
+  }, [loadManagedPosts, loadPublicSettings])
 
   const resetPostEditor = () => {
     setEditingPostId(null)
@@ -1388,115 +1191,6 @@ export function MainsiteModule() {
         </div>
       </form>
 
-      <article className="result-card">
-        <div className="result-toolbar">
-          <div>
-            <h4><Save size={16} /> Painel de controle de rate limit</h4>
-            <p className="field-hint">Políticas por rota com atualização em tempo real e opção de restaurar padrão.</p>
-            {hasUnsavedRatePolicies && (
-              <span className="badge badge-planejado">Alterações não salvas</span>
-            )}
-          </div>
-          <div className="inline-actions">
-            <button type="button" className="ghost-button" onClick={() => void loadRateLimit(true)} disabled={loadingRateLimit || updatingRateRoute !== null}>
-              {loadingRateLimit ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-              Atualizar painel
-            </button>
-            <button type="button" className="ghost-button" onClick={restoreAllRatePoliciesLocal} disabled={loadingRateLimit || updatingRateRoute !== null || ratePolicies.length === 0}>
-              <RefreshCw size={16} />
-              Restaurar padrão (todas)
-            </button>
-            <button type="button" className="primary-button" onClick={() => void saveAllRatePolicies()} disabled={loadingRateLimit || updatingRateRoute !== null || !hasUnsavedRatePolicies}>
-              {updatingRateRoute === '__all__' ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
-              Salvar painel
-            </button>
-          </div>
-        </div>
-
-        {ratePolicies.length === 0 ? (
-          <p className="result-empty">Sem policies de rate limit carregadas.</p>
-        ) : (
-          <ul className="result-list">
-            {ratePolicies.map((policy) => {
-              const isBusy = updatingRateRoute === policy.route
-              return (
-                <li key={policy.route} className="post-row">
-                  <div className="post-row-main">
-                    <strong>{policy.label}</strong>
-                    <div className="post-row-meta">
-                      <span>rota: {policy.route}</span>
-                      <span>janela atual: {policy.stats.total_requests_window} req / {policy.stats.distinct_keys_window} chaves</span>
-                      <span>updated at: {policy.updated_at ?? '—'}</span>
-                    </div>
-                  </div>
-
-                  <div className="form-grid">
-                    <div className="field-group">
-                      <label htmlFor={`mainsite-rate-enabled-${policy.route}`}>Escudo habilitado</label>
-                      <select
-                        id={`mainsite-rate-enabled-${policy.route}`}
-                        name={`mainsiteRateEnabled${policy.route}`}
-                        value={policy.enabled ? '1' : '0'}
-                        onChange={(event) => handleRatePolicyChange(policy.route, 'enabled', event.target.value === '1')}
-                        disabled={isBusy}
-                      >
-                        <option value="1">Ativo</option>
-                        <option value="0">Inativo</option>
-                      </select>
-                    </div>
-
-                    <div className="field-group">
-                      <label htmlFor={`mainsite-rate-max-${policy.route}`}>Máx. requisições/IP</label>
-                      <input
-                        id={`mainsite-rate-max-${policy.route}`}
-                        name={`mainsiteRateMax${policy.route}`}
-                        type="number"
-                        min={1}
-                        max={500}
-                        value={policy.max_requests}
-                        onChange={(event) => handleRatePolicyChange(policy.route, 'max_requests', Number(event.target.value))}
-                        disabled={isBusy}
-                      />
-                    </div>
-
-                    <div className="field-group">
-                      <label htmlFor={`mainsite-rate-window-${policy.route}`}>Janela (min)</label>
-                      <input
-                        id={`mainsite-rate-window-${policy.route}`}
-                        name={`mainsiteRateWindow${policy.route}`}
-                        type="number"
-                        min={1}
-                        max={1440}
-                        value={policy.window_minutes}
-                        onChange={(event) => handleRatePolicyChange(policy.route, 'window_minutes', Number(event.target.value))}
-                        disabled={isBusy}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="post-row-actions">
-                    <button type="button" className="ghost-button" onClick={() => void persistRatePolicy(policy.route, 'update')} disabled={isBusy}>
-                      {isBusy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
-                      Salvar policy
-                    </button>
-                    <button type="button" className="ghost-button" onClick={() => restoreRatePolicyLocal(policy.route)} disabled={isBusy}>
-                      <RefreshCw size={16} />
-                      Restaurar local
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </article>
-
-      <SyncStatusCard
-        module="mainsite"
-        endpoint="/api/mainsite/sync"
-        title="Sync manual do MainSite"
-        description="Executa validação e saneamento interno de posts/settings no `bigdata_db` com suporte a dry run."
-      />
     </section>
   )
 }

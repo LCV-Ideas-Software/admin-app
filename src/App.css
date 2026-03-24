@@ -1851,3 +1851,629 @@
   outline-offset: 2px;
   border-radius: 8px;
 }
+
+/* ── Telemetria module ────────────────────────── */
+.telemetria-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  margin: 16px 0;
+  background: rgba(30, 41, 59, 0.4);
+  border-radius: 12px;
+  border: 1px solid rgba(71, 85, 105, 0.25);
+}
+
+.telemetria-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.telemetria-tab:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: #cbd5e1;
+}
+
+.telemetria-tab.active {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.12);
+}
+
+.telemetria-refresh-btn {
+  margin-left: auto;
+}
+
+.telemetria-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px;
+  opacity: 0.5;
+}
+
+.telemetria-footer {
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: right;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(71, 85, 105, 0.15);
+}
+
+.telemetria-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(71, 85, 105, 0.2);
+  border-radius: 100px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.telemetria-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.telemetria-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ── Telemetria event log ─────────────────────── */
+.telemetria-event-log li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.telemetria-row-error {
+  border-left: 3px solid #ef4444 !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+}
+
+/* ── Telemetria contacts ──────────────────────── */
+.telemetria-contact-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.telemetria-contact-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.telemetria-contact-message {
+  font-size: 0.85rem;
+  font-style: italic;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(71, 85, 105, 0.12);
+  border-radius: 12px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.telemetria-contact-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* ── Telemetria shares - platform badges ──────── */
+.badge-whatsapp {
+  background: rgba(34, 197, 94, 0.15) !important;
+  color: #22c55e !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+.badge-email {
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+}
+
+/* ── Telemetria chatbot ───────────────────────── */
+.telemetria-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.telemetria-chat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px !important;
+  border-radius: 14px !important;
+}
+
+.telemetria-chat-user {
+  border-left: 3px solid #94a3b8 !important;
+}
+
+.telemetria-chat-bot {
+  border-left: 3px solid #3b82f6 !important;
+}
+
+.telemetria-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.telemetria-role-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 100px;
+  display: inline-block;
+}
+
+.telemetria-role-user {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+.telemetria-role-bot {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.telemetria-chat-message {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  margin: 0;
+}
+
+/* ── Telemetria audit IA ──────────────────────── */
+.telemetria-audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.telemetria-audit-card {
+  background: rgba(14, 165, 233, 0.04);
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  border-left: 4px solid rgba(14, 165, 233, 0.6);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.telemetria-audit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.telemetria-audit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.telemetria-audit-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  background: rgba(14, 165, 233, 0.15);
+  padding: 4px 10px;
+  border-radius: 100px;
+  display: inline-block;
+  margin-bottom: 4px;
+  color: #38bdf8;
+}
+
+.telemetria-audit-question {
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 10px 14px;
+  border-radius: 12px;
+  line-height: 1.6;
+}
+
+.telemetria-audit-metrics {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.telemetria-audit-terms {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+}
+
+.telemetria-audit-posts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.telemetria-audit-posts-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #94a3b8;
+}
+
+.telemetria-audit-post-item {
+  font-size: 0.78rem;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(71, 85, 105, 0.12);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+/* ── Telemetria overview link ─────────────────── */
+.telemetria-overview-link {
+  text-align: center;
+}
+
+.telemetria-overview-link .ghost-button {
+  margin-top: 8px;
+}
+
+/* ── Card Hub (stacked AdminHub + AppHub) ──────── */
+.card-hub-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.card-hub-stack > .detail-panel {
+  border-top: 1px solid rgba(71, 85, 105, 0.15);
+  padding-top: 24px;
+}
+
+.card-hub-stack > .detail-panel:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* ── Financeiro Module ──────── */
+
+.fin-balance-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.fin-balance-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.fin-balance-values {
+  display: flex;
+  gap: 24px;
+}
+
+.fin-balance-values > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fin-balance-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.fin-balance-amount {
+  font-size: 1.2rem;
+  color: #10b981;
+}
+
+.fin-balance-pending {
+  font-size: 1.05rem;
+  opacity: 0.8;
+}
+
+.fin-summary-bar {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.fin-summary-item {
+  flex: 1;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(100, 116, 139, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.fin-summary-approved {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.fin-summary-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+.fin-summary-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.fin-sync-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.fin-insight-controls {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.fin-insight-controls .field-group {
+  flex: 1;
+}
+
+.fin-insight-result {
+  padding: 12px 0;
+}
+
+.fin-insight-result .fin-detail-group {
+  margin-bottom: 10px;
+}
+
+.fin-json-pre {
+  font-size: 0.78rem;
+  max-height: 200px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px 12px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.fin-date-presets {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fin-preset-btn {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: inherit;
+  transition: all 0.15s;
+}
+
+.fin-preset-btn:hover {
+  background: rgba(100, 116, 139, 0.12);
+}
+
+.fin-preset-active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
+  font-weight: 600;
+}
+
+.fin-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.fin-row-clickable:hover {
+  background: rgba(100, 116, 139, 0.06);
+}
+
+.fin-row-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fin-status-badge {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fin-amount {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.fin-method {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.fin-date {
+  font-size: 0.78rem;
+  opacity: 0.5;
+  margin-left: auto;
+}
+
+.fin-expanded-section {
+  padding: 16px 0 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.fin-expanded-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fin-detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fin-detail-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+}
+
+.fin-detail-value {
+  font-size: 0.84rem;
+  word-break: break-all;
+}
+
+.fin-expanded-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.fin-delete-btn {
+  color: var(--semantic-error, #ef4444) !important;
+}
+
+.fin-action-refund {
+  color: #8b5cf6 !important;
+}
+
+.fin-action-cancel {
+  color: #f59e0b !important;
+}
+
+/* Modal */
+.fin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.fin-modal-content {
+  background: var(--surface, #fff);
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.fin-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.fin-modal-text {
+  font-size: 0.88rem;
+  opacity: 0.8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.fin-modal-content .field-group {
+  width: 100%;
+  text-align: left;
+}
+
+.fin-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.fin-modal-confirm {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: var(--semantic-error, #ef4444) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .fin-balance-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fin-summary-bar {
+    flex-direction: column;
+  }
+
+  .fin-insight-controls {
+    flex-direction: column;
+  }
+
+  .fin-expanded-grid {
+    grid-template-columns: 1fr;
+  }
+}

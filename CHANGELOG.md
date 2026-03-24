@@ -1,5 +1,23 @@
 # Changelog — Admin App
 
+## [v01.37.00] — 2026-03-24
+### Adicionado
+- **Módulo Financeiro completo**: painel consolidado com suporte a SumUp e Mercado Pago via SDKs oficiais.
+- Balance cards: saldos disponível/pendente para SumUp e MP, calculados via D1 (`mainsite_financial_logs`).
+- Insights: resumo de transações, métodos de pagamento e payouts (SumUp), com selecção por provider/tipo.
+- Sincronização: botões dedicados para sync SumUp, sync MP e reindex de status SumUp.
+- Estorno/Cancelamento: modais de confirmação para estorno (total/parcial) via `PaymentRefund` e cancelamento via `Payment.cancel` (MP SDK).
+- Tabela de transações: status badges dinâmicos (25+ estados SumUp/MP), expanded details com parsing de payload, filtros (status/método/data), presets de data, exportação CSV.
+- 10 endpoints backend Pages Functions: `financeiro.ts`, `delete.ts`, `sumup-balance.ts`, `mp-balance.ts`, `sumup-sync.ts`, `mp-sync.ts`, `mp-refund.ts`, `mp-cancel.ts`, `sumup-reindex.ts`, `insights.ts`.
+- Sidebar: módulo "Financeiro" integrado em ordem alfabética (Visão Geral → Astrólogo → Card Hub → **Financeiro** → Itaú → MainSite → MTA-STS → Telemetria → Configurações).
+- CSS: ~310 linhas de estilos dedicados ao módulo Financeiro (balance cards, status badges, modais, insight controls, date presets, responsive).
+
+### Dependências
+- `@sumup/sdk`, `mercadopago` adicionados ao `package.json`.
+
+### Notas de deploy
+- Secrets obrigatórios via `wrangler secret put`: `SUMUP_API_KEY_PRIVATE`, `SUMUP_MERCHANT_CODE`, `MP_ACCESS_TOKEN`.
+
 ## [v01.36.00] — 2026-03-24
 ### Adicionado
 - Editor TipTap: extensões `ResizableImage` (width %) e `ResizableYoutube` (nocookie, 16:9).
