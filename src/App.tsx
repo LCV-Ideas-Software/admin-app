@@ -25,7 +25,7 @@ import { MtastsModule } from './modules/mtasts/MtastsModule'
 import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
 
-const APP_VERSION = 'APP v01.31.03'
+const APP_VERSION = 'APP v01.31.04'
 
 type OperationalModuleStatus = {
   module: string
@@ -124,13 +124,13 @@ const moduleCards: ModuleCard[] = [
 
 const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
   { id: 'overview', label: 'Visão Geral', icon: PanelsTopLeft },
+  { id: 'adminhub', label: 'AdminHub', icon: FolderKanban },
+  { id: 'apphub', label: 'AppHub', icon: AppWindow },
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
-  { id: 'config', label: 'Configurações', icon: Wrench },
   { id: 'itau', label: 'Itaú', icon: Database },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
-  { id: 'apphub', label: 'AppHub', icon: AppWindow },
-  { id: 'adminhub', label: 'AdminHub', icon: FolderKanban },
+  { id: 'config', label: 'Configurações', icon: Wrench },
 ]
 
 function App() {

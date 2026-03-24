@@ -1,5 +1,11 @@
 # Changelog — Admin App
 
+## [v01.31.04] — 2026-03-24
+### Alterado
+- UX de sincronização simplificada em `SyncStatusCard`: removidos os dois botões separados e adotado botão único com toggle `Simular antes (dry run)`.
+- Ordenação do menu lateral padronizada para ordem alfabética com exceções fixas: `Visão Geral` sempre primeiro e `Configurações` sempre por último.
+- Versão da aplicação incrementada para `APP v01.31.04` em `src/App.tsx`.
+
 ## [v01.31.03] — 2026-03-24
 ### Corrigido
 - Removida duplicação acidental de código nos handlers de `mainsite` (`posts`, `posts-pin`, `settings`, `overview`, `sync`), restabelecendo compilação limpa sem símbolos duplicados.

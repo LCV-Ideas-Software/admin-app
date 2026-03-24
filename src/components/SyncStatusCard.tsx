@@ -63,6 +63,7 @@ export function SyncStatusCard({ module, endpoint, title, description }: SyncSta
   const { showNotification } = useNotification()
   const [loadingStatus, setLoadingStatus] = useState(true)
   const [runningSync, setRunningSync] = useState(false)
+  const [simulateBeforeSync, setSimulateBeforeSync] = useState(true)
   const [status, setStatus] = useState<OperationalSyncStatus | null>(null)
 
   const loadStatus = useCallback(async () => {
@@ -153,23 +154,24 @@ export function SyncStatusCard({ module, endpoint, title, description }: SyncSta
       )}
 
       <div className="sync-actions">
-        <button
-          type="button"
-          className="ghost-button"
-          disabled={runningSync || loadingStatus}
-          onClick={() => void handleRunSync(true)}
-        >
-          {runningSync ? <Loader2 size={18} className="spin" /> : <CheckCircle2 size={18} />}
-          Dry run
-        </button>
+        <label className="sync-toggle" htmlFor={`sync-toggle-${module}`}>
+          <input
+            id={`sync-toggle-${module}`}
+            type="checkbox"
+            checked={simulateBeforeSync}
+            onChange={(event) => setSimulateBeforeSync(event.target.checked)}
+            disabled={runningSync || loadingStatus}
+          />
+          <span>Simular antes (dry run)</span>
+        </label>
         <button
           type="button"
           className="primary-button"
           disabled={runningSync || loadingStatus}
-          onClick={() => void handleRunSync(false)}
+          onClick={() => void handleRunSync(simulateBeforeSync)}
         >
-          {runningSync ? <Loader2 size={18} className="spin" /> : <RefreshCw size={18} />}
-          Executar sync
+          {runningSync ? <Loader2 size={18} className="spin" /> : (simulateBeforeSync ? <CheckCircle2 size={18} /> : <RefreshCw size={18} />)}
+          {simulateBeforeSync ? 'Executar simulação' : 'Sincronizar'}
         </button>
       </div>
     </article>

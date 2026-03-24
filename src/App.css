@@ -894,8 +894,24 @@
 .sync-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
+}
+
+.sync-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.sync-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #1d4ed8;
 }
 
 .integrity-banner {
