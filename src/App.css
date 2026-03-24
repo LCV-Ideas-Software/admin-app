@@ -1153,3 +1153,262 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Seleção de item na lista ──────────────────────────────────── */
+.post-row--selected {
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 3px solid #3b82f6;
+}
+
+/* ── Diálogo de confirmação de exclusão ────────────────────────── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-dialog {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+}
+
+.confirm-dialog__icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+}
+
+.confirm-dialog h4 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.confirm-dialog p {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.confirm-dialog__actions .ghost-button,
+.confirm-dialog__actions .primary-button {
+  flex: 1;
+}
+
+.primary-button.danger {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  border-color: #b91c1c;
+}
+
+.primary-button.danger:hover {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+}
+
+/* ── Viewer estruturado do Astrólogo ───────────────────────────── */
+.astro-section {
+  padding: 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.astro-section__title {
+  font-size: 1rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.astro-section__title--tropical {
+  color: #f97316;
+}
+
+.astro-section__title--astronomica {
+  color: #818cf8;
+}
+
+.astro-grid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.astro-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.astro-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.astro-card {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.astro-card__label {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.astro-card__value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.astro-umbanda-card {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.astro-umbanda-card__simbolo {
+  font-size: 1.6rem;
+}
+
+.astro-umbanda-card__posicao {
+  font-size: 0.6rem;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.astro-umbanda-card__orixa {
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.astro-umbanda-card__orixa--tropical {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+.astro-umbanda-card__orixa--astronomica {
+  background: rgba(129, 140, 248, 0.12);
+  color: #818cf8;
+  border: 1px solid rgba(129, 140, 248, 0.2);
+}
+
+.astro-kv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.astro-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+}
+
+.astro-kv__label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.astro-kv strong {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+
+.astro-ia-content {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: #cbd5e1;
+  padding: 0 4px;
+}
+
+.astro-ia-content p { margin-bottom: 12px; text-align: justify; text-indent: 2em; }
+.astro-ia-content strong { color: #e2e8f0; }
+.astro-ia-content ul { list-style: disc; padding-left: 20px; }
+.astro-ia-content li { margin-bottom: 4px; }
+.astro-ia-content h1,
+.astro-ia-content h2,
+.astro-ia-content h3 { color: #818cf8; margin-bottom: 8px; font-weight: 700; }
+
+.astro-sharing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.astro-email-details {
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.astro-email-details summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+
+.astro-email-details summary:hover {
+  color: #e2e8f0;
+}
+
+@media (max-width: 768px) {
+  .astro-grid--4 { grid-template-columns: repeat(2, 1fr); }
+  .astro-grid--3 { grid-template-columns: repeat(2, 1fr); }
+  .confirm-dialog { padding: 24px; }
+}
+
+@media (max-width: 480px) {
+  .astro-grid--4,
+  .astro-grid--3 { grid-template-columns: 1fr; }
+}
