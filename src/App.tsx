@@ -25,7 +25,7 @@ import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
 import { formatOperationalSourceLabel, isLegacyOperationalSource } from './lib/operationalSource'
 
-const APP_VERSION = 'APP v01.33.00'
+const APP_VERSION = 'APP v01.34.00'
 
 type OperationalModuleStatus = {
   module: string

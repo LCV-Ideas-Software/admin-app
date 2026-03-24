@@ -1,5 +1,20 @@
 # Changelog — Admin App
 
+## [v01.34.00] — 2026-03-24
+### Corrigido
+- Endpoints `sync.ts`, `ler.ts`, `excluir.ts` do Astrólogo: referência a tabela legado `mapas_astrologicos` corrigida para `astrologo_mapas` (prefixada).
+- `excluir.ts`: remoção de redundância de double-delete e restauração da estrutura `try/catch`.
+- `ler.ts`, `excluir.ts`: argumento supérfluo em `resolveOperationalSource(context)` → `resolveOperationalSource()`.
+
+### Alterado
+- Módulo MainSite: diálogo de confirmação estilizado (`.confirm-dialog`) substitui `window.confirm()`.
+- Módulo MainSite: drag-and-drop nativo para reordenação de posts com grip handle e chamada à API `/api/mainsite/posts-reorder`.
+- Módulo MainSite: item selecionado destacado com borda azul (`.post-row--selected`).
+- Brand card: fonte do `h1` "Admin LCV" reduzida em 50% (`0.65rem`).
+
+### Adicionado
+- Endpoint `functions/api/mainsite/posts-reorder.ts` para atualização batch de `display_order`.
+
 ## [v01.33.00] — 2026-03-24
 ### Alterado
 - Módulo Astrólogo: viewer estruturado com grids de Tatwas, Numerologia, Astrologia Tropical (4 colunas), Astronômico Constelacional (4 colunas), Umbanda (3 colunas) e Síntese da IA — substitui textarea de JSON bruto.

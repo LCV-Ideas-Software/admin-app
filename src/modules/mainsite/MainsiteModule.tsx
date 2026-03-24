@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Activity, FilePlus2, Globe, Loader2, Pencil, Pin, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
+import { Activity, AlertTriangle, FilePlus2, Globe, GripVertical, Loader2, Pencil, Pin, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
 import type { RateLimitPolicy } from '../../lib/rate-limit-common'
@@ -33,6 +33,13 @@ type ManagedPost = {
   content: string
   created_at: string
   is_pinned: number | boolean
+  display_order?: number
+}
+
+type ConfirmDeleteState = {
+  show: boolean
+  id: number | null
+  title: string
 }
 
 type MainsiteSettingsPayload = {
@@ -82,6 +89,7 @@ export function MainsiteModule() {
   const [payload, setPayload] = useState<OverviewPayload>(initialPayload)
   const [managedPosts, setManagedPosts] = useState<ManagedPost[]>([])
   const [editingPostId, setEditingPostId] = useState<number | null>(null)
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
   const [postTitle, setPostTitle] = useState('')
   const [postContent, setPostContent] = useState('')
   const [appearanceJson, setAppearanceJson] = useState('')
@@ -89,6 +97,8 @@ export function MainsiteModule() {
   const [disclaimersJson, setDisclaimersJson] = useState('')
   const [ratePolicies, setRatePolicies] = useState<RateLimitPolicy[]>([])
   const [baselineRatePolicies, setBaselineRatePolicies] = useState<RateLimitPolicy[]>([])
+  const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' })
+  const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null)
 
   const hasUnsavedRatePolicies = useMemo(() => (
     JSON.stringify(normalizePoliciesForCompare(ratePolicies)) !== JSON.stringify(normalizePoliciesForCompare(baselineRatePolicies))
@@ -443,10 +453,14 @@ export function MainsiteModule() {
     }
   }
 
-  const handleDeletePost = async (id: number, title: string) => {
-    if (!window.confirm(`Deseja excluir o post "${title}"?`)) {
-      return
-    }
+  const requestDeletePost = (id: number, title: string) => {
+    setConfirmDelete({ show: true, id, title })
+  }
+
+  const executeDeletePost = async () => {
+    const { id } = confirmDelete
+    setConfirmDelete({ show: false, id: null, title: '' })
+    if (!id) return
 
     setActionPostId(id)
     try {
@@ -467,6 +481,9 @@ export function MainsiteModule() {
       if (editingPostId === id) {
         resetPostEditor()
       }
+      if (selectedPostId === id) {
+        setSelectedPostId(null)
+      }
 
       await Promise.all([loadManagedPosts(), loadOverview()])
       showNotification(withTrace('Post do MainSite excluído com sucesso.', nextPayload), 'success')
@@ -474,6 +491,34 @@ export function MainsiteModule() {
       showNotification('Não foi possível excluir o post do MainSite.', 'error')
     } finally {
       setActionPostId(null)
+    }
+  }
+
+  // ── DnD reorder ─────────────────────────────────────────────
+  const handlePostDragStart = (index: number) => setDraggedPostIndex(index)
+  const handlePostDragEnd = () => setDraggedPostIndex(null)
+
+  const handlePostDrop = async (dropIndex: number) => {
+    if (draggedPostIndex === null || draggedPostIndex === dropIndex) return
+    const next = [...managedPosts]
+    const [dragged] = next.splice(draggedPostIndex, 1)
+    next.splice(dropIndex, 0, dragged)
+    setManagedPosts(next)
+    setDraggedPostIndex(null)
+
+    try {
+      const items = next.map((post, idx) => ({ id: post.id, display_order: idx }))
+      const response = await fetch('/api/mainsite/posts-reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+        body: JSON.stringify({ items, adminActor }),
+      })
+      const result = await response.json() as { ok: boolean; error?: string }
+      if (!response.ok || !result.ok) throw new Error(result.error ?? 'Falha ao reordenar posts.')
+      showNotification('Ordem dos posts sincronizada.', 'success')
+    } catch {
+      showNotification('Erro ao reordenar posts.', 'error')
+      void loadManagedPosts()
     }
   }
 
@@ -555,6 +600,23 @@ export function MainsiteModule() {
           <p>Operação interna no shell unificado: leitura e escrita diretas em `bigdata_db`.</p>
         </div>
       </div>
+
+      {/* ── Diálogo de confirmação ────────────────────── */}
+      {confirmDelete.show && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <div className="confirm-dialog__icon">
+              <AlertTriangle size={28} />
+            </div>
+            <h4>Excluir post</h4>
+            <p>Deseja apagar permanentemente o post &ldquo;{confirmDelete.title}&rdquo;?</p>
+            <div className="confirm-dialog__actions">
+              <button type="button" className="ghost-button" onClick={() => setConfirmDelete({ show: false, id: null, title: '' })}>Cancelar</button>
+              <button type="button" className="primary-button danger" onClick={() => void executeDeletePost()}>Apagar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form className="form-card" onSubmit={handleSubmit}>
         <div className="form-grid">
@@ -683,13 +745,26 @@ export function MainsiteModule() {
           <p className="result-empty">Nenhum post encontrado no `bigdata_db`.</p>
         ) : (
           <ul className="result-list">
-            {managedPosts.map((post) => {
+            {managedPosts.map((post, index) => {
               const isPinned = Number(post.is_pinned) === 1 || post.is_pinned === true
               const isBusy = actionPostId === post.id
+              const isSelected = selectedPostId === post.id
               return (
-                <li key={post.id} className="post-row">
+                <li
+                  key={post.id}
+                  className={`post-row${isSelected ? ' post-row--selected' : ''}`}
+                  draggable
+                  onDragStart={() => handlePostDragStart(index)}
+                  onDragEnd={handlePostDragEnd}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => void handlePostDrop(index)}
+                  style={{ opacity: draggedPostIndex === index ? 0.4 : 1, cursor: 'grab' }}
+                >
                   <div className="post-row-main">
-                    <strong>{post.title}</strong>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <GripVertical size={14} style={{ color: '#64748b', flexShrink: 0 }} />
+                      <strong>{post.title}</strong>
+                    </div>
                     <p className="field-hint">{post.content.length > 220 ? `${post.content.slice(0, 220)}…` : post.content}</p>
                     <div className="post-row-meta">
                       <span>ID #{post.id}</span>
@@ -701,7 +776,7 @@ export function MainsiteModule() {
                   </div>
 
                   <div className="post-row-actions">
-                    <button type="button" className="ghost-button" onClick={() => void handleEditPost(post.id)} disabled={isBusy || savingPost}>
+                    <button type="button" className="ghost-button" onClick={() => { setSelectedPostId(post.id); void handleEditPost(post.id) }} disabled={isBusy || savingPost}>
                       {isBusy ? <Loader2 size={16} className="spin" /> : <Pencil size={16} />}
                       Editar
                     </button>
@@ -709,7 +784,7 @@ export function MainsiteModule() {
                       {isBusy ? <Loader2 size={16} className="spin" /> : <Pin size={16} />}
                       {isPinned ? 'Desfixar' : 'Fixar'}
                     </button>
-                    <button type="button" className="ghost-button" onClick={() => void handleDeletePost(post.id, post.title)} disabled={isBusy}>
+                    <button type="button" className="ghost-button" onClick={() => requestDeletePost(post.id, post.title)} disabled={isBusy}>
                       {isBusy ? <Loader2 size={16} className="spin" /> : <Trash2 size={16} />}
                       Excluir
                     </button>

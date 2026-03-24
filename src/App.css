@@ -36,6 +36,10 @@
   padding: 20px;
 }
 
+.brand-card h1 {
+  font-size: 0.65rem;
+}
+
 .brand-icon,
 .metric-icon,
 .detail-icon {
