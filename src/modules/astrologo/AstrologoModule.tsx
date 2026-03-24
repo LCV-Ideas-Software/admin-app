@@ -371,11 +371,6 @@ export function AstrologoModule() {
             <p className="field-hint astro-local-hint">{selectedMapa.local_nascimento}</p>
           )}
 
-          {/* Empty state for unanalyzed records */}
-          {!parsedData?.globais && !parsedData?.tropical && !parsedData?.astronomica && !selectedMapa.analise_ia && (
-            <p className="result-empty">Este registro ainda não foi analisado pelo motor astrológico. Os dados brutos de cálculo ainda não estão disponíveis.</p>
-          )}
-
           {parsedData?.globais && (
             <div className="astro-section">
               <div className="form-grid">
