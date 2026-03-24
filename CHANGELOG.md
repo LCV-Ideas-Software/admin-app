@@ -1,5 +1,26 @@
 # Changelog — Admin App
 
+## [v01.45.00] — 2026-03-24
+### Adicionado
+- **[NEW] src/components/FloatingScrollButtons.tsx**: botões flutuantes de rolagem inteligentes (paridade mainsite-frontend). Glassmorphism, animação fadeIn, responsivo.
+- **Fontes de notícias dinâmicas**: adicionar/remover quantas fontes RSS quiser via Configurações (nome, URL, categoria).
+- **Barra de busca no NewsPanel**: filtro instantâneo por palavras-chave direto no painel de notícias.
+- **Ícones expandidos para novas fontes**: CNN, UOL, Estadão detectados automaticamente.
+
+### Alterado
+- **Astrólogo — Email dialog**: modal global substituído por formulário inline na linha do registro. autoComplete=email, glassmorphism, Enter key.
+- **newsSettings.ts**: refatorado para fontes dinâmicas (NewsSource[] com id/name/url/category). Migração automática.
+- **feed.ts (backend)**: aceita fontes customizadas via param custom_sources (JSON).
+- **NewsPanel**: filtro por keywords via useMemo local (sem re-fetch). Contador X/Y filtradas.
+- **ConfigModule**: cards de fontes com checkbox + lixeira + formulário Adicionar nova fonte.
+- **Label accessibility**: labels sem campo associado convertidas para p.field-label.
+- **.content**: position relative + overflow-y auto para scroll buttons.
+
+### Removido
+- **Email modal global (Astrólogo)**: overlay confirm-dialog removido.
+- **Filtro de palavras-chave (ConfigModule)**: movido para NewsPanel como barra de busca inline.
+- **MainsiteModule — Overview + Últimos posts**: removido formulário Qtd. posts + Carregar overview e seção Últimos posts com badge BIGDATA_DB. Dead code eliminado (OverviewPayload, loadOverview, handleSubmit, etc.).
+
 ## [v01.44.00] — 2026-03-24
 ### Adicionado
 - **News Panel — Configurações**: seção completa no módulo Configurações para ajustar fontes, atualização automática, máx. notícias e filtro por palavras-chave.

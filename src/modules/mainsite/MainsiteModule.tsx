@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Suspense, lazy } from 'react'
 import {
-  Activity, AlertTriangle,
+  AlertTriangle,
   FilePlus2, Globe, GripVertical,
   Loader2, Pencil, Pin, RefreshCw,
-  Save, Search, Trash2,
+  Save, Trash2,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
@@ -13,28 +12,6 @@ import { useNotification } from '../../components/Notification'
 const PostEditor = lazy(() => import('./PostEditor'))
 
 
-
-type OverviewPayload = {
-  ok: boolean
-  error?: string
-  fonte: 'bigdata_db'
-  filtros: {
-    limit: number
-  }
-  avisos: string[]
-  resumo: {
-    totalPosts: number
-    totalPinned: number
-    totalFinancialLogs: number | null
-    totalApprovedFinancialLogs: number | null
-  }
-  ultimosPosts: Array<{
-    id: number
-    title: string
-    createdAt: string
-    isPinned: boolean
-  }>
-}
 
 type ManagedPost = {
   id: number
@@ -66,35 +43,18 @@ type DisclaimersSettings = {
 
 const DEFAULT_DISCLAIMERS: DisclaimersSettings = { enabled: true, items: [] }
 
-const initialPayload: OverviewPayload = {
-  ok: true,
-  fonte: 'bigdata_db',
-  filtros: { limit: 20 },
-  avisos: [],
-  resumo: {
-    totalPosts: 0,
-    totalPinned: 0,
-    totalFinancialLogs: null,
-    totalApprovedFinancialLogs: null,
-  },
-  ultimosPosts: [],
-}
-
 
 export function MainsiteModule() {
   const { showNotification } = useNotification()
   const withTrace = (message: string, payload?: { request_id?: string }) => (
     payload?.request_id ? `${message} (req ${payload.request_id})` : message
   )
-  const [overviewLoading, setOverviewLoading] = useState(false)
   const [postsLoading, setPostsLoading] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [savingPost, setSavingPost] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [actionPostId, setActionPostId] = useState<number | null>(null)
-  const [limit, setLimit] = useState('20')
   const [adminActor] = useState('admin@app.lcv')
-  const [payload, setPayload] = useState<OverviewPayload>(initialPayload)
   const [managedPosts, setManagedPosts] = useState<ManagedPost[]>([])
   const [editingPostId, setEditingPostId] = useState<number | null>(null)
   const [showPostEditor, setShowPostEditor] = useState(false)
@@ -105,35 +65,6 @@ export function MainsiteModule() {
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' })
   const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null)
 
-  const disabled = useMemo(() => overviewLoading, [overviewLoading])
-
-  const loadOverview = useCallback(async (shouldNotify = false) => {
-    const query = new URLSearchParams({ limit })
-
-    setOverviewLoading(true)
-    try {
-      const response = await fetch(`/api/mainsite/overview?${query.toString()}`)
-      const nextPayload = await response.json() as OverviewPayload
-
-      if (!response.ok || !nextPayload.ok) {
-        throw new Error(nextPayload.error ?? 'Falha ao consultar o módulo MainSite.')
-      }
-
-      setPayload(nextPayload)
-
-      if (shouldNotify) {
-        showNotification(`MainSite atualizado: ${nextPayload.resumo.totalPosts} post(s) no recorte.`, 'success')
-      }
-
-      if (Array.isArray(nextPayload.avisos) && nextPayload.avisos.length > 0) {
-        showNotification(nextPayload.avisos[0], 'info')
-      }
-    } catch {
-      showNotification('Não foi possível carregar o módulo MainSite.', 'error')
-    } finally {
-      setOverviewLoading(false)
-    }
-  }, [limit, showNotification])
 
   const loadManagedPosts = useCallback(async (shouldNotify = false) => {
     setPostsLoading(true)
@@ -196,11 +127,6 @@ export function MainsiteModule() {
     setShowPostEditor(false)
   }
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    await loadOverview(true)
-  }
 
   /** Load post content for editing and open the editor */
   const handleEditPost = async (id: number) => {
@@ -423,50 +349,6 @@ export function MainsiteModule() {
         </div>
       )}
 
-      <form className="form-card form-card--compact" onSubmit={handleSubmit}>
-        <div className="overview-inline-form">
-          <div className="field-group field-group--fixed-120">
-            <label htmlFor="mainsite-filtro-limit">Qtd. posts</label>
-            <input
-              id="mainsite-filtro-limit"
-              name="mainsiteFiltroLimit"
-              type="number"
-              min={1}
-              max={50}
-              value={limit}
-              onChange={(event) => setLimit(event.target.value)}
-            />
-          </div>
-          <button type="submit" className="primary-button button--align-end" disabled={disabled}>
-            {overviewLoading ? <Loader2 size={18} className="spin" /> : <Search size={18} />}
-            Carregar overview
-          </button>
-        </div>
-      </form>
-
-
-      <article className="result-card">
-        <header className="result-header">
-          <h4><Activity size={16} /> Últimos posts</h4>
-          <span className="source-badge">{payload.fonte}</span>
-        </header>
-
-        {payload.ultimosPosts.length === 0 ? (
-          <p className="result-empty">Sem posts para os filtros atuais.</p>
-        ) : (
-          <ul className="result-list astro-akashico-scroll">
-            {payload.ultimosPosts.map((post) => (
-              <li key={post.id}>
-                <strong>{post.title}</strong>
-                <span>{new Date(post.createdAt).toLocaleString('pt-BR')}</span>
-                <span className={`badge ${post.isPinned ? 'badge-em-implantacao' : 'badge-planejado'}`}>
-                  {post.isPinned ? 'fixado' : 'normal'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </article>
 
       {showPostEditor || editingPostId ? (
         <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
