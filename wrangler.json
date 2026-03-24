@@ -11,13 +11,13 @@
     },
     {
       "binding": "ASTROLOGO_SOURCE_DB",
-      "database_name": "oraculo_astrologico_db",
-      "database_id": "7474fe8e-a56c-4a13-810a-4ec02133bc14"
+      "database_name": "bigdata_db",
+      "database_id": "6a71b62e-8ab9-45e6-a867-c0d4e6a56269"
     },
     {
       "binding": "ITAU_SOURCE_DB",
-      "database_name": "itau-calc-db",
-      "database_id": "db259ea6-5583-4820-b7af-c514485cfc9c"
+      "database_name": "bigdata_db",
+      "database_id": "6a71b62e-8ab9-45e6-a867-c0d4e6a56269"
     }
   ],
   "vars": {
