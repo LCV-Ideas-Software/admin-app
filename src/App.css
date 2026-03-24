@@ -714,6 +714,33 @@
   background: rgba(255, 255, 255, 0.86);
 }
 
+.telemetry-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.telemetry-status {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.telemetry-status-ok {
+  color: #047857;
+}
+
+.telemetry-status-error {
+  color: #b91c1c;
+}
+
+.telemetry-note {
+  margin: 12px 0 0;
+  color: #475569;
+  font-size: 0.83rem;
+  line-height: 1.6;
+}
+
 .post-row {
   grid-template-columns: 1fr;
 }

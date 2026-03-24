@@ -1,5 +1,23 @@
 # Changelog — Admin App
 
+## [v01.31.07] — 2026-03-24
+### Corrigido
+- `functions/api/astrologo/rate-limit.ts` passou a priorizar `BIGDATA_DB` como fonte operacional principal, removendo espelhamento legado desnecessário e reduzindo emissão de telemetria com `LEGACY-ADMIN` quando o binding interno está disponível.
+
+### Alterado
+- Versão da aplicação incrementada para `APP v01.31.07` em `src/App.tsx`.
+
+## [v01.31.06] — 2026-03-24
+### Alterado
+- Telemetria operacional (24h) da `Visão Geral` ficou mais explícita: rótulos revisados (`falhas` em vez de `erros`), destaque de `último evento: sucesso/falha` e indicação textual de que o badge representa a fonte do último evento.
+- Rótulos de fonte normalizados para leitura humana (`BIGDATA_DB`, `LEGACY-ADMIN (ponte)`, `LEGACY-WORKER (ponte)`).
+- Versão da aplicação incrementada para `APP v01.31.06` em `src/App.tsx`.
+
+## [v01.31.05] — 2026-03-24
+### Alterado
+- Removidos da aba `Visão Geral` os blocos de apresentação não operacionais (hero de estratégia e cards de métricas institucionais), reduzindo ruído visual no cockpit.
+- Versão da aplicação incrementada para `APP v01.31.05` em `src/App.tsx`.
+
 ## [v01.31.04] — 2026-03-24
 ### Alterado
 - UX de sincronização simplificada em `SyncStatusCard`: removidos os dois botões separados e adotado botão único com toggle `Simular antes (dry run)`.

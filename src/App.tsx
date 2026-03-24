@@ -25,7 +25,7 @@ import { MtastsModule } from './modules/mtasts/MtastsModule'
 import { ApphubModule } from './modules/hubs/ApphubModule'
 import { AdminhubModule } from './modules/hubs/AdminhubModule'
 
-const APP_VERSION = 'APP v01.31.04'
+const APP_VERSION = 'APP v01.31.07'
 
 type OperationalModuleStatus = {
   module: string
@@ -133,6 +133,21 @@ const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft 
   { id: 'config', label: 'Configurações', icon: Wrench },
 ]
 
+const formatTelemetrySourceLabel = (source: string) => {
+  switch (source) {
+    case 'bigdata_db':
+      return 'BIGDATA_DB'
+    case 'legacy-admin':
+      return 'LEGACY-ADMIN (ponte)'
+    case 'legacy-worker':
+      return 'LEGACY-WORKER (ponte)'
+    default:
+      return source.toUpperCase()
+  }
+}
+
+const isLegacySource = (source: string) => source === 'legacy-admin' || source === 'legacy-worker'
+
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleId>('overview')
   const [operationalOverview, setOperationalOverview] = useState<OperationalOverviewPayload | null>(null)
@@ -234,46 +249,10 @@ function App() {
 
         {activeModule === 'overview' ? (
           <>
-            <section className="hero-panel">
-              <div>
-                <p className="eyebrow">Estratégia aprovada</p>
-                <h3>Fase 1: cockpit paralelo em `admin.lcv.app.br`</h3>
-                <p className="hero-copy">
-                  Este projeto nasce como camada central de operação. Os admins individuais continuam ativos,
-                  enquanto o shell unificado consolida UX, governança, segurança e telemetria.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => showNotification('Estrutura base criada. Próximo passo: ligar APIs por módulo.', 'success')}
-              >
-                <Sparkles size={18} /> Confirmar scaffold inicial
-              </button>
-            </section>
-
-            <section className="metrics-grid">
-              <article className="metric-card">
-                <div className="metric-icon"><PanelsTopLeft size={20} /></div>
-                <strong>6 módulos</strong>
-                <span>Astrólogo, Calculadora, MainSite, MTA-STS, AppHub e AdminHub no shell.</span>
-              </article>
-              <article className="metric-card">
-                <div className="metric-icon"><ShieldCheck size={20} /></div>
-                <strong>Segurança</strong>
-                <span>Cloudflare Access e secrets centralizados como baseline obrigatório.</span>
-              </article>
-              <article className="metric-card">
-                <div className="metric-icon"><Database size={20} /></div>
-                <strong>D1 futura</strong>
-                <span>`bigdata_db` já definido com prefixação por contexto para evitar colisões.</span>
-              </article>
-            </section>
-
             <article className="result-card">
               <header className="result-header">
                 <h4><Activity size={16} /> Telemetria operacional (24h)</h4>
-                <span>{operationalOverview?.source ?? 'sem dados'}</span>
+                <span>fonte da consulta: {formatTelemetrySourceLabel(operationalOverview?.source ?? 'sem dados')}</span>
               </header>
 
               {!operationalOverview || operationalOverview.modules.length === 0 ? (
@@ -285,14 +264,26 @@ function App() {
                   {operationalOverview.modules.map((item) => (
                     <li key={item.module}>
                       <strong>{item.module}</strong>
-                      <span>eventos: {item.totalEvents24h} · fallback: {item.fallbackEvents24h} · erros: {item.errorEvents24h}</span>
-                      <span className={`badge ${item.fallbackEvents24h > 0 || !item.lastOk ? 'badge-planejado' : 'badge-em-implantacao'}`}>
-                        {item.lastSource}
+                      <div className="telemetry-metrics">
+                        <span>24h: {item.totalEvents24h} evento(s) · fallback: {item.fallbackEvents24h} · falhas: {item.errorEvents24h}</span>
+                        <span className={`telemetry-status ${item.lastOk ? 'telemetry-status-ok' : 'telemetry-status-error'}`}>
+                          último evento: {item.lastOk ? 'sucesso' : 'falha'}
+                        </span>
+                      </div>
+                      <span className={`badge ${(item.fallbackEvents24h > 0 || !item.lastOk || isLegacySource(item.lastSource)) ? 'badge-planejado' : 'badge-em-implantacao'}`}>
+                        {formatTelemetrySourceLabel(item.lastSource)}
                       </span>
                     </li>
                   ))}
                 </ul>
               )}
+
+              {operationalOverview && operationalOverview.modules.length > 0 ? (
+                <p className="telemetry-note">
+                  Observação: o badge à direita mostra a <strong>fonte do último evento</strong> de cada módulo.
+                  Quando aparecer <strong>LEGACY-ADMIN</strong> ou <strong>LEGACY-WORKER</strong>, ainda existe um trecho de compatibilidade legado no fluxo.
+                </p>
+              ) : null}
             </article>
 
             <article className="result-card">

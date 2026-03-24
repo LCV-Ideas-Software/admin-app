@@ -31,8 +31,6 @@ const toPositiveInt = (value: unknown, fallback: number) => {
   return parsed
 }
 
-const toBigdataRoute = (route: string) => route.startsWith('astrologo/') ? route : `astrologo/${route}`
-
 const buildFallbackPolicies = () => ([
   {
     route: 'calcular',
@@ -66,47 +64,13 @@ const buildFallbackPolicies = () => ([
   },
 ])
 
-const resolveRateLimitDb = (context: Context) => context.env.ASTROLOGO_SOURCE_DB ?? context.env.BIGDATA_DB
-
-const mirrorPoliciesToBigdata = async (context: Context) => {
-  if (!context.env.BIGDATA_DB || !context.env.ASTROLOGO_SOURCE_DB) {
-    return
-  }
-
-  const rows = await context.env.ASTROLOGO_SOURCE_DB.prepare(`
-    SELECT route, enabled, max_requests, window_minutes, updated_at
-    FROM astrologo_rate_limit_policies
-  `).all<{ route?: string; enabled?: number; max_requests?: number; window_minutes?: number; updated_at?: string | null }>()
-
-  for (const item of rows.results ?? []) {
-    const rawRoute = String(item.route ?? '').trim()
-    if (!rawRoute) {
-      continue
-    }
-
-    const route = toBigdataRoute(rawRoute)
-    const enabled = Number(item.enabled) === 1 ? 1 : 0
-    const maxRequests = Math.max(1, toPositiveInt(item.max_requests, 10))
-    const windowMinutes = Math.max(1, toPositiveInt(item.window_minutes, 10))
-    const updatedAt = typeof item.updated_at === 'string' && item.updated_at.trim() ? item.updated_at : new Date().toISOString()
-
-    await context.env.BIGDATA_DB.prepare(`
-      INSERT INTO astrologo_rate_limit_policies (route, enabled, max_requests, window_minutes, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(route) DO UPDATE SET
-        enabled = excluded.enabled,
-        max_requests = excluded.max_requests,
-        window_minutes = excluded.window_minutes,
-        updated_at = excluded.updated_at
-    `)
-      .bind(route, enabled, maxRequests, windowMinutes, updatedAt)
-      .run()
-  }
-}
+const resolveRateLimitDb = (context: Context) => context.env.BIGDATA_DB ?? context.env.ASTROLOGO_SOURCE_DB
+const resolveOperationalSource = (context: Context) => (context.env.BIGDATA_DB ? 'bigdata_db' : 'legacy-admin') as const
 
 export async function onRequestGet(context: Context) {
   const trace = createResponseTrace(context.request)
   const db = resolveRateLimitDb(context)
+  const source = resolveOperationalSource(context)
 
   if (!db) {
     return json({ ok: false, error: 'Nenhum binding D1 disponível (ASTROLOGO_SOURCE_DB/BIGDATA_DB).', ...trace }, 503)
@@ -120,7 +84,7 @@ export async function onRequestGet(context: Context) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'astrologo',
-          source: 'legacy-admin',
+          source,
           fallbackUsed: false,
           ok: true,
           metadata: {
@@ -143,7 +107,7 @@ export async function onRequestGet(context: Context) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'astrologo',
-          source: 'legacy-admin',
+          source,
           fallbackUsed: false,
           ok: false,
           errorMessage: message,
@@ -166,6 +130,7 @@ export async function onRequestGet(context: Context) {
 export async function onRequestPost(context: Context) {
   const trace = createResponseTrace(context.request)
   const db = resolveRateLimitDb(context)
+  const source = resolveOperationalSource(context)
 
   if (!db) {
     return json({ ok: false, error: 'Nenhum binding D1 disponível (ASTROLOGO_SOURCE_DB/BIGDATA_DB).', ...trace }, 503)
@@ -184,14 +149,13 @@ export async function onRequestPost(context: Context) {
 
     if (action === 'restore_default') {
       await resetRateLimitPolicy(db, route)
-      await mirrorPoliciesToBigdata(context)
       const policies = await listPoliciesWithStats(db)
 
       if (context.env.BIGDATA_DB) {
         try {
           await logModuleOperationalEvent(context.env.BIGDATA_DB, {
             module: 'astrologo',
-            source: 'legacy-admin',
+            source,
             fallbackUsed: false,
             ok: true,
             metadata: {
@@ -223,14 +187,13 @@ export async function onRequestPost(context: Context) {
       windowMinutes,
     })
 
-    await mirrorPoliciesToBigdata(context)
     const policies = await listPoliciesWithStats(db)
 
     if (context.env.BIGDATA_DB) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'astrologo',
-          source: 'legacy-admin',
+          source,
           fallbackUsed: false,
           ok: true,
           metadata: {
@@ -255,7 +218,7 @@ export async function onRequestPost(context: Context) {
       try {
         await logModuleOperationalEvent(context.env.BIGDATA_DB, {
           module: 'astrologo',
-          source: 'legacy-admin',
+          source,
           fallbackUsed: false,
           ok: false,
           errorMessage: message,
