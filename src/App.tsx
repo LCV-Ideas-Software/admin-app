@@ -29,7 +29,7 @@ const TelemetriaModule = lazy(() => import('./modules/telemetria/TelemetriaModul
 const FinanceiroModule = lazy(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
 const NewsPanel = lazy(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 
-const APP_VERSION = 'APP v01.46.09'
+const APP_VERSION = 'APP v01.46.11'
 
 
 

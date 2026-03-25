@@ -1,5 +1,19 @@
 # Changelog — Admin App
 
+## [v01.46.11] — 2026-03-25
+### Adicionado
+- **Runbook operacional de CSP no edge**: novo guia `docs/csp-report-only-edge-checklist.md` com passo a passo click-by-click no Cloudflare para identificar/remover injeção indevida de `Content-Security-Policy-Report-Only` com `script-src/connect-src 'none'`.
+
+### Operacional
+- **Auditoria de resposta efetiva**: procedimento formalizado para validar header final no navegador (Network/Response Headers) e diferenciar problema de app vs regra de edge.
+
+## [v01.46.10] — 2026-03-25
+### Corrigido
+- **CSP — política estável reforçada no deploy**: `public/_headers` atualizado com `script-src-elem` e `connect-src` explícitos, além de `Content-Security-Policy-Report-Only` alinhado à política válida de runtime (`self` + Cloudflare Insights), reduzindo ruído de fallback em navegadores.
+
+### Operacional
+- **Diagnóstico de edge**: quando o browser reportar `Content-Security-Policy-Report-Only` com `script-src 'none'` / `connect-src 'none'`, a causa provável é header injetado por regra externa no edge (Cloudflare Transform/managed rule), não por código do app.
+
 ## [v01.46.09] — 2026-03-25
 ### Corrigido
 - **Financeiro — badges de status (texto + cor) restaurados**: corrigida a resolução do status efetivo da SumUp para ignorar fallback técnico `—` quando o payload não traz `txStatus/checkoutStatus`, preservando o `log.status` real.
