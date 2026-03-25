@@ -1,15 +1,4 @@
-/**
- * PostEditor — TipTap rich-text editor sub-component.
- *
- * Extracted from MainsiteModule to enable code-splitting.
- * This component is lazy-loaded via React.lazy only when the user
- * clicks "Novo Post" or edits an existing post.
- *
- * All TipTap dependencies (24 extensions, ~450kB) are isolated in
- * this chunk, keeping the core MainsiteModule lightweight.
- */
-
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlignCenter, AlignJustify, AlignLeft, AlignRight,
   Bold, CheckSquare, Code, FilePlus2,
@@ -20,8 +9,10 @@ import {
   Subscript as SubIcon, Superscript as SuperIcon,
   Table as TableIcon,
   Upload, Image as ImageIcon, Youtube, ZoomIn, ZoomOut, MessageSquare,
+  Sparkles, MousePointer2
 } from 'lucide-react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
+import { NodeSelection } from 'prosemirror-state'
 import StarterKit from '@tiptap/starter-kit'
 import { Underline } from '@tiptap/extension-underline'
 import { Highlight } from '@tiptap/extension-highlight'
@@ -48,48 +39,272 @@ import { Markdown } from 'tiptap-markdown'
 
 // ── Media utilities ──────────────────────────────────────────
 
-/** Detects Google Drive share links and converts to direct embed URL */
 const formatImageUrl = (url: string): string => {
-  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (driveMatch) return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`
+  if (!url) return ''
+  const driveRegex = /(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/
+  const match = url.match(driveRegex)
+  if (match && match[1]) return `https://drive.google.com/uc?export=view&id=${match[1]}`
   return url
 }
 
-/** Clamp a numeric value between min and max */
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
-/** Predefined snap widths for images (percentage) */
+// ── Custom Node Views Components ──────────────────────────────
+
+const ResizableMediaHandle = ({ onStartResize, tone = 'neutral' }: { onStartResize: (e: React.MouseEvent | React.TouchEvent) => void, tone?: string }) => (
+  <button
+    type="button"
+    className={`media-resize-handle tone-${tone}`}
+    contentEditable={false}
+    onMouseDown={onStartResize}
+    onPointerDown={onStartResize}
+    title="Arraste para redimensionar"
+    aria-label="Arraste para redimensionar"
+  />
+)
+
+const SelectMediaButton = ({ onSelect }: { onSelect: () => void }) => (
+  <button
+    type="button"
+    className="media-select-btn"
+    contentEditable={false}
+    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onSelect(); }}
+    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onSelect(); }}
+    title="Selecionar mídia"
+    aria-label="Selecionar mídia"
+  >
+    <MousePointer2 size={13} className="media-select-btn-icon" />
+    <span className="media-select-btn-label">Selecionar</span>
+  </button>
+)
+
 const IMAGE_SNAPS = [
-  { label: '25%', value: 25 },
-  { label: '50%', value: 50 },
-  { label: '75%', value: 75 },
-  { label: '100%', value: 100 },
+  { label: '25%', v: '25%' },
+  { label: '50%', v: '50%' },
+  { label: '75%', v: '75%' },
+  { label: '100%', v: '100%' },
 ]
 
-/** Predefined snap sizes for YouTube embeds (width px) */
+const MediaSnapBar = ({ onSnap }: { onSnap: (v: string) => void }) => (
+  <div className="media-snap-bar" contentEditable={false} onMouseDown={e => e.preventDefault()}>
+    {IMAGE_SNAPS.map(({ label, v }) => (
+      <button key={v} type="button" onClick={() => onSnap(v)} title={v}>{label}</button>
+    ))}
+  </div>
+)
+
 const VIDEO_SNAPS = [
-  { label: '480p', width: 640, height: 360 },
-  { label: '720p', width: 840, height: 472 },
-  { label: '1080p', width: 1200, height: 675 },
+  { label: '480p', w: 853, h: 480 },
+  { label: '720p', w: 1280, h: 720 },
+  { label: '840px', w: 840, h: 472 },
 ]
 
-/** TipTap Image extension with width attribute for resizing */
-const ResizableImage = Image.extend({
+const YoutubeSnapBar = ({ onSnap }: { onSnap: (w: number, h: number) => void }) => (
+  <div className="media-snap-bar" contentEditable={false} onMouseDown={e => e.preventDefault()}>
+    {VIDEO_SNAPS.map(({ label, w, h }) => (
+      <button key={label} type="button" onClick={() => onSnap(w, h)} title={`${w}×${h}`}>{label}</button>
+    ))}
+  </div>
+)
+
+const ResizableImageNodeView = ({ node, updateAttributes, selected, editor, getPos }: any) => {
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(100)
+  const imageRef = useRef<HTMLImageElement>(null)
+  const [localTone, setLocalTone] = useState('neutral')
+
+  useEffect(() => {
+    const img = imageRef.current
+    if (!img) return
+
+    const analyzeTone = () => {
+      try {
+        const sample = 24
+        const canvas = document.createElement('canvas')
+        canvas.width = sample
+        canvas.height = sample
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        if (!ctx) {
+          setLocalTone('neutral')
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, sample, sample)
+        const { data } = ctx.getImageData(0, 0, sample, sample)
+        let total = 0
+        let count = 0
+
+        for (let i = 0; i < data.length; i += 4) {
+          const a = data[i + 3]
+          if (a < 32) continue
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+          total += (0.299 * r) + (0.587 * g) + (0.114 * b)
+          count += 1
+        }
+
+        if (!count) {
+          setLocalTone('neutral')
+          return
+        }
+
+        const luma = (total / count) / 255
+        setLocalTone(luma >= 0.56 ? 'light' : 'dark')
+      } catch {
+        setLocalTone('neutral')
+      }
+    }
+
+    if (img.complete) analyzeTone()
+    img.addEventListener('load', analyzeTone)
+    return () => img.removeEventListener('load', analyzeTone)
+  }, [node.attrs.src])
+
+  const onStartResize = (event: React.MouseEvent | React.TouchEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const point = ('touches' in event) ? event.touches[0] : (event as React.MouseEvent)
+    startXRef.current = point.clientX
+    startWidthRef.current = Number(String(node.attrs.width || '100').replace('%', '')) || 100
+
+    const onMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const p = ('touches' in moveEvent) ? moveEvent.touches[0] : (moveEvent as MouseEvent)
+      const deltaX = p.clientX - startXRef.current
+      const next = clamp(Math.round(startWidthRef.current + (deltaX * 0.22)), 20, 100)
+      updateAttributes({ width: `${next}%` })
+    }
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: true })
+    window.addEventListener('touchend', onUp)
+  }
+
+  const selectCurrentNode = () => {
+    const pos = getPos?.()
+    if (typeof pos !== 'number') return
+    const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos))
+    editor.view.dispatch(tr)
+    editor.commands.focus()
+  }
+
+  return (
+    <NodeViewWrapper
+      className={`resizable-media media-image tone-${localTone} ${selected ? 'is-selected' : ''}`}
+      contentEditable={false}
+      style={{ width: node.attrs.width || '100%' }}
+    >
+      <MediaSnapBar onSnap={(size) => updateAttributes({ width: size })} />
+      <SelectMediaButton onSelect={selectCurrentNode} />
+      <img ref={imageRef} src={node.attrs.src} alt={node.attrs.alt || ''} title={node.attrs.title || ''} draggable="false" />
+      <ResizableMediaHandle onStartResize={onStartResize} tone={localTone} />
+    </NodeViewWrapper>
+  )
+}
+
+const ResizableYoutubeNodeView = ({ node, updateAttributes, selected, editor, getPos }: any) => {
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(840)
+  const currentW = Number(node.attrs.width) || 840
+  const currentH = Number(node.attrs.height) || Math.round((currentW * 9) / 16)
+
+  const onStartResize = (event: React.MouseEvent | React.TouchEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const point = ('touches' in event) ? event.touches[0] : (event as React.MouseEvent)
+    startXRef.current = point.clientX
+    startWidthRef.current = currentW
+
+    const onMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const p = ('touches' in moveEvent) ? moveEvent.touches[0] : (moveEvent as MouseEvent)
+      const deltaX = p.clientX - startXRef.current
+      const nextW = clamp(Math.round(startWidthRef.current + (deltaX * 1.2)), 320, 1200)
+      const nextH = Math.round((nextW * 9) / 16)
+      updateAttributes({ width: nextW, height: nextH })
+    }
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: true })
+    window.addEventListener('touchend', onUp)
+  }
+
+  const selectCurrentNode = () => {
+    const pos = getPos?.()
+    if (typeof pos !== 'number') return
+    const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos))
+    editor.view.dispatch(tr)
+    editor.commands.focus()
+  }
+
+  return (
+    <NodeViewWrapper className={`resizable-media media-youtube ${selected ? 'is-selected' : ''}`} contentEditable={false} style={{ width: `${currentW}px`, maxWidth: '100%' }}>
+      <YoutubeSnapBar onSnap={(w, h) => updateAttributes({ width: w, height: h })} />
+      <SelectMediaButton onSelect={selectCurrentNode} />
+      <div data-youtube-video style={{ pointerEvents: selected ? 'auto' : 'none' }}>
+        <iframe
+          src={node.attrs.src}
+          width={currentW}
+          height={currentH}
+          title="YouTube video"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+      <ResizableMediaHandle onStartResize={onStartResize} tone="neutral" />
+    </NodeViewWrapper>
+  )
+}
+
+// ── TipTap extensions ─────────────────────────────────────────
+
+const CustomResizableImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      width: { default: '100%', parseHTML: (el) => el.getAttribute('width') || el.style.width || '100%', renderHTML: (attrs) => ({ width: attrs.width, style: `width: ${attrs.width}` }) },
+      width: {
+        default: '100%',
+        parseHTML: (element) => element.getAttribute('data-width') || element.style.width || element.getAttribute('width') || '100%',
+        renderHTML: (attributes) => {
+          if (!attributes.width) return {}
+          const normalized = String(attributes.width).endsWith('%') ? attributes.width : `${attributes.width}`
+          return {
+            'data-width': normalized,
+            style: `width: ${normalized}; height: auto;`,
+          }
+        },
+      },
     }
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageNodeView)
   },
 })
 
-/** TipTap YouTube extension */
-const ResizableYoutube = YoutubeExtension.configure({
-  width: 840, height: 472, allowFullscreen: true, nocookie: true,
+const CustomResizableYoutube = YoutubeExtension.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableYoutubeNodeView)
+  },
 })
 
-// ── TipTap extensions ─────────────────────────────────────────
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({ dropcursor: false, link: false }),
   Markdown,
@@ -108,8 +323,8 @@ const TIPTAP_EXTENSIONS = [
   CharacterCount,
   Placeholder.configure({ placeholder: 'Comece a escrever o conteúdo do post...' }),
   LinkExtension.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
-  ResizableImage,
-  ResizableYoutube,
+  CustomResizableImage,
+  CustomResizableYoutube.configure({ width: 840, height: 472, allowFullscreen: true, nocookie: true }),
 ]
 
 // ── Prompt modal state type ───────────────────────────────────
@@ -151,6 +366,7 @@ export default function PostEditor({
   const [postTitle, setPostTitle] = useState(initialTitle)
   const [promptModal, setPromptModal] = useState<PromptModalState>(PROMPT_MODAL_INITIAL)
   const [isUploading, setIsUploading] = useState(false)
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
@@ -170,9 +386,41 @@ export default function PostEditor({
     setPostTitle(initialTitle)
   }, [initialTitle])
 
+  // ── AI handler ─────────────────────────────────────────────
+
+  const handleAITransform = async (action: string) => {
+    if (!editor) return
+
+    const { from, to, empty } = editor.state.selection
+    if (empty) {
+      showNotification("Por favor, selecione um trecho de texto no editor para aplicar a IA.", "error")
+      return
+    }
+
+    const selectedText = editor.state.doc.textBetween(from, to, ' ')
+    setIsGeneratingAI(true)
+    showNotification("Processando transformação textual no Gemini...", "info")
+
+    try {
+      const res = await fetch(`/api/mainsite/ai/transform`, {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, text: selectedText })
+      })
+      const data = await res.json() as any
+      if (!res.ok) throw new Error(data.error || "Erro na geração por IA.")
+
+      editor.chain().focus().deleteSelection().insertContent(data.text).run()
+      showNotification("Transformação aplicada com sucesso.", "success")
+    } catch (err) {
+      showNotification(err instanceof Error ? err.message : "Erro desconhecido na IA.", "error")
+    } finally {
+      setIsGeneratingAI(false)
+    }
+  }
+
   // ── Media handler functions ─────────────────────────────────
 
-  /** Insert a styled caption paragraph after the current cursor position */
   const insertCaptionBlock = useCallback((caption: string) => {
     if (!editor) return
     const safe = (caption || '').trim()
@@ -184,7 +432,6 @@ export default function PostEditor({
     }).run()
   }, [editor])
 
-  /** Upload file to R2 via admin-app upload endpoint */
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!editor) return
     const file = event.target.files?.[0]
@@ -215,7 +462,6 @@ export default function PostEditor({
     }
   }, [editor, showNotification, insertCaptionBlock])
 
-  /** Insert image from URL (supports Google Drive auto-detect) */
   const addImageUrl = useCallback(() => {
     if (!editor) return
     setPromptModal({
@@ -232,7 +478,6 @@ export default function PostEditor({
     })
   }, [editor, insertCaptionBlock])
 
-  /** Insert YouTube video */
   const addYoutube = useCallback(() => {
     if (!editor) return
     setPromptModal({
@@ -248,7 +493,6 @@ export default function PostEditor({
     })
   }, [editor, insertCaptionBlock])
 
-  /** Insert hyperlink */
   const addLink = useCallback(() => {
     if (!editor) return
     const prev = editor.getAttributes('link').href || ''
@@ -269,7 +513,6 @@ export default function PostEditor({
     })
   }, [editor])
 
-  /** Adjust media size (image ±10%, video ±80px width maintaining 16:9) */
   const adjustSelectedMediaSize = useCallback((direction: 1 | -1) => {
     if (!editor) return
     if (editor.isActive('image')) {
@@ -292,7 +535,6 @@ export default function PostEditor({
     showNotification('Selecione uma imagem ou vídeo para redimensionar.', 'info')
   }, [editor, showNotification])
 
-  /** Add or edit caption on media */
   const editCaption = useCallback(() => {
     if (!editor) return
     const isImg = editor.isActive('image')
@@ -304,7 +546,7 @@ export default function PostEditor({
     const { selection, doc } = editor.state
     const nodeSize = (selection as unknown as { node?: { nodeSize: number } }).node?.nodeSize || 1
     const nodeEnd = selection.from + nodeSize
-    // Detect existing caption immediately after media
+    
     let existingCaption = ''
     let captionFrom: number | null = null
     let captionTo: number | null = null
@@ -339,6 +581,7 @@ export default function PostEditor({
             })
           }
         } else if (trimmed) {
+          // Focus fix required:
           editor.commands.setTextSelection(nodeEnd)
           insertCaptionBlock(trimmed)
         }
@@ -455,6 +698,19 @@ export default function PostEditor({
               </div>
             )}
 
+            {/* AI Action Tool */}
+            <div className="tiptap-ai-group">
+              <Sparkles size={14} color="#0284c7" />
+              <select id="ai-action" name="aiAction" title="Inteligência Artificial (Gemini 2.5 Pro)" autoComplete="off" onChange={(e) => { if (e.target.value) { handleAITransform(e.target.value); e.target.value = ''; } }} disabled={isGeneratingAI}>
+                <option value="">{isGeneratingAI ? 'Processando...' : 'IA: Aprimorar Texto'}</option>
+                <option value="grammar">Corrigir Gramática</option>
+                <option value="summarize">Resumir Seleção</option>
+                <option value="expand">Expandir Conteúdo</option>
+                <option value="formal">Tornar Formal</option>
+              </select>
+            </div>
+            <span className="tiptap-divider" />
+
             <button type="button" title="Negrito" className={editor.isActive('bold') ? 'active' : ''} onClick={() => editor.chain().focus().toggleBold().run()}><Bold size={15} /></button>
             <button type="button" title="Itálico" className={editor.isActive('italic') ? 'active' : ''} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={15} /></button>
             <button type="button" title="Sublinhado" className={editor.isActive('underline') ? 'active' : ''} onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon size={15} /></button>
@@ -491,22 +747,9 @@ export default function PostEditor({
             <button type="button" title="Reduzir mídia" onClick={() => adjustSelectedMediaSize(-1)} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><ZoomOut size={15} /></button>
             <button type="button" title="Ampliar mídia" onClick={() => adjustSelectedMediaSize(1)} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><ZoomIn size={15} /></button>
             <button type="button" title="Legenda da mídia" onClick={editCaption} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><MessageSquare size={15} /></button>
-            {/* Snap bars for images */}
-            {editor.isActive('image') && (
-              <div className="tiptap-snap-group">
-                {IMAGE_SNAPS.map((snap) => (
-                  <button key={snap.label} type="button" title={snap.label} className="snap-btn" onClick={() => editor.chain().focus().updateAttributes('image', { width: `${snap.value}%` }).run()}>{snap.label}</button>
-                ))}
-              </div>
-            )}
-            {/* Snap bars for YouTube */}
-            {editor.isActive('youtube') && (
-              <div className="tiptap-snap-group">
-                {VIDEO_SNAPS.map((snap) => (
-                  <button key={snap.label} type="button" title={snap.label} className="snap-btn" onClick={() => editor.chain().focus().updateAttributes('youtube', { width: snap.width, height: snap.height }).run()}>{snap.label}</button>
-                ))}
-              </div>
-            )}
+            
+            <span className="tiptap-divider" />
+            
             <div className="tiptap-color-group">
               <Palette size={14} />
               <input id="tiptap-text-color" name="tiptapTextColor" type="color" title="Cor do texto" onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()} value={(editor.getAttributes('textStyle').color as string) || '#000000'} />

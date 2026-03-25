@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.46.18] — 2026-03-25
+### Adicionado
+- **PostEditor — Funcionalidades de Mídia Interativa**: Portado `ResizableImageNodeView` e `ResizableYoutubeNodeView` para o `admin-app/src/modules/mainsite/PostEditor.tsx`.
+- **PostEditor — Transformer IA**: Integrada barra de formatação inteligente usando Gemini v1beta, contendo correções gramaticais, tradução, sumário, modo formal e expansão criativa (requer as configs já documentadas no backend).
+
+### Corrigido
+- **PostEditor — Correção de CORS e bug de legenda**: Removido o atributo `crossOrigin="anonymous"` da extensão `ResizableImage` para resolver bloqueios CORS (`tiny icon` no editor).
+- **PostEditor — Fluxo de Legenda**: Corrigido bug onde a mídia que não continha legenda perdia o evento de edição, focando o nó adjacente e mantendo o conteúdo isolado.
+- **MainsiteModule — Padronização Visual de Pop-ups**: Os comandos e mensagens de input adotam o padrão visual `itau-calculadora`, garantindo uniformidade visual.
+
 ## [v01.46.17] — 2026-03-25
 ### Corrigido
 - **Financeiro — empilhamento forçado sem conflito de CSS legado**: o container de detalhes expandido passou a usar classe dedicada (`.fin-expanded-stack`) com fluxo vertical obrigatório, garantindo exibição em coluna única e evitando sobrescrita por regras herdadas da lista.
