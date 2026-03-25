@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.46.16] — 2026-03-25
+### Corrigido
+- **Financeiro — detalhes restaurados com empilhamento vertical**: seção expandida de transações ajustada para coluna única real (`.fin-expanded-grid` em fluxo vertical), com cards de detalhe visíveis e empilhados dentro do frame.
+
+### Alterado
+- **CSP local afrouxado ao máximo**: `public/_headers` atualizado para política permissiva ampla em `Content-Security-Policy` e `Content-Security-Policy-Report-Only` (`script-src/connect-src/frame-src` com curingas), conforme solicitação operacional.
+
 ## [v01.46.15] — 2026-03-25
 ### Corrigido
 - **Financeiro — detalhes em coluna única**: o bloco expandido das transações agora renderiza os dados em uma única coluna, com todos os cards de detalhe empilhados verticalmente dentro do frame, eliminando distribuição em múltiplas colunas.
