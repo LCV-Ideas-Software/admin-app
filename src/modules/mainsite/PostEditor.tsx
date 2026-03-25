@@ -429,12 +429,6 @@ export default function PostEditor({
     const safe = (caption || '').trim()
     if (!safe) return
 
-    // Escape the selected media node before inserting the caption block
-    const { selection } = editor.state
-    const nodeSize = (selection as unknown as { node?: { nodeSize: number } }).node?.nodeSize || 0
-    const nodeEnd = nodeSize > 0 ? selection.from + nodeSize : selection.to
-    editor.commands.setTextSelection(nodeEnd)
-
     editor.chain().focus().insertContent({
       type: 'paragraph',
       attrs: { textAlign: 'center' },
@@ -454,8 +448,9 @@ export default function PostEditor({
       const res = await fetch('/api/mainsite/upload', { method: 'POST', body: formData })
       if (!res.ok) throw new Error('Falha na consolidação do arquivo.')
       const data = await res.json() as { url: string }
-      editor.chain().focus().setImage({ src: data.url }).run()
-      editor.chain().focus().updateAttributes('image', { width: '100%' }).run()
+      // Use 'as any' to bypass Tiptap's strict TS definition that does not include our custom 'width' attribute
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      editor.chain().focus().setImage({ src: data.url, width: '100%' } as any).run()
       showNotification('Upload concluído com sucesso.', 'success')
       setPromptModal({
         ...PROMPT_MODAL_INITIAL,
@@ -481,8 +476,9 @@ export default function PostEditor({
       showCaption: true,
       callback: (url, _text, caption) => {
         if (!url) return
-        editor.chain().focus().setImage({ src: formatImageUrl(url) }).run()
-        editor.chain().focus().updateAttributes('image', { width: '100%' }).run()
+        // Use 'as any' to bypass Tiptap's strict TS definition that does not include our custom 'width' attribute
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        editor.chain().focus().setImage({ src: formatImageUrl(url), width: '100%' } as any).run()
         insertCaptionBlock(caption)
       },
     })
