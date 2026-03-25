@@ -206,7 +206,7 @@ const ResizableImageNodeView = ({ node, updateAttributes, selected, editor, getP
     >
       <MediaSnapBar onSnap={(size) => updateAttributes({ width: size })} />
       <SelectMediaButton onSelect={selectCurrentNode} />
-      <img ref={imageRef} src={node.attrs.src} alt={node.attrs.alt || ''} title={node.attrs.title || ''} draggable="false" />
+      <img ref={imageRef} crossOrigin="anonymous" src={node.attrs.src} alt={node.attrs.alt || ''} title={node.attrs.title || ''} draggable="false" />
       <ResizableMediaHandle onStartResize={onStartResize} tone={localTone} />
     </NodeViewWrapper>
   )
@@ -425,15 +425,12 @@ export default function PostEditor({
   // ── Media handler functions ─────────────────────────────────
 
   const insertCaptionBlock = useCallback((caption: string) => {
-    if (!editor) return
-    const safe = (caption || '').trim()
-    if (!safe) return
-
-    // By explicitly targeting selection.to, we guarantee the insertion happens AFTER the media node, never replacing it.
-    editor.chain().focus().insertContentAt(editor.state.selection.to, {
+    const safeCaption = (caption || '').trim()
+    if (!safeCaption) return
+    editor!.chain().focus().insertContent({
       type: 'paragraph',
       attrs: { textAlign: 'center' },
-      content: [{ type: 'text', text: safe, marks: [{ type: 'italic' }] }],
+      content: [{ type: 'text', text: safeCaption, marks: [{ type: 'italic' }] }],
     }).run()
   }, [editor])
 
@@ -477,22 +474,12 @@ export default function PostEditor({
       showCaption: true,
       callback: (url, _text, caption) => {
         if (!url) return
-        const safeCaption = (caption || '').trim()
-        const t = editor.chain().focus()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        t.setImage({ src: formatImageUrl(url), width: '100%' } as any)
-        
-        if (safeCaption) {
-          t.insertContent({
-            type: 'paragraph',
-            attrs: { textAlign: 'center' },
-            content: [{ type: 'text', text: safeCaption, marks: [{ type: 'italic' }] }],
-          })
-        }
-        t.run()
+        editor!.chain().focus().setImage({ src: formatImageUrl(url), width: '100%' } as any).run()
+        insertCaptionBlock(caption)
       },
     })
-  }, [editor])
+  }, [editor, insertCaptionBlock])
 
   const addYoutube = useCallback(() => {
     if (!editor) return
@@ -503,21 +490,11 @@ export default function PostEditor({
       showCaption: true,
       callback: (url, _text, caption) => {
         if (!url) return
-        const safeCaption = (caption || '').trim()
-        const t = editor.chain().focus()
-        t.setYoutubeVideo({ src: url, width: 840, height: 472 })
-        
-        if (safeCaption) {
-          t.insertContent({
-            type: 'paragraph',
-            attrs: { textAlign: 'center' },
-            content: [{ type: 'text', text: safeCaption, marks: [{ type: 'italic' }] }],
-          })
-        }
-        t.run()
+        editor!.chain().focus().setYoutubeVideo({ src: url, width: 840, height: 472 }).run()
+        insertCaptionBlock(caption)
       },
     })
-  }, [editor])
+  }, [editor, insertCaptionBlock])
 
   const addLink = useCallback(() => {
     if (!editor) return
@@ -607,8 +584,7 @@ export default function PostEditor({
             })
           }
         } else if (trimmed) {
-          // Focus fix required:
-          editor.commands.setTextSelection(nodeEnd)
+          editor!.commands.setTextSelection(nodeEnd)
           insertCaptionBlock(trimmed)
         }
       },
