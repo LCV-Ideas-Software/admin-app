@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.46.21] — 2026-03-25
+### Corrigido
+- **PostEditor — Renderização Fatal de Mídia (Tiptap Schema)**: O node customizado `CustomResizableImage` estava renderizando como 0x0/transparente após inserção porque faltava a marcação `inline: false` em sua configuração. A falta dessa diretriz de escopo bloco destruía a árvore DOM do editor, pois media nodes interativos geram React Views complexas que não podem coabitar propriedades _inline_ padrão. Tanto a imagem quanto o Youtube foram selados como `inline: false`.
+- **PostEditor — Extensão FontSize Reinstaurada**: A extensão `FontSize` (e seu componente UI) que existia na arquitetura do legando mas que havia sido perdida acidentalmente durante essa refatoração estrutural, foi trazida de volta nativamente com inferência tipada (bypassing `any` estrito em comandos locais do Tiptap).
+
 ## [v01.46.20] — 2026-03-25
 ### Corrigido
 - **PostEditor — Replicada Arquitetura Nativa (Inserção de Mídia vs Legenda)**: Código original do protótipo (`mainsite-admin`) restaurado na íntegra. Em vez de comandos hacky de manipulação de cursores para corrigir colisão com legendas, a resolução voltou à base: injetar a imagem com o atributo `width` pré-formatado diretamente na função `setImage`. O cursor agora descansa suavemente pós-imagem sem desativar/substituir o bloco primário, viabilizando o parágrafo da legenda.
