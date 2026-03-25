@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type ComponentType } from 'react'
+import { Component, lazy, Suspense, useState, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import {
   BarChart3,
   Database,
@@ -20,6 +20,68 @@ import { FloatingScrollButtons } from './components/FloatingScrollButtons'
 
 /* Lazy-loaded modules — cada módulo vira um chunk separado */
 const LAZY_IMPORT_RELOAD_KEY = 'admin-app:lazy-import-reload-once'
+const CHUNK_IMPORT_ERROR_REGEX = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk\s+\d+\s+failed/i
+
+type LazyModuleErrorBoundaryState = {
+  hasError: boolean
+  message: string
+}
+
+class LazyModuleErrorBoundary extends Component<{ children: ReactNode }, LazyModuleErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = {
+      hasError: false,
+      message: '',
+    }
+  }
+
+  static getDerivedStateFromError(error: unknown): LazyModuleErrorBoundaryState {
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      hasError: true,
+      message,
+    }
+  }
+
+  componentDidCatch(error: unknown, errorInfo: ErrorInfo) {
+    void errorInfo
+    console.error('[admin-app] lazy module render error', error)
+  }
+
+  private handleReload = () => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.sessionStorage.removeItem(LAZY_IMPORT_RELOAD_KEY)
+    window.location.reload()
+  }
+
+  render() {
+    if (!this.state.hasError) {
+      return this.props.children
+    }
+
+    const isChunkFailure = CHUNK_IMPORT_ERROR_REGEX.test(this.state.message)
+
+    return (
+      <section className="module-error-panel" role="alert" aria-live="assertive">
+        <h3>Não foi possível carregar este módulo</h3>
+        <p>
+          {isChunkFailure
+            ? 'A sessão de acesso pode ter expirado. Recarregue para renegociar autenticação e tentar novamente.'
+            : 'O módulo encontrou um erro inesperado ao carregar. Recarregue a página para tentar novamente.'}
+        </p>
+        <div className="module-error-panel__actions">
+          <button type="button" className="primary-button" onClick={this.handleReload}>
+            Recarregar agora
+          </button>
+        </div>
+      </section>
+    )
+  }
+}
 
 function lazyWithAccessRecovery<T extends ComponentType<unknown>>(
   importer: () => Promise<{ default: T }>,
@@ -34,7 +96,7 @@ function lazyWithAccessRecovery<T extends ComponentType<unknown>>(
     } catch (error) {
       if (typeof window !== 'undefined') {
         const message = error instanceof Error ? error.message : String(error)
-        const isChunkFetchFailure = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk\s+\d+\s+failed/i.test(message)
+        const isChunkFetchFailure = CHUNK_IMPORT_ERROR_REGEX.test(message)
 
         // Em cenários de expiração do Cloudflare Access, chunks lazy podem retornar 401.
         // Damos um único reload forçado para renegociar sessão e evitar crash permanente do módulo.
@@ -65,7 +127,7 @@ const TelemetriaModule = lazyWithAccessRecovery(() => import('./modules/telemetr
 const FinanceiroModule = lazyWithAccessRecovery(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 
-const APP_VERSION = 'APP v01.46.13'
+const APP_VERSION = 'APP v01.46.15'
 
 
 
@@ -152,27 +214,29 @@ function App() {
           </div>
         </header>
 
-        <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
-        {activeModule === 'overview' ? (
-          <NewsPanel />
-        ) : activeModule === 'astrologo' ? (
-          <AstrologoModule />
-        ) : activeModule === 'config' ? (
-          <ConfigModule />
-        ) : activeModule === 'calculadora' ? (
-          <CalculadoraModule />
-        ) : activeModule === 'mainsite' ? (
-          <MainsiteModule />
-        ) : activeModule === 'mtasts' ? (
-          <MtastsModule />
-        ) : activeModule === 'cardhub' ? (
-          <CardHubModule />
-        ) : activeModule === 'financeiro' ? (
-          <FinanceiroModule />
-        ) : activeModule === 'telemetria' ? (
-          <TelemetriaModule />
-        ) : null}
-        </Suspense>
+        <LazyModuleErrorBoundary>
+          <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
+          {activeModule === 'overview' ? (
+            <NewsPanel />
+          ) : activeModule === 'astrologo' ? (
+            <AstrologoModule />
+          ) : activeModule === 'config' ? (
+            <ConfigModule />
+          ) : activeModule === 'calculadora' ? (
+            <CalculadoraModule />
+          ) : activeModule === 'mainsite' ? (
+            <MainsiteModule />
+          ) : activeModule === 'mtasts' ? (
+            <MtastsModule />
+          ) : activeModule === 'cardhub' ? (
+            <CardHubModule />
+          ) : activeModule === 'financeiro' ? (
+            <FinanceiroModule />
+          ) : activeModule === 'telemetria' ? (
+            <TelemetriaModule />
+          ) : null}
+          </Suspense>
+        </LazyModuleErrorBoundary>
         <FloatingScrollButtons />
       </main>
     </div>
