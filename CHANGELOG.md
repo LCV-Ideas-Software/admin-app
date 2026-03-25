@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.46.02] — 2026-03-24
+### Corrigido
+- **Financeiro — Cores dos badges de status**: regras CSS `.fin-status-badge` e `.fin-insight-count-badge` corrigidas para consumir `color: var(--badge-color)` e `background: var(--badge-bg)`. Badges de aprovado, recusado, cancelado e estornado voltam a exibir cores distintas.
+- **Financeiro — Labels em inglês nos detalhes**: todos os rótulos dos detalhes expandidos (SumUp e Mercado Pago) traduzidos para português (ex.: Provider → Provedor, TX Code → Cód. Transação, Fee → Taxa, Payer → Pagador, etc.).
+
 ## [v01.46.01] — 2026-03-24
 ### Corrigido
 - **Astrólogo — E-mail HTML**: `astrological-report.ts` reescrito portando fielmente `gerarHtmlRelatorio()` e `gerarTextoRelatorio()` do `astrologo-frontend` original. O e-mail anterior usava um modelo de dados incorreto (`planets`/`houses`/`aspects`) e gerava conteúdo vazio. Agora reproduz o layout completo: header gradiente, grids de astrologia/umbanda, tatwas, numerologia, interlúdio "Verdade Oculta" e síntese IA.

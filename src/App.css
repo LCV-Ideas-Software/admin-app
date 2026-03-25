@@ -2616,6 +2616,8 @@ input[type="color"]:focus-visible {
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.03em;
+  color: var(--badge-color, #6b7280);
+  background: var(--badge-bg, rgba(107, 114, 128, 0.15));
 }
 
 .fin-insight-count-badge strong {
@@ -2709,6 +2711,8 @@ input[type="color"]:focus-visible {
   font-weight: 700;
   letter-spacing: 0.04em;
   white-space: nowrap;
+  color: var(--badge-color, #6b7280);
+  background: var(--badge-bg, rgba(107, 114, 128, 0.15));
 }
 
 .fin-amount {

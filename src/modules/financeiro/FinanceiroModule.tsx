@@ -332,32 +332,32 @@ export function FinanceiroModule() {
     if (provider === 'sumup') {
       const p = parseSumupPayload(log.raw_payload)
       items.push(
-        { label: 'Provider', value: 'SumUp' }, { label: 'Checkout Status', value: p.checkoutStatus ?? '—' },
-        { label: 'Checkout Ref', value: p.checkoutRef ?? '—' }, { label: 'TX Code', value: p.transactionCode ?? '—' },
-        { label: 'TX UUID', value: p.transactionUUID ?? '—' }, { label: 'Payment Type', value: p.paymentType ?? '—' },
-        { label: 'Auth Code', value: p.authCode ?? '—' }, { label: 'Entry Mode', value: p.entryMode ?? '—' },
-        { label: 'Currency', value: p.currency ?? '—' }, { label: 'TX Timestamp', value: p.txTimestamp ? formatDateBR(p.txTimestamp) : '—' },
-        { label: 'Internal ID', value: p.internalId ?? '—' }, { label: 'TX Status', value: p.txStatus ?? '—' },
+        { label: 'Provedor', value: 'SumUp' }, { label: 'Status do Checkout', value: p.checkoutStatus ?? '—' },
+        { label: 'Ref. Checkout', value: p.checkoutRef ?? '—' }, { label: 'Cód. Transação', value: p.transactionCode ?? '—' },
+        { label: 'UUID Transação', value: p.transactionUUID ?? '—' }, { label: 'Tipo de Pagamento', value: p.paymentType ?? '—' },
+        { label: 'Cód. Autorização', value: p.authCode ?? '—' }, { label: 'Modo de Entrada', value: p.entryMode ?? '—' },
+        { label: 'Moeda', value: p.currency ?? '—' }, { label: 'Data/Hora TX', value: p.txTimestamp ? formatDateBR(p.txTimestamp) : '—' },
+        { label: 'ID Interno', value: p.internalId ?? '—' }, { label: 'Status TX', value: p.txStatus ?? '—' },
       )
     } else if (provider === 'mercadopago') {
       const p = parseMPPayload(log.raw_payload)
       items.push(
-        { label: 'Provider', value: 'Mercado Pago' }, { label: 'Status Detail', value: p.statusDetail ?? '—' },
-        { label: 'Payment Method', value: p.paymentMethodId ?? '—' }, { label: 'Payment Type', value: p.paymentTypeId ?? '—' },
-        { label: 'Installments', value: String(p.installments ?? '—') },
+        { label: 'Provedor', value: 'Mercado Pago' }, { label: 'Detalhe do Status', value: p.statusDetail ?? '—' },
+        { label: 'Método de Pagamento', value: p.paymentMethodId ?? '—' }, { label: 'Tipo de Pagamento', value: p.paymentTypeId ?? '—' },
+        { label: 'Parcelas', value: String(p.installments ?? '—') },
       )
-      if (p.firstSix || p.lastFour) items.push({ label: 'Card', value: `${p.firstSix ?? '••••••'}...${p.lastFour ?? '••••'}` })
-      if (p.cardholderName) items.push({ label: 'Cardholder', value: p.cardholderName })
+      if (p.firstSix || p.lastFour) items.push({ label: 'Cartão', value: `${p.firstSix ?? '••••••'}...${p.lastFour ?? '••••'}` })
+      if (p.cardholderName) items.push({ label: 'Titular', value: p.cardholderName })
       items.push(
-        { label: 'Net Received', value: p.netReceivedAmount != null ? formatBRL(p.netReceivedAmount) : '—' },
-        { label: 'Total Paid', value: p.totalPaidAmount != null ? formatBRL(p.totalPaidAmount) : '—' },
-        { label: 'Fee', value: p.feeAmount != null ? formatBRL(p.feeAmount) : '—' },
-        { label: 'Auth Code', value: p.authCode ?? '—' }, { label: 'External Ref', value: p.externalRef ?? '—' },
+        { label: 'Valor Líquido', value: p.netReceivedAmount != null ? formatBRL(p.netReceivedAmount) : '—' },
+        { label: 'Valor Pago', value: p.totalPaidAmount != null ? formatBRL(p.totalPaidAmount) : '—' },
+        { label: 'Taxa', value: p.feeAmount != null ? formatBRL(p.feeAmount) : '—' },
+        { label: 'Cód. Autorização', value: p.authCode ?? '—' }, { label: 'Ref. Externa', value: p.externalRef ?? '—' },
       )
-      if (p.dateApproved) items.push({ label: 'Approved At', value: formatDateBR(p.dateApproved) })
-      if (p.moneyReleaseDate) items.push({ label: 'Release Date', value: formatDateBR(p.moneyReleaseDate) })
-      if (p.payerName) items.push({ label: 'Payer', value: p.payerName })
-      if (p.payerDoc) items.push({ label: 'Document', value: p.payerDoc })
+      if (p.dateApproved) items.push({ label: 'Aprovado em', value: formatDateBR(p.dateApproved) })
+      if (p.moneyReleaseDate) items.push({ label: 'Data de Liberação', value: formatDateBR(p.moneyReleaseDate) })
+      if (p.payerName) items.push({ label: 'Pagador', value: p.payerName })
+      if (p.payerDoc) items.push({ label: 'Documento', value: p.payerDoc })
     } else {
       try { items.push({ label: 'Raw', value: JSON.stringify(JSON.parse(log.raw_payload ?? '{}'), null, 2) }) } catch { items.push({ label: 'Raw', value: log.raw_payload ?? '—' }) }
     }
