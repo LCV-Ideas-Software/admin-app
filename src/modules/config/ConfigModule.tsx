@@ -826,25 +826,47 @@ export function ConfigModule() {
               </div>
               {suggestions.map((s, i) => {
                 const badge = sourceBadge(s.source)
+                const isHighlighted = i === highlightedIndex
                 return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    role="option"
-                    aria-selected={i === highlightedIndex ? 'true' : 'false'}
-                    className={`rss-discover-item${i === highlightedIndex ? ' rss-discover-item--active' : ''}`}
-                    onClick={() => selectSuggestion(s)}
-                    onMouseEnter={() => setHighlightedIndex(i)}
-                  >
-                    <div className="rss-discover-item__info">
-                      <span className="rss-discover-item__name">{s.name}</span>
-                      <span className="rss-discover-item__url">{s.url}</span>
-                    </div>
-                    <span className="rss-discover-item__cat">{s.category}</span>
-                    <span className={`rss-discover-badge rss-discover-badge--${s.source}`} title={badge.label}>
-                      {badge.emoji}
-                    </span>
-                  </button>
+                  isHighlighted ? (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="option"
+                      aria-selected="true"
+                      className="rss-discover-item rss-discover-item--active"
+                      onClick={() => selectSuggestion(s)}
+                      onMouseEnter={() => setHighlightedIndex(i)}
+                    >
+                      <div className="rss-discover-item__info">
+                        <span className="rss-discover-item__name">{s.name}</span>
+                        <span className="rss-discover-item__url">{s.url}</span>
+                      </div>
+                      <span className="rss-discover-item__cat">{s.category}</span>
+                      <span className={`rss-discover-badge rss-discover-badge--${s.source}`} title={badge.label}>
+                        {badge.emoji}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      className="rss-discover-item"
+                      onClick={() => selectSuggestion(s)}
+                      onMouseEnter={() => setHighlightedIndex(i)}
+                    >
+                      <div className="rss-discover-item__info">
+                        <span className="rss-discover-item__name">{s.name}</span>
+                        <span className="rss-discover-item__url">{s.url}</span>
+                      </div>
+                      <span className="rss-discover-item__cat">{s.category}</span>
+                      <span className={`rss-discover-badge rss-discover-badge--${s.source}`} title={badge.label}>
+                        {badge.emoji}
+                      </span>
+                    </button>
+                  )
                 )
               })}
             </div>

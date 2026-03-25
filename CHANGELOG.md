@@ -1,5 +1,11 @@
 # Changelog — Admin App
 
+## [v01.46.07] — 2026-03-24
+### Corrigido
+- **Workspace — falsos positivos de ARIA**: os controles expansíveis do `FinanceiroModule` e as opções do discovery RSS em `ConfigModule` foram reestruturados para usar atributos ARIA literais no JSX, eliminando os alertas do workspace sobre `aria-expanded` e `aria-selected`.
+- **Financeiro — estrutura semântica preservada**: a linha expansível da tabela manteve o comportamento acessível por teclado enquanto o markup foi ajustado para não gerar diagnóstico incorreto no editor.
+- **Configurações — autocomplete RSS sem ruído estático**: a lista de sugestões continua com semântica `listbox/option`, mas agora sem warnings pendentes no painel de problemas do VS Code.
+
 ## [v01.46.06] — 2026-03-24
 ### Corrigido
 - **Acessibilidade global — PopupPortal**: janela popup nativa agora expõe semântica de diálogo (`role="dialog"`, `aria-modal`, rótulo acessível) e restaura o foco ao elemento de origem ao fechar, melhorando conformidade com WCAG 2.1 AA / eMAG em contexto de janela secundária.
