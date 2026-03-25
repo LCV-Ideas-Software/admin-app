@@ -1,5 +1,13 @@
 # Changelog — Admin App
 
+## [v01.46.15] — 2026-03-25
+### Corrigido
+- **Financeiro — detalhes em coluna única**: o bloco expandido das transações agora renderiza os dados em uma única coluna, com todos os cards de detalhe empilhados verticalmente dentro do frame, eliminando distribuição em múltiplas colunas.
+
+## [v01.46.14] — 2026-03-25
+### Corrigido
+- **UX de falha em módulo lazy**: adicionado `LazyModuleErrorBoundary` em `App.tsx` para capturar erro residual de `import()` dinâmico e exibir painel amigável com ação de recarregar sessão, evitando quebra silenciosa da interface quando chunks continuam indisponíveis após o reload automático.
+
 ## [v01.46.13] — 2026-03-25
 ### Corrigido
 - **Cloudflare Access + lazy chunks**: adicionado mecanismo de recuperação no `App.tsx` para falhas de `import()` dinâmico (ex.: `401 Unauthorized` em chunks lazy após expiração de sessão), com reload único automático para renegociar autenticação e evitar crash persistente (`Failed to fetch dynamically imported module`).
