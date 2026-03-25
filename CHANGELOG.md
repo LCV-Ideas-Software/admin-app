@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.46.01] — 2026-03-24
+### Corrigido
+- **Astrólogo — E-mail HTML**: `astrological-report.ts` reescrito portando fielmente `gerarHtmlRelatorio()` e `gerarTextoRelatorio()` do `astrologo-frontend` original. O e-mail anterior usava um modelo de dados incorreto (`planets`/`houses`/`aspects`) e gerava conteúdo vazio. Agora reproduz o layout completo: header gradiente, grids de astrologia/umbanda, tatwas, numerologia, interlúdio "Verdade Oculta" e síntese IA.
+- **Astrólogo — Autopreenchimento de e-mail**: formulário inline trocado de `<div>` para `<form autoComplete="on">`, `name` corrigido de `astrologoEmailInline` para `email`, botão Enviar alterado para `type="submit"`. Browsers agora sugerem endereços de e-mail salvos.
+
 ## [v01.46.00] — 2026-03-24
 ### Adicionado
 - **Motor de Descoberta RSS Inteligente (3 camadas)**: pesquisa automática de fontes RSS ao digitar em qualquer campo (Nome, URL, Categoria) do formulário "Adicionar nova fonte".

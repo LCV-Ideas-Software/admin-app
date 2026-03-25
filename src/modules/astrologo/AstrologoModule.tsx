@@ -123,7 +123,7 @@ export function AstrologoModule() {
       
       // Auto-generate astrological reports
       try {
-        const report = generateAstrologicalReport(payload.mapa, 'completo')
+        const report = generateAstrologicalReport(payload.mapa)
         setRelatorioHtml(report.html)
         setRelatorioTexto(report.text)
       } catch {
@@ -353,7 +353,7 @@ export function AstrologoModule() {
 
                   {/* Inline email form — appears right below the row */}
                   {emailModalMapaId === item.id && (
-                    <div className="astro-email-inline">
+                    <form className="astro-email-inline" autoComplete="on" onSubmit={(e) => { e.preventDefault(); void handleSendEmailFromModal() }}>
                       <div className="astro-email-inline__header">
                         <Mail size={14} />
                         <strong>Enviar Dossiê Celestial</strong>
@@ -362,7 +362,7 @@ export function AstrologoModule() {
                       <div className="astro-email-inline__row">
                         <input
                           id={`astrologo-email-inline-${item.id}`}
-                          name="astrologoEmailInline"
+                          name="email"
                           type="email"
                           autoComplete="email"
                           placeholder="consulente@email.com"
@@ -370,12 +370,10 @@ export function AstrologoModule() {
                           onChange={(e) => setEmailModalInput(e.target.value)}
                           disabled={sendingEmail}
                           className="astro-email-inline__input"
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleSendEmailFromModal() } }}
                         />
                         <button
-                          type="button"
+                          type="submit"
                           className="primary-button"
-                          onClick={() => void handleSendEmailFromModal()}
                           disabled={sendingEmail || !emailModalInput.trim()}
                         >
                           {sendingEmail ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
@@ -390,7 +388,7 @@ export function AstrologoModule() {
                           Cancelar
                         </button>
                       </div>
-                    </div>
+                    </form>
                   )}
                 </li>
               )
