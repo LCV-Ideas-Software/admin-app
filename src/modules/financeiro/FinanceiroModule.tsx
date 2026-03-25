@@ -783,27 +783,51 @@ export function FinanceiroModule() {
                 const toggleLabel = isExp ? `Ocultar detalhes da transação ${log.id}` : `Mostrar detalhes da transação ${log.id}`
                 return (
                   <li key={log.id} className="post-row">
-                    <button
-                      type="button"
-                      className="post-row-main fin-row-clickable fin-row-toggle"
-                      onClick={() => setExpandedRow(isExp ? null : log.id)}
-                      aria-expanded={isExp ? 'true' : 'false'}
-                      aria-controls={expandedSectionId}
-                      aria-label={toggleLabel}
-                    >
-                      <div className="fin-row-header">
-                        <span className={`fin-status-badge ${getFinancialToneClass(cfg.label)}`}>{cfg.label}</span>
-                        <strong className="fin-amount">{formatBRL(log.amount)}</strong>
-                        <span className="fin-method">{log.method ?? '—'}</span>
-                        <span className="fin-date">{formatDateBR(log.created_at)}</span>
-                        {isExp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </div>
-                      <div className="post-row-meta">
-                        <span>ID: {log.id}</span>
-                        {log.payment_id && <span>Pagamento: {log.payment_id}</span>}
-                        {log.payer_email && <span>Pagador: {log.payer_email}</span>}
-                      </div>
-                    </button>
+                    {isExp ? (
+                      <button
+                        type="button"
+                        className="post-row-main fin-row-clickable fin-row-toggle"
+                        onClick={() => setExpandedRow(null)}
+                        aria-expanded="true"
+                        aria-controls={expandedSectionId}
+                        aria-label={toggleLabel}
+                      >
+                        <div className="fin-row-header">
+                          <span className={`fin-status-badge ${getFinancialToneClass(cfg.label)}`}>{cfg.label}</span>
+                          <strong className="fin-amount">{formatBRL(log.amount)}</strong>
+                          <span className="fin-method">{log.method ?? '—'}</span>
+                          <span className="fin-date">{formatDateBR(log.created_at)}</span>
+                          <ChevronUp size={14} />
+                        </div>
+                        <div className="post-row-meta">
+                          <span>ID: {log.id}</span>
+                          {log.payment_id && <span>Pagamento: {log.payment_id}</span>}
+                          {log.payer_email && <span>Pagador: {log.payer_email}</span>}
+                        </div>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="post-row-main fin-row-clickable fin-row-toggle"
+                        onClick={() => setExpandedRow(log.id)}
+                        aria-expanded="false"
+                        aria-controls={expandedSectionId}
+                        aria-label={toggleLabel}
+                      >
+                        <div className="fin-row-header">
+                          <span className={`fin-status-badge ${getFinancialToneClass(cfg.label)}`}>{cfg.label}</span>
+                          <strong className="fin-amount">{formatBRL(log.amount)}</strong>
+                          <span className="fin-method">{log.method ?? '—'}</span>
+                          <span className="fin-date">{formatDateBR(log.created_at)}</span>
+                          <ChevronDown size={14} />
+                        </div>
+                        <div className="post-row-meta">
+                          <span>ID: {log.id}</span>
+                          {log.payment_id && <span>Pagamento: {log.payment_id}</span>}
+                          {log.payer_email && <span>Pagador: {log.payer_email}</span>}
+                        </div>
+                      </button>
+                    )}
                     {isExp && (
                       <div id={expandedSectionId} className="fin-expanded-section">
                         {renderExpandedDetails(log)}
