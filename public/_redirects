@@ -1,5 +1,0 @@
-/assets/*   /assets/:splat   200
-/favicon.svg /favicon.svg 200
-/icons.svg /icons.svg 200
-/api/*      /api/:splat      200
-/*          /index.html      200

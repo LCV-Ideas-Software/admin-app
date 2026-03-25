@@ -1,9 +1,0 @@
-/*
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), accelerometer=(), gyroscope=()
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Resource-Policy: same-origin
-  Content-Security-Policy: default-src * data: blob: filesystem: ws: wss: 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src-elem * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data: blob:; connect-src * data: blob: ws: wss:; frame-src *; frame-ancestors *; object-src *; base-uri *; form-action *; upgrade-insecure-requests
-  Content-Security-Policy-Report-Only: default-src * data: blob: filesystem: ws: wss: 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src-elem * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data: blob:; connect-src * data: blob: ws: wss:; frame-src *; frame-ancestors *; object-src *; base-uri *; form-action *

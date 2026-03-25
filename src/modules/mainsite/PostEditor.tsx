@@ -429,7 +429,8 @@ export default function PostEditor({
     const safe = (caption || '').trim()
     if (!safe) return
 
-    editor.chain().focus().insertContent({
+    // By explicitly targeting selection.to, we guarantee the insertion happens AFTER the media node, never replacing it.
+    editor.chain().focus().insertContentAt(editor.state.selection.to, {
       type: 'paragraph',
       attrs: { textAlign: 'center' },
       content: [{ type: 'text', text: safe, marks: [{ type: 'italic' }] }],
@@ -476,13 +477,22 @@ export default function PostEditor({
       showCaption: true,
       callback: (url, _text, caption) => {
         if (!url) return
-        // Use 'as any' to bypass Tiptap's strict TS definition that does not include our custom 'width' attribute
+        const safeCaption = (caption || '').trim()
+        const t = editor.chain().focus()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        editor.chain().focus().setImage({ src: formatImageUrl(url), width: '100%' } as any).run()
-        insertCaptionBlock(caption)
+        t.setImage({ src: formatImageUrl(url), width: '100%' } as any)
+        
+        if (safeCaption) {
+          t.insertContent({
+            type: 'paragraph',
+            attrs: { textAlign: 'center' },
+            content: [{ type: 'text', text: safeCaption, marks: [{ type: 'italic' }] }],
+          })
+        }
+        t.run()
       },
     })
-  }, [editor, insertCaptionBlock])
+  }, [editor])
 
   const addYoutube = useCallback(() => {
     if (!editor) return
@@ -493,11 +503,21 @@ export default function PostEditor({
       showCaption: true,
       callback: (url, _text, caption) => {
         if (!url) return
-        editor.chain().focus().setYoutubeVideo({ src: url, width: 840, height: 472 }).run()
-        insertCaptionBlock(caption)
+        const safeCaption = (caption || '').trim()
+        const t = editor.chain().focus()
+        t.setYoutubeVideo({ src: url, width: 840, height: 472 })
+        
+        if (safeCaption) {
+          t.insertContent({
+            type: 'paragraph',
+            attrs: { textAlign: 'center' },
+            content: [{ type: 'text', text: safeCaption, marks: [{ type: 'italic' }] }],
+          })
+        }
+        t.run()
       },
     })
-  }, [editor, insertCaptionBlock])
+  }, [editor])
 
   const addLink = useCallback(() => {
     if (!editor) return
