@@ -11,6 +11,7 @@ import {
   Upload, Image as ImageIcon, Youtube, ZoomIn, ZoomOut, MessageSquare,
   Sparkles, MousePointer2
 } from 'lucide-react'
+import { Extension } from '@tiptap/core'
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
 import { NodeSelection } from 'prosemirror-state'
@@ -306,6 +307,37 @@ const CustomResizableYoutube = YoutubeExtension.extend({
   },
 })
 
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addOptions() { return { types: ['textStyle'] } },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: element => element.style.fontSize.replace(/['"]+/g, ''),
+            renderHTML: attributes => {
+              if (!attributes.fontSize) return {}
+              return { style: `font-size: ${attributes.fontSize}` }
+            },
+          },
+        },
+      },
+    ]
+  },
+  addCommands() {
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setFontSize: (fontSize: string) => ({ chain }: any) => chain().setMark('textStyle', { fontSize }).run(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      unsetFontSize: () => ({ chain }: any) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+  },
+})
+
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({ dropcursor: false, link: false }),
   Markdown,
@@ -316,6 +348,7 @@ const TIPTAP_EXTENSIONS = [
   TextStyle,
   Color,
   FontFamily,
+  FontSize,
   Typography,
   TextAlign.configure({ types: ['heading', 'paragraph'], defaultAlignment: 'justify' }),
   Table.configure({ resizable: true }), TableRow, TableHeader, TableCell,
@@ -324,8 +357,8 @@ const TIPTAP_EXTENSIONS = [
   CharacterCount,
   Placeholder.configure({ placeholder: 'Comece a escrever o conteúdo do post...' }),
   LinkExtension.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
-  CustomResizableImage,
-  CustomResizableYoutube.configure({ width: 840, height: 472, allowFullscreen: true, nocookie: true }),
+  CustomResizableImage.configure({ inline: false }),
+  CustomResizableYoutube.configure({ inline: false, width: 840, height: 472, allowFullscreen: true, nocookie: true }),
 ]
 
 // ── Prompt modal state type ───────────────────────────────────
@@ -763,6 +796,19 @@ export default function PostEditor({
                 <option value="monospace">Monospace</option>
                 <option value="Arial">Arial</option>
                 <option value="'Times New Roman', Times, serif">Times</option>
+              </select>
+            </div>
+            <div className="tiptap-select-group">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              <select id="tiptap-font-size" name="tiptapFontSize" title="Tamanho da fonte" onChange={(e) => (editor.chain().focus() as any).setFontSize(e.target.value).run()} value={(editor.getAttributes('textStyle').fontSize as string) || ''}>
+                <option value="">Tam.</option>
+                <option value="12px">12px</option>
+                <option value="14px">14px</option>
+                <option value="16px">16px</option>
+                <option value="18px">18px</option>
+                <option value="20px">20px</option>
+                <option value="24px">24px</option>
+                <option value="30px">30px</option>
               </select>
             </div>
           </div>
