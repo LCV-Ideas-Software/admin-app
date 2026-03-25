@@ -102,22 +102,37 @@ export function PopupPortal({ isOpen, onClose, title = 'LCV Admin', children }: 
       body {
         margin: 0;
         padding: 16px;
+        box-sizing: border-box;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background: var(--background, #f8fafc);
         color: var(--foreground, #1e293b);
-        min-height: 100vh;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
       #popup-root {
         max-width: 1200px;
         margin: 0 auto;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
       }
       #popup-root .form-card {
         border: none;
         box-shadow: none;
         background: transparent;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        margin: 0;
+        padding: 0;
       }
       .popup-portal__dialog {
         outline: none;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
       }
     `
     popup.document.head.appendChild(popupBaseStyle)

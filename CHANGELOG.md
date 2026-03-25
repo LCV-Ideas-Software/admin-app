@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.46.19] — 2026-03-25
+### Corrigido
+- **PostEditor — Inserção de Mídia vs Legenda**: Resolvido falha de sobrescrita. Ao inserir uma imagem ou vídeo diretamente por URL ou Upload sem informar uma legenda, o Tiptap perdia o nó selecionado. A instrução `setTextSelection` com o ponteiro do node garante a transição segura antes de invocar `insertContent()`, mantendo a imagem e a legenda a salvo de formatações acidentais simultâneas.
+- **PostEditor — Expansão Dinâmica (Flexbox)**: Corrigido o colapso visual do editor no novo `PopupPortal`. A cadeia inteira de componentes (`body`, `#popup-root`, `.popup-portal__dialog` e `.form-card`) agora compõe uma sub-árvore `flex` em `height: 100vh`, permitindo que o `.tiptap-container` adote o atributo `flex: 1` e estique ocupando inteiramente o pop-up dinâmico no Desktop sem quebras.
+
 ## [v01.46.18] — 2026-03-25
 ### Adicionado
 - **PostEditor — Funcionalidades de Mídia Interativa**: Portado `ResizableImageNodeView` e `ResizableYoutubeNodeView` para o `admin-app/src/modules/mainsite/PostEditor.tsx`.

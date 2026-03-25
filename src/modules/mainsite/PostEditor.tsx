@@ -12,6 +12,7 @@ import {
   Sparkles, MousePointer2
 } from 'lucide-react'
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
+import type { NodeViewProps } from '@tiptap/react'
 import { NodeSelection } from 'prosemirror-state'
 import StarterKit from '@tiptap/starter-kit'
 import { Underline } from '@tiptap/extension-underline'
@@ -108,7 +109,7 @@ const YoutubeSnapBar = ({ onSnap }: { onSnap: (w: number, h: number) => void }) 
   </div>
 )
 
-const ResizableImageNodeView = ({ node, updateAttributes, selected, editor, getPos }: any) => {
+const ResizableImageNodeView = ({ node, updateAttributes, selected, editor, getPos }: NodeViewProps) => {
   const startXRef = useRef(0)
   const startWidthRef = useRef(100)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -211,7 +212,7 @@ const ResizableImageNodeView = ({ node, updateAttributes, selected, editor, getP
   )
 }
 
-const ResizableYoutubeNodeView = ({ node, updateAttributes, selected, editor, getPos }: any) => {
+const ResizableYoutubeNodeView = ({ node, updateAttributes, selected, editor, getPos }: NodeViewProps) => {
   const startXRef = useRef(0)
   const startWidthRef = useRef(840)
   const currentW = Number(node.attrs.width) || 840
@@ -257,7 +258,7 @@ const ResizableYoutubeNodeView = ({ node, updateAttributes, selected, editor, ge
     <NodeViewWrapper className={`resizable-media media-youtube ${selected ? 'is-selected' : ''}`} contentEditable={false} style={{ width: `${currentW}px`, maxWidth: '100%' }}>
       <YoutubeSnapBar onSnap={(w, h) => updateAttributes({ width: w, height: h })} />
       <SelectMediaButton onSelect={selectCurrentNode} />
-      <div data-youtube-video style={{ pointerEvents: selected ? 'auto' : 'none' }}>
+      <div data-youtube-video>
         <iframe
           src={node.attrs.src}
           width={currentW}
@@ -407,10 +408,12 @@ export default function PostEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, text: selectedText })
       })
-      const data = await res.json() as any
+      const data = await res.json() as { text?: string; error?: string }
       if (!res.ok) throw new Error(data.error || "Erro na geração por IA.")
 
-      editor.chain().focus().deleteSelection().insertContent(data.text).run()
+      if (data.text) {
+        editor.chain().focus().deleteSelection().insertContent(data.text).run()
+      }
       showNotification("Transformação aplicada com sucesso.", "success")
     } catch (err) {
       showNotification(err instanceof Error ? err.message : "Erro desconhecido na IA.", "error")
@@ -425,6 +428,13 @@ export default function PostEditor({
     if (!editor) return
     const safe = (caption || '').trim()
     if (!safe) return
+
+    // Escape the selected media node before inserting the caption block
+    const { selection } = editor.state
+    const nodeSize = (selection as unknown as { node?: { nodeSize: number } }).node?.nodeSize || 0
+    const nodeEnd = nodeSize > 0 ? selection.from + nodeSize : selection.to
+    editor.commands.setTextSelection(nodeEnd)
+
     editor.chain().focus().insertContent({
       type: 'paragraph',
       attrs: { textAlign: 'center' },

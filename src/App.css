@@ -3952,6 +3952,9 @@ input[type="color"]:focus-visible {
 .ProseMirror .resizable-media.is-selected, .ProseMirror .resizable-media.ProseMirror-selectednode,
 .ProseMirror img.ProseMirror-selectednode, .ProseMirror [data-youtube-video].ProseMirror-selectednode { outline: 2px solid #0284c7; outline-offset: 3px; }
 
+.ProseMirror .resizable-media.media-youtube > div[data-youtube-video] { pointer-events: none; }
+.ProseMirror .resizable-media.media-youtube.is-selected > div[data-youtube-video] { pointer-events: auto; }
+
 /* AI Form and Toolbars */
 .ai-transform-selector {
   display: flex; align-items: center; gap: 8px; background: rgba(2, 132, 199, 0.1);

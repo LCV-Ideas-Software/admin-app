@@ -9,10 +9,25 @@
  * @property {number} retryDelayMs - Delay entre tentativas (800)
  */
 
-/**
- * @typedef {Object} Env
- * @property {string} GEMINI_API_KEY
- */
+export interface Env {
+  GEMINI_API_KEY: string
+}
+
+interface GeminiResponse {
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    cachedContentTokenCount?: number;
+  };
+  candidates?: {
+    content?: {
+      parts?: {
+        text?: string;
+        thought?: boolean;
+      }[];
+    };
+  }[];
+}
 
 const GEMINI_CONFIG = {
   model: 'gemini-pro-latest',
@@ -36,13 +51,16 @@ const GEMINI_CONFIG = {
  * @param {string} message 
  * @param {Object} context 
  */
-function structuredLog(level, message, context = {}) {
-  console[level](JSON.stringify({
+function structuredLog(level: 'info' | 'warn' | 'error', message: string, context: Record<string, unknown> = {}) {
+  const logStr = JSON.stringify({
     timestamp: new Date().toISOString(),
     level: level.toUpperCase(),
     message,
     ...context
-  }));
+  });
+  if (level === 'error') console.error(logStr);
+  else if (level === 'warn') console.warn(logStr);
+  else console.info(logStr);
 }
 
 /**
@@ -51,7 +69,7 @@ function structuredLog(level, message, context = {}) {
  * @param {string} apiKey 
  * @returns {Promise<number>}
  */
-async function estimateTokenCount(text, apiKey) {
+async function estimateTokenCount(text: string, apiKey: string): Promise<number> {
   try {
     const url = `https://generativelanguage.googleapis.com/${GEMINI_CONFIG.version}/models/${GEMINI_CONFIG.model}:countTokens?key=${apiKey}`;
     const payload = { contents: [{ parts: [{ text }] }] };
@@ -63,12 +81,12 @@ async function estimateTokenCount(text, apiKey) {
     });
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await response.json() as { totalTokens?: number };
       return data.totalTokens || 0;
     }
     return 0;
   } catch (error) {
-    structuredLog('warn', 'Failed to count tokens', { error: error.message });
+    structuredLog('warn', 'Failed to count tokens', { error: (error as Error).message });
     return 0;
   }
 }
@@ -77,7 +95,7 @@ async function estimateTokenCount(text, apiKey) {
  * Valida a entrada de tokens
  * @param {number} tokenCount 
  */
-function validateInputTokens(tokenCount) {
+function validateInputTokens(tokenCount: number) {
   if (tokenCount > GEMINI_CONFIG.maxTokensInput) {
     return {
       shouldReject: true,
@@ -92,7 +110,7 @@ function validateInputTokens(tokenCount) {
  * Extrai usageMetadata do payload de resposta
  * @param {Object} responseData 
  */
-function extractUsageMetadata(responseData) {
+function extractUsageMetadata(responseData: GeminiResponse) {
   if (!responseData?.usageMetadata) return { promptTokens: 0, outputTokens: 0, cachedTokens: 0 };
   return {
     promptTokens: responseData.usageMetadata.promptTokenCount || 0,
@@ -105,7 +123,7 @@ function extractUsageMetadata(responseData) {
  * Extrai apenas o texto válido ignorando o thinking block
  * @param {Array} parts 
  */
-function extractTextFromParts(parts) {
+function extractTextFromParts(parts: { text?: string; thought?: boolean }[] | undefined) {
   return (parts || [])
     .filter(p => p.text && !p.thought)
     .map(p => p.text)
@@ -170,7 +188,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     };
 
     let lastStatus = 502;
-    let finalResponse = null;
+    let finalResponse: GeminiResponse | null = null;
 
     // 7. Detailed Retry Handling
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
@@ -186,7 +204,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         });
         
         if (response.ok) {
-          const data = await response.json() as any;
+          const data = await response.json() as GeminiResponse;
           // 5. Usage Metadata Tracking
           const usage = extractUsageMetadata(data);
           structuredLog('info', 'Gemini request succeeded', {
