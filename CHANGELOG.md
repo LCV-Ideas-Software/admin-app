@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.46.09] — 2026-03-25
+### Corrigido
+- **Financeiro — badges de status (texto + cor) restaurados**: corrigida a resolução do status efetivo da SumUp para ignorar fallback técnico `—` quando o payload não traz `txStatus/checkoutStatus`, preservando o `log.status` real.
+- **Financeiro — tons por label alinhados ao original**: mapeamento visual de badges ampliado para labels do painel legado em pt-BR (`APROVADO`, `PENDENTE`, `EM ANÁLISE`, `RECUSADO`, `CANCELADO`, `ESTORNADO`, etc.), restabelecendo padrão de cor e legibilidade.
+
 ## [v01.46.08] — 2026-03-25
 ### Corrigido
 - **Financeiro — paridade dos detalhes expandidos (base `mainsite-admin`)**: a seção de detalhes das transações foi reconstruída campo a campo para reproduzir a estrutura do painel original, incluindo ordem, nomenclatura e regras de exibição por provedor (SumUp e Mercado Pago), com adaptação ao esqueleto visual do `admin-app`.

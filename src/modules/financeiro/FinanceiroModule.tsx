@@ -279,11 +279,11 @@ const detectProvider = (raw: string | null, method?: string | null): 'sumup' | '
 const getFinancialToneClass = (value: string): string => {
   const normalized = String(value || '').trim().toUpperCase()
   if (!normalized) return 'fin-tone-neutral'
-  if (['SUCCESSFUL', 'PAID', 'APPROVED'].includes(normalized)) return 'fin-tone-success'
-  if (['PENDING', 'IN_PROCESS', 'PROCESSING'].includes(normalized)) return 'fin-tone-pending'
-  if (['FAILED', 'FAILURE', 'REJECTED'].includes(normalized)) return 'fin-tone-error'
-  if (['REFUNDED', 'PARTIALLY_REFUNDED'].includes(normalized)) return 'fin-tone-refund'
-  if (['CANCELLED', 'CANCELED', 'EXPIRED'].includes(normalized)) return 'fin-tone-cancel'
+  if (['SUCCESSFUL', 'PAID', 'APPROVED', 'APROVADO'].includes(normalized)) return 'fin-tone-success'
+  if (['PENDING', 'IN_PROCESS', 'PROCESSING', 'PENDENTE', 'EM ANÁLISE'].includes(normalized)) return 'fin-tone-pending'
+  if (['FAILED', 'FAILURE', 'REJECTED', 'RECUSADO', 'SEM SALDO', 'LIGUE AO BANCO', 'DADOS INVÁLIDOS', 'DUPLICADO', 'LIMITE ATINGIDO'].includes(normalized)) return 'fin-tone-error'
+  if (['REFUNDED', 'PARTIALLY_REFUNDED', 'ESTORNADO', 'EST. PARCIAL'].includes(normalized)) return 'fin-tone-refund'
+  if (['CANCELLED', 'CANCELED', 'EXPIRED', 'CANCELADO', 'EXPIRADO'].includes(normalized)) return 'fin-tone-cancel'
   if (normalized.includes('CHARGEBACK') || normalized.includes('CHARGE_BACK')) return 'fin-tone-error'
   return 'fin-tone-info'
 }
@@ -452,7 +452,9 @@ export function FinanceiroModule() {
     const provider = detectProvider(log.raw_payload, log.method)
     if (provider === 'mercadopago') { const p = parseMPPayload(log.raw_payload); return getMPStatusConfig(log.status, p.statusDetail?.toString()) }
     const sumupInfo = parseSumupPayload(log.raw_payload)
-    const effectiveSumupStatus = String(sumupInfo.txStatus || sumupInfo.checkoutStatus || log.status || '')
+    const effectiveSumupStatus = [sumupInfo.txStatus, sumupInfo.checkoutStatus, log.status]
+      .map((value) => String(value ?? '').trim())
+      .find((value) => value !== '' && value !== '—') || String(log.status || '')
     return getSumupStatusConfig(effectiveSumupStatus)
   }
 
