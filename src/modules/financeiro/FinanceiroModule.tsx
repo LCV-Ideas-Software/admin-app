@@ -464,6 +464,7 @@ export function FinanceiroModule() {
     const provider = detectProvider(log.raw_payload, log.method)
     const txId = log.payment_id ?? String(log.id)
     const statusCfg = resolveStatusConfig(log)
+    const fallbackItems = buildStructuredFallbackDetails(log.raw_payload, log.method)
 
     if (provider === 'sumup') {
       const p = parseSumupPayload(log.raw_payload)
@@ -482,10 +483,13 @@ export function FinanceiroModule() {
         { label: 'Data TX (Brasília)', value: p.txTimestamp ? formatDateBR(String(p.txTimestamp)) : '—' },
       ]
 
+      const hasStructuredSignal = items.some((item) => item.value !== '—')
+      const displayItems = hasStructuredSignal ? items : fallbackItems
+
       return (
         <>
-          <div className="fin-expanded-grid">
-            {items.map((item, i) => (
+          <div className="fin-expanded-stack">
+            {displayItems.map((item, i) => (
               <div key={i} className="fin-detail-group">
                 <span className="fin-detail-label">{item.label}</span>
                 <span className="fin-detail-value">{item.value}</span>
@@ -530,10 +534,12 @@ export function FinanceiroModule() {
         .filter(([, value]) => value != null && value !== '')
         .map(([label, value]) => ({ label, value: formatDetailValue(value) }))
 
+      const displayItems = items.length > 0 ? items : fallbackItems
+
       return (
         <>
-          <div className="fin-expanded-grid">
-            {items.map((item, i) => (
+          <div className="fin-expanded-stack">
+            {displayItems.map((item, i) => (
               <div key={i} className="fin-detail-group">
                 <span className="fin-detail-label">{item.label}</span>
                 <span className="fin-detail-value">{item.value}</span>
@@ -549,10 +555,9 @@ export function FinanceiroModule() {
       )
     }
 
-    const items = buildStructuredFallbackDetails(log.raw_payload, log.method)
     return (
-      <div className="fin-expanded-grid">
-        {items.map((item, i) => (
+      <div className="fin-expanded-stack">
+        {fallbackItems.map((item, i) => (
           <div key={i} className="fin-detail-group">
             <span className="fin-detail-label">{item.label}</span>
             <span className="fin-detail-value">{item.value}</span>

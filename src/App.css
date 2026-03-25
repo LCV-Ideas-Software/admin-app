@@ -2827,10 +2827,28 @@ input[type="color"]:focus-visible {
 }
 
 .fin-expanded-grid {
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
   gap: 10px;
   margin-bottom: 12px;
+  width: 100%;
+}
+
+.fin-expanded-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.result-list li.post-row {
+  grid-template-columns: 1fr;
+}
+
+.post-row-main.fin-row-toggle,
+.fin-expanded-section {
+  grid-column: 1 / -1;
   width: 100%;
 }
 

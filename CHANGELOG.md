@@ -1,5 +1,9 @@
 # Changelog — Admin App
 
+## [v01.46.17] — 2026-03-25
+### Corrigido
+- **Financeiro — empilhamento forçado sem conflito de CSS legado**: o container de detalhes expandido passou a usar classe dedicada (`.fin-expanded-stack`) com fluxo vertical obrigatório, garantindo exibição em coluna única e evitando sobrescrita por regras herdadas da lista.
+
 ## [v01.46.16] — 2026-03-25
 ### Corrigido
 - **Financeiro — detalhes restaurados com empilhamento vertical**: seção expandida de transações ajustada para coluna única real (`.fin-expanded-grid` em fluxo vertical), com cards de detalhe visíveis e empilhados dentro do frame.
