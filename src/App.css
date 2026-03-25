@@ -3841,11 +3841,12 @@ input[type="color"]:focus-visible {
 .itau-modal-actions {
   margin-top: 8px;
   display: flex;
-  gap: 12px;
+  gap: 16px;
+  justify-content: space-between;
 }
 
 .itau-modal-btn {
-  width: 100%;
+  flex: 1;
   background-color: #0ea5e9;
   color: #ffffff;
   font-weight: 700;
@@ -3880,4 +3881,18 @@ input[type="color"]:focus-visible {
   background-color: rgba(148, 163, 184, 0.1);
   color: #334155;
   box-shadow: none;
+}
+
+.itau-modal-icon--danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.itau-modal-btn--danger {
+  background-color: #ef4444;
+}
+
+.itau-modal-btn--danger:hover {
+  background-color: #dc2626;
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.3);
 }

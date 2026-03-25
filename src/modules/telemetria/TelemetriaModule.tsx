@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, AlertTriangle, BarChart3, Bot, Calendar,
   Database, Loader2, MessageSquare, RefreshCw, Share2,
-  Trash2, Mail,
+  Trash2, Mail, X,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
@@ -422,16 +422,27 @@ export function TelemetriaModule() {
 
       {/* ── Confirmation dialog ── */}
       {confirmDelete.show && (
-        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
-          <div className="confirm-dialog">
-            <div className="confirm-dialog__icon"><AlertTriangle size={28} /></div>
-            <h4>Excluir registro</h4>
-            <p>Deseja apagar permanentemente &ldquo;{confirmDelete.label}&rdquo;?</p>
-            <div className="confirm-dialog__actions">
-              <button type="button" className="ghost-button" onClick={() => setConfirmDelete({ show: false, table: '', id: 0, label: '' })}>Cancelar</button>
-              <button type="button" className="primary-button danger" onClick={() => void executeDelete()} disabled={deletingId !== null}>
-                {deletingId !== null ? <Loader2 size={16} className="spin" /> : 'Apagar'}
-              </button>
+        <div className="itau-modal-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
+          <div className="itau-modal-content">
+            <button type="button" title="Fechar diálogo" className="itau-modal-close" onClick={() => setConfirmDelete({ show: false, table: '', id: 0, label: '' })}>
+              <X size={24} />
+            </button>
+            <div className="itau-modal-header">
+              <div className="itau-modal-icon itau-modal-icon--danger">
+                <AlertTriangle size={24} />
+              </div>
+              <h2 className="itau-modal-title">Excluir registro</h2>
+              <p className="itau-modal-subtitle">Deseja apagar permanentemente &ldquo;{confirmDelete.label}&rdquo;?</p>
+            </div>
+            <div className="itau-modal-form">
+              <div className="itau-modal-actions">
+                <button type="button" className="itau-modal-btn itau-modal-btn--ghost" onClick={() => setConfirmDelete({ show: false, table: '', id: 0, label: '' })}>
+                  Cancelar
+                </button>
+                <button type="button" className="itau-modal-btn itau-modal-btn--danger" onClick={() => void executeDelete()} disabled={deletingId !== null}>
+                  {deletingId !== null ? <Loader2 size={18} className="spin" /> : 'Apagar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

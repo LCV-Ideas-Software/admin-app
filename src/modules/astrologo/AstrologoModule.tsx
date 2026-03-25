@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Loader2, Mail, Search, Send, Sparkles, Telescope, Trash2 } from 'lucide-react'
+import { Loader2, Mail, Search, Send, Sparkles, Telescope, Trash2, X } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { generateAstrologicalReport } from '../../lib/astrological-report'
 import DOMPurify from 'dompurify'
@@ -267,18 +267,29 @@ export function AstrologoModule() {
 
       {/* Dialog de confirmação de exclusão */}
       {confirmDelete?.show && (
-        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
-          <article className="confirm-dialog">
-            <div className="confirm-dialog__icon"><Trash2 size={28} /></div>
-            <h4>Atenção Crítica</h4>
-            <p>Você está prestes a expurgar o registro de <strong>{confirmDelete.nome}</strong>. Esta ação não poderá ser desfeita.</p>
-            <div className="confirm-dialog__actions">
-              <button type="button" className="ghost-button" onClick={() => setConfirmDelete(null)}>Cancelar</button>
-              <button type="button" className="primary-button danger" onClick={() => void executeDeleteMapa(confirmDelete.id)}>
-                <Trash2 size={16} /> Apagar
-              </button>
+        <div className="itau-modal-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
+          <div className="itau-modal-content">
+            <button type="button" title="Fechar diálogo" className="itau-modal-close" onClick={() => setConfirmDelete(null)}>
+              <X size={24} />
+            </button>
+            <div className="itau-modal-header">
+              <div className="itau-modal-icon itau-modal-icon--danger">
+                <Trash2 size={24} />
+              </div>
+              <h2 className="itau-modal-title">Atenção Crítica</h2>
+              <p className="itau-modal-subtitle">Você está prestes a expurgar o registro de <strong>{confirmDelete.nome}</strong>. Esta ação não poderá ser desfeita.</p>
             </div>
-          </article>
+            <div className="itau-modal-form">
+              <div className="itau-modal-actions">
+                <button type="button" className="itau-modal-btn itau-modal-btn--ghost" onClick={() => setConfirmDelete(null)}>
+                  Cancelar
+                </button>
+                <button type="button" className="itau-modal-btn itau-modal-btn--danger" onClick={() => void executeDeleteMapa(confirmDelete.id)}>
+                  Apagar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

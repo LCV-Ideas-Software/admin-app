@@ -4,7 +4,7 @@ import {
   AlertTriangle,
   FilePlus2, Globe, GripVertical,
   Loader2, Pencil, Pin, RefreshCw,
-  Save, Trash2,
+  Save, Trash2, X,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { PopupPortal } from '../../components/PopupPortal'
@@ -334,16 +334,27 @@ export function MainsiteModule() {
 
       {/* ── Diálogo de confirmação ────────────────────── */}
       {confirmDelete.show && (
-        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
-          <div className="confirm-dialog">
-            <div className="confirm-dialog__icon">
-              <AlertTriangle size={28} />
+        <div className="itau-modal-overlay" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
+          <div className="itau-modal-content">
+            <button type="button" title="Fechar diálogo" className="itau-modal-close" onClick={() => setConfirmDelete({ show: false, id: null, title: '' })}>
+              <X size={24} />
+            </button>
+            <div className="itau-modal-header">
+              <div className="itau-modal-icon itau-modal-icon--danger">
+                <AlertTriangle size={24} />
+              </div>
+              <h2 className="itau-modal-title">Excluir post</h2>
+              <p className="itau-modal-subtitle">Deseja apagar permanentemente o post &ldquo;{confirmDelete.title}&rdquo;?</p>
             </div>
-            <h4>Excluir post</h4>
-            <p>Deseja apagar permanentemente o post &ldquo;{confirmDelete.title}&rdquo;?</p>
-            <div className="confirm-dialog__actions">
-              <button type="button" className="ghost-button" onClick={() => setConfirmDelete({ show: false, id: null, title: '' })}>Cancelar</button>
-              <button type="button" className="primary-button danger" onClick={() => void executeDeletePost()}>Apagar</button>
+            <div className="itau-modal-form">
+              <div className="itau-modal-actions">
+                <button type="button" className="itau-modal-btn itau-modal-btn--ghost" onClick={() => setConfirmDelete({ show: false, id: null, title: '' })}>
+                  Cancelar
+                </button>
+                <button type="button" className="itau-modal-btn itau-modal-btn--danger" onClick={() => void executeDeletePost()}>
+                  Apagar
+                </button>
+              </div>
             </div>
           </div>
         </div>
