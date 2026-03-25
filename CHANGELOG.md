@@ -1,5 +1,29 @@
 # Changelog — Admin App
 
+## [v01.46.00] — 2026-03-24
+### Adicionado
+- **Motor de Descoberta RSS Inteligente (3 camadas)**: pesquisa automática de fontes RSS ao digitar em qualquer campo (Nome, URL, Categoria) do formulário "Adicionar nova fonte".
+  - **Camada 1 — Diretório Curado**: ~150 fontes RSS brasileiras e internacionais organizadas em 12 categorias, com busca fuzzy por nome/URL/categoria/tags.
+  - **Camada 2 — Google News RSS**: geração dinâmica de feeds via `news.google.com/rss/search`.
+  - **Camada 3 — Gemini AI**: descoberta inteligente via `gemini-2.5-flash-lite` (Google Generative Language API v1beta).
+  - **Bônus — Auto-detect**: detecção automática de RSS em URLs HTML via `<link rel="alternate">`.
+- **[NEW] `src/lib/rssDirectory.ts`**: banco curado de ~150 fontes com função `searchDirectory()` de busca fuzzy.
+- **[NEW] `functions/api/news/discover.ts`**: endpoint backend com as 3 camadas + auto-detect, timeout de 5s, fallback gracioso.
+- **Dropdown de sugestões glassmorphic**: autocomplete debounced (400ms) nos 3 inputs, badges de origem (📚 Diretório, 📰 Google News, 🤖 Gemini AI, 🔍 Auto-detect), navegação por teclado (↑↓ Enter Esc), click-outside dismiss.
+- **Filtro por categoria**: dropdown na seção "Fontes de notícias ativas" para filtrar fontes por categoria com contagem.
+- **Lista scrollável**: fontes agrupadas com scroll encapsulado (~10 itens visíveis).
+- **[NEW] `src/components/PopupPortal.tsx`**: componente genérico para renderizar React children em popup nativo do SO via `window.open()` + `ReactDOM.createPortal`. Auto-sizing (~90% da tela), cópia de stylesheets, monitoramento de close via polling.
+- **PostEditor em popup nativo**: botão "Novo Post" e "Editar" agora abrem o editor TipTap em janela separada do sistema operacional, com dimensionamento inteligente.
+
+### Alterado
+- **PostEditor — comportamento pós-save**: popup permanece aberto após salvar (não fecha automaticamente). Somente fecha via botão "Fechar" ou controle do SO.
+- **ConfigModule**: hint atualizado com ícone ⚡ indicando motor inteligente.
+
+### Removido
+- **Preview de conteúdo HTML na lista de posts (MainSite)**: exibição truncada de HTML bruto removida. Lista agora mostra apenas título + metadados.
+
+### CSS
+- ~200 linhas para discovery dropdown (`.rss-discover-*`), filtro de categoria (`.rss-category-filter`), lista scrollável (`.rss-sources-scroll`), badges de origem, e responsivo.
 ## [v01.45.01] — 2026-03-24
 ### Corrigido
 - **Deploy fix**: 3 referências a loadOverview substituídas por loadManagedPosts() e FormEvent corrigido para React.FormEvent em MainsiteModule.tsx.

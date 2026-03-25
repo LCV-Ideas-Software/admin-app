@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Save, Settings2, ShieldCheck, Trash2 } from 'lucide-react'
+import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Save, Search, Settings2, ShieldCheck, Trash2, Zap } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { RateLimitPanel } from '../../components/RateLimitPanel'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
@@ -115,10 +115,112 @@ export function ConfigModule() {
     updateNewsSettings({ enabledSources: next })
   }, [newsSettings.enabledSources, updateNewsSettings])
 
-  // ── New source form ──
+  // ── New source form + discovery engine ──
   const [newSourceName, setNewSourceName] = useState('')
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceCategory, setNewSourceCategory] = useState('')
+
+  // Discovery autocomplete state
+  interface RssSuggestion {
+    id: string; name: string; url: string; category: string
+    source: 'curated' | 'google-news' | 'gemini-ai' | 'auto-detect'
+  }
+  const [suggestions, setSuggestions] = useState<RssSuggestion[]>([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [activeField, setActiveField] = useState<'name' | 'url' | 'category' | null>(null)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const discoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Category filter for sources list
+  const [sourceCategoryFilter, setSourceCategoryFilter] = useState('__all__')
+
+  const sourceCategories = useMemo(() => {
+    const cats = new Set(newsSettings.sources.map(s => s.category))
+    return Array.from(cats).sort()
+  }, [newsSettings.sources])
+
+  const filteredSources = useMemo(() => {
+    if (sourceCategoryFilter === '__all__') return newsSettings.sources
+    return newsSettings.sources.filter(s => s.category === sourceCategoryFilter)
+  }, [newsSettings.sources, sourceCategoryFilter])
+
+  // Debounced discovery fetch
+  const triggerDiscovery = useCallback((query: string, field: 'name' | 'url' | 'category') => {
+    if (discoverTimerRef.current) clearTimeout(discoverTimerRef.current)
+    if (!query || query.trim().length < 2) {
+      setSuggestions([])
+      setLoadingSuggestions(false)
+      return
+    }
+    setLoadingSuggestions(true)
+    discoverTimerRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q: query.trim(), field })
+        const res = await fetch(`/api/news/discover?${params}`)
+        const data = await res.json() as { ok: boolean; suggestions?: RssSuggestion[] }
+        if (data.ok && data.suggestions) {
+          setSuggestions(data.suggestions)
+        } else {
+          setSuggestions([])
+        }
+      } catch {
+        setSuggestions([])
+      } finally {
+        setLoadingSuggestions(false)
+      }
+    }, 400)
+  }, [])
+
+  // Select a suggestion → fill all 3 fields
+  const selectSuggestion = useCallback((s: RssSuggestion) => {
+    setNewSourceName(s.name)
+    setNewSourceUrl(s.url)
+    setNewSourceCategory(s.category)
+    setSuggestions([])
+    setActiveField(null)
+    setHighlightedIndex(-1)
+  }, [])
+
+  // Keyboard navigation for dropdown
+  const handleDiscoverKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (suggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightedIndex(prev => Math.min(prev + 1, suggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIndex(prev => Math.max(prev - 1, 0))
+    } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+      e.preventDefault()
+      selectSuggestion(suggestions[highlightedIndex])
+    } else if (e.key === 'Escape') {
+      setSuggestions([])
+      setActiveField(null)
+    }
+  }, [suggestions, highlightedIndex, selectSuggestion])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setSuggestions([])
+        setActiveField(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Source badge labels
+  const sourceBadge = (src: RssSuggestion['source']) => {
+    switch (src) {
+      case 'curated': return { emoji: '📚', label: 'Diretório' }
+      case 'google-news': return { emoji: '📰', label: 'Google News' }
+      case 'gemini-ai': return { emoji: '🤖', label: 'Gemini AI' }
+      case 'auto-detect': return { emoji: '🔍', label: 'Auto-detect' }
+    }
+  }
 
   const handleAddSource = useCallback(() => {
     const name = newSourceName.trim()
@@ -138,6 +240,7 @@ export function ConfigModule() {
     setNewSourceName('')
     setNewSourceUrl('')
     setNewSourceCategory('')
+    setSuggestions([])
     showNotification(`Fonte "${name}" adicionada.`, 'success')
   }, [newSourceName, newSourceUrl, newSourceCategory, newsSettings, updateNewsSettings, showNotification])
 
@@ -607,11 +710,26 @@ export function ConfigModule() {
           </div>
         </div>
 
-        {/* Fontes */}
+        {/* Fontes — agrupadas por categoria */}
         <div className="field-group">
-          <p className="field-label"><strong>Fontes de notícias ativas ({newsSettings.sources.length})</strong></p>
-          <div className="news-settings__sources">
-            {newsSettings.sources.map(source => (
+          <div className="rss-sources-header">
+            <p className="field-label"><strong>Fontes de notícias ativas ({newsSettings.sources.length})</strong></p>
+            <select
+              id="news-source-category-filter"
+              name="newsSourceCategoryFilter"
+              title="Filtrar fontes por categoria"
+              className="rss-category-filter"
+              value={sourceCategoryFilter}
+              onChange={e => setSourceCategoryFilter(e.target.value)}
+            >
+              <option value="__all__">Todas as categorias</option>
+              {sourceCategories.map(cat => (
+                <option key={cat} value={cat}>{cat} ({newsSettings.sources.filter(s => s.category === cat).length})</option>
+              ))}
+            </select>
+          </div>
+          <div className="rss-sources-scroll">
+            {filteredSources.map(source => (
               <label key={source.id} className="news-settings__source-toggle">
                 <input
                   type="checkbox"
@@ -630,21 +748,31 @@ export function ConfigModule() {
                 </button>
               </label>
             ))}
+            {filteredSources.length === 0 && (
+              <p className="field-hint rss-sources-empty">Nenhuma fonte nesta categoria.</p>
+            )}
           </div>
         </div>
 
-        {/* Adicionar nova fonte */}
-        <div className="field-group">
-          <p className="field-label"><strong>Adicionar nova fonte RSS</strong></p>
-          <p className="field-hint">Informe o nome, a URL do feed RSS e uma categoria. Use feeds no formato RSS 2.0 ou Atom.</p>
-          <div className="news-settings__add-source">
+        {/* Adicionar nova fonte — com descoberta inteligente */}
+        <div className="field-group" ref={dropdownRef}>
+          <p className="field-label">
+            <strong>Adicionar nova fonte RSS</strong>
+            {loadingSuggestions && <Loader2 size={14} className="spin" style={{ marginLeft: 8, verticalAlign: 'middle' }} />}
+          </p>
+          <p className="field-hint">
+            <Zap size={12} style={{ verticalAlign: 'middle' }} />{' '}
+            Motor inteligente: digite em qualquer campo para descobrir fontes automaticamente.
+          </p>
+          <div className="news-settings__add-source" onKeyDown={handleDiscoverKeyDown}>
             <input
               id="news-new-source-name"
               name="newsNewSourceName"
               type="text"
               placeholder="Nome (ex.: CNN Brasil)"
               value={newSourceName}
-              onChange={e => setNewSourceName(e.target.value)}
+              onChange={e => { setNewSourceName(e.target.value); setActiveField('name'); triggerDiscovery(e.target.value, 'name') }}
+              onFocus={() => { setActiveField('name'); if (newSourceName.trim().length >= 2) triggerDiscovery(newSourceName, 'name') }}
               autoComplete="off"
             />
             <input
@@ -653,7 +781,8 @@ export function ConfigModule() {
               type="url"
               placeholder="URL do feed RSS (ex.: https://...)"
               value={newSourceUrl}
-              onChange={e => setNewSourceUrl(e.target.value)}
+              onChange={e => { setNewSourceUrl(e.target.value); setActiveField('url'); triggerDiscovery(e.target.value, 'url') }}
+              onFocus={() => { setActiveField('url'); if (newSourceUrl.trim().length >= 2) triggerDiscovery(newSourceUrl, 'url') }}
               autoComplete="off"
             />
             <input
@@ -662,7 +791,8 @@ export function ConfigModule() {
               type="text"
               placeholder="Categoria (ex.: Economia)"
               value={newSourceCategory}
-              onChange={e => setNewSourceCategory(e.target.value)}
+              onChange={e => { setNewSourceCategory(e.target.value); setActiveField('category'); triggerDiscovery(e.target.value, 'category') }}
+              onFocus={() => { setActiveField('category'); if (newSourceCategory.trim().length >= 2) triggerDiscovery(newSourceCategory, 'category') }}
               autoComplete="off"
             />
             <button
@@ -674,6 +804,37 @@ export function ConfigModule() {
               <Plus size={14} /> Adicionar
             </button>
           </div>
+
+          {/* Discovery dropdown */}
+          {activeField && suggestions.length > 0 && (
+            <div className="rss-discover-dropdown">
+              <div className="rss-discover-header">
+                <Search size={12} />
+                <span>{suggestions.length} sugestões encontradas</span>
+              </div>
+              {suggestions.map((s, i) => {
+                const badge = sourceBadge(s.source)
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={`rss-discover-item${i === highlightedIndex ? ' rss-discover-item--active' : ''}`}
+                    onClick={() => selectSuggestion(s)}
+                    onMouseEnter={() => setHighlightedIndex(i)}
+                  >
+                    <div className="rss-discover-item__info">
+                      <span className="rss-discover-item__name">{s.name}</span>
+                      <span className="rss-discover-item__url">{s.url}</span>
+                    </div>
+                    <span className="rss-discover-item__cat">{s.category}</span>
+                    <span className={`rss-discover-badge rss-discover-badge--${s.source}`} title={badge.label}>
+                      {badge.emoji}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       </article>
     </section>

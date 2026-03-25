@@ -7,6 +7,7 @@ import {
   Save, Trash2,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+import { PopupPortal } from '../../components/PopupPortal'
 
 // Lazy-loaded PostEditor — TipTap chunk only loads when editor is opened
 const PostEditor = lazy(() => import('./PostEditor'))
@@ -179,7 +180,6 @@ export function MainsiteModule() {
         throw new Error(nextPayload.error ?? 'Falha ao salvar o post do MainSite.')
       }
 
-      resetPostEditor()
       await loadManagedPosts()
       showNotification(withTrace(isEditing ? 'Post do MainSite atualizado com sucesso.' : 'Post do MainSite criado com sucesso.', nextPayload), 'success')
     } catch {
@@ -350,7 +350,11 @@ export function MainsiteModule() {
       )}
 
 
-      {showPostEditor || editingPostId ? (
+      <PopupPortal
+        isOpen={showPostEditor || editingPostId !== null}
+        onClose={resetPostEditor}
+        title={editingPostId ? `Editar post #${editingPostId} — LCV Admin` : 'Novo Post — LCV Admin'}
+      >
         <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
           <PostEditor
             editingPostId={editingPostId}
@@ -363,12 +367,12 @@ export function MainsiteModule() {
             onClose={resetPostEditor}
           />
         </Suspense>
-      ) : (
-        <button type="button" className="primary-button" onClick={() => setShowPostEditor(true)}>
-          <FilePlus2 size={18} />
-          Novo Post
-        </button>
-      )}
+      </PopupPortal>
+
+      <button type="button" className="primary-button" onClick={() => setShowPostEditor(true)}>
+        <FilePlus2 size={18} />
+        Novo Post
+      </button>
 
       <article className="result-card">
         <div className="result-toolbar">
@@ -411,7 +415,7 @@ export function MainsiteModule() {
                       <GripVertical size={14} className="grip-icon" />
                       <strong>{post.title}</strong>
                     </div>
-                    <p className="field-hint">{post.content.length > 220 ? `${post.content.slice(0, 220)}…` : post.content}</p>
+
                     <div className="post-row-meta">
                       <span>ID #{post.id}</span>
                       <span>{new Date(post.created_at).toLocaleString('pt-BR')}</span>
