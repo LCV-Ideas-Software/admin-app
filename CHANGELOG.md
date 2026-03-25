@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.46.08] — 2026-03-25
+### Corrigido
+- **Financeiro — paridade dos detalhes expandidos (base `mainsite-admin`)**: a seção de detalhes das transações foi reconstruída campo a campo para reproduzir a estrutura do painel original, incluindo ordem, nomenclatura e regras de exibição por provedor (SumUp e Mercado Pago), com adaptação ao esqueleto visual do `admin-app`.
+- **Financeiro — fallback técnico estruturado**: corrigido bug que exibia chaves literais do payload (`status_detail`, `payment_id`, etc.) no lugar dos valores reais quando o retorno vinha em formatos alternativos.
+- **Financeiro — status efetivo SumUp**: cálculo de status passou a priorizar `txStatus`/`checkoutStatus` do payload antes do `log.status`, alinhando o badge e os estados de ação ao comportamento do painel legado.
+- **Financeiro — compliance de status/action matrix**: `getSumupStatusConfig` alinhado ao mapeamento do painel original para fluxos `SUCCESSFUL/PENDING/PARTIALLY_REFUNDED`, preservando compatibilidade com os SDKs oficiais (SumUp e Mercado Pago) já integrados no backend.
+
+### Alterado
+- **Financeiro — paridade visual do bloco expandido**: o container de detalhes agora aplica estilização contextual por provedor (fundo, borda lateral e nota operacional) equivalente ao padrão do `FinancialPanel.jsx`.
+
 ## [v01.46.07] — 2026-03-24
 ### Corrigido
 - **Workspace — falsos positivos de ARIA**: os controles expansíveis do `FinanceiroModule` e as opções do discovery RSS em `ConfigModule` foram reestruturados para usar atributos ARIA literais no JSX, eliminando os alertas do workspace sobre `aria-expanded` e `aria-selected`.

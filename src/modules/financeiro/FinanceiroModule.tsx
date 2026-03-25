@@ -44,9 +44,9 @@ type StatusConfig = { color: string; bg: string; label: string; canRefund?: bool
 const getSumupStatusConfig = (status: string): StatusConfig => {
   const s = (status || '').toUpperCase()
   if (['PAID', 'SUCCESSFUL', 'APPROVED'].includes(s))
-    return { color: '#10b981', bg: 'rgba(16,185,129,0.15)', label: 'SUCCESSFUL', canRefund: false, canCancel: false }
+    return { color: '#10b981', bg: 'rgba(16,185,129,0.15)', label: 'SUCCESSFUL', canRefund: true, canCancel: false }
   if (['PENDING', 'IN_PROCESS', 'PROCESSING'].includes(s))
-    return { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', label: 'PENDING', canRefund: false, canCancel: false }
+    return { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', label: 'PENDING', canRefund: false, canCancel: true }
   if (['FAILED', 'FAILURE'].includes(s))
     return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'FAILED', canRefund: false, canCancel: false }
   if (s === 'EXPIRED')
@@ -54,7 +54,7 @@ const getSumupStatusConfig = (status: string): StatusConfig => {
   if (s === 'REFUNDED')
     return { color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', label: 'REFUNDED', canRefund: false, canCancel: false }
   if (s === 'PARTIALLY_REFUNDED')
-    return { color: '#a78bfa', bg: 'rgba(167,139,250,0.15)', label: 'PARTIALLY_REFUNDED', canRefund: false, canCancel: false }
+    return { color: '#a78bfa', bg: 'rgba(167,139,250,0.15)', label: 'PARTIALLY_REFUNDED', canRefund: true, canCancel: false }
   if (['CANCELLED', 'CANCEL', 'CANCELED'].includes(s))
     return { color: '#f97316', bg: 'rgba(249,115,22,0.15)', label: 'CANCELLED', canRefund: false, canCancel: false }
   if (s.includes('CHARGEBACK') || s.includes('CHARGE_BACK'))
@@ -217,7 +217,7 @@ const buildStructuredFallbackDetails = (raw: string | null, method?: string | nu
       : 'Registro técnico'
 
   const candidates: Array<[string, string]> = [
-    ['Provedor inferido', methodLabel],
+    ['Provedor inferido', '__provider_label__'],
     ['Status', 'status'],
     ['Detalhe do Status', 'status_detail'],
     ['ID principal', 'id'],
@@ -245,9 +245,9 @@ const buildStructuredFallbackDetails = (raw: string | null, method?: string | nu
   const seen = new Set<string>()
 
   for (const [label, pathOrValue] of candidates) {
-    const rawValue = pathOrValue.includes('.') || parsed[pathOrValue] !== undefined
-      ? getNestedValue(parsed, pathOrValue)
-      : pathOrValue
+    const rawValue = pathOrValue === '__provider_label__'
+      ? methodLabel
+      : getNestedValue(parsed, pathOrValue)
     const value = formatDetailValue(rawValue)
     if (value === '—' || seen.has(`${label}:${value}`)) continue
     items.push({ label, value })
@@ -451,76 +451,103 @@ export function FinanceiroModule() {
   const resolveStatusConfig = (log: FinancialLog): StatusConfig => {
     const provider = detectProvider(log.raw_payload, log.method)
     if (provider === 'mercadopago') { const p = parseMPPayload(log.raw_payload); return getMPStatusConfig(log.status, p.statusDetail?.toString()) }
-    return getSumupStatusConfig(log.status)
+    const sumupInfo = parseSumupPayload(log.raw_payload)
+    const effectiveSumupStatus = String(sumupInfo.txStatus || sumupInfo.checkoutStatus || log.status || '')
+    return getSumupStatusConfig(effectiveSumupStatus)
   }
 
   // ── Render helpers ──
 
   const renderExpandedDetails = (log: FinancialLog) => {
     const provider = detectProvider(log.raw_payload, log.method)
-    const items: { label: string; value: string }[] = []
+    const txId = log.payment_id ?? String(log.id)
+    const statusCfg = resolveStatusConfig(log)
 
     if (provider === 'sumup') {
       const p = parseSumupPayload(log.raw_payload)
-      items.push(
-        { label: 'Provedor', value: 'SumUp' }, { label: 'Status do Checkout', value: p.checkoutStatus ?? '—' },
-        { label: 'Ref. Checkout', value: p.checkoutRef ?? '—' }, { label: 'Cód. Transação', value: p.transactionCode ?? '—' },
-        { label: 'UUID Transação', value: p.transactionUUID ?? '—' }, { label: 'Tipo de Pagamento', value: p.paymentType ?? '—' },
-        { label: 'Cód. Autorização', value: p.authCode ?? '—' }, { label: 'Modo de Entrada', value: p.entryMode ?? '—' },
-        { label: 'Moeda', value: p.currency ?? '—' }, { label: 'Data/Hora TX', value: p.txTimestamp ? formatDateBR(p.txTimestamp) : '—' },
-        { label: 'ID Interno', value: p.internalId ?? '—' }, { label: 'Status TX', value: p.txStatus ?? '—' },
+      const items: { label: string; value: string }[] = [
+        { label: 'Checkout UUID', value: String(txId) },
+        { label: 'Transação UUID', value: formatDetailValue(p.transactionUUID) },
+        { label: 'Código TX', value: formatDetailValue(p.transactionCode) },
+        { label: 'Auth Code', value: formatDetailValue(p.authCode) },
+        { label: 'Tipo de Pagamento', value: formatDetailValue(p.paymentType) },
+        { label: 'Entry Mode', value: formatDetailValue(p.entryMode) },
+        { label: 'Status Checkout', value: formatDetailValue(p.checkoutStatus) },
+        { label: 'Status Transação', value: formatDetailValue(p.txStatus) },
+        { label: 'Moeda', value: formatDetailValue(p.currency) },
+        { label: 'ID Interno', value: formatDetailValue(p.internalId) },
+        { label: 'Checkout Ref', value: formatDetailValue(p.checkoutRef) },
+        { label: 'Data TX (Brasília)', value: p.txTimestamp ? formatDateBR(String(p.txTimestamp)) : '—' },
+      ]
+
+      return (
+        <>
+          <div className="fin-expanded-grid">
+            {items.map((item, i) => (
+              <div key={i} className="fin-detail-group">
+                <span className="fin-detail-label">{item.label}</span>
+                <span className="fin-detail-value">{item.value}</span>
+              </div>
+            ))}
+          </div>
+          {statusCfg.canRefund && (
+            <div className="fin-expanded-note fin-expanded-note--sumup">
+              <AlertCircle size={13} /> Estornos SumUp só ficam disponíveis após a liquidação da transação (geralmente em até 24h).
+            </div>
+          )}
+        </>
       )
-      if (p.hasThreeDS) {
-        items.push(
-          { label: 'Fluxo 3DS', value: 'Sim' },
-          { label: 'Mecanismo 3DS', value: p.nextStepMechanism ?? '—' },
-          { label: 'Método Próxima Etapa', value: p.nextStepMethod ?? '—' },
-          { label: 'URL Próxima Etapa', value: p.nextStepUrl ?? '—' },
-          { label: 'Método Pré-Ação', value: p.preActionMethod ?? '—' },
-          { label: 'URL Pré-Ação', value: p.preActionUrl ?? '—' },
-        )
-      }
-      if (p.gatewayMessage) items.push({ label: 'Mensagem Gateway', value: p.gatewayMessage })
-    } else if (provider === 'mercadopago') {
+    }
+
+    if (provider === 'mercadopago') {
       const p = parseMPPayload(log.raw_payload)
-      items.push(
-        { label: 'Provedor', value: 'Mercado Pago' },
-        { label: 'Status', value: p.status ?? log.status ?? '—' },
-        { label: 'Detalhe do Status', value: p.statusDetail ?? '—' },
-        { label: 'Método de Pagamento', value: p.paymentMethodId ?? '—' }, { label: 'Tipo de Pagamento', value: p.paymentTypeId ?? '—' },
-        { label: 'Parcelas', value: String(p.installments ?? '—') },
+      const rawItems: Array<[string, unknown]> = [
+        ['Payment ID', txId],
+        ['Ref. Externa', p.externalRef],
+        ['Método de Pgto.', p.paymentMethodId],
+        ['Tipo de Pgto.', p.paymentTypeId],
+        ['Detalhe do Status', p.statusDetail],
+        ['Parcelas', p.installments ? String(p.installments) : null],
+        ['Cartão (Primeiros 6)', p.firstSix],
+        ['Cartão (Últimos 4)', p.lastFour],
+        ['Titular do Cartão', p.cardholderName],
+        ['Pagador', p.payerName],
+        ['Doc. Pagador', p.payerDoc],
+        ['Cód. Autorização', p.authCode],
+        ['Valor Total Pago', p.totalPaidAmount != null ? formatBRL(Number(p.totalPaidAmount)) : null],
+        ['Valor Líquido Recebido', p.netReceivedAmount != null ? formatBRL(Number(p.netReceivedAmount)) : null],
+        ['Taxa MP', p.feeAmount != null ? formatBRL(Number(p.feeAmount)) : null],
+        ['Data de Aprovação', p.dateApproved ? formatDateBR(String(p.dateApproved)) : null],
+        ['Previsão de Liberação', p.moneyReleaseDate ? formatDateBR(String(p.moneyReleaseDate)) : null],
+        ['Status de Liberação', p.moneyReleaseStatus],
+        ['Modo de Processamento', p.processingMode],
+        ['Ref. Adquirente', p.acquirerRef],
+      ]
+
+      const items = rawItems
+        .filter(([, value]) => value != null && value !== '')
+        .map(([label, value]) => ({ label, value: formatDetailValue(value) }))
+
+      return (
+        <>
+          <div className="fin-expanded-grid">
+            {items.map((item, i) => (
+              <div key={i} className="fin-detail-group">
+                <span className="fin-detail-label">{item.label}</span>
+                <span className="fin-detail-value">{item.value}</span>
+              </div>
+            ))}
+          </div>
+          {statusCfg.canRefund && (
+            <div className="fin-expanded-note fin-expanded-note--mp">
+              <AlertCircle size={13} /> O valor líquido recebido já desconta as taxas do Mercado Pago.
+            </div>
+          )}
+        </>
       )
-      if (p.firstSix || p.lastFour) items.push({ label: 'Cartão', value: `${p.firstSix ?? '••••••'}...${p.lastFour ?? '••••'}` })
-      if (p.cardholderName) items.push({ label: 'Titular', value: p.cardholderName })
-      items.push(
-        { label: 'Valor Líquido', value: p.netReceivedAmount != null ? formatBRL(p.netReceivedAmount) : '—' },
-        { label: 'Valor Pago', value: p.totalPaidAmount != null ? formatBRL(p.totalPaidAmount) : '—' },
-        { label: 'Taxa', value: p.feeAmount != null ? formatBRL(p.feeAmount) : '—' },
-        { label: 'Cód. Autorização', value: p.authCode ?? '—' }, { label: 'Ref. Externa', value: p.externalRef ?? '—' },
-      )
-      if (p.dateApproved) items.push({ label: 'Aprovado em', value: formatDateBR(p.dateApproved) })
-      if (p.moneyReleaseDate) items.push({ label: 'Data de Liberação', value: formatDateBR(p.moneyReleaseDate) })
-      if (p.payerName) items.push({ label: 'Pagador', value: p.payerName })
-      if (p.payerDoc) items.push({ label: 'Documento', value: p.payerDoc })
-      if (p.processingMode) items.push({ label: 'Modo de Processamento', value: p.processingMode })
-      if (p.gatewayCode) items.push({ label: 'Código do Gateway', value: String(p.gatewayCode) })
-      if (p.gatewayType) items.push({ label: 'Tipo do Gateway', value: String(p.gatewayType) })
-      if (p.gatewayMessage) items.push({ label: 'Mensagem Gateway', value: p.gatewayMessage })
-      if (p.ticketUrl) items.push({ label: 'Link do Comprovante', value: p.ticketUrl })
-      if (p.qrCode) items.push({ label: 'QR Code PIX', value: p.qrCode })
-    } else {
-      items.push(...buildStructuredFallbackDetails(log.raw_payload, log.method))
     }
 
-    const fallbackItems = buildStructuredFallbackDetails(log.raw_payload, log.method)
-    const existingKeys = new Set(items.map((item) => `${item.label}:${item.value}`))
-    for (const fallbackItem of fallbackItems) {
-      const key = `${fallbackItem.label}:${fallbackItem.value}`
-      if (existingKeys.has(key)) continue
-      items.push(fallbackItem)
-      existingKeys.add(key)
-    }
-
+    const items = buildStructuredFallbackDetails(log.raw_payload, log.method)
     return (
       <div className="fin-expanded-grid">
         {items.map((item, i) => (
@@ -829,7 +856,10 @@ export function FinanceiroModule() {
                       </button>
                     )}
                     {isExp && (
-                      <div id={expandedSectionId} className="fin-expanded-section">
+                      <div
+                        id={expandedSectionId}
+                        className={`fin-expanded-section ${provider === 'sumup' ? 'fin-expanded-section--sumup' : provider === 'mercadopago' ? 'fin-expanded-section--mp' : 'fin-expanded-section--fallback'}`}
+                      >
                         {renderExpandedDetails(log)}
                         <div className="fin-expanded-actions">
                           {provider === 'mercadopago' && cfg.canRefund && (

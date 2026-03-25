@@ -2779,8 +2779,24 @@ input[type="color"]:focus-visible {
 }
 
 .fin-expanded-section {
-  padding: 16px 0 8px;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  padding: 16px 20px;
+  margin: 0 12px 12px 12px;
+  border-radius: 0 8px 8px 0;
+}
+
+.fin-expanded-section--sumup {
+  background: rgba(79, 70, 229, 0.04);
+  border-left: 3px solid #4f46e5;
+}
+
+.fin-expanded-section--mp {
+  background: rgba(14, 165, 233, 0.04);
+  border-left: 3px solid #0ea5e9;
+}
+
+.fin-expanded-section--fallback {
+  background: rgba(100, 116, 139, 0.05);
+  border-left: 3px solid rgba(100, 116, 139, 0.55);
 }
 
 .fin-expanded-grid {
@@ -2805,7 +2821,32 @@ input[type="color"]:focus-visible {
 
 .fin-detail-value {
   font-size: 0.84rem;
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-weight: 600;
+  color: #1d4ed8;
   word-break: break-all;
+}
+
+.fin-expanded-note {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fin-expanded-note--sumup {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+.fin-expanded-note--mp {
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  color: #0ea5e9;
 }
 
 .fin-expanded-actions {
