@@ -25,16 +25,17 @@
   /* COLOR PALETTE */
   /* ====================================================================== */
 
-  /* Primary Brand Colors */
-  --color-primary: #3b82f6;
-  --color-primary-light: rgba(59, 130, 246, 0.24);
-  --color-primary-lighter: rgba(59, 130, 246, 0.08);
-  --color-primary-dark: #1d4ed8;
+  /* Primary Brand Colors — Google Blue */
+  --color-primary: #1a73e8;
+  --color-primary-light: rgba(26, 115, 232, 0.16);
+  --color-primary-lighter: rgba(26, 115, 232, 0.08);
+  --color-primary-dark: #185abc;
+  --color-primary-rgb: 26, 115, 232;
 
-  /* Secondary Brand Colors */
-  --color-secondary: #a855f7;
-  --color-secondary-light: rgba(168, 85, 247, 0.22);
-  --color-secondary-lighter: rgba(168, 85, 247, 0.08);
+  /* Secondary Brand Colors — unified with primary (no purple) */
+  --color-secondary: #1a73e8;
+  --color-secondary-light: rgba(26, 115, 232, 0.16);
+  --color-secondary-lighter: rgba(26, 115, 232, 0.08);
 
   /* Status Colors */
   --color-success: #16a34a;
@@ -53,25 +54,25 @@
   --color-info-light: #38bdf8;
   --color-info-bg: rgba(2, 132, 199, 0.12);
 
-  /* Neutral Colors - Light mode */
-  --color-bg-light: #f8fafc;
+  /* Neutral Colors - Light mode (tiptap.dev warm grays) */
+  --color-bg-light: #f5f4f4;
   --color-surface-light: #ffffff;
-  --color-surface-light-secondary: #f1f5f9;
-  --color-text-light: #0f172a;
-  --color-text-light-muted: #475569;
-  --color-text-light-subtle: #64748b;
-  --color-border-light: rgba(148, 163, 184, 0.18);
-  --color-border-light-secondary: rgba(148, 163, 184, 0.38);
+  --color-surface-light-secondary: #eeedec;
+  --color-text-light: #0d0d0d;
+  --color-text-light-muted: #514b48;
+  --color-text-light-subtle: #6b6462;
+  --color-border-light: rgba(0, 0, 0, 0.08);
+  --color-border-light-secondary: rgba(0, 0, 0, 0.14);
 
   /* Neutral Colors - Dark mode */
-  --color-bg-dark: #0f1117;
-  --color-surface-dark: #1e293b;
-  --color-surface-dark-secondary: #0f172a;
-  --color-text-dark: #e2e8f0;
-  --color-text-dark-muted: #cbd5e1;
-  --color-text-dark-subtle: #94a3b8;
-  --color-border-dark: rgba(148, 163, 184, 0.18);
-  --color-border-dark-secondary: rgba(255, 255, 255, 0.08);
+  --color-bg-dark: #16171d;
+  --color-surface-dark: #1e1f26;
+  --color-surface-dark-secondary: #131419;
+  --color-text-dark: #d1d5db;
+  --color-text-dark-muted: #9ca3af;
+  --color-text-dark-subtle: #6b7280;
+  --color-border-dark: rgba(255, 255, 255, 0.1);
+  --color-border-dark-secondary: rgba(255, 255, 255, 0.06);
 
   /* Status Shades */
   --color-success-dark: #15803d;
@@ -83,7 +84,7 @@
   /* ====================================================================== */
 
   /* Font Family */
-  --font-family-base: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-base: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-family-mono: ui-monospace, "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
 
   /* Font Sizes */
@@ -148,35 +149,35 @@
   /* BORDER RADIUS */
   /* ====================================================================== */
 
-  --radius-sm: 12px;
-  --radius-md: 16px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
   --radius-lg: 20px;
-  --radius-xl: 24px;
-  --radius-2xl: 28px;
+  --radius-xl: 30px;
+  --radius-2xl: 36px;
   --radius-full: 999px;
 
   /* Component-specific radius */
-  --radius-button: var(--radius-md);
-  --radius-card: var(--radius-xl);
-  --radius-input: var(--radius-md);
+  --radius-button: 100px; /* tiptap.dev pill shape */
+  --radius-card: var(--radius-xl); /* 30px */
+  --radius-input: var(--radius-sm); /* 10px — tiptap compact */
   --radius-badge: var(--radius-full);
-  --radius-modal: 28px;
+  --radius-modal: var(--radius-xl); /* 30px */
 
   /* ====================================================================== */
   /* SHADOWS & ELEVATION */
   /* ====================================================================== */
 
-  /* Soft shadows for subtle depth */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
+  /* Soft shadows — tiptap.dev ultra-subtle */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.08);
 
-  /* Admin-app specific shadow */
-  --shadow-admin: 0 18px 48px rgba(15, 23, 42, 0.14);
-  --shadow-admin-raised: 0 24px 48px rgba(0, 0, 0, 0.1);
-  --shadow-admin-glass: 0 8px 30px rgba(0, 0, 0, 0.12);
+  /* Admin-app specific shadow — tiptap-inspired */
+  --shadow-admin: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-admin-raised: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-admin-glass: 0 4px 12px rgba(0, 0, 0, 0.06);
 
   /* Status shadows */
   --shadow-success: 0 8px 24px rgba(22, 163, 74, 0.3);

@@ -1,5 +1,24 @@
 # Changelog — Admin App
 
+## [v01.49.00] — 2026-03-26
+### UI/UX Redesign — tiptap.dev Style (Google Blue)
+- **Design Tokens (`variables.css`)**: paleta primária migrou de `#3b82f6` (Tailwind blue) para `#1a73e8` (Google Blue). Cor secundária unificada (purple removido). Background `#f8fafc` → `#f5f4f4` (warm gray tiptap). Texto `#0f172a` → `#0d0d0d`. Bordas de `rgba(148,163,184)` → `rgba(0,0,0)`. Font family: `'Inter'` como primária. Radius card `24px` → `30px`, button `16px` → `100px` (pill), input `16px` → `10px`. Shadows ultra-sutis (opacidade 0.04–0.08).
+- **Sidebar**: fundo escuro (`linear-gradient navy`) → fundo claro `#f5f4f4`. Texto branco → texto escuro `#0d0d0d`. Nav items pill (border-radius 100px), active Google Blue `rgba(26,115,232,0.1)`. Brand card pill com borda sutil.
+- **Content area**: gradientes radiais azul/roxo removidos → sólido warm gray `#f5f4f4`.
+- **Buttons**: primary de gradient azul-roxo → sólido preto `#0d0d0d` com hover Google Blue. Ghost: transparente com borda sutil. Ambos pill (100px).
+- **Cards/Forms**: background semi-transparente → sólido `#ffffff`. Shadows de `0 18px 48px` → `0 1px 3px`. Glassmorphism `backdrop-filter` removido.
+- **Module Shells**: glassmorphism pesado (`blur(24px) saturate(145%)`) → clean white surface. Accents softer (opacity 0.08/0.18 vs 0.14/0.34).
+- **Focus Indicators (WCAG)**: migrados de `#3b82f6` para `#1a73e8`. Todos os `:focus-visible` pill-shaped onde aplicável.
+- **Cores secundárias**: ~80 referências de valores hardcoded (slate/cool gray) atualizadas para warm palette tiptap.
+
+## [v01.48.01] — 2026-03-26
+### Corrigido
+- **PostEditor — Duplicate extension `underline`**: removida importação explícita de `@tiptap/extension-underline` e entrada no array `TIPTAP_EXTENSIONS`. O `StarterKit` do TipTap v3 já inclui `Underline` por padrão; a duplicata gerava warning no console.
+- **PostEditor — ProseMirror white-space warning**: adicionado `white-space: pre-wrap` na regra CSS `.tiptap-editor .tiptap`, satisfazendo requisito do ProseMirror e silenciando aviso no console.
+
+### Melhorado
+- **PostEditor — AI Dropdown pill styling**: dropdown "IA: Aprimorar Texto" recebeu CSS `.tiptap-ai-group` com design pill (border-radius 100px, fundo sky-blue translúcido, texto bold accent, hover transitions). Paridade visual com o mainsite-admin. Suporte a dark mode via `[data-theme="dark"]`.
+
 ## [v01.48.00] — 2026-03-26
 ### Adicionado
 - **PostEditor — BubbleMenu (toolbar contextual)**: menu flutuante aparece ao selecionar texto, com formatação rápida (negrito, itálico, sublinhado, tachado, marca-texto, sub/sobrescrito, código inline, link). Arrastável com viewport clamping. Portal via `ownerDocument.body` (compatível com PopupPortal).

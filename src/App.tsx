@@ -127,7 +127,7 @@ const TelemetriaModule = lazyWithAccessRecovery(() => import('./modules/telemetr
 const FinanceiroModule = lazyWithAccessRecovery(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 
-const APP_VERSION = 'APP v01.48.00'
+const APP_VERSION = 'APP v01.49.00'
 
 
 
