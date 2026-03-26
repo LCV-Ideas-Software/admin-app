@@ -23,7 +23,12 @@ type AppearanceSettings = {
   allowAutoMode: boolean
   light: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
   dark: { bgColor: string; bgImage: string; fontColor: string; titleColor: string }
-  shared: { fontSize: string; titleFontSize: string; fontFamily: string }
+  shared: {
+    fontSize: string; titleFontSize: string; fontFamily: string
+    bodyWeight?: string; titleWeight?: string; lineHeight?: string
+    textAlign?: string; textIndent?: string; paragraphSpacing?: string
+    contentMaxWidth?: string; linkColor?: string
+  }
 }
 
 type RotationSettings = {
@@ -35,7 +40,12 @@ const DEFAULT_APPEARANCE: AppearanceSettings = {
   allowAutoMode: true,
   light: { bgColor: '#f8f9fa', bgImage: '', fontColor: '#202124', titleColor: '#1a73e8' },
   dark: { bgColor: '#131314', bgImage: '', fontColor: '#e3e3e3', titleColor: '#8ab4f8' },
-  shared: { fontSize: '1rem', titleFontSize: '1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif' },
+  shared: {
+    fontSize: '1rem', titleFontSize: '1.5rem', fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+    bodyWeight: '500', titleWeight: '700', lineHeight: '1.9',
+    textAlign: 'justify', textIndent: '3.5rem', paragraphSpacing: '2.2rem',
+    contentMaxWidth: '1126px', linkColor: '#4da6ff',
+  },
 }
 
 const DEFAULT_ROTATION: RotationSettings = { enabled: false, interval: 60 }
@@ -551,22 +561,94 @@ export function ConfigModule() {
         <fieldset className="settings-fieldset">
           <legend>Configurações Globais (Ambos os Temas)</legend>
           <div className="form-grid">
-            <div className="field-group">
-              <label htmlFor="cfg-shared-font-size">Tamanho da Fonte Base</label>
-              <input id="cfg-shared-font-size" name="cfgSharedFontSize" value={msAppearance.shared.fontSize} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, fontSize: e.target.value } })} placeholder="1rem" />
-            </div>
-            <div className="field-group">
-              <label htmlFor="cfg-shared-title-font-size">Tamanho Títulos (H1)</label>
-              <input id="cfg-shared-title-font-size" name="cfgSharedTitleFontSize" value={msAppearance.shared.titleFontSize} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, titleFontSize: e.target.value } })} placeholder="1.5rem" />
-            </div>
+            {/* ─── Tipografia ─── */}
             <div className="field-group">
               <label htmlFor="cfg-shared-font-family">Família da Fonte</label>
               <select id="cfg-shared-font-family" name="cfgSharedFontFamily" value={msAppearance.shared.fontFamily} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, fontFamily: e.target.value } })}>
-                <option value="system-ui, -apple-system, sans-serif">System UI</option>
-                <option value="sans-serif">Sans-Serif</option>
-                <option value="serif">Serif</option>
+                <option value="'Inter', system-ui, -apple-system, sans-serif">Inter (Recomendada)</option>
+                <option value="system-ui, -apple-system, sans-serif">System UI (Nativa)</option>
+                <option value="sans-serif">Sans-Serif (Genérica)</option>
+                <option value="'Georgia', serif">Georgia (Serifada)</option>
+                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                <option value="'Courier New', Courier, monospace">Courier New</option>
                 <option value="monospace">Monospace</option>
               </select>
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-font-size">Tamanho da Fonte Base (Corpo)</label>
+              <input id="cfg-shared-font-size" name="cfgSharedFontSize" value={msAppearance.shared.fontSize} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, fontSize: e.target.value } })} placeholder="Ex: 1.15rem" />
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-title-font-size">Tamanho da Fonte dos Títulos (H1)</label>
+              <input id="cfg-shared-title-font-size" name="cfgSharedTitleFontSize" value={msAppearance.shared.titleFontSize} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, titleFontSize: e.target.value } })} placeholder="Ex: 1.8rem" />
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-body-weight">Peso do Corpo de Texto</label>
+              <select id="cfg-shared-body-weight" name="cfgSharedBodyWeight" value={msAppearance.shared.bodyWeight || '500'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, bodyWeight: e.target.value } })}>
+                <option value="300">Light (300)</option>
+                <option value="400">Regular (400)</option>
+                <option value="500">Medium (500) — Recomendado</option>
+                <option value="600">Semibold (600)</option>
+                <option value="700">Bold (700)</option>
+              </select>
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-title-weight">Peso dos Títulos</label>
+              <select id="cfg-shared-title-weight" name="cfgSharedTitleWeight" value={msAppearance.shared.titleWeight || '700'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, titleWeight: e.target.value } })}>
+                <option value="500">Medium (500)</option>
+                <option value="600">Semibold (600)</option>
+                <option value="700">Bold (700) — Recomendado</option>
+                <option value="800">Extrabold (800)</option>
+                <option value="900">Black (900)</option>
+              </select>
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-line-height">Altura de Linha (Corpo): <strong className="range-value">{msAppearance.shared.lineHeight || '1.9'}</strong></label>
+              <input id="cfg-shared-line-height" name="cfgSharedLineHeight" type="range" min={1.4} max={2.4} step={0.1} value={msAppearance.shared.lineHeight || '1.9'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, lineHeight: e.target.value } })} />
+              <div className="range-labels"><span>Compacto</span><span>Confortável</span><span>Espaçoso</span></div>
+            </div>
+
+            {/* ─── Layout de Leitura ─── */}
+            <div className="field-group">
+              <label htmlFor="cfg-shared-text-align">Alinhamento do Texto</label>
+              <select id="cfg-shared-text-align" name="cfgSharedTextAlign" value={msAppearance.shared.textAlign || 'justify'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, textAlign: e.target.value } })}>
+                <option value="justify">Justificado (Clássico)</option>
+                <option value="left">Alinhado à Esquerda (Moderno)</option>
+              </select>
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-text-indent">Recuo da Primeira Linha (Parágrafo)</label>
+              <select id="cfg-shared-text-indent" name="cfgSharedTextIndent" value={msAppearance.shared.textIndent || '3.5rem'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, textIndent: e.target.value } })}>
+                <option value="0">Sem recuo (Moderno)</option>
+                <option value="1.5rem">Sutil (1.5rem)</option>
+                <option value="2.5rem">Médio (2.5rem)</option>
+                <option value="3.5rem">Clássico (3.5rem)</option>
+              </select>
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-paragraph-spacing">Espaçamento entre Parágrafos</label>
+              <select id="cfg-shared-paragraph-spacing" name="cfgSharedParagraphSpacing" value={msAppearance.shared.paragraphSpacing || '2.2rem'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, paragraphSpacing: e.target.value } })}>
+                <option value="1.2rem">Compacto (1.2rem)</option>
+                <option value="1.8rem">Normal (1.8rem)</option>
+                <option value="2.2rem">Generoso (2.2rem) — Recomendado</option>
+                <option value="3rem">Amplo (3rem)</option>
+              </select>
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-content-max-width">Largura Máxima de Leitura</label>
+              <select id="cfg-shared-content-max-width" name="cfgSharedContentMaxWidth" value={msAppearance.shared.contentMaxWidth || '1126px'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, contentMaxWidth: e.target.value } })}>
+                <option value="680px">Estreita (680px) — Foco total</option>
+                <option value="800px">Média (800px)</option>
+                <option value="960px">Larga (960px)</option>
+                <option value="1126px">Ampla (1126px) — Padrão</option>
+                <option value="100%">Tela cheia</option>
+              </select>
+            </div>
+            <div className="field-group">
+              <label htmlFor="cfg-shared-link-color">Cor dos Links (Conteúdo)</label>
+              <div className="theme-color-grid">
+                <label className="color-label">Cor ativa <input id="cfg-shared-link-color" name="cfgSharedLinkColor" type="color" value={msAppearance.shared.linkColor || '#4da6ff'} onChange={(e) => setMsAppearance({ ...msAppearance, shared: { ...msAppearance.shared, linkColor: e.target.value } })} /></label>
+              </div>
             </div>
           </div>
         </fieldset>

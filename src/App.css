@@ -2129,6 +2129,27 @@ input[type="color"]:focus-visible {
   padding: 0 8px;
 }
 
+/* Range slider helpers (line-height, etc.) */
+.range-value {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  opacity: 0.45;
+  margin-top: -4px;
+}
+
+.settings-fieldset input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+  accent-color: #1a73e8;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;

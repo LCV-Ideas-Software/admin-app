@@ -1,5 +1,23 @@
 # Changelog — Admin App
 
+## [v01.50.00] — 2026-03-26
+### Adicionado
+- **Configurações Globais — Paridade com mainsite-admin**: seção "Configurações Globais (Ambos os Temas)" do módulo Configurações ampliada de 3 para 11 controles, replicando fielmente o painel do `mainsite-admin/SettingsPanel.jsx`:
+  - **Peso do Corpo de Texto** (select: Light 300 → Bold 700).
+  - **Peso dos Títulos** (select: Medium 500 → Black 900).
+  - **Altura de Linha** (range slider: 1.4–2.4, com labels Compacto/Confortável/Espaçoso).
+  - **Alinhamento do Texto** (select: Justificado/Esquerda).
+  - **Recuo da Primeira Linha** (select: 0–3.5rem em 4 opções).
+  - **Espaçamento entre Parágrafos** (select: 1.2rem–3rem em 4 opções).
+  - **Largura Máxima de Leitura** (select: 680px–100% em 5 opções).
+  - **Cor dos Links** (color picker).
+- **Família da Fonte — opções expandidas**: select atualizado de 4 para 7 opções (Inter Recomendada, System UI Nativa, Sans-Serif Genérica, Georgia Serifada, Times New Roman, Courier New, Monospace).
+- **CSS — range slider helpers**: classes `.range-value`, `.range-labels` e estilo de `input[type="range"]` dentro de `.settings-fieldset` para o controle de Altura de Linha.
+
+### Alterado
+- **Tipo `AppearanceSettings.shared`**: expandido com 8 campos opcionais (`bodyWeight`, `titleWeight`, `lineHeight`, `textAlign`, `textIndent`, `paragraphSpacing`, `contentMaxWidth`, `linkColor`).
+- **`DEFAULT_APPEARANCE.shared`**: defaults atualizados para parear com mainsite-admin (fontFamily agora `'Inter'`, bodyWeight `'500'`, titleWeight `'700'`, etc.).
+
 ## [v01.49.02] — 2026-03-26
 ### Corrigido
 - **FloatingScrollButtons — posicionamento**: CSS de `.floating-scroll-btns` corrigido de `position: sticky` para `position: fixed` com `bottom: 24px; right: 24px`.
