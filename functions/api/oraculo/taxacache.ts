@@ -28,14 +28,28 @@ function json(data: unknown, status = 200) {
   })
 }
 
-function parseCSV(csvText: string): TituloTD[] {
-  const lines = csvText.trim().split('\n')
-  if (lines.length < 2) return []
+interface ParseResult {
+  titulos: TituloTD[]
+  totalLines: number
+  sampleRow: string
+}
+
+function parseCSV(csvText: string): ParseResult {
+  // Strip BOM e normalizar line endings
+  const clean = csvText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = clean.trim().split('\n')
+  if (lines.length < 2) return { titulos: [], totalLines: lines.length, sampleRow: lines[0] ?? '' }
+
   const results: TituloTD[] = []
   let latestDate = ''
+
+  // Sample da última linha para debug
+  const sampleRow = lines[lines.length - 1]
+
   for (let i = lines.length - 1; i >= 1; i--) {
     const cols = lines[i].split(';')
     if (cols.length < 6) continue
+
     const tipoTitulo = cols[0].trim()
     const tituloPublico = cols[1]?.trim() ?? ''
     const dataVencimento = cols[2]?.trim() ?? ''
@@ -43,12 +57,22 @@ function parseCSV(csvText: string): TituloTD[] {
     const taxaCompra = parseFloat((cols[4] ?? '0').replace(',', '.'))
     const taxaVenda = parseFloat((cols[5] ?? '0').replace(',', '.'))
     const puCompra = parseFloat((cols[6] ?? '0').replace(',', '.'))
+
     if (!dataBase) continue
     if (!latestDate) latestDate = dataBase
     if (dataBase !== latestDate) break
-    const isIpca = tipoTitulo === 'Tesouro IPCA+' ||
-      tipoTitulo === 'Tesouro IPCA+ com Juros Semestrais' ||
-      tituloPublico.includes('IPCA+')
+
+    // Matching robusto: case-insensitive, inclui NTN-B (nome antigo)
+    const tipoLower = tipoTitulo.toLowerCase()
+    const pubLower = tituloPublico.toLowerCase()
+    const isIpca =
+      tipoLower.includes('ipca') ||
+      tipoLower.includes('ntn-b') ||
+      tipoLower === 'ntn-b' ||
+      tipoLower === 'ntn-b principal' ||
+      pubLower.includes('ipca') ||
+      pubLower.includes('ntn-b')
+
     if (isIpca) {
       results.push({
         tipo: tipoTitulo,
@@ -60,7 +84,7 @@ function parseCSV(csvText: string): TituloTD[] {
       })
     }
   }
-  return results
+  return { titulos: results, totalLines: lines.length, sampleRow }
 }
 
 export const onRequestGet = async ({ env, request }: Ctx) => {
@@ -105,7 +129,7 @@ export const onRequestGet = async ({ env, request }: Ctx) => {
     }
 
     const csvText = await csvRes.text()
-    const titulos = parseCSV(csvText)
+    const { titulos, totalLines, sampleRow } = parseCSV(csvText)
     if (titulos.length === 0) {
       if (cacheRow) {
         return json({
@@ -116,7 +140,11 @@ export const onRequestGet = async ({ env, request }: Ctx) => {
           titulos: JSON.parse(cacheRow.vencimentos_json),
         })
       }
-      return json({ ok: false, error: 'Nenhum título IPCA+ encontrado no CSV.' }, 404)
+      return json({
+        ok: false,
+        error: 'Nenhum título IPCA+ encontrado no CSV.',
+        debug: { totalLines, sampleRow: sampleRow.substring(0, 200), csvBytes: csvText.length },
+      }, 404)
     }
 
     const taxasValidas = titulos.filter(t => t.taxaCompra > 0)
