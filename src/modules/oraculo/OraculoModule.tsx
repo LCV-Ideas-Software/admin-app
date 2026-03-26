@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   BrainCircuit, Clock, Database, Download, ExternalLink,
-  Globe, Loader2, RefreshCw, Search, Settings, Trash2, X,
+  Globe, Loader2, Mail, RefreshCw, Search, Settings, Trash2, X,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-type TabId = 'lci-lca' | 'tesouro-ipca' | 'configuracoes'
+type TabId = 'lci-lca' | 'tesouro-ipca' | 'usuarios' | 'configuracoes'
 
 interface RegistroLciLca {
   id: string; criadoEm: string; prazoDias: number
@@ -99,6 +99,16 @@ export function OraculoModule() {
   const [geminiModels, setGeminiModels] = useState<GeminiModelItem[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
 
+  // Dados de usuários
+  interface UserDataRow {
+    id: string; email: string; dadosJson: string
+    criadoEm: string; atualizadoEm: string
+  }
+  const [userData, setUserData] = useState<UserDataRow[]>([])
+  const [userDataLoading, setUserDataLoading] = useState(false)
+  const [userDataTotal, setUserDataTotal] = useState(0)
+  const [selectedUser, setSelectedUser] = useState<UserDataRow | null>(null)
+
   // ── Data Fetching ─────────────────────────────────────────────────────────
 
   const carregarRegistros = useCallback(async (notify = false) => {
@@ -158,14 +168,31 @@ export function OraculoModule() {
     } finally { setCsvTriggerLoading(false) }
   }
 
+  const carregarUserData = useCallback(async (notify = false) => {
+    setUserDataLoading(true)
+    try {
+      const res = await fetch('/api/oraculo/userdata?limit=200')
+      const data = await res.json() as { ok: boolean; data: UserDataRow[]; total: number }
+      if (data.ok) {
+        setUserData(data.data)
+        setUserDataTotal(data.total)
+        if (notify) showNotification('Dados de usuários atualizados.', 'success')
+      }
+    } catch {
+      showNotification('Falha ao carregar dados de usuários.', 'error')
+    } finally { setUserDataLoading(false) }
+  }, [showNotification])
+
   useEffect(() => {
     if (activeTab === 'configuracoes') {
       void carregarStatusCache()
       void carregarModelos()
+    } else if (activeTab === 'usuarios') {
+      void carregarUserData()
     } else {
       void carregarRegistros()
     }
-  }, [activeTab, carregarRegistros, carregarStatusCache, carregarModelos])
+  }, [activeTab, carregarRegistros, carregarStatusCache, carregarModelos, carregarUserData])
 
   const saveConfig = (patch: Partial<OracleConfig>) => {
     const next = { ...config, ...patch }
@@ -213,6 +240,7 @@ export function OraculoModule() {
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'lci-lca', label: 'LCI / LCA', icon: <Database size={14} /> },
     { id: 'tesouro-ipca', label: 'Tesouro IPCA+', icon: <Globe size={14} /> },
+    { id: 'usuarios', label: 'Dados de Usuários', icon: <Mail size={14} /> },
     { id: 'configuracoes', label: 'Configurações', icon: <Settings size={14} /> },
   ]
 
@@ -271,7 +299,7 @@ export function OraculoModule() {
       </div>
 
       {/* ═══════════════════════ TAB: Registros ═══════════════════════ */}
-      {activeTab !== 'configuracoes' && (
+      {activeTab !== 'configuracoes' && activeTab !== 'usuarios' && (
         <article className="result-card">
           <div className="result-toolbar">
             <div>
@@ -345,6 +373,132 @@ export function OraculoModule() {
           <p className="field-hint" style={{ textAlign: 'right', paddingTop: '0.5rem' }}>
             Total: {totalRegistros} registro(s)
           </p>
+        </article>
+      )}
+
+      {/* ═══════════════════════ TAB: Dados de Usuários ═══════════════════════ */}
+      {activeTab === 'usuarios' && (
+        <article className="result-card">
+          <div className="result-toolbar">
+            <div>
+              <h4><Mail size={16} /> Dados Salvos por Usuários</h4>
+              <p className="field-hint">Análises salvas via autenticação por e-mail no frontend do Oráculo.</p>
+            </div>
+            <div className="inline-actions">
+              <button type="button" className="ghost-button" onClick={() => void carregarUserData(true)} disabled={userDataLoading}>
+                {userDataLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+                Recarregar
+              </button>
+            </div>
+          </div>
+
+          {selectedUser ? (() => {
+            let parsed: Record<string, unknown> = {}
+            try { parsed = JSON.parse(selectedUser.dadosJson) } catch { /* */ }
+            const tRegs = (parsed.tesouroRegistros ?? []) as Array<Record<string, unknown>>
+            const lRegs = (parsed.lciRegistros ?? []) as Array<Record<string, unknown>>
+            return (
+              <div style={{ padding: '1rem 0' }}>
+                <div className="inline-actions" style={{ marginBottom: '1rem' }}>
+                  <button type="button" className="ghost-button" onClick={() => setSelectedUser(null)}>← Voltar à lista</button>
+                  <span className="badge badge-em-implantacao">{selectedUser.email}</span>
+                  <span className="field-hint">Atualizado em {new Date(selectedUser.atualizadoEm).toLocaleString('pt-BR')}</span>
+                </div>
+
+                {tRegs.length > 0 && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <h5 style={{ margin: '0 0 0.5rem' }}><Globe size={14} /> Tesouro IPCA+ ({tRegs.length} lotes)</h5>
+                    <ul className="result-list" style={{ maxHeight: '300px', overflow: 'auto' }}>
+                      {tRegs.map((r, i) => (
+                        <li key={i} className="post-row">
+                          <div className="post-row-main">
+                            <strong>R$ {Number(r.valorInvestido ?? 0).toLocaleString('pt-BR')}</strong>
+                            <div className="post-row-meta">
+                              <span>{String(r.dataCompra ?? '').split('-').reverse().join('/')}</span>
+                              <span className="badge badge-em-implantacao">{Number(r.taxaContratada ?? 0).toFixed(2)}% a.a.</span>
+                              {r.vencimento ? <span className="badge badge-planejado">Venc: {String(r.vencimento)}</span> : null}
+                              <span className={`badge ${r.sinal === 'vender' ? 'badge-danger' : 'badge-em-implantacao'}`}>{String(r.sinal ?? '').toUpperCase()}</span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {lRegs.length > 0 && (
+                  <div>
+                    <h5 style={{ margin: '0 0 0.5rem' }}><Database size={14} /> LCI/LCA ({lRegs.length} registros)</h5>
+                    <ul className="result-list" style={{ maxHeight: '300px', overflow: 'auto' }}>
+                      {lRegs.map((r, i) => (
+                        <li key={i} className="post-row">
+                          <div className="post-row-main">
+                            <strong>R$ {Number(r.aporte ?? 0).toLocaleString('pt-BR')}</strong>
+                            <div className="post-row-meta">
+                              <span>{Number(r.prazoDias ?? 0)} dias</span>
+                              <span className="badge badge-em-implantacao">{Number(r.taxaLciLca ?? 0).toFixed(2)}% CDI</span>
+                              <span className="badge badge-planejado">≈ CDB {Number(r.cdbEquivalente ?? 0).toFixed(2)}%</span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {tRegs.length === 0 && lRegs.length === 0 && (
+                  <p className="result-empty">Nenhum dado de análise salvo neste registro.</p>
+                )}
+              </div>
+            )
+          })() : (
+            <>
+              {userDataLoading && userData.length === 0 ? (
+                <div className="result-empty" style={{ textAlign: 'center', padding: '3rem 0' }}>
+                  <Loader2 size={28} className="spin" style={{ marginBottom: '0.5rem' }} />
+                  <p>Carregando…</p>
+                </div>
+              ) : userData.length === 0 ? (
+                <p className="result-empty">Nenhum usuário salvou dados ainda.</p>
+              ) : (
+                <ul className="result-list astro-akashico-scroll">
+                  {userData.map((row) => {
+                    const dt = new Date(row.atualizadoEm).toLocaleString('pt-BR')
+                    let preview = ''
+                    try {
+                      const d = JSON.parse(row.dadosJson)
+                      const tCount = (d.tesouroRegistros ?? []).length
+                      const lCount = (d.lciRegistros ?? []).length
+                      preview = `${tCount} lotes IPCA+ · ${lCount} registros LCI`
+                    } catch { preview = 'Dados inválidos' }
+                    return (
+                      <li key={row.id} className="post-row">
+                        <div className="post-row-main" style={{ cursor: 'pointer' }} onClick={() => setSelectedUser(row)}>
+                          <div className="flex-row-center">
+                            <Mail size={14} style={{ marginRight: '0.4rem', color: 'var(--fg-dim, #888)' }} />
+                            <strong>{row.email}</strong>
+                          </div>
+                          <div className="post-row-meta">
+                            <span>{dt}</span>
+                            <span className="badge badge-em-implantacao">{preview}</span>
+                          </div>
+                        </div>
+                        <div className="post-row-actions">
+                          <button type="button" className="ghost-button danger" onClick={() => setConfirmDelete({ show: true, id: row.id, label: row.email })} disabled={deletingId === row.id}>
+                            {deletingId === row.id ? <Loader2 size={16} className="spin" /> : <Trash2 size={16} />}
+                            Excluir
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              <p className="field-hint" style={{ textAlign: 'right', paddingTop: '0.5rem' }}>
+                Total: {userDataTotal} usuário(s)
+              </p>
+            </>
+          )}
         </article>
       )}
 
