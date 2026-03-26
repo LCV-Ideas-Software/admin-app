@@ -773,26 +773,15 @@ export default function PostEditor({
         </div>
       </div>
 
-      <div className="form-grid">
-        <div className="field-group">
-          <label htmlFor="mainsite-post-title">Título do post</label>
-          <input
-            id="mainsite-post-title"
-            name="mainsitePostTitle"
-            value={postTitle}
-            onChange={(event) => setPostTitle(event.target.value)}
-            disabled={savingPost}
-          />
-        </div>
-        <div className="field-group">
-          <label htmlFor="mainsite-post-mode">Modo atual</label>
-          <input
-            id="mainsite-post-mode"
-            name="mainsitePostMode"
-            value={editingPostId ? `Editando #${editingPostId}` : 'Criando novo post'}
-            readOnly
-          />
-        </div>
+      <div className="field-group">
+        <label htmlFor="mainsite-post-title">Título do post</label>
+        <input
+          id="mainsite-post-title"
+          name="mainsitePostTitle"
+          value={postTitle}
+          onChange={(event) => setPostTitle(event.target.value)}
+          disabled={savingPost}
+        />
       </div>
 
       {/* ── TipTap Editor ────────────────────────────────────────────── */}
