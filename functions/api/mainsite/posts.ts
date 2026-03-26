@@ -28,6 +28,7 @@ type PostRow = {
   title?: string
   content?: string
   created_at?: string
+  updated_at?: string
   is_pinned?: number
 }
 
@@ -46,6 +47,7 @@ const mapPostRow = (row: PostRow) => {
   const title = String(row.title ?? '').trim()
   const content = String(row.content ?? '').trim()
   const createdAt = String(row.created_at ?? '').trim()
+  const updatedAt = row.updated_at ? String(row.updated_at).trim() : null
 
   if (!Number.isFinite(id) || !title || !content || !createdAt) {
     return null
@@ -56,6 +58,7 @@ const mapPostRow = (row: PostRow) => {
     title,
     content,
     created_at: createdAt,
+    updated_at: updatedAt,
     is_pinned: Number(row.is_pinned ?? 0) === 1 ? 1 : 0,
   }
 }
@@ -87,7 +90,7 @@ export async function onRequestGet(context: MainsiteContext) {
 
     if (id) {
       const row = await db.prepare(`
-        SELECT id, title, content, created_at, is_pinned
+        SELECT id, title, content, created_at, updated_at, is_pinned
         FROM mainsite_posts
         WHERE id = ?
         LIMIT 1
@@ -106,7 +109,7 @@ export async function onRequestGet(context: MainsiteContext) {
     }
 
     const rows = await db.prepare(`
-      SELECT id, title, content, created_at, is_pinned
+      SELECT id, title, content, created_at, updated_at, is_pinned
       FROM mainsite_posts
       ORDER BY is_pinned DESC, display_order ASC, created_at DESC
     `).all<PostRow>()
@@ -157,8 +160,8 @@ export async function onRequestPost(context: MainsiteContext) {
     }
 
     await db.prepare(`
-      INSERT INTO mainsite_posts (title, content, is_pinned, display_order, created_at)
-      VALUES (?, ?, 0, 0, CURRENT_TIMESTAMP)
+      INSERT INTO mainsite_posts (title, content, is_pinned, display_order, created_at, updated_at)
+      VALUES (?, ?, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `)
       .bind(title, content)
       .run()
@@ -237,7 +240,7 @@ export async function onRequestPut(context: MainsiteContext) {
       return buildErrorResponse('ID, título e conteúdo são obrigatórios para atualizar um post.', trace, 400)
     }
 
-    await db.prepare('UPDATE mainsite_posts SET title = ?, content = ? WHERE id = ?')
+    await db.prepare('UPDATE mainsite_posts SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .bind(title, content, id)
       .run()
 
