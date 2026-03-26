@@ -34,55 +34,75 @@ interface ParseResult {
   sampleRow: string
 }
 
+/**
+ * CSV real do Tesouro Transparente (7 colunas, sem header "Titulo Publico"):
+ * cols[0] = Tipo Titulo       (ex: "Tesouro IPCA+")
+ * cols[1] = Data Vencimento    (ex: "15/08/2040")
+ * cols[2] = Data Base          (ex: "25/03/2026")
+ * cols[3] = Taxa Compra Manha  (ex: "7,16")
+ * cols[4] = Taxa Venda Manha   (ex: "7,28")
+ * cols[5] = PU Compra Manha    (ex: "1724,41")
+ * cols[6] = PU Venda Manha     (ex: "1696,38")
+ *
+ * ATENÇÃO: dados NÃO são cronológicos — precisa scan completo.
+ */
 function parseCSV(csvText: string): ParseResult {
-  // Strip BOM e normalizar line endings
   const clean = csvText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const lines = clean.trim().split('\n')
   if (lines.length < 2) return { titulos: [], totalLines: lines.length, sampleRow: lines[0] ?? '' }
 
-  const results: TituloTD[] = []
-  let latestDate = ''
-
-  // Sample da última linha para debug
   const sampleRow = lines[lines.length - 1]
 
-  for (let i = lines.length - 1; i >= 1; i--) {
+  // Converter data BR (dd/mm/yyyy) para comparável (yyyymmdd)
+  function dateKey(dataBR: string): string {
+    const [d, m, y] = dataBR.split('/')
+    return `${y}${m}${d}`
+  }
+
+  // Passo 1: scan completo para encontrar a data base mais recente
+  let latestDateKey = ''
+  let latestDateBR = ''
+  for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(';')
-    if (cols.length < 6) continue
+    if (cols.length < 5) continue
+    const dataBase = cols[2]?.trim() ?? ''
+    if (!dataBase || !dataBase.includes('/')) continue
+    const dk = dateKey(dataBase)
+    if (dk > latestDateKey) {
+      latestDateKey = dk
+      latestDateBR = dataBase
+    }
+  }
+
+  if (!latestDateBR) return { titulos: [], totalLines: lines.length, sampleRow }
+
+  // Passo 2: coletar somente IPCA+ na data mais recente
+  const results: TituloTD[] = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(';')
+    if (cols.length < 5) continue
 
     const tipoTitulo = cols[0].trim()
-    const tituloPublico = cols[1]?.trim() ?? ''
-    const dataVencimento = cols[2]?.trim() ?? ''
-    const dataBase = cols[3]?.trim() ?? ''
-    const taxaCompra = parseFloat((cols[4] ?? '0').replace(',', '.'))
-    const taxaVenda = parseFloat((cols[5] ?? '0').replace(',', '.'))
-    const puCompra = parseFloat((cols[6] ?? '0').replace(',', '.'))
+    const dataVencimento = cols[1]?.trim() ?? ''
+    const dataBase = cols[2]?.trim() ?? ''
+    const taxaCompra = parseFloat((cols[3] ?? '0').replace(',', '.'))
+    const taxaVenda = parseFloat((cols[4] ?? '0').replace(',', '.'))
+    const puCompra = parseFloat((cols[5] ?? '0').replace(',', '.'))
 
-    if (!dataBase) continue
-    if (!latestDate) latestDate = dataBase
-    if (dataBase !== latestDate) break
+    if (dataBase !== latestDateBR) continue
 
-    // Matching robusto: case-insensitive, inclui NTN-B (nome antigo)
     const tipoLower = tipoTitulo.toLowerCase()
-    const pubLower = tituloPublico.toLowerCase()
-    const isIpca =
-      tipoLower.includes('ipca') ||
-      tipoLower.includes('ntn-b') ||
-      tipoLower === 'ntn-b' ||
-      tipoLower === 'ntn-b principal' ||
-      pubLower.includes('ipca') ||
-      pubLower.includes('ntn-b')
+    const isIpca = tipoLower.includes('ipca') || tipoLower.includes('ntn-b')
+    if (!isIpca) continue
 
-    if (isIpca) {
-      results.push({
-        tipo: tipoTitulo,
-        vencimento: dataVencimento,
-        dataBase,
-        taxaCompra: isNaN(taxaCompra) ? 0 : taxaCompra,
-        taxaVenda: isNaN(taxaVenda) ? 0 : taxaVenda,
-        pu: isNaN(puCompra) ? 0 : puCompra,
-      })
-    }
+    results.push({
+      tipo: tipoTitulo,
+      vencimento: dataVencimento,
+      dataBase,
+      taxaCompra: isNaN(taxaCompra) ? 0 : taxaCompra,
+      taxaVenda: isNaN(taxaVenda) ? 0 : taxaVenda,
+      pu: isNaN(puCompra) ? 0 : puCompra,
+    })
   }
   return { titulos: results, totalLines: lines.length, sampleRow }
 }
