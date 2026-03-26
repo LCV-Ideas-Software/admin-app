@@ -144,7 +144,7 @@ export const onRequestGet = async ({ env, request }: Ctx) => {
         ok: false,
         error: 'Nenhum título IPCA+ encontrado no CSV.',
         debug: { totalLines, sampleRow: sampleRow.substring(0, 200), csvBytes: csvText.length },
-      }, 404)
+      }, 200)
     }
 
     const taxasValidas = titulos.filter(t => t.taxaCompra > 0)
