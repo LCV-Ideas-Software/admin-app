@@ -146,10 +146,10 @@ const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft 
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
   { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
   { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
-  { id: 'oraculo', label: 'Oráculo', icon: BrainCircuit },
   { id: 'itau', label: 'Itaú', icon: Database },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
+  { id: 'oraculo', label: 'Oráculo', icon: BrainCircuit },
   { id: 'telemetria', label: 'Telemetria', icon: BarChart3 },
   { id: 'config', label: 'Configurações', icon: Wrench },
 ]
