@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.52.00] — 2026-03-26
+### Adicionado
+- **Módulo Oráculo Financeiro**: criação de um módulo nativo no painel administrativo (`OraculoModule.tsx`) para gestão dos registros (Visualização LCI/Tesouro e Deleção Permanente), com integração de iconografia (`BrainCircuit`) no App Shell.
+- **Endpoints D1**: criadas as rotas `functions/api/oraculo/listar.ts` e `functions/api/oraculo/excluir.ts`.
+
 ## [v01.51.00] — 2026-03-26
 ### Removido
 - **Mecanismo de Dry Sync:** Remoção completa da flag de simulação ("Simular antes") da interface de sincronização (`SyncStatusCard.tsx`) e da área de configurações preferenciais (`ConfigModule.tsx`).

@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense, useState, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import {
   BarChart3,
+  BrainCircuit,
   Database,
   DollarSign,
   Globe,
@@ -125,16 +126,17 @@ const MtastsModule = lazyWithAccessRecovery(() => import('./modules/mtasts/Mtast
 const CardHubModule = lazyWithAccessRecovery(() => import('./modules/hubs/CardHubModule').then(m => ({ default: m.CardHubModule })))
 const TelemetriaModule = lazyWithAccessRecovery(() => import('./modules/telemetria/TelemetriaModule').then(m => ({ default: m.TelemetriaModule })))
 const FinanceiroModule = lazyWithAccessRecovery(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
+const OraculoModule = lazyWithAccessRecovery(() => import('./modules/oraculo/OraculoModule').then(m => ({ default: m.OraculoModule })))
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 
 const APP_VERSION = 'APP v01.51.00'
 
 
 
-type ModuleId = 'overview' | 'astrologo' | 'config' | 'financeiro' | 'itau' | 'mainsite' | 'mtasts' | 'cardhub' | 'telemetria'
+type ModuleId = 'overview' | 'astrologo' | 'config' | 'financeiro' | 'oraculo' | 'itau' | 'mainsite' | 'mtasts' | 'cardhub' | 'telemetria'
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
-  astrologo: 'Astrólogo', cardhub: 'Card Hub', financeiro: 'Financeiro',
+  astrologo: 'Astrólogo', cardhub: 'Card Hub', financeiro: 'Financeiro', oraculo: 'Oráculo',
   itau: 'Itaú', mainsite: 'MainSite', mtasts: 'MTA-STS',
   telemetria: 'Telemetria', config: 'Configurações',
 }
@@ -144,6 +146,7 @@ const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft 
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
   { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
   { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
+  { id: 'oraculo', label: 'Oráculo', icon: BrainCircuit },
   { id: 'itau', label: 'Itaú', icon: Database },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
@@ -232,6 +235,8 @@ function App() {
             <CardHubModule />
           ) : activeModule === 'financeiro' ? (
             <FinanceiroModule />
+          ) : activeModule === 'oraculo' ? (
+            <OraculoModule />
           ) : activeModule === 'telemetria' ? (
             <TelemetriaModule />
           ) : null}
