@@ -120,7 +120,7 @@ export function OraculoModule() {
   const carregarStatusCache = useCallback(async () => {
     setTaxaCacheLoading(true)
     try {
-      const res = await fetch('/api/oraculo/taxa-cache')
+      const res = await fetch('/api/oraculo/taxacache')
       setTaxaCache(await res.json() as TaxaCacheResponse)
     } catch {
       setTaxaCache({ ok: false, error: 'Falha na conexão.' })
@@ -130,7 +130,7 @@ export function OraculoModule() {
   const carregarModelos = useCallback(async () => {
     setModelsLoading(true)
     try {
-      const res = await fetch('/api/oraculo/gemini-models')
+      const res = await fetch('/api/oraculo/modelos')
       const data = await res.json() as { ok: boolean; models?: GeminiModelItem[] }
       if (data.ok && data.models) setGeminiModels(data.models)
     } catch { /* silencioso — manterá inputs manuais */ }
@@ -142,7 +142,7 @@ export function OraculoModule() {
     setCsvTriggerResult(null)
     const t0 = performance.now()
     try {
-      const res = await fetch('/api/oraculo/taxa-cache?force=true')
+      const res = await fetch('/api/oraculo/taxacache?force=true')
       const data = await res.json() as TaxaCacheResponse
       const ms = Math.round(performance.now() - t0)
       if (data.ok) {
@@ -232,7 +232,7 @@ export function OraculoModule() {
           {!geminiModels.find(m => m.id === value) && <option value={value}>{value} (manual)</option>}
           {geminiModels.map(m => (
             <option key={m.id} value={m.id}>
-              {m.id}{m.api === 'v1beta' ? ' (preview)' : ''}
+              {m.displayName}{m.api === 'v1beta' ? ' (preview)' : ' (stable)'}
             </option>
           ))}
         </select>
