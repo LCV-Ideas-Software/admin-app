@@ -24,8 +24,6 @@ const parseLimit = (rawValue: string | null) => {
   return Math.min(1000, Math.max(1, parsed))
 }
 
-const parseDryRun = (rawValue: string | null) => rawValue === '1' || rawValue === 'true'
-
 const toHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -64,14 +62,13 @@ export async function onRequestPost(context: Context) {
 
   const url = new URL(request.url)
   const limit = parseLimit(url.searchParams.get('limit'))
-  const dryRun = parseDryRun(url.searchParams.get('dryRun'))
 
   const startedAt = Date.now()
   const syncRunId = await startSyncRun(env.BIGDATA_DB, {
     module: 'astrologo',
     status: 'running',
     startedAt,
-    metadata: { limit, dryRun },
+    metadata: { limit },
   })
 
   try {
@@ -90,20 +87,18 @@ export async function onRequestPost(context: Context) {
 
     let upserted = 0
 
-    if (!dryRun) {
-      for (const row of rows) {
-        await env.BIGDATA_DB.prepare(`
-          INSERT INTO astrologo_mapas (id, nome, data_nascimento, created_at)
-          VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-          ON CONFLICT(id) DO UPDATE SET
-            nome = excluded.nome,
-            data_nascimento = excluded.data_nascimento
-        `)
-          .bind(row.id, row.nome, row.dataNascimento)
-          .run()
+    for (const row of rows) {
+      await env.BIGDATA_DB.prepare(`
+        INSERT INTO astrologo_mapas (id, nome, data_nascimento, created_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          nome = excluded.nome,
+          data_nascimento = excluded.data_nascimento
+      `)
+        .bind(row.id, row.nome, row.dataNascimento)
+        .run()
 
-        upserted += 1
-      }
+      upserted += 1
     }
 
     await finishSyncRun(env.BIGDATA_DB, {
@@ -111,7 +106,7 @@ export async function onRequestPost(context: Context) {
       status: 'success',
       finishedAt: Date.now(),
       recordsRead: rows.length,
-      recordsUpserted: dryRun ? 0 : upserted,
+      recordsUpserted: upserted,
     })
 
     await logModuleOperationalEvent(env.BIGDATA_DB, {
@@ -121,19 +116,17 @@ export async function onRequestPost(context: Context) {
       ok: true,
       metadata: {
         action: 'sync',
-        dryRun,
         limit,
         recordsRead: rows.length,
-        recordsUpserted: dryRun ? 0 : upserted,
+        recordsUpserted: upserted,
       },
     })
 
     return new Response(JSON.stringify({
       ok: true,
-      dryRun,
       syncRunId,
       recordsRead: rows.length,
-      recordsUpserted: dryRun ? 0 : upserted,
+      recordsUpserted: upserted,
       startedAt,
       finishedAt: Date.now(),
     }), {
@@ -160,7 +153,6 @@ export async function onRequestPost(context: Context) {
       metadata: {
         action: 'sync',
         limit,
-        dryRun,
       },
     })
 

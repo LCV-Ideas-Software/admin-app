@@ -5,8 +5,6 @@
  * Substitui todas as ocorrências de URLs externas do mainsite-worker
  * (https://mainsite-app.lcv.rio.br/api/uploads/...) por URLs relativas
  * do próprio admin-app (/api/mainsite/media/...) no conteúdo HTML dos posts.
- *
- * Suporta dry-run via query param ?dryRun=1 para preview sem alteração.
  */
 
 interface Env {
@@ -28,9 +26,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return Response.json({ ok: false, error: 'BIGDATA_DB não configurado.' }, { status: 503 })
   }
 
-  const url = new URL(context.request.url)
-  const dryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true'
-
   try {
     const { results } = await db.prepare(
       "SELECT id, content FROM mainsite_posts WHERE content LIKE '%mainsite-app.lcv.rio.br/api/uploads/%'"
@@ -41,7 +36,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (posts.length === 0) {
       return Response.json({
         ok: true,
-        dryRun,
         message: 'Nenhum post contém URLs externas de mídia. Nada a migrar.',
         postsAffected: 0,
       })
@@ -57,18 +51,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
       const newContent = post.content.replace(EXTERNAL_MEDIA_PATTERN, INTERNAL_MEDIA_PREFIX)
 
-      if (!dryRun) {
-        await db.prepare(
-          'UPDATE mainsite_posts SET content = ? WHERE id = ?'
-        ).bind(newContent, post.id).run()
-      }
+      await db.prepare(
+        'UPDATE mainsite_posts SET content = ? WHERE id = ?'
+      ).bind(newContent, post.id).run()
 
       migrated.push({ id: post.id, replacements })
     }
 
     return Response.json({
       ok: true,
-      dryRun,
       postsAffected: migrated.length,
       totalReplacements: migrated.reduce((sum, m) => sum + m.replacements, 0),
       details: migrated,

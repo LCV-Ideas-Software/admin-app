@@ -61,8 +61,6 @@ const parseLimit = (rawValue: string | null) => {
   return Math.min(1000, Math.max(1, parsed))
 }
 
-const parseDryRun = (rawValue: string | null) => rawValue === '1' || rawValue === 'true'
-
 const toHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -160,14 +158,13 @@ export async function onRequestPost(context: Context) {
 
   const url = new URL(request.url)
   const limit = parseLimit(url.searchParams.get('limit'))
-  const dryRun = parseDryRun(url.searchParams.get('dryRun'))
 
   const startedAt = Date.now()
   const syncRunId = await startSyncRun(env.BIGDATA_DB, {
     module: 'calculadora',
     status: 'running',
     startedAt,
-    metadata: { limit, dryRun },
+    metadata: { limit },
   })
 
   try {
@@ -193,79 +190,77 @@ export async function onRequestPost(context: Context) {
     let observabilidadeInserted = 0
     let rateLimitUpserted = 0
 
-    if (!dryRun) {
-      for (const row of observabilidadeRows) {
-        const alreadyExists = await existsObservabilidade(env.BIGDATA_DB, row)
-        if (alreadyExists) {
-          continue
-        }
-
-        await env.BIGDATA_DB.prepare(`
-          INSERT INTO calc_oraculo_observabilidade (
-            created_at,
-            status,
-            from_cache,
-            force_refresh,
-            duration_ms,
-            moeda,
-            valor_original,
-            preview,
-            error_message,
-            app_version
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-          .bind(
-            row.createdAt,
-            row.status,
-            row.fromCache,
-            row.forceRefresh,
-            row.durationMs,
-            row.moeda,
-            row.valorOriginal,
-            row.preview,
-            row.errorMessage,
-            row.appVersion,
-          )
-          .run()
-
-        observabilidadeInserted += 1
+    for (const row of observabilidadeRows) {
+      const alreadyExists = await existsObservabilidade(env.BIGDATA_DB, row)
+      if (alreadyExists) {
+        continue
       }
 
-      for (const row of rateLimitRows) {
-        await env.BIGDATA_DB.prepare(`
-          INSERT INTO calc_rate_limit_policies (
-            route_key,
-            enabled,
-            max_requests,
-            window_minutes,
-            updated_at,
-            updated_by
-          )
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(route_key) DO UPDATE SET
-            enabled = excluded.enabled,
-            max_requests = excluded.max_requests,
-            window_minutes = excluded.window_minutes,
-            updated_at = excluded.updated_at,
-            updated_by = excluded.updated_by
-        `)
-          .bind(
-            row.routeKey,
-            row.enabled,
-            row.maxRequests,
-            row.windowMinutes,
-            row.updatedAt,
-            row.updatedBy,
-          )
-          .run()
+      await env.BIGDATA_DB.prepare(`
+        INSERT INTO calc_oraculo_observabilidade (
+          created_at,
+          status,
+          from_cache,
+          force_refresh,
+          duration_ms,
+          moeda,
+          valor_original,
+          preview,
+          error_message,
+          app_version
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+        .bind(
+          row.createdAt,
+          row.status,
+          row.fromCache,
+          row.forceRefresh,
+          row.durationMs,
+          row.moeda,
+          row.valorOriginal,
+          row.preview,
+          row.errorMessage,
+          row.appVersion,
+        )
+        .run()
 
-        rateLimitUpserted += 1
-      }
+      observabilidadeInserted += 1
+    }
+
+    for (const row of rateLimitRows) {
+      await env.BIGDATA_DB.prepare(`
+        INSERT INTO calc_rate_limit_policies (
+          route_key,
+          enabled,
+          max_requests,
+          window_minutes,
+          updated_at,
+          updated_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(route_key) DO UPDATE SET
+          enabled = excluded.enabled,
+          max_requests = excluded.max_requests,
+          window_minutes = excluded.window_minutes,
+          updated_at = excluded.updated_at,
+          updated_by = excluded.updated_by
+      `)
+        .bind(
+          row.routeKey,
+          row.enabled,
+          row.maxRequests,
+          row.windowMinutes,
+          row.updatedAt,
+          row.updatedBy,
+        )
+        .run()
+
+      rateLimitUpserted += 1
     }
 
     const recordsRead = observabilidadeRows.length + rateLimitRows.length
-    const recordsUpserted = dryRun ? 0 : observabilidadeInserted + rateLimitUpserted
+    const recordsUpserted = observabilidadeInserted + rateLimitUpserted
 
     await finishSyncRun(env.BIGDATA_DB, {
       id: syncRunId,
@@ -282,28 +277,26 @@ export async function onRequestPost(context: Context) {
       ok: true,
       metadata: {
         action: 'sync',
-        dryRun,
         limit,
         observabilidadeLidas: observabilidadeRows.length,
-        observabilidadeInseridas: dryRun ? 0 : observabilidadeInserted,
+        observabilidadeInseridas: observabilidadeInserted,
         rateLimitLidas: rateLimitRows.length,
-        rateLimitUpserted: dryRun ? 0 : rateLimitUpserted,
+        rateLimitUpserted: rateLimitUpserted,
       },
     })
 
     return new Response(JSON.stringify({
       ok: true,
-      dryRun,
       syncRunId,
       recordsRead,
       recordsUpserted,
       observabilidade: {
         lidas: observabilidadeRows.length,
-        inseridas: dryRun ? 0 : observabilidadeInserted,
+        inseridas: observabilidadeInserted,
       },
       rateLimit: {
         lidas: rateLimitRows.length,
-        upserted: dryRun ? 0 : rateLimitUpserted,
+        upserted: rateLimitUpserted,
       },
       startedAt,
       finishedAt: Date.now(),
@@ -331,7 +324,6 @@ export async function onRequestPost(context: Context) {
       metadata: {
         action: 'sync',
         limit,
-        dryRun,
       },
     })
 

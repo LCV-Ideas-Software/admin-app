@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.51.00] — 2026-03-26
+### Removido
+- **Mecanismo de Dry Sync:** Remoção completa da flag de simulação ("Simular antes") da interface de sincronização (`SyncStatusCard.tsx`) e da área de configurações preferenciais (`ConfigModule.tsx`).
+- **Backend Sync:** Remoção da flag `?dryRun=1` dos endpoints `/api/mainsite/sync`, `/api/mtasts/sync`, `/api/astrologo/sync`, `/api/calculadora/sync` e `/api/mainsite/migrate-media-urls`. Os bancos de dados Cloudflare D1 e KV agora são sempre operados ativamente (aplicativo considerado estável).
+
 ## [v01.50.00] — 2026-03-26
 ### Adicionado
 - **Configurações Globais — Paridade com mainsite-admin**: seção "Configurações Globais (Ambos os Temas)" do módulo Configurações ampliada de 3 para 11 controles, replicando fielmente o painel do `mainsite-admin/SettingsPanel.jsx`:

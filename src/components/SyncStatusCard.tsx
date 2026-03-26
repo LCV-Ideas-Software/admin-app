@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw } from 'lucide-react'
 import { useNotification } from './Notification'
 
 type OperationalSyncStatus = {
@@ -19,7 +19,6 @@ type OperationalOverviewPayload = {
 type SyncRunPayload = {
   ok: boolean
   error?: string
-  dryRun: boolean
   recordsRead: number
   recordsUpserted: number
   observabilidade?: {
@@ -48,10 +47,6 @@ const formatDateTime = (value: number | null) => {
 }
 
 const buildSuccessMessage = (moduleTitle: string, payload: SyncRunPayload) => {
-  if (payload.dryRun) {
-    return `${moduleTitle}: dry run concluído com ${payload.recordsRead} registro(s) lido(s).`
-  }
-
   if (payload.observabilidade && payload.rateLimit) {
     return `${moduleTitle}: sync concluído com ${payload.recordsUpserted} alteração(ões) aplicadas.`
   }
@@ -63,7 +58,6 @@ export function SyncStatusCard({ module, endpoint, title, description }: SyncSta
   const { showNotification } = useNotification()
   const [loadingStatus, setLoadingStatus] = useState(true)
   const [runningSync, setRunningSync] = useState(false)
-  const [simulateBeforeSync, setSimulateBeforeSync] = useState(true)
   const [status, setStatus] = useState<OperationalSyncStatus | null>(null)
 
   const loadStatus = useCallback(async () => {
@@ -99,10 +93,10 @@ export function SyncStatusCard({ module, endpoint, title, description }: SyncSta
         ? 'sync em execução'
         : 'sem histórico'
 
-  const handleRunSync = async (dryRun: boolean) => {
+  const handleRunSync = async () => {
     setRunningSync(true)
     try {
-      const response = await fetch(`${endpoint}?dryRun=${dryRun ? '1' : '0'}`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
       })
       const payload = await response.json() as SyncRunPayload
@@ -154,24 +148,14 @@ export function SyncStatusCard({ module, endpoint, title, description }: SyncSta
       )}
 
       <div className="sync-actions">
-        <label className="sync-toggle" htmlFor={`sync-toggle-${module}`}>
-          <input
-            id={`sync-toggle-${module}`}
-            type="checkbox"
-            checked={simulateBeforeSync}
-            onChange={(event) => setSimulateBeforeSync(event.target.checked)}
-            disabled={runningSync || loadingStatus}
-          />
-          <span>Simular antes (dry run)</span>
-        </label>
         <button
           type="button"
           className="primary-button"
           disabled={runningSync || loadingStatus}
-          onClick={() => void handleRunSync(simulateBeforeSync)}
+          onClick={() => void handleRunSync()}
         >
-          {runningSync ? <Loader2 size={18} className="spin" /> : (simulateBeforeSync ? <CheckCircle2 size={18} /> : <RefreshCw size={18} />)}
-          {simulateBeforeSync ? 'Executar simulação' : 'Sincronizar'}
+          {runningSync ? <Loader2 size={18} className="spin" /> : <RefreshCw size={18} />}
+          Sincronizar
         </button>
       </div>
     </article>

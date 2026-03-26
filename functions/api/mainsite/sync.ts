@@ -17,8 +17,6 @@ type SettingRow = {
   payload?: string
 }
 
-const parseDryRun = (rawValue: string | null) => rawValue === '1' || rawValue === 'true'
-
 const toHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -67,7 +65,7 @@ const isValidJson = (raw: string | undefined) => {
 }
 
 export async function onRequestPost(context: Context) {
-  const { request, env } = context
+  const { env } = context
 
   if (!env.BIGDATA_DB) {
     return new Response(JSON.stringify({
@@ -79,15 +77,12 @@ export async function onRequestPost(context: Context) {
     })
   }
 
-  const url = new URL(request.url)
-  const dryRun = parseDryRun(url.searchParams.get('dryRun'))
-
   const startedAt = Date.now()
   const syncRunId = await startSyncRun(env.BIGDATA_DB, {
     module: 'mainsite',
     status: 'running',
     startedAt,
-    metadata: { dryRun },
+    metadata: {},
   })
 
   try {
@@ -103,31 +98,29 @@ export async function onRequestPost(context: Context) {
     let settingsInserted = 0
     let settingsFixed = 0
 
-    if (!dryRun) {
-      for (const entry of DEFAULT_SETTINGS) {
-        const current = settingsMap.get(entry.id)
+    for (const entry of DEFAULT_SETTINGS) {
+      const current = settingsMap.get(entry.id)
 
-        if (!current) {
-          await env.BIGDATA_DB.prepare(`
-            INSERT INTO mainsite_settings (id, payload, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-          `)
-            .bind(entry.id, JSON.stringify(entry.payload))
-            .run()
-          settingsInserted += 1
-          continue
-        }
+      if (!current) {
+        await env.BIGDATA_DB.prepare(`
+          INSERT INTO mainsite_settings (id, payload, updated_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+        `)
+          .bind(entry.id, JSON.stringify(entry.payload))
+          .run()
+        settingsInserted += 1
+        continue
+      }
 
-        if (!isValidJson(current.payload)) {
-          await env.BIGDATA_DB.prepare(`
-            UPDATE mainsite_settings
-            SET payload = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `)
-            .bind(JSON.stringify(entry.payload), entry.id)
-            .run()
-          settingsFixed += 1
-        }
+      if (!isValidJson(current.payload)) {
+        await env.BIGDATA_DB.prepare(`
+          UPDATE mainsite_settings
+          SET payload = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `)
+          .bind(JSON.stringify(entry.payload), entry.id)
+          .run()
+        settingsFixed += 1
       }
     }
 
@@ -135,7 +128,7 @@ export async function onRequestPost(context: Context) {
       + Number(financialCountRow?.total ?? 0)
       + settingsRows.length
 
-    const recordsUpserted = dryRun ? 0 : (settingsInserted + settingsFixed)
+    const recordsUpserted = settingsInserted + settingsFixed
 
     await finishSyncRun(env.BIGDATA_DB, {
       id: syncRunId,
@@ -153,18 +146,16 @@ export async function onRequestPost(context: Context) {
       metadata: {
         action: 'sync',
         pulledFrom: 'bigdata_db',
-        dryRun,
         postsLidos: Number(postsCountRow?.total ?? 0),
         financeirosLidos: Number(financialCountRow?.total ?? 0),
         settingsLidos: settingsRows.length,
-        settingsInseridos: dryRun ? 0 : settingsInserted,
-        settingsCorrigidos: dryRun ? 0 : settingsFixed,
+        settingsInseridos: settingsInserted,
+        settingsCorrigidos: settingsFixed,
       },
     })
 
     return new Response(JSON.stringify({
       ok: true,
-      dryRun,
       syncRunId,
       recordsRead,
       recordsUpserted,
@@ -176,8 +167,8 @@ export async function onRequestPost(context: Context) {
       },
       settings: {
         lidos: settingsRows.length,
-        inseridos: dryRun ? 0 : settingsInserted,
-        corrigidos: dryRun ? 0 : settingsFixed,
+        inseridos: settingsInserted,
+        corrigidos: settingsFixed,
       },
       startedAt,
       finishedAt: Date.now(),
@@ -205,7 +196,6 @@ export async function onRequestPost(context: Context) {
       metadata: {
         action: 'sync',
         pulledFrom: 'bigdata_db',
-        dryRun,
       },
     })
 

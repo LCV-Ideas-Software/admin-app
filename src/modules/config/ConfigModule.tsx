@@ -12,7 +12,6 @@ import {
 type AdminRuntimeConfig = {
   defaultAdminActor: string
   defaultOverviewLimit: number
-  defaultSyncDryRun: boolean
   enableOperationalToasts: boolean
   strictValidationMode: boolean
   requireConfirmBeforeDelete: boolean
@@ -55,7 +54,6 @@ const STORAGE_KEY = 'admin-app/runtime-config/v1'
 const DEFAULT_CONFIG: AdminRuntimeConfig = {
   defaultAdminActor: 'admin@app.lcv',
   defaultOverviewLimit: 30,
-  defaultSyncDryRun: false,
   enableOperationalToasts: true,
   strictValidationMode: true,
   requireConfirmBeforeDelete: true,
@@ -78,7 +76,6 @@ const loadStoredConfig = (): AdminRuntimeConfig => {
     return {
       defaultAdminActor: String(parsed.defaultAdminActor ?? DEFAULT_CONFIG.defaultAdminActor).trim() || DEFAULT_CONFIG.defaultAdminActor,
       defaultOverviewLimit: normalizeLimit(Number(parsed.defaultOverviewLimit ?? DEFAULT_CONFIG.defaultOverviewLimit)),
-      defaultSyncDryRun: Boolean(parsed.defaultSyncDryRun),
       enableOperationalToasts: parsed.enableOperationalToasts !== false,
       strictValidationMode: parsed.strictValidationMode !== false,
       requireConfirmBeforeDelete: parsed.requireConfirmBeforeDelete !== false,
@@ -456,20 +453,6 @@ export function ConfigModule() {
         </div>
 
         <div className="form-grid">
-          <div className="field-group">
-            <label htmlFor="config-default-sync-dry-run">Sync padrão em dry run</label>
-            <select
-              id="config-default-sync-dry-run"
-              name="configDefaultSyncDryRun"
-              value={config.defaultSyncDryRun ? '1' : '0'}
-              onChange={(event) => setConfig((current) => ({ ...current, defaultSyncDryRun: event.target.value === '1' }))}
-              disabled={saving}
-            >
-              <option value="1">Ligado</option>
-              <option value="0">Desligado</option>
-            </select>
-          </div>
-
           <div className="field-group">
             <label htmlFor="config-enable-operational-toasts">Toasts operacionais</label>
             <select

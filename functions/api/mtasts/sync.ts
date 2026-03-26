@@ -25,15 +25,13 @@ type PolicyRow = {
   tlsrpt_email?: string | null
 }
 
-const parseDryRun = (rawValue: string | null) => rawValue === '1' || rawValue === 'true'
-
 const toHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
 })
 
 export async function onRequestPost(context: Context) {
-  const { request, env } = context
+  const { env } = context
 
   if (!env.BIGDATA_DB) {
     return new Response(JSON.stringify({
@@ -45,15 +43,12 @@ export async function onRequestPost(context: Context) {
     })
   }
 
-  const url = new URL(request.url)
-  const dryRun = parseDryRun(url.searchParams.get('dryRun'))
-
   const startedAt = Date.now()
   const syncRunId = await startSyncRun(env.BIGDATA_DB, {
     module: 'mtasts',
     status: 'running',
     startedAt,
-    metadata: { dryRun },
+    metadata: {},
   })
 
   try {
@@ -91,46 +86,44 @@ export async function onRequestPost(context: Context) {
     let historyUpserted = 0
     let policiesUpserted = 0
 
-    if (!dryRun) {
-      for (const row of historyRows) {
-        await env.BIGDATA_DB.prepare(`
-          INSERT INTO mtasts_history (gerado_em, domain, data_criacao)
-          VALUES (?, ?, CURRENT_TIMESTAMP)
-          ON CONFLICT(gerado_em) DO UPDATE SET
-            domain = excluded.domain
-        `)
-          .bind(row.geradoEm, row.domain)
-          .run()
+    for (const row of historyRows) {
+      await env.BIGDATA_DB.prepare(`
+        INSERT INTO mtasts_history (gerado_em, domain, data_criacao)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(gerado_em) DO UPDATE SET
+          domain = excluded.domain
+      `)
+        .bind(row.geradoEm, row.domain)
+        .run()
 
-        historyUpserted += 1
+      historyUpserted += 1
+    }
+
+    for (const item of dnsSnapshots) {
+      const domain = item.zone.name
+      const existing = policyByDomain.get(domain)
+      const policyText = existing?.policyText
+
+      if (!policyText) {
+        continue
       }
 
-      for (const item of dnsSnapshots) {
-        const domain = item.zone.name
-        const existing = policyByDomain.get(domain)
-        const policyText = existing?.policyText
+      await env.BIGDATA_DB.prepare(`
+        INSERT INTO mtasts_mta_sts_policies (domain, policy_text, tlsrpt_email, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(domain) DO UPDATE SET
+          policy_text = excluded.policy_text,
+          tlsrpt_email = excluded.tlsrpt_email,
+          updated_at = CURRENT_TIMESTAMP
+      `)
+        .bind(domain, policyText, item.dns.dnsTlsRptEmail ?? existing.tlsrptEmail)
+        .run()
 
-        if (!policyText) {
-          continue
-        }
-
-        await env.BIGDATA_DB.prepare(`
-          INSERT INTO mtasts_mta_sts_policies (domain, policy_text, tlsrpt_email, updated_at)
-          VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-          ON CONFLICT(domain) DO UPDATE SET
-            policy_text = excluded.policy_text,
-            tlsrpt_email = excluded.tlsrpt_email,
-            updated_at = CURRENT_TIMESTAMP
-        `)
-          .bind(domain, policyText, item.dns.dnsTlsRptEmail ?? existing.tlsrptEmail)
-          .run()
-
-        policiesUpserted += 1
-      }
+      policiesUpserted += 1
     }
 
     const recordsRead = historyRows.length + dnsSnapshots.length
-    const recordsUpserted = dryRun ? 0 : historyUpserted + policiesUpserted
+    const recordsUpserted = historyUpserted + policiesUpserted
 
     await finishSyncRun(env.BIGDATA_DB, {
       id: syncRunId,
@@ -149,28 +142,26 @@ export async function onRequestPost(context: Context) {
         action: 'sync',
         pulledFrom: 'cloudflare-api+d1',
         provider: 'cloudflare-api',
-        dryRun,
         historyLido: historyRows.length,
-        historyUpserted: dryRun ? 0 : historyUpserted,
+        historyUpserted: historyUpserted,
         policiesLidas: dnsSnapshots.length,
-        policiesUpserted: dryRun ? 0 : policiesUpserted,
+        policiesUpserted: policiesUpserted,
         zonesAuditadas: zones.length,
       },
     })
 
     return new Response(JSON.stringify({
       ok: true,
-      dryRun,
       syncRunId,
       recordsRead,
       recordsUpserted,
       history: {
         lidos: historyRows.length,
-        upserted: dryRun ? 0 : historyUpserted,
+        upserted: historyUpserted,
       },
       policies: {
         lidas: dnsSnapshots.length,
-        upserted: dryRun ? 0 : policiesUpserted,
+        upserted: policiesUpserted,
       },
       zonesAuditadas: zones.length,
       startedAt,
@@ -200,7 +191,6 @@ export async function onRequestPost(context: Context) {
         action: 'sync',
         pulledFrom: 'cloudflare-api+d1',
         provider: 'cloudflare-api',
-        dryRun,
       },
     })
 
