@@ -1,5 +1,19 @@
 # Changelog — Admin App
 
+## [v01.48.00] — 2026-03-26
+### Adicionado
+- **PostEditor — BubbleMenu (toolbar contextual)**: menu flutuante aparece ao selecionar texto, com formatação rápida (negrito, itálico, sublinhado, tachado, marca-texto, sub/sobrescrito, código inline, link). Arrastável com viewport clamping. Portal via `ownerDocument.body` (compatível com PopupPortal).
+- **PostEditor — FloatingMenu (toolbar de inserção)**: menu flutuante aparece em linhas vazias para inserção rápida (H1-H3, listas, tarefas, citação, código, HR, tabela). Arrastável com viewport clamping.
+- **PostEditor — TextIndent extension**: recuo de parágrafo em 4 níveis (0/1.5/2.5/3.5rem). Botões Indent/Outdent na toolbar.
+- **PostEditor — AI Freeform (Wand2)**: botão de instrução livre para Gemini. Popover glassmorphic com textarea. Opera em seleção ou texto inteiro. Portal via `ownerDocument.body`.
+- **Google Fonts Inter com itálico**: `index.html` agora carrega Inter com eixo `ital` (variantes normais + itálicas). Corrige itálico invisível causado por `font-synthesis: none`.
+- **CSS**: estilos para `.bubble-menu`, `.floating-menu`, `.ai-freeform-popover` com glassmorphism, drag states, e active indicators.
+
+### Corrigido
+- **PostEditor — Justify sempre ativo**: removido `defaultAlignment: 'justify'` do TextAlign. Default volta a `'left'`.
+- **PostEditor — Toolbar estática**: adicionados listeners `transaction` + `selectionUpdate` para re-render dinâmico dos botões (Word-like).
+- **PostEditor — Prompt modal em popup**: modal de inserção (link/imagem/YouTube) agora renderiza via `ReactDOM.createPortal(ownerDocument.body)`, corrigindo supressão pelo browser em janela não-ativa.
+
 ## [v01.47.00] — 2026-03-26
 ### Adicionado
 - **Coluna `updated_at` na tabela `mainsite_posts`**: suporte completo a rastreamento de data de atualização de posts.

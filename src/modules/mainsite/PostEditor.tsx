@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import ReactDOM from 'react-dom'
 import {
   AlignCenter, AlignJustify, AlignLeft, AlignRight,
   Bold, CheckSquare, Code, FilePlus2,
-  Heading1, Heading2, Highlighter, Italic, List, ListOrdered,
+  Heading1, Heading2, Heading3, Highlighter, Italic, List, ListOrdered,
   Loader2, Minus, Palette, Quote, Save, Strikethrough, Type,
   Underline as UnderlineIcon, WrapText, X,
-  Link as LinkIcon, Unlink,
+  Link as LinkIcon, Unlink, Indent, Outdent,
   Subscript as SubIcon, Superscript as SuperIcon,
-  Table as TableIcon,
+  Table as TableIcon, LayoutGrid, ListChecks,
   Upload, Image as ImageIcon, Youtube, ZoomIn, ZoomOut, MessageSquare,
-  Sparkles, MousePointer2
+  Sparkles, MousePointer2, Wand2, Send
 } from 'lucide-react'
 import { Extension } from '@tiptap/core'
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
@@ -346,6 +347,61 @@ const FontSize = Extension.create({
   },
 })
 
+// TextIndent extension — stores text-indent as inline style on paragraph/heading
+const TextIndent = Extension.create({
+  name: 'textIndent',
+  addGlobalAttributes() {
+    return [{
+      types: ['paragraph', 'heading'],
+      attributes: {
+        textIndent: {
+          default: 0,
+          parseHTML: el => {
+            const v = el.style.textIndent
+            if (!v) return 0
+            const n = parseFloat(v)
+            return isNaN(n) ? 0 : n
+          },
+          renderHTML: attrs => {
+            if (!attrs.textIndent) return {}
+            return { style: `text-indent: ${attrs.textIndent}rem` }
+          },
+        },
+      },
+    }]
+  },
+  addCommands() {
+    const LEVELS = [0, 1.5, 2.5, 3.5]
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      increaseIndent: () => ({ tr, state, dispatch }: any) => {
+        const { from, to } = state.selection
+        state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+          if (!node.type.isTextblock) return
+          const current = node.attrs.textIndent || 0
+          const idx = LEVELS.findIndex(l => l >= current)
+          const next = idx < LEVELS.length - 1 ? LEVELS[idx + 1] : LEVELS[LEVELS.length - 1]
+          if (next !== current && dispatch) tr.setNodeMarkup(pos, undefined, { ...node.attrs, textIndent: next })
+        })
+        return true
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      decreaseIndent: () => ({ tr, state, dispatch }: any) => {
+        const { from, to } = state.selection
+        state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+          if (!node.type.isTextblock) return
+          const current = node.attrs.textIndent || 0
+          const idx = LEVELS.findIndex(l => l >= current)
+          const next = idx > 0 ? LEVELS[idx - 1] : 0
+          if (next !== current && dispatch) tr.setNodeMarkup(pos, undefined, { ...node.attrs, textIndent: next })
+        })
+        return true
+      },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+  },
+})
+
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({ dropcursor: false, link: false }),
   Markdown,
@@ -357,8 +413,9 @@ const TIPTAP_EXTENSIONS = [
   Color,
   FontFamily,
   FontSize,
+  TextIndent,
   Typography,
-  TextAlign.configure({ types: ['heading', 'paragraph'], defaultAlignment: 'justify' }),
+  TextAlign.configure({ types: ['heading', 'paragraph'] }),
   Table.configure({ resizable: true }), TableRow, TableHeader, TableCell,
   TaskList, TaskItem.configure({ nested: true }),
   Dropcursor.configure({ color: '#3b82f6', width: 2 }),
@@ -410,11 +467,25 @@ export default function PostEditor({
   const [isUploading, setIsUploading] = useState(false)
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // AI Freeform Command
+  const [aiChatOpen, setAiChatOpen] = useState(false)
+  const [aiChatInput, setAiChatInput] = useState('')
+  const aiChatBtnRef = useRef<HTMLButtonElement>(null)
 
   const editor = useEditor({
     extensions: TIPTAP_EXTENSIONS,
     content: initialContent || '',
   })
+
+  // Force re-render on transaction AND selection change for Word-like dynamic button state
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!editor) return
+    const forceUpdate = () => { try { if (editor.view?.dom) setTick(t => t + 1) } catch { /* view not ready */ } }
+    editor.on('transaction', forceUpdate)
+    editor.on('selectionUpdate', forceUpdate)
+    return () => { editor.off('transaction', forceUpdate); editor.off('selectionUpdate', forceUpdate) }
+  }, [editor])
 
   // Sync initial content when editing a different post
   useEffect(() => {
@@ -428,7 +499,34 @@ export default function PostEditor({
     setPostTitle(initialTitle)
   }, [initialTitle])
 
-  // ── AI handler ─────────────────────────────────────────────
+  // ── AI handlers ─────────────────────────────────────────────
+
+  const handleAIFreeform = async () => {
+    if (!editor) return
+    const instruction = aiChatInput.trim()
+    if (!instruction) return
+    const { from, to, empty } = editor.state.selection
+    const text = empty ? editor.getHTML() : editor.state.doc.textBetween(from, to, ' ')
+    if (!text) { showNotification('O editor está vazio.', 'error'); return }
+    setIsGeneratingAI(true)
+    setAiChatOpen(false)
+    showNotification('Gemini está processando sua instrução...', 'info')
+    try {
+      const res = await fetch('/api/mainsite/ai/transform', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'freeform', text, instruction })
+      })
+      const data = await res.json() as { text?: string; error?: string }
+      if (!res.ok) throw new Error(data.error || 'Erro na geração por IA.')
+      if (data.text) {
+        if (empty) editor.commands.setContent(data.text)
+        else editor.chain().focus().deleteSelection().insertContent(data.text).run()
+      }
+      showNotification('Instrução aplicada com sucesso.', 'success')
+      setAiChatInput('')
+    } catch (err) { showNotification(err instanceof Error ? err.message : 'Erro desconhecido na IA.', 'error') }
+    finally { setIsGeneratingAI(false) }
+  }
 
   const handleAITransform = async (action: string) => {
     if (!editor) return
@@ -702,7 +800,7 @@ export default function PostEditor({
         {editor && (
           <div className="tiptap-toolbar">
             {/* Universal prompt modal (link / image URL / youtube / caption) */}
-            {promptModal.show && (
+            {promptModal.show && ReactDOM.createPortal(
               <div className="admin-modal-overlay" role="dialog" aria-modal="true" aria-label="Entrada de dados">
                 <div className="admin-modal-content">
                   <button type="button" title="Fechar diálogo" className="admin-modal-close" onClick={() => setPromptModal(PROMPT_MODAL_INITIAL)}>
@@ -745,7 +843,8 @@ export default function PostEditor({
                     </div>
                   </div>
                 </div>
-              </div>
+              </div>,
+              editor.view?.dom?.ownerDocument?.body || document.body
             )}
 
             {/* AI Action Tool */}
@@ -785,6 +884,10 @@ export default function PostEditor({
             <button type="button" title="Linha" onClick={() => editor.chain().focus().setHorizontalRule().run()}><Minus size={15} /></button>
             <button type="button" title="Tabela" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><TableIcon size={15} /></button>
             <button type="button" title="Quebra" onClick={() => editor.chain().focus().setHardBreak().run()}><WrapText size={15} /></button>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <button type="button" title="Aumentar recuo" onClick={() => (editor.chain().focus() as any).increaseIndent().run()}><Indent size={15} /></button>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <button type="button" title="Diminuir recuo" onClick={() => (editor.chain().focus() as any).decreaseIndent().run()}><Outdent size={15} /></button>
             <span className="tiptap-divider" />
             <button type="button" title="Link" className={editor.isActive('link') ? 'active' : ''} onClick={addLink}><LinkIcon size={15} /></button>
             <button type="button" title="Remover Link" onClick={() => editor.chain().focus().unsetLink().run()} disabled={!editor.isActive('link')} className={!editor.isActive('link') ? 'disabled' : ''}><Unlink size={15} /></button>
@@ -826,9 +929,55 @@ export default function PostEditor({
                 <option value="30px">30px</option>
               </select>
             </div>
+
+            <span className="tiptap-divider" />
+
+            {/* AI Freeform Command (Wand2) */}
+            <div style={{ position: 'relative' }}>
+              <button ref={aiChatBtnRef} type="button" title="IA: Instrução Livre (Gemini)" onClick={() => setAiChatOpen(!aiChatOpen)} className={aiChatOpen ? 'active' : ''} disabled={isGeneratingAI}>
+                {isGeneratingAI ? <Loader2 size={15} className="spin" /> : <Wand2 size={15} />}
+              </button>
+              {aiChatOpen && (() => {
+                const btnRect = aiChatBtnRef.current?.getBoundingClientRect()
+                const ownerDoc = aiChatBtnRef.current?.ownerDocument
+                const popupWin = ownerDoc?.defaultView
+                const vpW = popupWin?.innerWidth || 800
+                let popLeft = btnRect ? btnRect.left : 0
+                const popW = 340
+                if (popLeft + popW > vpW - 8) popLeft = vpW - popW - 8
+                if (popLeft < 8) popLeft = 8
+                return ReactDOM.createPortal(
+                  <div className="ai-freeform-popover" style={{ position: 'fixed', top: btnRect ? btnRect.bottom + 6 : 100, left: popLeft, width: `${popW}px`, zIndex: 99999 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                      <Wand2 size={14} color="#0284c7" />
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>IA: Instrução Livre</span>
+                      <span style={{ fontSize: '10px', opacity: 0.5, marginLeft: 'auto' }}>{editor?.state.selection.empty ? 'Texto inteiro' : 'Seleção'}</span>
+                    </div>
+                    <textarea
+                      autoFocus
+                      rows={3}
+                      placeholder="Ex: Traduza para inglês, resuma em 3 bullets, torne poético..."
+                      value={aiChatInput}
+                      onChange={e => setAiChatInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAIFreeform() } if (e.key === 'Escape') setAiChatOpen(false) }}
+                      style={{ width: '100%', resize: 'vertical', padding: '10px 12px', fontSize: '13px', lineHeight: '1.5', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '10px', background: 'rgba(0,0,0,0.02)', color: 'inherit', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px', gap: '8px' }}>
+                      <button type="button" onClick={() => setAiChatOpen(false)} style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent', color: 'inherit', opacity: 0.6 }}>Cancelar</button>
+                      <button type="button" onClick={handleAIFreeform} disabled={!aiChatInput.trim()} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', fontSize: '12px', fontWeight: '700', border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#0284c7', color: '#fff', opacity: aiChatInput.trim() ? 1 : 0.5, transition: 'opacity 0.15s' }}>
+                        <Send size={12} /> Enviar
+                      </button>
+                    </div>
+                  </div>,
+                  ownerDoc?.body || document.body
+                )
+              })()}
+            </div>
           </div>
         )}
         <EditorContent editor={editor} className="tiptap-editor" />
+        {editor && <EditorBubbleMenu editor={editor} />}
+        {editor && <EditorFloatingMenu editor={editor} />}
         {editor && (
           <div className="tiptap-status-bar">
             {editor.storage.characterCount.characters()} caracteres &middot; {editor.storage.characterCount.words()} palavras
@@ -843,5 +992,188 @@ export default function PostEditor({
         </button>
       </div>
     </form>
+  )
+}
+
+// ── BubbleMenu — contextual formatting toolbar on text selection (draggable + viewport-clamped) ──
+function EditorBubbleMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [autoPos, setAutoPos] = useState<{ top: number; left: number } | null>(null)
+  const [dragPos, setDragPos] = useState<{ top: number; left: number } | null>(null)
+  const dragRef = useRef({ active: false, offsetX: 0, offsetY: 0 })
+
+  useEffect(() => {
+    if (!editor) return
+    const update = () => {
+      const { from, to, empty } = editor.state.selection
+      if (empty || editor.state.selection instanceof NodeSelection) { setAutoPos(null); setDragPos(null); return }
+      try {
+        const domRange = editor.view.domAtPos(from)
+        const ownerDoc = editor.view.dom.ownerDocument
+        const popupWin = ownerDoc.defaultView
+        const range = ownerDoc.createRange()
+        range.setStart(domRange.node, domRange.offset)
+        const endDom = editor.view.domAtPos(to)
+        range.setEnd(endDom.node, endDom.offset)
+        const rect = range.getBoundingClientRect()
+        if (rect.width === 0) { setAutoPos(null); return }
+        const menuH = 44, menuW = 340
+        const vpW = popupWin?.innerWidth || 800
+        const vpH = popupWin?.innerHeight || 600
+        let top = rect.top - menuH - 8
+        let left = rect.left + rect.width / 2 - menuW / 2
+        if (top < 4) top = rect.bottom + 8
+        left = Math.max(4, Math.min(left, vpW - menuW - 4))
+        top = Math.max(4, Math.min(top, vpH - menuH - 4))
+        setAutoPos({ top, left })
+        setDragPos(null)
+      } catch { setAutoPos(null) }
+    }
+    editor.on('selectionUpdate', update)
+    const onBlur = () => { setAutoPos(null); setDragPos(null) }
+    editor.on('blur', onBlur)
+    return () => { editor.off('selectionUpdate', update); editor.off('blur', onBlur) }
+  }, [editor])
+
+  const startDrag = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    e.preventDefault()
+    const menuEl = ref.current
+    if (!menuEl) return
+    const rect = menuEl.getBoundingClientRect()
+    dragRef.current = { active: true, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
+    menuEl.classList.add('dragging')
+    const ownerDoc = menuEl.ownerDocument
+    const popupWin = ownerDoc.defaultView
+    const menuW = rect.width, menuH = rect.height
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current.active) return
+      const vpW = popupWin?.innerWidth || 800
+      const vpH = popupWin?.innerHeight || 600
+      let nx = ev.clientX - dragRef.current.offsetX
+      let ny = ev.clientY - dragRef.current.offsetY
+      nx = Math.max(0, Math.min(nx, vpW - menuW))
+      ny = Math.max(0, Math.min(ny, vpH - menuH))
+      setDragPos({ top: ny, left: nx })
+    }
+    const onUp = () => {
+      dragRef.current.active = false
+      menuEl.classList.remove('dragging')
+      ownerDoc.removeEventListener('mousemove', onMove)
+      ownerDoc.removeEventListener('mouseup', onUp)
+    }
+    ownerDoc.addEventListener('mousemove', onMove)
+    ownerDoc.addEventListener('mouseup', onUp)
+  }
+
+  if (!autoPos || !editor) return null
+  const pos = dragPos || autoPos
+  const portalTarget = editor.view?.dom?.ownerDocument?.body || document.body
+  return ReactDOM.createPortal(
+    <div ref={ref} className="bubble-menu" onMouseDown={startDrag} style={{ position: 'fixed', top: `${pos.top}px`, left: `${pos.left}px`, zIndex: 99999, cursor: 'grab' }}>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBold().run() }} className={editor.isActive('bold') ? 'is-active' : ''} title="Negrito"><Bold size={14} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleItalic().run() }} className={editor.isActive('italic') ? 'is-active' : ''} title="Itálico"><Italic size={14} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleUnderline().run() }} className={editor.isActive('underline') ? 'is-active' : ''} title="Sublinhado"><UnderlineIcon size={14} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleStrike().run() }} className={editor.isActive('strike') ? 'is-active' : ''} title="Tachado"><Strikethrough size={14} /></button>
+      <span className="bubble-divider" />
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHighlight().run() }} className={editor.isActive('highlight') ? 'is-active' : ''} title="Marca-texto"><Highlighter size={14} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleSubscript().run() }} className={editor.isActive('subscript') ? 'is-active' : ''} title="Subscrito"><SubIcon size={14} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleSuperscript().run() }} className={editor.isActive('superscript') ? 'is-active' : ''} title="Sobrescrito"><SuperIcon size={14} /></button>
+      <span className="bubble-divider" />
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleCode().run() }} className={editor.isActive('code') ? 'is-active' : ''} title="Código inline"><Code size={14} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); if (editor.isActive('link')) { editor.chain().focus().unsetLink().run() } else { const popupWin = editor.view.dom.ownerDocument.defaultView || window; const url = popupWin.prompt('URL do link:'); if (url) editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run() } }} className={editor.isActive('link') ? 'is-active' : ''} title="Link"><LinkIcon size={14} /></button>
+    </div>,
+    portalTarget
+  )
+}
+
+// ── FloatingMenu — quick-insert toolbar on empty lines (draggable + viewport-clamped) ──
+function EditorFloatingMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [autoPos, setAutoPos] = useState<{ top: number; left: number } | null>(null)
+  const [dragPos, setDragPos] = useState<{ top: number; left: number } | null>(null)
+  const dragRef = useRef({ active: false, offsetX: 0, offsetY: 0 })
+
+  useEffect(() => {
+    if (!editor) return
+    const update = () => {
+      const { $anchor } = editor.state.selection
+      const isEmptyTextBlock = $anchor.parent.isTextblock && $anchor.parent.content.size === 0
+      if (!isEmptyTextBlock || !editor.state.selection.empty) { setAutoPos(null); setDragPos(null); return }
+      try {
+        const coords = editor.view.coordsAtPos($anchor.pos)
+        const ownerDoc = editor.view.dom.ownerDocument
+        const popupWin = ownerDoc.defaultView
+        const vpW = popupWin?.innerWidth || 800
+        const vpH = popupWin?.innerHeight || 600
+        const menuW = 380, menuH = 40
+        let left = coords.left - 16 - menuW
+        let top = coords.top - 4
+        if (left < 4) left = coords.left + 16
+        left = Math.max(4, Math.min(left, vpW - menuW - 4))
+        top = Math.max(4, Math.min(top, vpH - menuH - 4))
+        setAutoPos({ top, left })
+        setDragPos(null)
+      } catch { setAutoPos(null) }
+    }
+    let wrapper: Element | null = null
+    try { wrapper = editor.view?.dom?.closest('.tiptap-editor') } catch { /* view not mounted */ }
+    const hideOnScroll = () => { setAutoPos(null); setDragPos(null) }
+    editor.on('selectionUpdate', update)
+    editor.on('focus', update)
+    wrapper?.addEventListener('scroll', hideOnScroll)
+    return () => { editor.off('selectionUpdate', update); editor.off('focus', update); wrapper?.removeEventListener('scroll', hideOnScroll) }
+  }, [editor])
+
+  const startDrag = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    e.preventDefault()
+    const menuEl = menuRef.current
+    if (!menuEl) return
+    const rect = menuEl.getBoundingClientRect()
+    dragRef.current = { active: true, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
+    menuEl.classList.add('dragging')
+    const ownerDoc = menuEl.ownerDocument
+    const popupWin = ownerDoc.defaultView
+    const menuW = rect.width, menuH = rect.height
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current.active) return
+      const vpW = popupWin?.innerWidth || 800
+      const vpH = popupWin?.innerHeight || 600
+      let nx = ev.clientX - dragRef.current.offsetX
+      let ny = ev.clientY - dragRef.current.offsetY
+      nx = Math.max(0, Math.min(nx, vpW - menuW))
+      ny = Math.max(0, Math.min(ny, vpH - menuH))
+      setDragPos({ top: ny, left: nx })
+    }
+    const onUp = () => {
+      dragRef.current.active = false
+      menuEl.classList.remove('dragging')
+      ownerDoc.removeEventListener('mousemove', onMove)
+      ownerDoc.removeEventListener('mouseup', onUp)
+    }
+    ownerDoc.addEventListener('mousemove', onMove)
+    ownerDoc.addEventListener('mouseup', onUp)
+  }
+
+  if (!autoPos || !editor) return null
+  const pos = dragPos || autoPos
+  const portalTarget = editor.view?.dom?.ownerDocument?.body || document.body
+  return ReactDOM.createPortal(
+    <div ref={menuRef} className="floating-menu" onMouseDown={startDrag} style={{ position: 'fixed', top: `${pos.top}px`, left: `${pos.left}px`, zIndex: 99999, cursor: 'grab' }}>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 1 }).run() }} className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''} title="Título 1"><Heading1 size={16} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 2 }).run() }} className={editor.isActive('heading', { level: 2 }) ? 'is-active' : ''} title="Título 2"><Heading2 size={16} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 3 }).run() }} className={editor.isActive('heading', { level: 3 }) ? 'is-active' : ''} title="Título 3"><Heading3 size={16} /></button>
+      <span className="floating-divider" />
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBulletList().run() }} title="Marcadores"><List size={16} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleOrderedList().run() }} title="Numeração"><ListOrdered size={16} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleTaskList().run() }} title="Tarefas"><ListChecks size={16} /></button>
+      <span className="floating-divider" />
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBlockquote().run() }} title="Citação"><Quote size={16} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleCodeBlock().run() }} title="Bloco de Código"><Code size={16} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().setHorizontalRule().run() }} title="Linha Horizontal"><Minus size={16} /></button>
+      <button type="button" onMouseDown={e => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() }} title="Tabela"><LayoutGrid size={16} /></button>
+    </div>,
+    portalTarget
   )
 }
