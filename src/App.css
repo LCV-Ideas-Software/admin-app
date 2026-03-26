@@ -1893,6 +1893,7 @@ input[type="color"]:focus-visible {
   font-size: 0.95rem;
   line-height: 1.7;
   color: #1e293b;
+  white-space: pre-wrap; /* ProseMirror requires this */
 }
 
 .tiptap-editor .tiptap p.is-editor-empty:first-child::before {

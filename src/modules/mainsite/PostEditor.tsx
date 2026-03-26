@@ -17,7 +17,7 @@ import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from
 import type { NodeViewProps } from '@tiptap/react'
 import { NodeSelection } from 'prosemirror-state'
 import StarterKit from '@tiptap/starter-kit'
-import { Underline } from '@tiptap/extension-underline'
+// Underline is now included in StarterKit v3 — no explicit import needed
 import { Highlight } from '@tiptap/extension-highlight'
 import TextAlign from '@tiptap/extension-text-align'
 import LinkExtension from '@tiptap/extension-link'
@@ -405,7 +405,7 @@ const TextIndent = Extension.create({
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({ dropcursor: false, link: false }),
   Markdown,
-  Underline,
+  // Underline is bundled in StarterKit v3 — no need to add explicitly
   Highlight,
   Subscript,
   Superscript,
