@@ -2,7 +2,8 @@
 
 ## [v01.49.02] — 2026-03-26
 ### Corrigido
-- **FloatingScrollButtons — posicionamento**: CSS de `.floating-scroll-btns` corrigido de `position: sticky` (não funciona dentro de container com `overflow-y: auto`) para `position: fixed`. Botões agora aparecem corretamente em bottom-right. Removido `margin-top: -60px` hack e `pointer-events: none` do container.
+- **FloatingScrollButtons — posicionamento**: CSS de `.floating-scroll-btns` corrigido de `position: sticky` para `position: fixed` com `bottom: 24px; right: 24px`.
+- **App shell — layout de scroll**: `.app-shell` mudou de `min-height: 100vh` para `height: 100vh` e `.content` recebeu `min-height: 0`. Com `min-height`, o grid row crescia infinitamente e `.content` nunca desborda — scroll events nunca disparam. Agora `.content` é constrito pela viewport e rola internamente.
 
 ## [v01.49.01] — 2026-03-26
 ### Removido

@@ -141,7 +141,7 @@ input[type="color"]:focus-visible {
 .app-shell {
   display: grid;
   grid-template-columns: 280px 1fr;
-  min-height: 100vh;
+  height: 100vh;
   transition: grid-template-columns 0.25s ease;
   font-family: var(--font-family-base);
 }
@@ -318,6 +318,7 @@ input[type="color"]:focus-visible {
   padding: 32px 36px;
   position: relative;
   overflow-y: auto;
+  min-height: 0;
   background: #f5f4f4;
 }
 
