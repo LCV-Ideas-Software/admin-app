@@ -4,6 +4,7 @@
 ### Adicionado
 - **Módulo Oráculo Financeiro**: criação de um módulo nativo no painel administrativo (`OraculoModule.tsx`) para gestão dos registros (Visualização LCI/Tesouro e Deleção Permanente), com integração de iconografia (`BrainCircuit`) no App Shell.
 - **Endpoints D1**: criadas as rotas `functions/api/oraculo/listar.ts` e `functions/api/oraculo/excluir.ts`.
+- **Menu Reordenado**: `navItems` ajustado para obedecer rigorosamente a ordem alfabética das rotas entre *Visão Geral* (1º) e *Configurações* (último).
 
 ## [v01.51.00] — 2026-03-26
 ### Removido
