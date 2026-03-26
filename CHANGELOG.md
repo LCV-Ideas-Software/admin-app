@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.49.01] — 2026-03-26
+### Removido
+- **PostEditor — Indicador "Modo atual"**: removido campo read-only que exibia "Criando novo post" / "Editando #ID". Sem utilidade funcional, ocupava espaço no popup do editor.
+- **`form-grid` wrapper**: removido pois restava apenas o campo título. O título agora ocupa a largura completa do editor popup.
+
 ## [v01.49.00] — 2026-03-26
 ### UI/UX Redesign — tiptap.dev Style (Google Blue)
 - **Design Tokens (`variables.css`)**: paleta primária migrou de `#3b82f6` (Tailwind blue) para `#1a73e8` (Google Blue). Cor secundária unificada (purple removido). Background `#f8fafc` → `#f5f4f4` (warm gray tiptap). Texto `#0f172a` → `#0d0d0d`. Bordas de `rgba(148,163,184)` → `rgba(0,0,0)`. Font family: `'Inter'` como primária. Radius card `24px` → `30px`, button `16px` → `100px` (pill), input `16px` → `10px`. Shadows ultra-sutis (opacidade 0.04–0.08).
