@@ -1,5 +1,13 @@
 # Changelog — Admin App
 
+## [v01.47.00] — 2026-03-26
+### Adicionado
+- **Coluna `updated_at` na tabela `mainsite_posts`**: suporte completo a rastreamento de data de atualização de posts.
+- **INSERT com `updated_at`**: novos posts são criados com `updated_at = CURRENT_TIMESTAMP` (igual a `created_at`).
+- **UPDATE com `updated_at`**: edições de posts agora setam `updated_at = CURRENT_TIMESTAMP` automaticamente.
+- **SELECTs ampliados**: queries de listagem e detalhe de posts retornam `updated_at` para exibição no frontend.
+- **PostRow type + mapPostRow**: tipo e mapeador atualizados para incluir `updated_at`.
+
 ## [v01.46.24] — 2026-03-25
 ### Corrigido
 - **PostEditor — YouTube iframe bloqueado (X-Frame-Options)**: O `ReactNodeViewRenderer` customizado do YouTube bypassa o `renderHTML` do TipTap, que normalmente converte URLs `watch?v=` para `embed/`. A conversão foi implementada explicitamente no `ResizableYoutubeNodeView` usando `getEmbedUrlFromYoutubeUrl` importado do `@tiptap/extension-youtube`, com `nocookie: true`.
