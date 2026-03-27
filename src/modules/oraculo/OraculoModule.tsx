@@ -260,16 +260,29 @@ export function OraculoModule() {
     setConfirmDelete(null)
     setDeletingId(id)
     try {
-      const res = await fetch('/api/oraculo/excluir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
-        body: JSON.stringify({ id, tipo: activeTab }),
-      })
+      let res: Response
+      if (activeTab === 'usuarios') {
+        // Dados de usuários usam endpoint dedicado (DELETE)
+        res = await fetch(`/api/oraculo/userdata?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      } else {
+        res = await fetch('/api/oraculo/excluir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+          body: JSON.stringify({ id, tipo: activeTab }),
+        })
+      }
       const data = await res.json() as { ok: boolean; error?: string }
       if (!res.ok || !data.ok) throw new Error(data.error)
-      if (activeTab === 'lci-lca') setLciRegistros(p => p.filter(r => r.id !== id))
-      else setTesouroRegistros(p => p.filter(r => r.id !== id))
-      setTotalRegistros(n => Math.max(0, n - 1))
+      if (activeTab === 'usuarios') {
+        setUserData(p => p.filter(r => r.id !== id))
+        setUserDataTotal(n => Math.max(0, n - 1))
+      } else if (activeTab === 'lci-lca') {
+        setLciRegistros(p => p.filter(r => r.id !== id))
+        setTotalRegistros(n => Math.max(0, n - 1))
+      } else {
+        setTesouroRegistros(p => p.filter(r => r.id !== id))
+        setTotalRegistros(n => Math.max(0, n - 1))
+      }
       showNotification('Registro excluído.', 'success')
     } catch {
       showNotification('Falha ao excluir registro.', 'error')

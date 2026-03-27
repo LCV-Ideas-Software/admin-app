@@ -1,5 +1,9 @@
 # Changelog — Admin App
 
+## [v01.56.02] — 2026-03-27
+### Corrigido
+- **OraculoModule — Excluir usuário retornava 400**: botão "Excluir" na aba "Dados de Usuários" chamava `/api/oraculo/excluir` com `tipo: 'usuarios'`, que o backend rejeitava (só aceita `lci-lca`/`tesouro-ipca`). Corrigido para usar `DELETE /api/oraculo/userdata?id=...` quando `activeTab === 'usuarios'`, e atualizar corretamente o state local `userData`/`userDataTotal`.
+
 ## [v01.56.01] — 2026-03-27
 ### Melhorado
 - **Cron GET handler logging**: endpoint `GET /api/oraculo/cron` agora loga schedule lido e erros para observabilidade completa no Cloudflare.
