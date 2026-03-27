@@ -19,10 +19,12 @@ function resolveToken(env: Env): string {
 // ─── GET: Lê o cron schedule atual do worker ─────────────────────────────────
 
 export const onRequestGet = async ({ env }: Ctx) => {
+  console.log('[oraculo/cron] GET — Lendo schedule atual do worker cron-taxa-ipca')
   const token = resolveToken(env)
   const accountId = env.CF_ACCOUNT_ID?.trim()
 
   if (!token || !accountId) {
+    console.error('[oraculo/cron] GET — CF_API_TOKEN ou CF_ACCOUNT_ID ausente')
     return json({ ok: false, error: 'CF_API_TOKEN ou CF_ACCOUNT_ID ausente.' }, 503)
   }
 
@@ -38,8 +40,10 @@ export const onRequestGet = async ({ env }: Ctx) => {
     }
 
     const schedules = data.result?.schedules ?? []
+    console.log(`[oraculo/cron] GET — Schedule atual: ${JSON.stringify(schedules)}`)
     return json({ ok: true, schedules })
   } catch (err) {
+    console.error(`[oraculo/cron] GET — Erro: ${err instanceof Error ? err.message : err}`)
     return json({ ok: false, error: err instanceof Error ? err.message : 'Erro interno.' }, 500)
   }
 }
