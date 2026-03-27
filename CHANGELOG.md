@@ -1,5 +1,13 @@
 # Changelog — Admin App
 
+## [v01.56.00] — 2026-03-27
+### Adicionado
+- **OraculoModule — Cron Schedule via Cloudflare API**: selects compactos de hora/minuto BRT com botão "Salvar" que atualiza o cron trigger do worker `cron-taxa-ipca` via Cloudflare Workers Schedules API (`PUT /accounts/{id}/workers/scripts/{name}/schedules`). Carrega schedule atual do worker ao abrir a aba Configurações.
+- **[NEW] `functions/api/oraculo/cron.ts`**: endpoint GET (lê schedule atual) e PUT (atualiza schedule) usando `CF_API_TOKEN` + `CF_ACCOUNT_ID`. Logging estruturado para observabilidade.
+
+### Removido
+- **OraculoModule — Cron read-only**: removida exibição estática de expressão cron e texto "requer deploy para alteração" (substituída por controle interativo real).
+
 ## [v01.55.00] — 2026-03-26
 ### Alterado
 - **OraculoModule — Visualização de dados do usuário reescrita**: detalhe de usuário expandido agora mostra parâmetros de simulação (CDI, IPCA, Duration, taxa, aporte, prazo) em card glassmorphic com badges. Lotes Tesouro IPCA+ com `border-left` colorida (verde MANTER / vermelho VENDER), sinal badge, texto de análise por lote, e totais agregados (investido + taxa média). Registros LCI/LCA com badge IR, taxa CDI, e CDB equivalente.

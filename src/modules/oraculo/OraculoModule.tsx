@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   BrainCircuit, Clock, Database, Download, ExternalLink,
-  Globe, Loader2, Mail, RefreshCw, Search, Settings, Trash2, X,
+  Globe, Loader2, Mail, RefreshCw, Save, Search, Settings, Trash2, X,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
@@ -38,16 +38,12 @@ interface GeminiModelItem {
 
 interface OracleConfig {
   csvUrl: string
-  cronHour: number     // Hora BRT (0-23)
-  cronMinute: number   // Minuto (0-59)
   modeloVision: string
   modeloAnalise: string
 }
 
 const DEFAULT_CONFIG: OracleConfig = {
   csvUrl: 'https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv',
-  cronHour: 2,
-  cronMinute: 0,
   modeloVision: 'gemini-2.5-pro-preview-05-06',
   modeloAnalise: 'gemini-2.5-pro-preview-05-06',
 }
@@ -64,9 +60,16 @@ function brtToUtc(hour: number): number {
   return (hour + 3) % 24
 }
 
+/** Converte hora UTC para BRT (BRT = UTC-3) */
+function utcToBrt(hour: number): number {
+  return (hour - 3 + 24) % 24
+}
+
 function cronExpression(hour: number, minute: number): string {
   return `${minute} ${brtToUtc(hour)} * * *`
 }
+
+const pad = (n: number) => String(n).padStart(2, '0')
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 
@@ -98,6 +101,13 @@ export function OraculoModule() {
   // Gemini models
   const [geminiModels, setGeminiModels] = useState<GeminiModelItem[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
+
+  // Cron
+  const [cronHour, setCronHour] = useState(2)
+  const [cronMinute, setCronMinute] = useState(0)
+  const [cronSaving, setCronSaving] = useState(false)
+  const [cronLoading, setCronLoading] = useState(false)
+  const [cronDirty, setCronDirty] = useState(false)
 
   // Dados de usuários
   interface UserDataRow {
@@ -147,6 +157,48 @@ export function OraculoModule() {
     finally { setModelsLoading(false) }
   }, [])
 
+  /** Carrega o cron schedule atual do worker via Cloudflare API */
+  const carregarCron = useCallback(async () => {
+    setCronLoading(true)
+    try {
+      const res = await fetch('/api/oraculo/cron')
+      const data = await res.json() as { ok: boolean; schedules?: { cron: string }[]; error?: string }
+      if (data.ok && data.schedules && data.schedules.length > 0) {
+        const parts = data.schedules[0].cron.split(/\s+/)
+        if (parts.length >= 2) {
+          const utcMinute = parseInt(parts[0], 10)
+          const utcHour = parseInt(parts[1], 10)
+          setCronMinute(isNaN(utcMinute) ? 0 : utcMinute)
+          setCronHour(isNaN(utcHour) ? 2 : utcToBrt(utcHour))
+          setCronDirty(false)
+        }
+      }
+    } catch { /* silencioso */ }
+    finally { setCronLoading(false) }
+  }, [])
+
+  /** Salva o cron schedule no worker via Cloudflare API */
+  const salvarCron = async () => {
+    setCronSaving(true)
+    try {
+      const expr = cronExpression(cronHour, cronMinute)
+      const res = await fetch('/api/oraculo/cron', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cron: expr }),
+      })
+      const data = await res.json() as { ok: boolean; message?: string; error?: string }
+      if (data.ok) {
+        showNotification(data.message ?? 'Cron atualizado com sucesso.', 'success')
+        setCronDirty(false)
+      } else {
+        showNotification(`Falha: ${data.error ?? 'Erro desconhecido.'}`, 'error')
+      }
+    } catch {
+      showNotification('Falha na conexão com o servidor.', 'error')
+    } finally { setCronSaving(false) }
+  }
+
   const dispararCSV = async () => {
     setCsvTriggerLoading(true)
     setCsvTriggerResult(null)
@@ -187,12 +239,13 @@ export function OraculoModule() {
     if (activeTab === 'configuracoes') {
       void carregarStatusCache()
       void carregarModelos()
+      void carregarCron()
     } else if (activeTab === 'usuarios') {
       void carregarUserData()
     } else {
       void carregarRegistros()
     }
-  }, [activeTab, carregarRegistros, carregarStatusCache, carregarModelos, carregarUserData])
+  }, [activeTab, carregarRegistros, carregarStatusCache, carregarModelos, carregarUserData, carregarCron])
 
   const saveConfig = (patch: Partial<OracleConfig>) => {
     const next = { ...config, ...patch }
@@ -244,11 +297,7 @@ export function OraculoModule() {
     { id: 'configuracoes', label: 'Configurações', icon: <Settings size={14} /> },
   ]
 
-  // ── Helpers para horas ────────────────────────────────────────────────────
 
-  const hoursOptions = Array.from({ length: 24 }, (_, i) => i)
-  const minutesOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
-  const pad = (n: number) => String(n).padStart(2, '0')
 
   // ── Model select or fallback input ────────────────────────────────────────
 
@@ -695,49 +744,50 @@ export function OraculoModule() {
             <fieldset className="settings-fieldset">
               <legend><Clock size={14} style={{ verticalAlign: 'middle' }} /> Atualização Automática (Cron)</legend>
               <p className="field-hint" style={{ marginBottom: '0.75rem' }}>
-                O worker <code>cron-taxa-ipca</code> atualiza o cache automaticamente. Configure o horário desejado abaixo (Brasília, UTC-3).
+                O worker <code>cron-taxa-ipca</code> atualiza o cache automaticamente.
+                {cronLoading && <> <Loader2 size={12} className="spin" style={{ verticalAlign: 'middle' }} /> Carregando…</>}
               </p>
-              <div className="form-grid">
-                <div className="field-group">
-                  <label htmlFor="cron-hour">Hora (Brasília)</label>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div className="field-group" style={{ flex: '0 0 auto' }}>
+                  <label htmlFor="cron-hour">Hora (BRT)</label>
                   <select
                     id="cron-hour"
-                    value={config.cronHour}
-                    onChange={e => {
-                      const h = Number(e.target.value)
-                      setConfig(c => ({ ...c, cronHour: h }))
-                      saveConfig({ cronHour: h })
-                    }}
+                    value={cronHour}
+                    style={{ width: '80px' }}
+                    onChange={e => { setCronHour(Number(e.target.value)); setCronDirty(true) }}
                   >
-                    {hoursOptions.map(h => (
-                      <option key={h} value={h}>{pad(h)}h</option>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>{pad(i)}h</option>
                     ))}
                   </select>
                 </div>
-                <div className="field-group">
+                <div className="field-group" style={{ flex: '0 0 auto' }}>
                   <label htmlFor="cron-minute">Minuto</label>
                   <select
                     id="cron-minute"
-                    value={config.cronMinute}
-                    onChange={e => {
-                      const m = Number(e.target.value)
-                      setConfig(c => ({ ...c, cronMinute: m }))
-                      saveConfig({ cronMinute: m })
-                    }}
+                    value={cronMinute}
+                    style={{ width: '80px' }}
+                    onChange={e => { setCronMinute(Number(e.target.value)); setCronDirty(true) }}
                   >
-                    {minutesOptions.map(m => (
+                    {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
                       <option key={m} value={m}>:{pad(m)}</option>
                     ))}
                   </select>
                 </div>
-                <div className="field-group">
-                  <label>Expressão gerada</label>
-                  <input type="text" readOnly value={cronExpression(config.cronHour, config.cronMinute)} style={{ opacity: 0.65, fontFamily: 'monospace' }} />
-                  <p className="field-hint">
-                    Execução diária às <strong>{pad(config.cronHour)}:{pad(config.cronMinute)} BRT</strong> ({pad(brtToUtc(config.cronHour))}:{pad(config.cronMinute)} UTC)
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={cronSaving || !cronDirty}
+                  onClick={() => void salvarCron()}
+                  style={{ marginBottom: '0.35rem' }}
+                >
+                  {cronSaving ? <><Loader2 size={16} className="spin" /> Salvando…</> : <><Save size={16} /> Salvar</>}
+                </button>
               </div>
+              <p className="field-hint" style={{ marginTop: '0.5rem' }}>
+                Expressão: <code style={{ fontFamily: 'monospace' }}>{cronExpression(cronHour, cronMinute)}</code>
+                {' · '}Execução diária às <strong>{pad(cronHour)}:{pad(cronMinute)} BRT</strong> ({pad(brtToUtc(cronHour))}:{pad(cronMinute)} UTC)
+              </p>
             </fieldset>
           </form>
 
