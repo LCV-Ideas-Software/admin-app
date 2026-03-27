@@ -1,5 +1,9 @@
 # Changelog — Admin App
 
+## [v01.56.01] — 2026-03-27
+### Melhorado
+- **Cron GET handler logging**: endpoint `GET /api/oraculo/cron` agora loga schedule lido e erros para observabilidade completa no Cloudflare.
+
 ## [v01.56.00] — 2026-03-27
 ### Adicionado
 - **OraculoModule — Cron Schedule via Cloudflare API**: selects compactos de hora/minuto BRT com botão "Salvar" que atualiza o cron trigger do worker `cron-taxa-ipca` via Cloudflare Workers Schedules API (`PUT /accounts/{id}/workers/scripts/{name}/schedules`). Carrega schedule atual do worker ao abrir a aba Configurações.

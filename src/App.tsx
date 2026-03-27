@@ -129,7 +129,7 @@ const FinanceiroModule = lazyWithAccessRecovery(() => import('./modules/financei
 const OraculoModule = lazyWithAccessRecovery(() => import('./modules/oraculo/OraculoModule').then(m => ({ default: m.OraculoModule })))
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 
-const APP_VERSION = 'APP v01.56.00'
+const APP_VERSION = 'APP v01.56.01'
 
 
 
