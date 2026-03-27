@@ -262,7 +262,7 @@ export function OraculoModule() {
     try {
       let res: Response
       if (activeTab === 'usuarios') {
-        // Dados de usuários usam endpoint dedicado (DELETE)
+        // Dados de usuários usam endpoint dedicado (DELETE) com cascata
         res = await fetch(`/api/oraculo/userdata?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
       } else {
         res = await fetch('/api/oraculo/excluir', {
@@ -276,6 +276,11 @@ export function OraculoModule() {
       if (activeTab === 'usuarios') {
         setUserData(p => p.filter(r => r.id !== id))
         setUserDataTotal(n => Math.max(0, n - 1))
+        // Cascata: backend removeu lotes/registros individuais — recarregar abas
+        setLciRegistros([])
+        setTesouroRegistros([])
+        setTotalRegistros(0)
+        void carregarRegistros(true)
       } else if (activeTab === 'lci-lca') {
         setLciRegistros(p => p.filter(r => r.id !== id))
         setTotalRegistros(n => Math.max(0, n - 1))

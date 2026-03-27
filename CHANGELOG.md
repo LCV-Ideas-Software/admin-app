@@ -1,5 +1,11 @@
 # Changelog — Admin App
 
+## [v01.57.00] — 2026-03-27\r
+### Adicionado\r
+- **Cascata de exclusão completa**: `DELETE /api/oraculo/userdata` agora apaga registros de todas as tabelas — `oraculo_user_data`, `oraculo_tesouro_ipca_lotes`, `oraculo_lci_cdb_registros`, `oraculo_auth_tokens` — por IDs do JSON + email (safety net). Observabilidade com contadores de registros deletados.\r
+- **Sincronização reversa em `excluir.ts`**: ao excluir registro individual das abas LCI/LCA ou Tesouro IPCA+, o `dados_json` em `oraculo_user_data` é atualizado para remover o ID deletado.\r
+- **Reload pós-exclusão**: após excluir usuário na aba "Dados de Usuários", as abas LCI/LCA e Tesouro IPCA+ são recarregadas automaticamente.\r
+\r
 ## [v01.56.02] — 2026-03-27
 ### Corrigido
 - **OraculoModule — Excluir usuário retornava 400**: botão "Excluir" na aba "Dados de Usuários" chamava `/api/oraculo/excluir` com `tipo: 'usuarios'`, que o backend rejeitava (só aceita `lci-lca`/`tesouro-ipca`). Corrigido para usar `DELETE /api/oraculo/userdata?id=...` quando `activeTab === 'usuarios'`, e atualizar corretamente o state local `userData`/`userDataTotal`.
