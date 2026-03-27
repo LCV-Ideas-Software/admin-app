@@ -1,5 +1,9 @@
 # Changelog — Admin App
 
+## [v01.55.00] — 2026-03-26
+### Alterado
+- **OraculoModule — Visualização de dados do usuário reescrita**: detalhe de usuário expandido agora mostra parâmetros de simulação (CDI, IPCA, Duration, taxa, aporte, prazo) em card glassmorphic com badges. Lotes Tesouro IPCA+ com `border-left` colorida (verde MANTER / vermelho VENDER), sinal badge, texto de análise por lote, e totais agregados (investido + taxa média). Registros LCI/LCA com badge IR, taxa CDI, e CDB equivalente.
+
 ## [v01.54.00] — 2026-03-26
 ### Adicionado
 - **OraculoModule Redesign v3**: reescrita completa alinhada ao design do MainsiteModule (`detail-panel`, `result-card`, `result-toolbar`, `ghost-button`, `post-row`, `itau-modal`).
