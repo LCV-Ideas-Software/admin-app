@@ -94,6 +94,201 @@ type OperationalAlert = {
   action: string
 }
 
+type OpsActionField =
+  | 'scriptName'
+  | 'projectName'
+  | 'deploymentId'
+  | 'domainName'
+  | 'secretName'
+  | 'secretValue'
+  | 'usageModel'
+  | 'schedules'
+  | 'templateCode'
+  | 'projectBranch'
+  | 'pageSettingsJson'
+  | 'versionId'
+  | 'zoneId'
+  | 'routeId'
+  | 'routePattern'
+  | 'rawMethod'
+  | 'rawPath'
+  | 'rawBodyJson'
+
+type OpsActionDefinition = {
+  value: string
+  label: string
+  description: string
+  fields: OpsActionField[]
+  outcomeLabel: string
+}
+
+const WORKER_OPS: OpsActionDefinition[] = [
+  {
+    value: 'create-worker-from-template',
+    label: 'Criar Worker com template base',
+    description: 'Publica um Worker inicial com um codigo JS simples e usage model definido no painel.',
+    fields: ['scriptName', 'usageModel', 'templateCode'],
+    outcomeLabel: 'Resumo do Worker criado',
+  },
+  {
+    value: 'get-worker-schedules',
+    label: 'Ler cron triggers do Worker',
+    description: 'Consulta os schedules configurados para execucao automatica do Worker.',
+    fields: ['scriptName'],
+    outcomeLabel: 'Schedules retornados pela Cloudflare',
+  },
+  {
+    value: 'update-worker-schedules',
+    label: 'Atualizar cron triggers do Worker',
+    description: 'Substitui a lista atual de schedules do Worker. Informe um cron por linha.',
+    fields: ['scriptName', 'schedules'],
+    outcomeLabel: 'Resultado da atualizacao de schedules',
+  },
+  {
+    value: 'get-worker-usage-model',
+    label: 'Ler usage model do Worker',
+    description: 'Mostra o modelo de cobranca atualmente aplicado ao Worker.',
+    fields: ['scriptName'],
+    outcomeLabel: 'Usage model atual',
+  },
+  {
+    value: 'update-worker-usage-model',
+    label: 'Atualizar usage model do Worker',
+    description: 'Altera o usage model do Worker sem precisar editar a publicacao manualmente.',
+    fields: ['scriptName', 'usageModel'],
+    outcomeLabel: 'Resultado da troca de usage model',
+  },
+  {
+    value: 'list-worker-secrets',
+    label: 'Listar secrets do Worker',
+    description: 'Retorna os nomes dos secrets configurados para o Worker selecionado.',
+    fields: ['scriptName'],
+    outcomeLabel: 'Secrets encontrados',
+  },
+  {
+    value: 'add-worker-secret',
+    label: 'Adicionar secret ao Worker',
+    description: 'Grava um novo secret_text no Worker. O valor e enviado apenas na execucao.',
+    fields: ['scriptName', 'secretName', 'secretValue'],
+    outcomeLabel: 'Resultado da gravacao do secret',
+  },
+  {
+    value: 'delete-worker-secret',
+    label: 'Remover secret do Worker',
+    description: 'Exclui um secret existente pelo nome.',
+    fields: ['scriptName', 'secretName'],
+    outcomeLabel: 'Resultado da remocao do secret',
+  },
+  {
+    value: 'list-worker-versions',
+    label: 'Listar versoes do Worker',
+    description: 'Consulta as versoes publicadas para apoiar rollback e promote controlado.',
+    fields: ['scriptName'],
+    outcomeLabel: 'Versoes retornadas',
+  },
+  {
+    value: 'deploy-worker-version',
+    label: 'Promover versao do Worker',
+    description: 'Move uma versao especifica para 100% do trafego do Worker.',
+    fields: ['scriptName', 'versionId'],
+    outcomeLabel: 'Resultado da promocao de versao',
+  },
+  {
+    value: 'list-worker-routes',
+    label: 'Listar rotas do Worker por zona',
+    description: 'Consulta as rotas vinculadas a uma zona Cloudflare especifica.',
+    fields: ['zoneId'],
+    outcomeLabel: 'Rotas encontradas na zona',
+  },
+  {
+    value: 'add-worker-route',
+    label: 'Adicionar rota do Worker',
+    description: 'Vincula um Worker existente a um pattern de rota dentro da zona.',
+    fields: ['zoneId', 'routePattern', 'scriptName'],
+    outcomeLabel: 'Resultado da criacao da rota',
+  },
+  {
+    value: 'delete-worker-route',
+    label: 'Remover rota do Worker',
+    description: 'Exclui uma rota especifica usando zoneId e routeId.',
+    fields: ['zoneId', 'routeId'],
+    outcomeLabel: 'Resultado da remocao da rota',
+  },
+]
+
+const PAGE_OPS: OpsActionDefinition[] = [
+  {
+    value: 'create-page-project',
+    label: 'Criar projeto Pages',
+    description: 'Cria um projeto Pages informando o nome e a branch principal de deploy.',
+    fields: ['projectName', 'projectBranch'],
+    outcomeLabel: 'Resumo do projeto criado',
+  },
+  {
+    value: 'update-page-project-settings',
+    label: 'Atualizar settings do Pages',
+    description: 'Aplica um PATCH no projeto Pages usando JSON valido no formato da API Cloudflare.',
+    fields: ['projectName', 'pageSettingsJson'],
+    outcomeLabel: 'Resultado do PATCH no projeto',
+  },
+  {
+    value: 'list-page-domains',
+    label: 'Listar dominios do Pages',
+    description: 'Consulta os dominios ja vinculados ao projeto Pages.',
+    fields: ['projectName'],
+    outcomeLabel: 'Dominios configurados no projeto',
+  },
+  {
+    value: 'add-page-domain',
+    label: 'Adicionar dominio ao Pages',
+    description: 'Solicita o vinculo de um dominio customizado ao projeto Pages.',
+    fields: ['projectName', 'domainName'],
+    outcomeLabel: 'Resultado da adicao do dominio',
+  },
+  {
+    value: 'delete-page-domain',
+    label: 'Remover dominio do Pages',
+    description: 'Remove um dominio customizado do projeto Pages informado.',
+    fields: ['projectName', 'domainName'],
+    outcomeLabel: 'Resultado da remocao do dominio',
+  },
+  {
+    value: 'retry-page-deployment',
+    label: 'Refazer deployment do Pages',
+    description: 'Dispara novo processamento para um deployment especifico do projeto.',
+    fields: ['projectName', 'deploymentId'],
+    outcomeLabel: 'Resultado do retry de deployment',
+  },
+  {
+    value: 'rollback-page-deployment',
+    label: 'Executar rollback de deployment',
+    description: 'Solicita rollback para um deployment especifico do projeto Pages.',
+    fields: ['projectName', 'deploymentId'],
+    outcomeLabel: 'Resultado do rollback',
+  },
+  {
+    value: 'get-page-deployment-logs',
+    label: 'Ler logs de deployment do Pages',
+    description: 'Traz o historico de logs do deployment para auditoria operacional.',
+    fields: ['projectName', 'deploymentId'],
+    outcomeLabel: 'Logs retornados pela Cloudflare',
+  },
+]
+
+const RAW_OPS: OpsActionDefinition[] = [
+  {
+    value: 'raw-cloudflare-request',
+    label: 'Executar chamada raw controlada',
+    description: 'Use apenas quando a operacao ainda nao estiver modelada acima. O path precisa iniciar com /accounts/... ou /zones/... .',
+    fields: ['rawMethod', 'rawPath', 'rawBodyJson'],
+    outcomeLabel: 'Retorno bruto da API Cloudflare',
+  },
+]
+
+const findOpsAction = (value: string) => {
+  return [...WORKER_OPS, ...PAGE_OPS, ...RAW_OPS].find((item) => item.value === value) ?? WORKER_OPS[1]
+}
+
 const parseApiPayload = async <T,>(response: Response, fallback: string): Promise<T> => {
   const rawText = await response.text()
   const trimmed = rawText.trim()
@@ -191,6 +386,9 @@ export function CfPwModule() {
   const [opsRawPath, setOpsRawPath] = useState('')
   const [opsRawBodyJson, setOpsRawBodyJson] = useState('')
   const [opsResult, setOpsResult] = useState<unknown>(null)
+
+  const currentOpsAction = useMemo(() => findOpsAction(opsAction), [opsAction])
+  const visibleOpsFields = useMemo(() => new Set(currentOpsAction.fields), [currentOpsAction])
 
   const operationalAlerts = useMemo<OperationalAlert[]>(() => {
     const next: OperationalAlert[] = []
@@ -321,6 +519,7 @@ export function CfPwModule() {
         id: scriptName,
         payload,
       })
+      setOpsScriptName(scriptName)
       showNotification(withReq(`Detalhes do Worker ${scriptName} carregados.`, payload), 'success')
     } catch (error) {
       const message = error instanceof Error ? error.message : `Não foi possível carregar detalhes do Worker ${scriptName}.`
@@ -350,6 +549,7 @@ export function CfPwModule() {
         id: projectName,
         payload,
       })
+      setOpsProjectName(projectName)
       showNotification(withReq(`Detalhes do projeto ${projectName} carregados.`, payload), 'success')
     } catch (error) {
       const message = error instanceof Error ? error.message : `Não foi possível carregar detalhes do projeto ${projectName}.`
@@ -746,7 +946,7 @@ export function CfPwModule() {
                 {detailWarnings.length > 0 ? (
                   <div className="cfpw-inline-warning" role="status" aria-live="polite">
                     {detailWarnings.map((warning) => (
-                      <p key={warning.code}><strong>{warning.code}</strong> - {warning.message}</p>
+                      <p key={warning.code}><strong>{warning.message}</strong> <span>({warning.code})</span></p>
                     ))}
                   </div>
                 ) : null}
@@ -807,6 +1007,16 @@ export function CfPwModule() {
               <h4>Operações avançadas (Paridade Cloudflare)</h4>
             </div>
 
+            <div className="cfpw-ops-guide" role="status" aria-live="polite">
+              <strong>{currentOpsAction.label}</strong>
+              <p>{currentOpsAction.description}</p>
+              {details ? (
+                <p>
+                  Contexto rapido carregado do painel: <strong>{details.type === 'worker' ? 'Worker' : 'Pages'}</strong> <strong>{details.id}</strong>.
+                </p>
+              ) : null}
+            </div>
+
             <div className="form-grid">
               <div className="field-group">
                 <label htmlFor="cfpw-ops-action">Ação</label>
@@ -814,184 +1024,241 @@ export function CfPwModule() {
                   id="cfpw-ops-action"
                   name="cfpw-ops-action"
                   value={opsAction}
-                  onChange={(event) => setOpsAction(event.target.value)}
+                  onChange={(event) => {
+                    setOpsAction(event.target.value)
+                    setOpsResult(null)
+                  }}
                   disabled={opsLoading}
                 >
-                  <option value="create-worker-from-template">Worker: criar (template)</option>
-                  <option value="get-worker-schedules">Worker: ler cron triggers</option>
-                  <option value="update-worker-schedules">Worker: atualizar cron triggers</option>
-                  <option value="get-worker-usage-model">Worker: ler usage model</option>
-                  <option value="update-worker-usage-model">Worker: atualizar usage model</option>
-                  <option value="list-worker-secrets">Worker: listar secrets</option>
-                  <option value="add-worker-secret">Worker: adicionar secret</option>
-                  <option value="delete-worker-secret">Worker: remover secret</option>
-                  <option value="list-worker-versions">Worker: listar versões</option>
-                  <option value="deploy-worker-version">Worker: promover versão</option>
-                  <option value="list-worker-routes">Worker: listar rotas (zone)</option>
-                  <option value="add-worker-route">Worker: adicionar rota (zone)</option>
-                  <option value="delete-worker-route">Worker: remover rota (zone)</option>
-                  <option value="create-page-project">Pages: criar projeto</option>
-                  <option value="update-page-project-settings">Pages: atualizar settings projeto</option>
-                  <option value="list-page-domains">Pages: listar domínios</option>
-                  <option value="add-page-domain">Pages: adicionar domínio</option>
-                  <option value="delete-page-domain">Pages: remover domínio</option>
-                  <option value="retry-page-deployment">Pages: retry deployment</option>
-                  <option value="rollback-page-deployment">Pages: rollback deployment</option>
-                  <option value="get-page-deployment-logs">Pages: logs deployment</option>
-                  <option value="raw-cloudflare-request">Cloudflare API: operação raw controlada</option>
+                  <optgroup label="Workers">
+                    {WORKER_OPS.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Pages">
+                    {PAGE_OPS.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Cloudflare API">
+                    {RAW_OPS.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
-
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-script">Worker scriptName</label>
-                <input id="cfpw-ops-script" name="cfpw-ops-script" value={opsScriptName} onChange={(event) => setOpsScriptName(event.target.value)} disabled={opsLoading} />
-              </div>
-
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-project">Pages projectName</label>
-                <input id="cfpw-ops-project" name="cfpw-ops-project" value={opsProjectName} onChange={(event) => setOpsProjectName(event.target.value)} disabled={opsLoading} />
-              </div>
-
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-deployment">deploymentId</label>
-                <input id="cfpw-ops-deployment" name="cfpw-ops-deployment" value={opsDeploymentId} onChange={(event) => setOpsDeploymentId(event.target.value)} disabled={opsLoading} />
-              </div>
             </div>
 
-            <div className="form-grid">
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-domain">domainName</label>
-                <input id="cfpw-ops-domain" name="cfpw-ops-domain" value={opsDomainName} onChange={(event) => setOpsDomainName(event.target.value)} disabled={opsLoading} />
-              </div>
+            <div className="form-grid cfpw-ops-grid">
+              {visibleOpsFields.has('scriptName') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-script">Worker</label>
+                  <input id="cfpw-ops-script" name="cfpw-ops-script" list="cfpw-workers-list" value={opsScriptName} onChange={(event) => setOpsScriptName(event.target.value)} placeholder="Selecione ou digite o scriptName" disabled={opsLoading} />
+                  <datalist id="cfpw-workers-list">
+                    {workers.map((worker) => (
+                      <option key={worker.scriptName} value={worker.scriptName} />
+                    ))}
+                  </datalist>
+                </div>
+              ) : null}
 
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-secret-name">secretName</label>
-                <input id="cfpw-ops-secret-name" name="cfpw-ops-secret-name" value={opsSecretName} onChange={(event) => setOpsSecretName(event.target.value)} disabled={opsLoading} />
-              </div>
+              {visibleOpsFields.has('projectName') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-project">Projeto Pages</label>
+                  <input id="cfpw-ops-project" name="cfpw-ops-project" list="cfpw-pages-list" value={opsProjectName} onChange={(event) => setOpsProjectName(event.target.value)} placeholder="Selecione ou digite o projectName" disabled={opsLoading} />
+                  <datalist id="cfpw-pages-list">
+                    {pages.map((page) => (
+                      <option key={page.projectName} value={page.projectName} />
+                    ))}
+                  </datalist>
+                </div>
+              ) : null}
 
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-secret-value">secretValue</label>
-                <input id="cfpw-ops-secret-value" name="cfpw-ops-secret-value" value={opsSecretValue} onChange={(event) => setOpsSecretValue(event.target.value)} disabled={opsLoading} />
-              </div>
+              {visibleOpsFields.has('deploymentId') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-deployment">Deployment ID</label>
+                  <input id="cfpw-ops-deployment" name="cfpw-ops-deployment" value={opsDeploymentId} onChange={(event) => setOpsDeploymentId(event.target.value)} placeholder="Cole o ID do deployment" disabled={opsLoading} />
+                </div>
+              ) : null}
 
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-usage-model">usageModel</label>
-                <input id="cfpw-ops-usage-model" name="cfpw-ops-usage-model" value={opsUsageModel} onChange={(event) => setOpsUsageModel(event.target.value)} disabled={opsLoading} />
-              </div>
+              {visibleOpsFields.has('domainName') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-domain">Dominio</label>
+                  <input id="cfpw-ops-domain" name="cfpw-ops-domain" value={opsDomainName} onChange={(event) => setOpsDomainName(event.target.value)} placeholder="ex.: app.exemplo.com" disabled={opsLoading} />
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('secretName') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-secret-name">Nome do secret</label>
+                  <input id="cfpw-ops-secret-name" name="cfpw-ops-secret-name" value={opsSecretName} onChange={(event) => setOpsSecretName(event.target.value)} placeholder="ex.: API_KEY" disabled={opsLoading} />
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('secretValue') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-secret-value">Valor do secret</label>
+                  <input id="cfpw-ops-secret-value" name="cfpw-ops-secret-value" type="password" value={opsSecretValue} onChange={(event) => setOpsSecretValue(event.target.value)} placeholder="Digite o valor apenas na hora de gravar" disabled={opsLoading} />
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('usageModel') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-usage-model">Usage model</label>
+                  <select id="cfpw-ops-usage-model" name="cfpw-ops-usage-model" value={opsUsageModel} onChange={(event) => setOpsUsageModel(event.target.value)} disabled={opsLoading}>
+                    <option value="standard">standard</option>
+                    <option value="bundled">bundled</option>
+                    <option value="unbound">unbound</option>
+                  </select>
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('projectBranch') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-project-branch">Branch principal</label>
+                  <input id="cfpw-ops-project-branch" name="cfpw-ops-project-branch" value={opsProjectBranch} onChange={(event) => setOpsProjectBranch(event.target.value)} placeholder="main" disabled={opsLoading} />
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('versionId') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-version-id">Version ID</label>
+                  <input id="cfpw-ops-version-id" name="cfpw-ops-version-id" value={opsVersionId} onChange={(event) => setOpsVersionId(event.target.value)} placeholder="Cole a versao retornada pela listagem" disabled={opsLoading} />
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('zoneId') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-zone-id">Zone ID</label>
+                  <input id="cfpw-ops-zone-id" name="cfpw-ops-zone-id" value={opsZoneId} onChange={(event) => setOpsZoneId(event.target.value)} placeholder="Informe a zona usada nas rotas" disabled={opsLoading} />
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('routeId') ? (
+                <div className="field-group">
+                  <label htmlFor="cfpw-ops-route-id">Route ID</label>
+                  <input id="cfpw-ops-route-id" name="cfpw-ops-route-id" value={opsRouteId} onChange={(event) => setOpsRouteId(event.target.value)} placeholder="ID da rota retornado pela Cloudflare" disabled={opsLoading} />
+                </div>
+              ) : null}
+
+              {visibleOpsFields.has('routePattern') ? (
+                <div className="field-group cfpw-ops-grid-full">
+                  <label htmlFor="cfpw-ops-route-pattern">Pattern da rota</label>
+                  <input id="cfpw-ops-route-pattern" name="cfpw-ops-route-pattern" value={opsRoutePattern} onChange={(event) => setOpsRoutePattern(event.target.value)} placeholder="ex.: exemplo.com/api/*" disabled={opsLoading} />
+                </div>
+              ) : null}
             </div>
 
-            <div className="form-grid">
+            {visibleOpsFields.has('schedules') ? (
               <div className="field-group">
-                <label htmlFor="cfpw-ops-project-branch">projectBranch</label>
-                <input id="cfpw-ops-project-branch" name="cfpw-ops-project-branch" value={opsProjectBranch} onChange={(event) => setOpsProjectBranch(event.target.value)} disabled={opsLoading} />
-              </div>
-
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-version-id">versionId</label>
-                <input id="cfpw-ops-version-id" name="cfpw-ops-version-id" value={opsVersionId} onChange={(event) => setOpsVersionId(event.target.value)} disabled={opsLoading} />
-              </div>
-
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-zone-id">zoneId</label>
-                <input id="cfpw-ops-zone-id" name="cfpw-ops-zone-id" value={opsZoneId} onChange={(event) => setOpsZoneId(event.target.value)} disabled={opsLoading} />
-              </div>
-
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-route-id">routeId</label>
-                <input id="cfpw-ops-route-id" name="cfpw-ops-route-id" value={opsRouteId} onChange={(event) => setOpsRouteId(event.target.value)} disabled={opsLoading} />
-              </div>
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="cfpw-ops-route-pattern">routePattern</label>
-              <input id="cfpw-ops-route-pattern" name="cfpw-ops-route-pattern" value={opsRoutePattern} onChange={(event) => setOpsRoutePattern(event.target.value)} disabled={opsLoading} />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="cfpw-ops-schedules">Schedules (1 cron por linha)</label>
-              <textarea
-                id="cfpw-ops-schedules"
-                name="cfpw-ops-schedules"
-                className="json-textarea"
-                rows={3}
-                value={opsSchedulesRaw}
-                onChange={(event) => setOpsSchedulesRaw(event.target.value)}
-                disabled={opsLoading}
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="cfpw-ops-template-code">Worker template code (JS)</label>
-              <textarea
-                id="cfpw-ops-template-code"
-                name="cfpw-ops-template-code"
-                className="json-textarea"
-                rows={5}
-                value={opsTemplateCode}
-                onChange={(event) => setOpsTemplateCode(event.target.value)}
-                disabled={opsLoading}
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="cfpw-ops-page-settings">pageSettingsJson (PATCH Pages)</label>
-              <textarea
-                id="cfpw-ops-page-settings"
-                name="cfpw-ops-page-settings"
-                className="json-textarea"
-                rows={5}
-                value={opsPageSettingsJson}
-                onChange={(event) => setOpsPageSettingsJson(event.target.value)}
-                disabled={opsLoading}
-              />
-            </div>
-
-            <div className="form-grid">
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-raw-method">rawMethod</label>
-                <select
-                  id="cfpw-ops-raw-method"
-                  name="cfpw-ops-raw-method"
-                  value={opsRawMethod}
-                  onChange={(event) => setOpsRawMethod(event.target.value)}
+                <label htmlFor="cfpw-ops-schedules">Cron triggers (um por linha)</label>
+                <textarea
+                  id="cfpw-ops-schedules"
+                  name="cfpw-ops-schedules"
+                  className="json-textarea"
+                  rows={4}
+                  value={opsSchedulesRaw}
+                  onChange={(event) => setOpsSchedulesRaw(event.target.value)}
                   disabled={opsLoading}
-                >
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="PATCH">PATCH</option>
-                  <option value="DELETE">DELETE</option>
-                </select>
+                />
+                <p className="field-hint">Exemplo: 0 5 * * * para executar diariamente as 05:00 UTC.</p>
               </div>
+            ) : null}
 
+            {visibleOpsFields.has('templateCode') ? (
               <div className="field-group">
-                <label htmlFor="cfpw-ops-raw-path">rawPath (/accounts/... ou /zones/...)</label>
-                <input id="cfpw-ops-raw-path" name="cfpw-ops-raw-path" value={opsRawPath} onChange={(event) => setOpsRawPath(event.target.value)} disabled={opsLoading} />
+                <label htmlFor="cfpw-ops-template-code">Codigo inicial do Worker</label>
+                <textarea
+                  id="cfpw-ops-template-code"
+                  name="cfpw-ops-template-code"
+                  className="json-textarea"
+                  rows={6}
+                  value={opsTemplateCode}
+                  onChange={(event) => setOpsTemplateCode(event.target.value)}
+                  disabled={opsLoading}
+                />
+                <p className="field-hint">Se deixar em branco, o painel publica um template basico de resposta texto.</p>
               </div>
-            </div>
+            ) : null}
 
-            <div className="field-group">
-              <label htmlFor="cfpw-ops-raw-body">rawBodyJson</label>
-              <textarea
-                id="cfpw-ops-raw-body"
-                name="cfpw-ops-raw-body"
-                className="json-textarea"
-                rows={5}
-                value={opsRawBodyJson}
-                onChange={(event) => setOpsRawBodyJson(event.target.value)}
-                disabled={opsLoading}
-              />
-            </div>
+            {visibleOpsFields.has('pageSettingsJson') ? (
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-page-settings">JSON de settings do Pages</label>
+                <textarea
+                  id="cfpw-ops-page-settings"
+                  name="cfpw-ops-page-settings"
+                  className="json-textarea"
+                  rows={6}
+                  value={opsPageSettingsJson}
+                  onChange={(event) => setOpsPageSettingsJson(event.target.value)}
+                  disabled={opsLoading}
+                />
+                <p className="field-hint">Cole apenas JSON valido. Exemplo: {`{"production_branch":"main"}`}</p>
+              </div>
+            ) : null}
+
+            {visibleOpsFields.has('rawMethod') || visibleOpsFields.has('rawPath') || visibleOpsFields.has('rawBodyJson') ? (
+              <div className="cfpw-ops-guide cfpw-ops-guide-warning">
+                <strong>Modo raw controlado</strong>
+                <p>Use somente quando a operacao ainda nao estiver modelada no painel. O retorno sera exibido como veio da API Cloudflare.</p>
+              </div>
+            ) : null}
+
+            {visibleOpsFields.has('rawMethod') || visibleOpsFields.has('rawPath') ? (
+              <div className="form-grid cfpw-ops-grid">
+                {visibleOpsFields.has('rawMethod') ? (
+                  <div className="field-group">
+                    <label htmlFor="cfpw-ops-raw-method">Metodo HTTP</label>
+                    <select
+                      id="cfpw-ops-raw-method"
+                      name="cfpw-ops-raw-method"
+                      value={opsRawMethod}
+                      onChange={(event) => setOpsRawMethod(event.target.value)}
+                      disabled={opsLoading}
+                    >
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                      <option value="PUT">PUT</option>
+                      <option value="PATCH">PATCH</option>
+                      <option value="DELETE">DELETE</option>
+                    </select>
+                  </div>
+                ) : null}
+
+                {visibleOpsFields.has('rawPath') ? (
+                  <div className="field-group cfpw-ops-grid-full">
+                    <label htmlFor="cfpw-ops-raw-path">Path da API Cloudflare</label>
+                    <input id="cfpw-ops-raw-path" name="cfpw-ops-raw-path" value={opsRawPath} onChange={(event) => setOpsRawPath(event.target.value)} placeholder="/accounts/... ou /zones/..." disabled={opsLoading} />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {visibleOpsFields.has('rawBodyJson') && opsRawMethod !== 'GET' ? (
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-raw-body">JSON do corpo</label>
+                <textarea
+                  id="cfpw-ops-raw-body"
+                  name="cfpw-ops-raw-body"
+                  className="json-textarea"
+                  rows={6}
+                  value={opsRawBodyJson}
+                  onChange={(event) => setOpsRawBodyJson(event.target.value)}
+                  disabled={opsLoading}
+                />
+              </div>
+            ) : null}
 
             <div className="inline-actions">
               <button type="button" className="primary-button" onClick={() => void runAdvancedOp()} disabled={opsLoading}>
                 {opsLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-                Executar operação avançada
+                Executar: {currentOpsAction.label}
               </button>
             </div>
 
             {opsResult != null ? (
               <div className="cfpw-json-preview">
+                <div className="cfpw-json-preview__title">{currentOpsAction.outcomeLabel}</div>
                 <pre>{JSON.stringify(opsResult, null, 2)}</pre>
               </div>
             ) : null}

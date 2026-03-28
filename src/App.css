@@ -1523,6 +1523,16 @@ input[type="color"]:focus-visible {
   overflow: auto;
 }
 
+.cfpw-json-preview__title {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.14);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+}
+
 .cfpw-detail-grid {
   margin-top: 12px;
   display: grid;
@@ -1569,6 +1579,52 @@ input[type="color"]:focus-visible {
   margin: 0;
   font-size: 0.78rem;
   color: #7c2d12;
+}
+
+.cfpw-inline-warning p span {
+  color: #9a3412;
+  opacity: 0.85;
+}
+
+.cfpw-ops-guide {
+  margin-top: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(239, 246, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cfpw-ops-guide strong {
+  font-size: 0.82rem;
+  color: #1e3a8a;
+}
+
+.cfpw-ops-guide p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.cfpw-ops-guide-warning {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(255, 251, 235, 0.92);
+}
+
+.cfpw-ops-guide-warning strong {
+  color: #92400e;
+}
+
+.cfpw-ops-grid {
+  align-items: start;
+}
+
+.cfpw-ops-grid-full {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 1100px) {
