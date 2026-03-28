@@ -213,6 +213,12 @@ type CommonRecordValidation = {
   hints: string[]
 }
 
+type DnsOperationalAlert = {
+  code: string
+  cause: string
+  action: string
+}
+
 const IPV4_REGEX = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/
 const IPV6_REGEX = /^([0-9a-f]{1,4}:){1,7}[0-9a-f]{1,4}$|^::$|^(([0-9a-f]{1,4}:){1,7}:)$|^(:(:[0-9a-f]{1,4}){1,7})$/i
 const HOSTNAME_REGEX = /^(?:\*\.)?(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?:\.(?!-)[a-z0-9-]{1,63})*\.?$/i
@@ -531,60 +537,116 @@ export function CfDnsModule() {
     return parseCommonRecordDraft(draft.type, draft.name, draft.content, draft.priority)
   }, [draft.type, draft.name, draft.content, draft.priority, isSrvDraft, isCaaDraft, isUriDraft, isHttpsDraft])
 
-  const warnings = useMemo(() => {
-    const next: string[] = []
+  const operationalAlerts = useMemo<DnsOperationalAlert[]>(() => {
+    const next: DnsOperationalAlert[] = []
 
     if (!selectedZoneId) {
-      next.push('Selecione um domínio para gerenciar os registros DNS.')
+      next.push({
+        code: 'CFDNS-ZONE-MISSING',
+        cause: 'Nenhuma zona está selecionada para operar DNS.',
+        action: 'Selecione um domínio em "Domínio / Zona" para habilitar leitura e alteração de registros.',
+      })
     }
 
     if (draft.ttl && draft.ttl !== '1') {
       const ttl = Number(draft.ttl)
       if (Number.isFinite(ttl) && ttl > 0 && ttl < 300) {
-        next.push('TTL menor que 300 segundos pode aumentar o volume de consultas DNS.')
+        next.push({
+          code: 'CFDNS-TTL-LOW',
+          cause: `TTL configurado em ${ttl}s, abaixo do recomendado para estabilidade operacional.`,
+          action: 'Use TTL >= 300s para reduzir flapping de cache, salvo quando houver necessidade real de propagação rápida.',
+        })
       }
     }
 
     if (draft.proxied && !PROXY_COMPATIBLE_TYPES.has(draft.type)) {
-      next.push(`O tipo ${draft.type} não suporta proxy laranja. Desative o proxy para evitar erro da API.`)
+      next.push({
+        code: 'CFDNS-PROXY-INCOMPATIBLE',
+        cause: `O tipo ${draft.type} não suporta proxy laranja na Cloudflare.`,
+        action: 'Defina Proxy como "DNS only" para esse tipo antes de salvar.',
+      })
     }
 
     if (draft.type === 'MX' && !draft.priority.trim()) {
-      next.push('Registros MX exigem prioridade para roteamento correto de e-mail.')
+      next.push({
+        code: 'CFDNS-MX-PRIORITY-MISSING',
+        cause: 'Registro MX sem valor de prioridade.',
+        action: 'Informe prioridade (0-65535) para ordenar servidores de e-mail corretamente.',
+      })
     }
 
     if (isSrvDraft) {
       if (!draft.srvService.trim() || !draft.srvProto.trim() || !draft.srvTarget.trim() || !draft.srvPort.trim()) {
-        next.push('SRV exige service, proto, port e target para ser aceito pela Cloudflare.')
+        next.push({
+          code: 'CFDNS-SRV-REQUIRED-FIELDS',
+          cause: 'Registro SRV sem um ou mais campos obrigatórios (service/proto/port/target).',
+          action: 'Preencha todos os campos essenciais do SRV antes de salvar.',
+        })
       }
     }
 
     if (isCaaDraft && (!draft.caaTag.trim() || !draft.caaValue.trim())) {
-      next.push('CAA exige tag e value para controle de autoridades emissoras de certificado.')
+      next.push({
+        code: 'CFDNS-CAA-REQUIRED-FIELDS',
+        cause: 'Registro CAA sem tag e/ou value.',
+        action: 'Preencha tag e value para definir corretamente a política de emissão de certificados.',
+      })
     }
 
     if (isCaaDraft && caaValidation.issues.length > 0) {
-      next.push(`CAA possui ${caaValidation.issues.length} inconsistência(s).`)
+      for (const issue of caaValidation.issues) {
+        next.push({
+          code: 'CFDNS-CAA-INVALID',
+          cause: issue,
+          action: 'Corrija o(s) campo(s) CAA com erro e salve novamente.',
+        })
+      }
     }
 
     if (isUriDraft && !draft.uriTarget.trim()) {
-      next.push('URI exige target para roteamento do serviço.')
+      next.push({
+        code: 'CFDNS-URI-TARGET-MISSING',
+        cause: 'Registro URI sem target.',
+        action: 'Informe o target URI completo (ex.: https://servico.exemplo/rota).',
+      })
     }
 
     if (isUriDraft && uriValidation.issues.length > 0) {
-      next.push(`URI possui ${uriValidation.issues.length} inconsistência(s).`)
+      for (const issue of uriValidation.issues) {
+        next.push({
+          code: 'CFDNS-URI-INVALID',
+          cause: issue,
+          action: 'Ajuste o target URI para formato válido e salve novamente.',
+        })
+      }
     }
 
     if (isHttpsDraft && !draft.httpsValue.trim()) {
-      next.push('HTTPS/SVCB exige parâmetros em value (ex.: alpn=h3,h2 port=443).')
+      next.push({
+        code: 'CFDNS-HTTPS-VALUE-MISSING',
+        cause: `${draft.type} sem parâmetros em value.`,
+        action: 'Informe parâmetros como alpn, port e hints de IP conforme o cenário.',
+      })
     }
 
     if (isHttpsDraft && httpsValidation.issues.length > 0) {
-      next.push(`HTTPS/SVCB possui ${httpsValidation.issues.length} inconsistência(s) semântica(s).`)
+      for (const issue of httpsValidation.issues) {
+        next.push({
+          code: 'CFDNS-HTTPS-SEMANTIC-INVALID',
+          cause: issue,
+          action: 'Ajuste o parâmetro indicado em value para sintaxe chave=valor válida.',
+        })
+      }
     }
 
     if (!isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && commonValidation.issues.length > 0) {
-      next.push(`Registro ${draft.type} possui ${commonValidation.issues.length} inconsistência(s).`)
+      for (const issue of commonValidation.issues) {
+        next.push({
+          code: `CFDNS-${draft.type}-INVALID`,
+          cause: issue,
+          action: `Corrija o campo inválido do registro ${draft.type} antes de salvar.`,
+        })
+      }
     }
 
     return next
@@ -604,7 +666,7 @@ export function CfDnsModule() {
     caaValidation.issues.length,
     uriValidation.issues.length,
     httpsValidation.issues.length,
-    commonValidation.issues.length,
+    commonValidation.issues,
     isCaaDraft,
     isHttpsDraft,
     isSrvDraft,
@@ -619,11 +681,11 @@ export function CfDnsModule() {
     if (!selectedZoneId) {
       return 'idle'
     }
-    if (warnings.length > 0) {
+    if (operationalAlerts.length > 0) {
       return 'warning'
     }
     return 'ok'
-  }, [deletingId, recordsLoading, saving, selectedZoneId, warnings.length, zonesLoading])
+  }, [deletingId, operationalAlerts.length, recordsLoading, saving, selectedZoneId, zonesLoading])
 
   const statusLabel = useMemo(() => {
     if (zonesLoading || recordsLoading || saving || Boolean(deletingId)) {
@@ -632,11 +694,11 @@ export function CfDnsModule() {
     if (!selectedZoneId) {
       return 'Aguardando domínio'
     }
-    if (warnings.length > 0) {
-      return `${warnings.length} alerta(s)`
+    if (operationalAlerts.length > 0) {
+      return `${operationalAlerts.length} alerta(s)`
     }
     return 'Sincronizado'
-  }, [deletingId, recordsLoading, saving, selectedZoneId, warnings.length, zonesLoading])
+  }, [deletingId, operationalAlerts.length, recordsLoading, saving, selectedZoneId, zonesLoading])
 
   const resetDraft = () => {
     setDraft(DEFAULT_DRAFT)
@@ -1014,15 +1076,17 @@ export function CfDnsModule() {
         </span>
       </div>
 
-      {warnings.length > 0 && (
+      {operationalAlerts.length > 0 && (
         <article className="integrity-banner integrity-banner--warning">
           <header className="integrity-banner__header">
             <AlertTriangle size={16} />
             <strong>Alertas operacionais do DNS</strong>
           </header>
           <ul className="integrity-banner__list">
-            {warnings.map((warning, index) => (
-              <li key={`${warning}-${index}`}>{warning}</li>
+            {operationalAlerts.map((alert, index) => (
+              <li key={`${alert.code}-${index}`}>
+                <strong>{alert.code}</strong> · {alert.cause} Ação recomendada: {alert.action}
+              </li>
             ))}
           </ul>
         </article>

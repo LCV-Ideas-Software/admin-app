@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.64.00] — 2026-03-28
+### Adicionado
+- **CF P&W — Operações avançadas de paridade**: novo endpoint unificado `POST /api/cfpw/ops` com suporte operacional para schedules, usage model e secrets de Workers, além de domains e ações de deployment em Pages (retry, rollback e logs).
+- **CF P&W — Painel de execução avançada**: módulo `CF P&W` recebeu painel dedicado para executar operações de paridade com parâmetros operacionais e pré-visualização estruturada do retorno.
+
+### Alterado
+- **CF DNS — Alertas operacionais detalhados**: warnings de validação agora são emitidos com `code`, `cause` e `action`, elevando a legibilidade e a capacidade de ação do operador em cenários de configuração arriscada.
+- **CF P&W — Helper Cloudflare expandido**: `functions/api/_lib/cfpw-api.ts` ampliado para cobrir superfícies críticas da API de Workers/Pages além de overview/detalhes/exclusão.
+
 ## [v01.63.01] — 2026-03-28
 ### Alterado
 - **CF DNS — Edição contextual no estilo Cloudflare**: ao clicar em `Editar`, o painel de edição abre imediatamente abaixo do registro selecionado na tabela, mantendo contexto local da linha.

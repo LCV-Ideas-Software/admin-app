@@ -71,6 +71,15 @@ type DeletePayload = {
   message?: string
 }
 
+type OpsResponsePayload = {
+  ok: boolean
+  error?: string
+  request_id?: string
+  action?: string
+  accountId?: string
+  result?: unknown
+}
+
 type DetailType = 'worker' | 'page'
 
 type DetailState = {
@@ -161,6 +170,17 @@ export function CfPwModule() {
   const [deleteTarget, setDeleteTarget] = useState<{ type: DetailType; id: string } | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [opsLoading, setOpsLoading] = useState(false)
+  const [opsAction, setOpsAction] = useState('get-worker-schedules')
+  const [opsScriptName, setOpsScriptName] = useState('')
+  const [opsProjectName, setOpsProjectName] = useState('')
+  const [opsDeploymentId, setOpsDeploymentId] = useState('')
+  const [opsDomainName, setOpsDomainName] = useState('')
+  const [opsSecretName, setOpsSecretName] = useState('')
+  const [opsSecretValue, setOpsSecretValue] = useState('')
+  const [opsUsageModel, setOpsUsageModel] = useState('standard')
+  const [opsSchedulesRaw, setOpsSchedulesRaw] = useState('0 5 * * *')
+  const [opsResult, setOpsResult] = useState<unknown>(null)
 
   const operationalAlerts = useMemo<OperationalAlert[]>(() => {
     const next: OperationalAlert[] = []
@@ -379,6 +399,49 @@ export function CfPwModule() {
       setDeleting(false)
     }
   }, [adminActor, deleteConfirmation, deleteTarget, details, loadOverview, showNotification])
+
+  const runAdvancedOp = useCallback(async () => {
+    setOpsLoading(true)
+    try {
+      const schedules = opsSchedulesRaw
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((cron) => ({ cron }))
+
+      const response = await fetch('/api/cfpw/ops', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
+        },
+        body: JSON.stringify({
+          action: opsAction,
+          scriptName: opsScriptName,
+          projectName: opsProjectName,
+          deploymentId: opsDeploymentId,
+          domainName: opsDomainName,
+          secretName: opsSecretName,
+          secretValue: opsSecretValue,
+          usageModel: opsUsageModel,
+          schedules,
+        }),
+      })
+
+      const payload = await parseApiPayload<OpsResponsePayload>(response, `Falha ao executar operação avançada (${opsAction})`)
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? `Falha ao executar operação avançada (${opsAction}).`)
+      }
+
+      setOpsResult(payload.result ?? null)
+      showNotification(withReq(`Operação avançada concluída (${opsAction}).`, payload), 'success')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao executar operação avançada no CF P&W.'
+      showNotification(message, 'error')
+    } finally {
+      setOpsLoading(false)
+    }
+  }, [adminActor, opsAction, opsDeploymentId, opsDomainName, opsProjectName, opsSchedulesRaw, opsScriptName, opsSecretName, opsSecretValue, opsUsageModel, showNotification])
 
   useEffect(() => {
     void loadOverview()
@@ -695,6 +758,102 @@ export function CfPwModule() {
                 ) : null}
               </>
             )}
+          </article>
+
+          <article className="result-card cfpw-detail-card cfpw-detail-card-full">
+            <div className="result-toolbar">
+              <h4>Operações avançadas (Paridade Cloudflare)</h4>
+            </div>
+
+            <div className="form-grid">
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-action">Ação</label>
+                <select
+                  id="cfpw-ops-action"
+                  name="cfpw-ops-action"
+                  value={opsAction}
+                  onChange={(event) => setOpsAction(event.target.value)}
+                  disabled={opsLoading}
+                >
+                  <option value="get-worker-schedules">Worker: ler cron triggers</option>
+                  <option value="update-worker-schedules">Worker: atualizar cron triggers</option>
+                  <option value="get-worker-usage-model">Worker: ler usage model</option>
+                  <option value="update-worker-usage-model">Worker: atualizar usage model</option>
+                  <option value="list-worker-secrets">Worker: listar secrets</option>
+                  <option value="add-worker-secret">Worker: adicionar secret</option>
+                  <option value="delete-worker-secret">Worker: remover secret</option>
+                  <option value="list-page-domains">Pages: listar domínios</option>
+                  <option value="add-page-domain">Pages: adicionar domínio</option>
+                  <option value="delete-page-domain">Pages: remover domínio</option>
+                  <option value="retry-page-deployment">Pages: retry deployment</option>
+                  <option value="rollback-page-deployment">Pages: rollback deployment</option>
+                  <option value="get-page-deployment-logs">Pages: logs deployment</option>
+                </select>
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-script">Worker scriptName</label>
+                <input id="cfpw-ops-script" name="cfpw-ops-script" value={opsScriptName} onChange={(event) => setOpsScriptName(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-project">Pages projectName</label>
+                <input id="cfpw-ops-project" name="cfpw-ops-project" value={opsProjectName} onChange={(event) => setOpsProjectName(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-deployment">deploymentId</label>
+                <input id="cfpw-ops-deployment" name="cfpw-ops-deployment" value={opsDeploymentId} onChange={(event) => setOpsDeploymentId(event.target.value)} disabled={opsLoading} />
+              </div>
+            </div>
+
+            <div className="form-grid">
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-domain">domainName</label>
+                <input id="cfpw-ops-domain" name="cfpw-ops-domain" value={opsDomainName} onChange={(event) => setOpsDomainName(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-secret-name">secretName</label>
+                <input id="cfpw-ops-secret-name" name="cfpw-ops-secret-name" value={opsSecretName} onChange={(event) => setOpsSecretName(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-secret-value">secretValue</label>
+                <input id="cfpw-ops-secret-value" name="cfpw-ops-secret-value" value={opsSecretValue} onChange={(event) => setOpsSecretValue(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-usage-model">usageModel</label>
+                <input id="cfpw-ops-usage-model" name="cfpw-ops-usage-model" value={opsUsageModel} onChange={(event) => setOpsUsageModel(event.target.value)} disabled={opsLoading} />
+              </div>
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfpw-ops-schedules">Schedules (1 cron por linha)</label>
+              <textarea
+                id="cfpw-ops-schedules"
+                name="cfpw-ops-schedules"
+                className="json-textarea"
+                rows={3}
+                value={opsSchedulesRaw}
+                onChange={(event) => setOpsSchedulesRaw(event.target.value)}
+                disabled={opsLoading}
+              />
+            </div>
+
+            <div className="inline-actions">
+              <button type="button" className="primary-button" onClick={() => void runAdvancedOp()} disabled={opsLoading}>
+                {opsLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+                Executar operação avançada
+              </button>
+            </div>
+
+            {opsResult != null ? (
+              <div className="cfpw-json-preview">
+                <pre>{JSON.stringify(opsResult, null, 2)}</pre>
+              </div>
+            ) : null}
           </article>
         </div>
 

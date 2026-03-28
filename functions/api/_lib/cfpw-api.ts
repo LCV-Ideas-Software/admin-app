@@ -58,6 +58,23 @@ export type CfpwPageDeployment = {
   }
 }
 
+export type CfpwWorkerSchedule = {
+  cron?: string
+  created_on?: string
+  modified_on?: string
+}
+
+export type CfpwWorkerSecret = {
+  name?: string
+  type?: string
+}
+
+export type CfpwPageDomain = {
+  name?: string
+  status?: string
+  verification_data?: Record<string, unknown>
+}
+
 type EnvWithCloudflarePwToken = {
   CLOUDFLARE_PW?: string
   CLOUDFLARE_API_TOKEN?: string
@@ -308,5 +325,267 @@ export const deleteCloudflarePagesProject = async (env: EnvWithCloudflarePwToken
     {
       method: 'DELETE',
     },
+  )
+}
+
+export const getCloudflareWorkerSchedules = async (env: EnvWithCloudflarePwToken, accountId: string, scriptName: string) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para ler cron triggers do Worker.')
+  }
+
+  const schedules = await cloudflareRequest<CfpwWorkerSchedule[]>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/schedules`,
+    `Falha ao ler cron triggers do Worker ${normalizedScript}`,
+  )
+
+  return Array.isArray(schedules) ? schedules : []
+}
+
+export const updateCloudflareWorkerSchedules = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  scriptName: string,
+  schedules: Array<{ cron: string }>,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para atualizar cron triggers do Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/schedules`,
+    `Falha ao atualizar cron triggers do Worker ${normalizedScript}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(schedules),
+    },
+  )
+}
+
+export const getCloudflareWorkerUsageModel = async (env: EnvWithCloudflarePwToken, accountId: string, scriptName: string) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para ler usage model do Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/usage-model`,
+    `Falha ao ler usage model do Worker ${normalizedScript}`,
+  )
+}
+
+export const updateCloudflareWorkerUsageModel = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  scriptName: string,
+  usageModel: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para atualizar usage model do Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/usage-model`,
+    `Falha ao atualizar usage model do Worker ${normalizedScript}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ usage_model: usageModel.trim() }),
+    },
+  )
+}
+
+export const listCloudflareWorkerSecrets = async (env: EnvWithCloudflarePwToken, accountId: string, scriptName: string) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para listar secrets do Worker.')
+  }
+
+  const secrets = await cloudflareRequest<CfpwWorkerSecret[]>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/secrets`,
+    `Falha ao listar secrets do Worker ${normalizedScript}`,
+  )
+
+  return Array.isArray(secrets) ? secrets : []
+}
+
+export const addCloudflareWorkerSecret = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  scriptName: string,
+  name: string,
+  text: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para adicionar secret do Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/secrets`,
+    `Falha ao adicionar secret no Worker ${normalizedScript}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: name.trim(),
+        text,
+        type: 'secret_text',
+      }),
+    },
+  )
+}
+
+export const deleteCloudflareWorkerSecret = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  scriptName: string,
+  secretName: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  const normalizedSecret = secretName.trim()
+  if (!normalizedAccountId || !normalizedScript || !normalizedSecret) {
+    throw new Error('Account ID, scriptName e secretName são obrigatórios para remover secret do Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/secrets/${encodeURIComponent(normalizedSecret)}`,
+    `Falha ao remover secret ${normalizedSecret} do Worker ${normalizedScript}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
+export const listCloudflarePagesDomains = async (env: EnvWithCloudflarePwToken, accountId: string, projectName: string) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  if (!normalizedAccountId || !normalizedProject) {
+    throw new Error('Account ID e projectName são obrigatórios para listar domínios do Pages.')
+  }
+
+  const domains = await cloudflareRequest<CfpwPageDomain[]>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/domains`,
+    `Falha ao listar domínios do projeto ${normalizedProject}`,
+  )
+
+  return Array.isArray(domains) ? domains : []
+}
+
+export const addCloudflarePagesDomain = async (env: EnvWithCloudflarePwToken, accountId: string, projectName: string, domainName: string) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  const normalizedDomain = domainName.trim()
+  if (!normalizedAccountId || !normalizedProject || !normalizedDomain) {
+    throw new Error('Account ID, projectName e domainName são obrigatórios para adicionar domínio no Pages.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/domains`,
+    `Falha ao adicionar domínio no projeto ${normalizedProject}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ name: normalizedDomain }),
+    },
+  )
+}
+
+export const deleteCloudflarePagesDomain = async (env: EnvWithCloudflarePwToken, accountId: string, projectName: string, domainName: string) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  const normalizedDomain = domainName.trim()
+  if (!normalizedAccountId || !normalizedProject || !normalizedDomain) {
+    throw new Error('Account ID, projectName e domainName são obrigatórios para remover domínio do Pages.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/domains/${encodeURIComponent(normalizedDomain)}`,
+    `Falha ao remover domínio ${normalizedDomain} do projeto ${normalizedProject}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
+export const retryCloudflarePagesDeployment = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  projectName: string,
+  deploymentId: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  const normalizedDeploymentId = deploymentId.trim()
+  if (!normalizedAccountId || !normalizedProject || !normalizedDeploymentId) {
+    throw new Error('Account ID, projectName e deploymentId são obrigatórios para retry de deployment.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/deployments/${encodeURIComponent(normalizedDeploymentId)}/retry`,
+    `Falha ao executar retry do deployment ${normalizedDeploymentId}`,
+    {
+      method: 'POST',
+    },
+  )
+}
+
+export const rollbackCloudflarePagesDeployment = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  projectName: string,
+  deploymentId: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  const normalizedDeploymentId = deploymentId.trim()
+  if (!normalizedAccountId || !normalizedProject || !normalizedDeploymentId) {
+    throw new Error('Account ID, projectName e deploymentId são obrigatórios para rollback de deployment.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/deployments/${encodeURIComponent(normalizedDeploymentId)}/rollback`,
+    `Falha ao executar rollback do deployment ${normalizedDeploymentId}`,
+    {
+      method: 'POST',
+    },
+  )
+}
+
+export const getCloudflarePagesDeploymentLogs = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  projectName: string,
+  deploymentId: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  const normalizedDeploymentId = deploymentId.trim()
+  if (!normalizedAccountId || !normalizedProject || !normalizedDeploymentId) {
+    throw new Error('Account ID, projectName e deploymentId são obrigatórios para leitura de logs do deployment.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/deployments/${encodeURIComponent(normalizedDeploymentId)}/history/logs`,
+    `Falha ao ler logs do deployment ${normalizedDeploymentId}`,
   )
 }
