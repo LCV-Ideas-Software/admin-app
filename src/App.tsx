@@ -10,6 +10,7 @@ import {
   PanelsTopLeft,
   Pin,
   PinOff,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Workflow,
@@ -128,14 +129,15 @@ const TelemetriaModule = lazyWithAccessRecovery(() => import('./modules/telemetr
 const FinanceiroModule = lazyWithAccessRecovery(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
 const OraculoModule = lazyWithAccessRecovery(() => import('./modules/oraculo/OraculoModule').then(m => ({ default: m.OraculoModule })))
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
+const TlsrptModule = lazyWithAccessRecovery(() => import('./modules/tlsrpt/TlsrptModule').then(m => ({ default: m.TlsrptModule })))
 
-const APP_VERSION = 'APP v01.59.02'
-type ModuleId = 'overview' | 'astrologo' | 'config' | 'financeiro' | 'oraculo' | 'calculadora' | 'mainsite' | 'mtasts' | 'cardhub' | 'telemetria'
+const APP_VERSION = 'APP v01.60.00'
+type ModuleId = 'overview' | 'astrologo' | 'config' | 'financeiro' | 'oraculo' | 'calculadora' | 'mainsite' | 'mtasts' | 'cardhub' | 'telemetria' | 'tlsrpt'
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   astrologo: 'Astrólogo', cardhub: 'Card Hub', financeiro: 'Financeiro', oraculo: 'Oráculo',
   calculadora: 'Calculadora', mainsite: 'MainSite', mtasts: 'MTA-STS',
-  telemetria: 'Telemetria', config: 'Configurações',
+  telemetria: 'Telemetria', config: 'Configurações', tlsrpt: 'TLS-RPT',
 }
 
 const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
@@ -148,6 +150,7 @@ const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft 
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
   { id: 'oraculo', label: 'Oráculo', icon: BrainCircuit },
   { id: 'telemetria', label: 'Telemetria', icon: BarChart3 },
+  { id: 'tlsrpt', label: 'TLS-RPT', icon: ShieldAlert },
   { id: 'config', label: 'Configurações', icon: Wrench },
 ]
 
@@ -236,6 +239,8 @@ function App() {
             <OraculoModule />
           ) : activeModule === 'telemetria' ? (
             <TelemetriaModule />
+          ) : activeModule === 'tlsrpt' ? (
+            <TlsrptModule />
           ) : null}
           </Suspense>
         </LazyModuleErrorBoundary>
