@@ -109,7 +109,7 @@ export async function onRequestPost(context: Context) {
       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(domain) DO UPDATE SET
         policy_text = excluded.policy_text,
-        tlsrpt_email = excluded.tlsrpt_email,
+        tlsrpt_email = COALESCE(excluded.tlsrpt_email, mtasts_mta_sts_policies.tlsrpt_email),
         updated_at = CURRENT_TIMESTAMP
     `)
       .bind(domain, policyText, tlsrptEmail)
