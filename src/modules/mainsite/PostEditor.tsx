@@ -764,6 +764,10 @@ export default function PostEditor({
           <p className="field-hint">Crie e edite posts com salvamento imediato.</p>
         </div>
         <div className="inline-actions">
+          <button type="submit" className="primary-button" disabled={savingPost}>
+            {savingPost ? <Loader2 size={16} className="spin" /> : editingPostId ? <Save size={16} /> : <FilePlus2 size={16} />}
+            {editingPostId ? 'Salvar alterações' : 'Criar post'}
+          </button>
           <button type="button" className="ghost-button" onClick={handleClear} disabled={savingPost}>
             <X size={16} />
             Limpar
@@ -976,12 +980,7 @@ export default function PostEditor({
         )}
       </div>
 
-      <div className="form-actions">
-        <button type="submit" className="primary-button" disabled={savingPost}>
-          {savingPost ? <Loader2 size={18} className="spin" /> : editingPostId ? <Save size={18} /> : <FilePlus2 size={18} />}
-          {editingPostId ? 'Salvar alterações' : 'Criar post'}
-        </button>
-      </div>
+
     </form>
   )
 }

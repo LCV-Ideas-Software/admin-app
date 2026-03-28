@@ -101,7 +101,7 @@ export function PopupPortal({ isOpen, onClose, title = 'LCV Admin', children }: 
     popupBaseStyle.textContent = `
       body {
         margin: 0;
-        padding: 16px;
+        padding: 1cm;
         box-sizing: border-box;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background: var(--background, #f8fafc);
@@ -111,7 +111,6 @@ export function PopupPortal({ isOpen, onClose, title = 'LCV Admin', children }: 
         flex-direction: column;
       }
       #popup-root {
-        max-width: 1200px;
         margin: 0 auto;
         width: 100%;
         display: flex;

@@ -397,10 +397,6 @@ export function MainsiteModule() {
               {postsLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
               Recarregar lista
             </button>
-            <button type="button" className="ghost-button" onClick={resetPostEditor} disabled={savingPost}>
-              <Pencil size={16} />
-              Novo rascunho
-            </button>
           </div>
         </div>
 

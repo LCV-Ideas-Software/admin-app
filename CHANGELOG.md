@@ -1,5 +1,11 @@
 # Changelog — Admin App
 
+## [v01.61.01] — 2026-03-28
+### Alterado
+- **MainsiteModule**: Removido o botão "Novo Rascunho" da barra de ferramentas.
+- **PostEditor**: Botão "Salvar Alterações/Criar post" realocado para a barra superior (`inline-actions`), à esquerda do botão de "Limpar".
+- **PopupPortal**: CSS ajustado para permitir que o frame do editor de texto expanda e contraia dinamicamente consumindo todo o pop-up, com margem de 1cm.
+
 ## [v01.61.00] — 2026-03-28
 ### Adicionado
 - **Calculadora**: Implementado seletor de modelos de inteligência artificial (Gemini) na calculadora administrativa, operando em paridade visual e funcional com o *Oráculo* e *Astrólogo*, com persistência via `localStorage` e carregamento de endpoint dinâmico (`/api/calculadora/modelos`).
