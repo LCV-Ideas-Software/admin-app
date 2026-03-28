@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.66.01] — 2026-03-28
+### Corrigido
+- **CF DNS — Falsos positivos de auditoria**: alertas operacionais como `CFDNS-A-INVALID` ("Nome obrigatório", "Conteúdo obrigatório") eram gerados ao carregar o módulo com draft vazio, sem nenhuma interação do usuário. Alertas de validação de draft agora só aparecem quando o formulário de criação/edição está ativo (`showRecordForm || isEditing`). Alertas de zona (`CFDNS-ZONE-MISSING`) permanecem incondicionais.
+- **CF DNS — A records "ausentes"**: confirmado via documentação Cloudflare DNS API que registros A visíveis em `dig`/`nslookup` para domínios com CNAME flattening no apex são sintetizados pela edge Cloudflare e **não existem como registros armazenados** na zona — a API retorna corretamente o CNAME real.
+
 ## [v01.66.00] — 2026-03-28
 ### Adicionado
 - **Oráculo — Rate Limit**: controle completo de rate limit para o módulo Oráculo Financeiro, em paridade total com o Astrólogo.

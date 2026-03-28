@@ -239,7 +239,7 @@ const parseHttpsSvcbValue = (value: string): HttpsSvcbValidation => {
 
   for (const token of tokens) {
     if (!token.includes('=')) {
-      issues.push(`Token inválido \"${token}\" (esperado chave=valor).`)
+      issues.push(`Token inválido "${token}" (esperado chave=valor).`)
       continue
     }
 
@@ -248,7 +248,7 @@ const parseHttpsSvcbValue = (value: string): HttpsSvcbValidation => {
     const rawVal = token.slice(splitIndex + 1).trim()
 
     if (!key || !rawVal) {
-      issues.push(`Token incompleto \"${token}\".`)
+      issues.push(`Token incompleto "${token}".`)
       continue
     }
 
@@ -263,7 +263,7 @@ const parseHttpsSvcbValue = (value: string): HttpsSvcbValidation => {
     if (key === 'port') {
       const port = Number(rawVal)
       if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        issues.push(`port inválido em \"${token}\" (use 1-65535).`)
+        issues.push(`port inválido em "${token}" (use 1-65535).`)
       }
       continue
     }
@@ -271,7 +271,7 @@ const parseHttpsSvcbValue = (value: string): HttpsSvcbValidation => {
     if (key === 'ipv4hint') {
       const ips = rawVal.split(',').map((item) => item.trim()).filter(Boolean)
       if (ips.length === 0 || ips.some((ip) => !IPV4_REGEX.test(ip))) {
-        issues.push(`ipv4hint inválido em \"${token}\".`)
+        issues.push(`ipv4hint inválido em "${token}".`)
       }
       continue
     }
@@ -279,7 +279,7 @@ const parseHttpsSvcbValue = (value: string): HttpsSvcbValidation => {
     if (key === 'ipv6hint') {
       const ips = rawVal.split(',').map((item) => item.trim()).filter(Boolean)
       if (ips.length === 0 || ips.some((ip) => !IPV6_REGEX.test(ip))) {
-        issues.push(`ipv6hint inválido em \"${token}\".`)
+        issues.push(`ipv6hint inválido em "${token}".`)
       }
       continue
     }
@@ -291,7 +291,7 @@ const parseHttpsSvcbValue = (value: string): HttpsSvcbValidation => {
       continue
     }
 
-    hints.push(`Parâmetro custom \"${key}\" detectado. Verifique compatibilidade no provider.`)
+    hints.push(`Parâmetro custom "${key}" detectado. Verifique compatibilidade no provider.`)
   }
 
   return {
@@ -440,14 +440,14 @@ const formatRecordContent = (record: DnsRecord) => {
       const flags = String(data.flags ?? '').trim()
       const tag = String(data.tag ?? '').trim()
       const value = String(data.value ?? '').trim()
-      return `${flags} ${tag} \"${value}\"`.trim()
+      return `${flags} ${tag} "${value}"`.trim()
     }
 
     if (String(record.type ?? '').toUpperCase() === 'URI') {
       const priority = String(data.priority ?? '').trim()
       const weight = String(data.weight ?? '').trim()
       const target = String(data.target ?? '').trim()
-      return `${priority} ${weight} \"${target}\"`.trim()
+      return `${priority} ${weight} "${target}"`.trim()
     }
 
     if (String(record.type ?? '').toUpperCase() === 'HTTPS' || String(record.type ?? '').toUpperCase() === 'SVCB') {
@@ -558,12 +558,21 @@ export function CfDnsModule() {
   const operationalAlerts = useMemo<DnsOperationalAlert[]>(() => {
     const next: DnsOperationalAlert[] = []
 
+    // Alerta de zona é sempre visível — independe de formulário aberto
     if (!selectedZoneId) {
       next.push({
         code: 'CFDNS-ZONE-MISSING',
         cause: 'Nenhuma zona está selecionada para operar DNS.',
         action: 'Selecione um domínio em "Domínio / Zona" para habilitar leitura e alteração de registros.',
       })
+    }
+
+    // Alertas de validação do draft só aparecem quando o formulário de criação/edição está ativo.
+    // Em repouso, o draft contém valores padrão vazios (type=A, name='', content='') que
+    // gerariam falsos positivos (e.g. CFDNS-A-INVALID) sem interação do usuário.
+    const isDraftActive = showRecordForm || isEditing
+    if (!isDraftActive) {
+      return next
     }
 
     if (!isProxyValidated && draft.ttl && draft.ttl !== '1') {
@@ -661,10 +670,11 @@ export function CfDnsModule() {
 
     return next
   }, [
+    showRecordForm,
+    isEditing,
     draft.caaTag,
     draft.caaValue,
     draft.priority,
-    draft.proxied,
     draft.srvPort,
     draft.srvProto,
     draft.srvService,
@@ -673,16 +683,15 @@ export function CfDnsModule() {
     draft.type,
     draft.uriTarget,
     draft.httpsValue,
-    caaValidation.issues.length,
-    uriValidation.issues.length,
-    httpsValidation.issues.length,
+    caaValidation.issues,
+    uriValidation.issues,
+    httpsValidation.issues,
     commonValidation.issues,
     isCaaDraft,
     isHttpsDraft,
     isSrvDraft,
     isUriDraft,
     selectedZoneId,
-    selectedZoneName,
     zoneContextLabel,
     isProxyValidated,
   ])
