@@ -1,5 +1,18 @@
 # Changelog — Admin App
 
+## [v01.65.03] — 2026-03-28
+### Alterado
+- **CF DNS — Badges de proxy coloridos**: tabela de registros agora exibe badges visuais com ícone de nuvem — `Proxied` (laranja) e `DNS only` (cinza) — substituindo o texto genérico anterior, com tooltip explicativo.
+- **CF DNS — TTL humanizado**: valor de TTL `1` agora é exibido como `Auto` estilizado na tabela, em vez do número cru.
+- **CF DNS — Conteúdo truncado com tooltip**: valores de conteúdo maiores que 60 caracteres são truncados com reticências e o valor completo fica acessível via tooltip nativo.
+- **CF P&W — Resultado humanizado**: resultado de operações avançadas deixou de exibir JSON bruto, adotando badge de status verde (`✓ Concluído`), tabela key-value para dados simples, e JSON colapsável (`<details>`) para dados complexos.
+- **CF P&W — Confirmação destrutiva**: operações de delete (secrets, routes, raw DELETE) agora pedem confirmação via `window.confirm` antes de executar.
+- **CF P&W — Secret toggle**: campo de valor de secret recebeu botão Eye/EyeOff para alternar visibilidade do conteúdo sensível.
+- **CF P&W — Transições suaves**: campos condicionais aparecem com animação fade-in + slide-down.
+
+### Controle de versão
+- `admin-app`: APP v01.65.02 → APP v01.65.03
+
 ## [v01.65.02] — 2026-03-28
 ### Corrigido
 - **CF DNS — Proxy laranja soberano**: qualquer registro marcado como `proxied = true` passa a ser tratado como operacionalmente correto no painel, independentemente do tipo ou do conteudo informado. Foram removidos bloqueios e alertas semanticos locais quando o proxy esta ativo.
