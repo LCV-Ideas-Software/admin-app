@@ -1,7 +1,10 @@
 # Changelog — Admin App
 
-## [v01.60.01] — 2026-03-28
+## [v01.60.02] — 2026-03-28
 ### Corrigido
+- **MTA-STS & Cloudflare DNS API**: Refatorada a lógica de resolução de tokens (`functions/api/_lib/cloudflare-api.ts`) para priorizar a variável de ambiente `CLOUDFLARE_DNS` antes da `CF_API_TOKEN` e `CLOUDFLARE_API_TOKEN`. Isso resolve um Conflito de Permissões Crítico onde o token reservado ao Oráculo (`CF_API_TOKEN`, com privilégios limitados apenas a Worker Scripts) estava sendo acionado inadvertidamente pelos módulos de auditoria de DNS do app, causando Erros 403 (Authentication Error). A integração agora honra a diretiva do menor privilégio, lendo cada token restritamente para sua finalidade e priorizando chaves de DNS em rotas de zona.
+
+## [v01.60.01] — 2026-03-28
 - **Menu Lateral**: Adicionada rolagem vertical inteligente (`overflow-y: auto`) na `.nav-list` do menu lateral (`App.css`), permitindo acessar todos os itens quando a lista exceder a altura da tela, sem prejudicar o estado recolhido do sidebar. Conta com scrollbar customizada e sutil (Google Blue pattern).
 
 ### Alterado
