@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.59.01] — 2026-03-28
+### Adicionado
+- **Financeiro/SumUp**: criados endpoints locais `POST /api/financeiro/sumup-refund` e `POST /api/financeiro/sumup-cancel` para suportar estorno/cancelamento diretamente no `admin-app`, em paridade com o fluxo operacional do worker.
+
+### Corrigido
+- **Financeiro/SumUp**: tipagem e contrato de handlers ajustados para manter build/lint limpos no contexto Pages Functions do projeto.
+
 ## [v01.59.00] — 2026-03-27
 ### Adicionado
 - **Astrólogo**: Implementada aba de "Configurações" no módulo `AstrologoModule`.
