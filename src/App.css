@@ -269,6 +269,33 @@ input[type="color"]:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px; /* Evitar que conteúdo sobreponha scrollbar */
+  margin-right: -4px; /* Compensar padding visualmente */
+}
+
+/* Scrollbar invisível por padrão, aparece sutilmente ao pairar no sidebar */
+.nav-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.sidebar:hover .nav-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.nav-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .nav-item,

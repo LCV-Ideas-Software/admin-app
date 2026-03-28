@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.60.01] — 2026-03-28
+### Corrigido
+- **Menu Lateral**: Adicionada rolagem vertical inteligente (`overflow-y: auto`) na `.nav-list` do menu lateral (`App.css`), permitindo acessar todos os itens quando a lista exceder a altura da tela, sem prejudicar o estado recolhido do sidebar. Conta com scrollbar customizada e sutil (Google Blue pattern).
+
+### Alterado
+- **Deploy Automático**: Atualizado `deploy.yml` para incluir a flag `--commit-dirty=true` na step de "Deploy Admin App", garantindo sucesso mesmo havendo modificações locais em estado "dirty" no ambiente do GitHub Actions.
+
 ## [v01.60.00] — 2026-03-28
 ### Adicionado
 - **TLS-RPT**: Módulo frontal e motor de processamento migrados do `tlsrpt-app` autônomo diretamente para dentro do `admin-app`.
