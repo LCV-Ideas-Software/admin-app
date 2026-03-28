@@ -1,5 +1,17 @@
 # Changelog — Admin App
 
+## [v01.60.00] — 2026-03-28
+### Adicionado
+- **TLS-RPT**: Módulo frontal e motor de processamento migrados do `tlsrpt-app` autônomo diretamente para dentro do `admin-app`.
+- **TLS-RPT Frontend**: Criação do `TlsrptModule.tsx` e `TlsrptModule.css` portando a lógica React JSX e o design original, agora integrados no menu lateral com rota via proxy interno.
+- **TLS-RPT Motor**: Motor de processamento `tlsrpt-motor` incorporado como *Service Binding* (`TLSRPT_MOTOR`) configurado no `wrangler.json`. Redirecionado tráfego por um *Proxy Pages Function* (`functions/api/tlsrpt/[[path]].ts`).
+
+### Alterado
+- **CORS e Deploy**: Variáveis CORS do `tlsrpt-motor` ajustadas (`"ALLOWED_ORIGIN": "*"`) para aceitar proxy interno. Action de CI/CD (`deploy.yml`) agora coordena deploy do motor junto com a página.
+
+### Removido
+- Aplicativo obsoleto `tlsrpt-app` foi permanentemente deletado do workspace mantendo consistência monolítica na arquitetura do admin.
+
 ## [v01.59.02] — 2026-03-28
 ### Corrigido
 - **Financeiro/SumUp — chave canônica do registro**: sincronização, estorno e cancelamento passaram a reconciliar `mainsite_financial_logs` pelo `checkout.id` canônico, cobrindo também registros legados salvos com `transaction.id`.

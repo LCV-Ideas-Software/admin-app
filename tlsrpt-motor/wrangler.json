@@ -1,0 +1,22 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "tlsrpt-motor",
+	"main": "src/index.js",
+	"compatibility_date": "2026-02-28",
+	"observability": {
+		"enabled": true
+	},
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"vars": {
+		"ALLOWED_ORIGIN": "*"
+	},
+	"d1_databases": [
+		{
+			"binding": "BIGDATA_DB",
+			"database_name": "bigdata_db",
+			"database_id": "6a71b62e-8ab9-45e6-a867-c0d4e6a56269"
+		}
+	]
+}

@@ -16,6 +16,12 @@
       "bucket_name": "mainsite-media"
     }
   ],
+  "services": [
+    {
+      "binding": "TLSRPT_MOTOR",
+      "service": "tlsrpt-motor"
+    }
+  ],
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
