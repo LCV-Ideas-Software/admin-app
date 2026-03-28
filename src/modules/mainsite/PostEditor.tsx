@@ -376,6 +376,7 @@ const TextIndent = Extension.create({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       increaseIndent: () => ({ tr, state, dispatch }: any) => {
         const { from, to } = state.selection
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         state.doc.nodesBetween(from, to, (node: any, pos: number) => {
           if (!node.type.isTextblock) return
           const current = node.attrs.textIndent || 0
@@ -388,6 +389,7 @@ const TextIndent = Extension.create({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       decreaseIndent: () => ({ tr, state, dispatch }: any) => {
         const { from, to } = state.selection
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         state.doc.nodesBetween(from, to, (node: any, pos: number) => {
           if (!node.type.isTextblock) return
           const current = node.attrs.textIndent || 0

@@ -1,5 +1,18 @@
+interface D1Database {
+  prepare: (query: string) => D1PreparedStatement
+  batch: (statements: D1PreparedStatement[]) => Promise<D1Result[]>
+}
+
+interface D1PreparedStatement {
+  bind: (...values: unknown[]) => D1PreparedStatement
+}
+
+interface D1Result {
+  results?: Record<string, unknown>[]
+}
+
 interface Env {
-  BIGDATA_DB: any
+  BIGDATA_DB: D1Database
 }
 
 interface Context {
@@ -23,7 +36,6 @@ export const onRequestGet = async ({ env, request }: Context) => {
 
   try {
     if (tipo === 'lci-lca') {
-      // Colunas reais D1: id, created_at, prazo_dias, taxa_cdi, aporte, rendimento_bruto
       const stmt = db.prepare('SELECT * FROM oraculo_lci_cdb_registros ORDER BY created_at DESC LIMIT ? OFFSET ?')
       const countStmt = db.prepare('SELECT COUNT(*) as c FROM oraculo_lci_cdb_registros')
       
@@ -32,11 +44,10 @@ export const onRequestGet = async ({ env, request }: Context) => {
         countStmt
       ])
 
-      const total = (countRes.results?.[0] as any)?.c || 0
+      const total = Number(countRes.results?.[0]?.c ?? 0)
       
-      // Mapeamento snake_case → camelCase (alinhado ao schema da migration 009)
-      const items = (res.results ?? []).map((row: any) => {
-        const prazoDias = row.prazo_dias ?? 0
+      const items = (res.results ?? []).map((row) => {
+        const prazoDias = Number(row.prazo_dias ?? 0)
         const aliquotaIr = prazoDias <= 180 ? 22.5 : prazoDias <= 360 ? 20 : prazoDias <= 720 ? 17.5 : 15
         return {
           id: row.id,
@@ -54,7 +65,6 @@ export const onRequestGet = async ({ env, request }: Context) => {
         headers: { 'Content-Type': 'application/json' }
       })
     } else {
-      // Tesouro IPCA
       const stmt = db.prepare('SELECT * FROM oraculo_tesouro_ipca_lotes ORDER BY data_compra DESC LIMIT ? OFFSET ?')
       const countStmt = db.prepare('SELECT COUNT(*) as c FROM oraculo_tesouro_ipca_lotes')
       
@@ -63,9 +73,9 @@ export const onRequestGet = async ({ env, request }: Context) => {
         countStmt
       ])
 
-      const total = (countRes.results?.[0] as any)?.c || 0
+      const total = Number(countRes.results?.[0]?.c ?? 0)
       
-      const items = (res.results ?? []).map((row: any) => ({
+      const items = (res.results ?? []).map((row) => ({
         id: row.id,
         criadoEm: row.created_at,
         dataCompra: row.data_compra,
@@ -78,7 +88,7 @@ export const onRequestGet = async ({ env, request }: Context) => {
         headers: { 'Content-Type': 'application/json' }
       })
     }
-  } catch (error) {
+  } catch {
     return new Response(JSON.stringify({ ok: false, error: 'Falha na consulta ao banco de dados.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

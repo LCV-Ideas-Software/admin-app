@@ -64,6 +64,7 @@ export function TlsrptModule() {
 
   useEffect(() => {
     void fetchCloudReports(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchCloudReports = async (isManualRefresh = false) => {

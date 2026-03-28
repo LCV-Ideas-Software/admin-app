@@ -18,8 +18,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   try {
     const response = await context.env.TLSRPT_MOTOR.fetch(serviceRequest);
     return response;
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: 'Erro no proxy interno: ' + error.message }), {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: 'Erro no proxy interno: ' + message }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' }
     });
