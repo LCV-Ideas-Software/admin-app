@@ -763,6 +763,7 @@ export function ConfigModule() {
             <option value="astrologo">Astrólogo</option>
             <option value="calculadora">Calculadora</option>
             <option value="mainsite">MainSite</option>
+            <option value="oraculo">Oráculo</option>
           </select>
         </div>
       </article>
@@ -775,6 +776,9 @@ export function ConfigModule() {
       )}
       {selectedRateModule === 'mainsite' && (
         <RateLimitPanel moduleLabel="MainSite" endpoint="/api/mainsite/rate-limit" idPrefix="config-mainsite" />
+      )}
+      {selectedRateModule === 'oraculo' && (
+        <RateLimitPanel moduleLabel="Oráculo" endpoint="/api/oraculo/rate-limit" idPrefix="config-oraculo" />
       )}
 
       <article className="result-card">

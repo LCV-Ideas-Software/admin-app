@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.66.00] — 2026-03-28
+### Adicionado
+- **Oráculo — Rate Limit**: controle completo de rate limit para o módulo Oráculo Financeiro, em paridade total com o Astrólogo.
+- **[NEW] `functions/api/_lib/oraculo-admin.ts`**: helper de rate limit com tabelas D1 dedicadas (`oraculo_rate_limit_policies`, `oraculo_api_rate_limits`), 4 rotas protegidas: `analisar-ia`, `enviar-email`, `contato`, `tesouro-ipca-vision`.
+- **[NEW] `functions/api/oraculo/rate-limit.ts`**: endpoint GET/POST para leitura e persistência de políticas de rate limit do Oráculo, com fallback resiliente e telemetria operacional.
+- **Configurações — Oráculo no rate limit**: dropdown do painel Rate Limit em Configurações agora inclui a opção "Oráculo" com RateLimitPanel genérico.
+### Alterado
+- **Telemetria**: tipo `module` em `operational.ts` expandido para incluir `'oraculo'`.
+
 ## [v01.65.03] — 2026-03-28
 ### Alterado
 - **CF DNS — Badges de proxy coloridos**: tabela de registros agora exibe badges visuais com ícone de nuvem — `Proxied` (laranja) e `DNS only` (cinza) — substituindo o texto genérico anterior, com tooltip explicativo.
