@@ -207,7 +207,7 @@ export const getCloudflareWorker = async (env: EnvWithCloudflarePwToken, account
 
   const worker = await cloudflareRequest<Record<string, unknown>>(
     env,
-    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}`,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/settings`,
     `Falha ao ler Worker ${normalizedScript}`,
   )
 

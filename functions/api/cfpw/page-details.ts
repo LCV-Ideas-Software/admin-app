@@ -18,6 +18,11 @@ type Context = {
   }
 }
 
+type PartialWarning = {
+  code: string
+  message: string
+}
+
 const toHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -46,10 +51,29 @@ export async function onRequestGet(context: Context) {
   try {
     const accountInfo = await resolveCloudflarePwAccount(context.env)
 
-    const [project, deployments] = await Promise.all([
+    const [projectResult, deploymentsResult] = await Promise.allSettled([
       getCloudflarePagesProject(context.env, accountInfo.accountId, projectName),
       listCloudflarePagesDeployments(context.env, accountInfo.accountId, projectName),
     ])
+
+    const warnings: PartialWarning[] = []
+    const project = projectResult.status === 'fulfilled' ? projectResult.value : null
+    const deployments = deploymentsResult.status === 'fulfilled' ? deploymentsResult.value : []
+
+    if (projectResult.status === 'rejected') {
+      const message = projectResult.reason instanceof Error ? projectResult.reason.message : 'Falha ao ler detalhes do projeto Pages.'
+      warnings.push({ code: 'CFPW-PAGE-DETAILS-PARTIAL-PROJECT', message })
+    }
+
+    if (deploymentsResult.status === 'rejected') {
+      const message = deploymentsResult.reason instanceof Error ? deploymentsResult.reason.message : 'Falha ao listar deployments do projeto Pages.'
+      warnings.push({ code: 'CFPW-PAGE-DETAILS-PARTIAL-DEPLOYMENTS', message })
+    }
+
+    if (!project && deployments.length === 0) {
+      const fatal = warnings[0]?.message || `Falha ao carregar detalhes do Pages ${projectName}.`
+      throw new Error(fatal)
+    }
 
     if (context.env.BIGDATA_DB) {
       try {
@@ -64,6 +88,7 @@ export async function onRequestGet(context: Context) {
             accountId: accountInfo.accountId,
             projectName,
             deployments: deployments.length,
+            partialWarnings: warnings.length,
           },
         })
       } catch {
@@ -78,6 +103,7 @@ export async function onRequestGet(context: Context) {
       projectName,
       project,
       deployments,
+      warnings,
     }), {
       headers: toHeaders(),
     })

@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.63.01] — 2026-03-28
+### Alterado
+- **CF DNS — Edição contextual no estilo Cloudflare**: ao clicar em `Editar`, o painel de edição abre imediatamente abaixo do registro selecionado na tabela, mantendo contexto local da linha.
+- **CF DNS — Densidade harmônica de tabela e ações**: refinados paddings, tipografia e botões de ação para reduzir colisões visuais e evitar sobreposição de elementos no frame.
+
+### Corrigido
+- **CF P&W — Falhas 502 em detalhes de Worker/Pages**: endpoints de detalhes passaram a operar com tolerância a falha parcial (`Promise.allSettled`), retornando warnings estruturados quando apenas parte dos dados falha.
+- **CF P&W — JSON bruto removido da visão principal**: painel de detalhes migrado para layout estruturado (resumo operacional + tabela de deployments), mantendo leitura humana e auditável.
+
 ## [v01.63.00] — 2026-03-28
 ### Adicionado
 - **Módulo CF P&W (novo)**: criado o painel `CF P&W` no `admin-app` para gestão operacional de Cloudflare Pages e Workers via API nativa.

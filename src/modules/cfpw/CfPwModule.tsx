@@ -51,6 +51,7 @@ type WorkerDetailsPayload = {
   scriptName?: string
   worker?: Record<string, unknown>
   deployments?: Array<Record<string, unknown>>
+  warnings?: Array<{ code?: string; message?: string }>
 }
 
 type PageDetailsPayload = {
@@ -60,6 +61,7 @@ type PageDetailsPayload = {
   projectName?: string
   project?: Record<string, unknown>
   deployments?: Array<Record<string, unknown>>
+  warnings?: Array<{ code?: string; message?: string }>
 }
 
 type DeletePayload = {
@@ -121,6 +123,27 @@ const formatDateTime = (value: string | null | undefined) => {
   }
 
   return parsed.toLocaleString('pt-BR')
+}
+
+const valueToText = (value: unknown) => {
+  if (value == null) {
+    return '—'
+  }
+  if (typeof value === 'string') {
+    return value.trim() || '—'
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  return '—'
+}
+
+const keyValueRows = (record: Record<string, unknown>, keys: Array<{ key: string; label: string; isDate?: boolean }>) => {
+  return keys.map(({ key, label, isDate }) => {
+    const raw = record[key]
+    const value = isDate ? formatDateTime(typeof raw === 'string' ? raw : null) : valueToText(raw)
+    return { label, value }
+  })
 }
 
 export function CfPwModule() {
@@ -370,6 +393,64 @@ export function CfPwModule() {
     return Array.isArray(list) ? list : []
   }, [details])
 
+  const detailWarnings = useMemo(() => {
+    if (!details) {
+      return [] as Array<{ code: string; message: string }>
+    }
+
+    const warnings = Array.isArray(details.payload.warnings) ? details.payload.warnings : []
+    return warnings
+      .map((warning, index) => ({
+        code: String(warning?.code ?? `CFPW-DETAIL-WARN-${index + 1}`).trim() || `CFPW-DETAIL-WARN-${index + 1}`,
+        message: String(warning?.message ?? 'Falha parcial ao carregar detalhes.').trim() || 'Falha parcial ao carregar detalhes.',
+      }))
+  }, [details])
+
+  const detailSummaryRows = useMemo(() => {
+    if (!details) {
+      return [] as Array<{ label: string; value: string }>
+    }
+
+    if (details.type === 'worker') {
+      const workerPayload = details.payload as WorkerDetailsPayload
+      const worker = (workerPayload.worker && typeof workerPayload.worker === 'object'
+        ? workerPayload.worker
+        : {}) as Record<string, unknown>
+
+      return keyValueRows(worker, [
+        { key: 'id', label: 'ID técnico' },
+        { key: 'usage_model', label: 'Usage model' },
+        { key: 'compatibility_date', label: 'Compatibility date' },
+        { key: 'main_module', label: 'Módulo principal' },
+        { key: 'tail_consumers', label: 'Tail consumers' },
+        { key: 'logpush', label: 'Logpush' },
+      ])
+    }
+
+    const pagePayload = details.payload as PageDetailsPayload
+    const project = (pagePayload.project && typeof pagePayload.project === 'object'
+      ? pagePayload.project
+      : {}) as Record<string, unknown>
+
+    const domainsRaw = Array.isArray(project.domains)
+      ? project.domains.filter((domain) => typeof domain === 'string' && domain.trim().length > 0)
+      : []
+
+    return [
+      ...keyValueRows(project, [
+        { key: 'id', label: 'Project ID' },
+        { key: 'name', label: 'Nome do projeto' },
+        { key: 'subdomain', label: 'Subdomínio Pages' },
+        { key: 'production_branch', label: 'Branch de produção' },
+        { key: 'created_on', label: 'Criado em', isDate: true },
+      ]),
+      {
+        label: 'Domínios customizados',
+        value: domainsRaw.length > 0 ? domainsRaw.join(', ') : '—',
+      },
+    ]
+  }, [details])
+
   return (
     <section className="module-shell module-shell-cfpw" aria-label="Cloudflare Pages & Workers">
       <div className="detail-panel">
@@ -464,7 +545,7 @@ export function CfPwModule() {
                         <div className="cfdns-row-actions">
                           <button
                             type="button"
-                            className="ghost-button"
+                            className="ghost-button cfrow-action-btn"
                             onClick={() => void openWorkerDetails(worker.scriptName)}
                             disabled={detailsLoading || loadingOverview || deleting}
                           >
@@ -472,7 +553,7 @@ export function CfPwModule() {
                           </button>
                           <button
                             type="button"
-                            className="ghost-button"
+                            className="ghost-button cfrow-action-btn"
                             onClick={() => {
                               setDeleteTarget({ type: 'worker', id: worker.scriptName })
                               setDeleteConfirmation('')
@@ -518,7 +599,7 @@ export function CfPwModule() {
                         <div className="cfdns-row-actions">
                           <button
                             type="button"
-                            className="ghost-button"
+                            className="ghost-button cfrow-action-btn"
                             onClick={() => void openPageDetails(page.projectName)}
                             disabled={detailsLoading || loadingOverview || deleting}
                           >
@@ -526,7 +607,7 @@ export function CfPwModule() {
                           </button>
                           <button
                             type="button"
-                            className="ghost-button"
+                            className="ghost-button cfrow-action-btn"
                             onClick={() => {
                               setDeleteTarget({ type: 'page', id: page.projectName })
                               setDeleteConfirmation('')
@@ -556,12 +637,62 @@ export function CfPwModule() {
                   <strong>Tipo:</strong> {details.type === 'worker' ? 'Worker' : 'Pages'}{' '}
                   <strong>ID:</strong> {details.id}
                 </p>
-                <div className="cfpw-json-preview">
-                  <pre>{JSON.stringify(details.payload, null, 2)}</pre>
+
+                {detailWarnings.length > 0 ? (
+                  <div className="cfpw-inline-warning" role="status" aria-live="polite">
+                    {detailWarnings.map((warning) => (
+                      <p key={warning.code}><strong>{warning.code}</strong> - {warning.message}</p>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="cfpw-detail-grid">
+                  {detailSummaryRows.map((row) => (
+                    <div key={row.label} className="cfpw-detail-item">
+                      <span>{row.label}</span>
+                      <strong>{row.value}</strong>
+                    </div>
+                  ))}
                 </div>
+
                 <p className="field-hint">
                   Deployments encontrados: <strong>{detailDeployments.length}</strong>
                 </p>
+
+                {detailDeployments.length > 0 ? (
+                  <div className="cfpw-table-wrap">
+                    <table className="cfpw-table" aria-label="Tabela de deployments">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Ambiente</th>
+                          <th>Status/Strategy</th>
+                          <th>Criado em</th>
+                          <th>URL</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailDeployments.slice(0, 15).map((deployment, index) => {
+                          const id = valueToText(deployment.id ?? deployment.short_id)
+                          const environment = valueToText(deployment.environment)
+                          const statusOrStrategy = valueToText((deployment.latest_stage as Record<string, unknown> | undefined)?.status ?? deployment.strategy)
+                          const createdAt = formatDateTime(typeof deployment.created_on === 'string' ? deployment.created_on : null)
+                          const url = valueToText(deployment.url)
+
+                          return (
+                            <tr key={`${id}-${index}`}>
+                              <td>{id}</td>
+                              <td>{environment}</td>
+                              <td>{statusOrStrategy}</td>
+                              <td>{createdAt}</td>
+                              <td>{url}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </>
             )}
           </article>

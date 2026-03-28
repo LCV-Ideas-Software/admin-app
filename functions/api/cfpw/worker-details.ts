@@ -18,6 +18,11 @@ type Context = {
   }
 }
 
+type PartialWarning = {
+  code: string
+  message: string
+}
+
 const toHeaders = () => ({
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -46,10 +51,29 @@ export async function onRequestGet(context: Context) {
   try {
     const accountInfo = await resolveCloudflarePwAccount(context.env)
 
-    const [worker, deployments] = await Promise.all([
+    const [workerResult, deploymentsResult] = await Promise.allSettled([
       getCloudflareWorker(context.env, accountInfo.accountId, scriptName),
       listCloudflareWorkerDeployments(context.env, accountInfo.accountId, scriptName),
     ])
+
+    const warnings: PartialWarning[] = []
+    const worker = workerResult.status === 'fulfilled' ? workerResult.value : null
+    const deployments = deploymentsResult.status === 'fulfilled' ? deploymentsResult.value : []
+
+    if (workerResult.status === 'rejected') {
+      const message = workerResult.reason instanceof Error ? workerResult.reason.message : 'Falha ao ler configurações do Worker.'
+      warnings.push({ code: 'CFPW-WORKER-DETAILS-PARTIAL-WORKER', message })
+    }
+
+    if (deploymentsResult.status === 'rejected') {
+      const message = deploymentsResult.reason instanceof Error ? deploymentsResult.reason.message : 'Falha ao listar deployments do Worker.'
+      warnings.push({ code: 'CFPW-WORKER-DETAILS-PARTIAL-DEPLOYMENTS', message })
+    }
+
+    if (!worker && deployments.length === 0) {
+      const fatal = warnings[0]?.message || `Falha ao carregar detalhes do Worker ${scriptName}.`
+      throw new Error(fatal)
+    }
 
     if (context.env.BIGDATA_DB) {
       try {
@@ -64,6 +88,7 @@ export async function onRequestGet(context: Context) {
             accountId: accountInfo.accountId,
             scriptName,
             deployments: deployments.length,
+            partialWarnings: warnings.length,
           },
         })
       } catch {
@@ -78,6 +103,7 @@ export async function onRequestGet(context: Context) {
       scriptName,
       worker,
       deployments,
+      warnings,
     }), {
       headers: toHeaders(),
     })

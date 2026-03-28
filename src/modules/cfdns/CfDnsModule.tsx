@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
@@ -642,6 +642,11 @@ export function CfDnsModule() {
     setDraft(DEFAULT_DRAFT)
   }
 
+  const closeRecordForm = () => {
+    resetDraft()
+    setShowRecordForm(false)
+  }
+
   const openNewRecordForm = () => {
     resetDraft()
     setShowRecordForm(true)
@@ -938,6 +943,7 @@ export function CfDnsModule() {
       }
 
       resetDraft()
+      setShowRecordForm(false)
       await loadRecords(selectedZoneId, { pageOverride: page })
       showNotification(withReq(`Registro DNS ${isEditing ? 'atualizado' : 'criado'} com sucesso.`, payload), 'success')
     } catch (error) {
@@ -982,7 +988,7 @@ export function CfDnsModule() {
       }
 
       if (draft.recordId === recordId) {
-        resetDraft()
+        closeRecordForm()
       }
 
       await loadRecords(selectedZoneId, { pageOverride: page })
@@ -1154,26 +1160,183 @@ export function CfDnsModule() {
                   const isSelected = recordId && draft.recordId === recordId
 
                   return (
-                    <tr key={recordId || `${record.type}-${record.name}-${record.content}`} className={isSelected ? 'cfdns-row-selected' : ''}>
-                      <td>{String(record.type ?? '').toUpperCase() || '—'}</td>
-                      <td>{String(record.name ?? '') || '—'}</td>
-                      <td className="cfdns-cell-content">{formatRecordContent(record)}</td>
-                      <td>{record.ttl ?? 'auto'}</td>
-                      <td>{record.proxied ? 'Proxied' : 'DNS only'}</td>
-                      <td title={formatDateTimeFull(record.modified_on)}>{formatDateTime(record.modified_on)}</td>
-                      <td>
-                        <div className="cfdns-row-actions">
-                          <button type="button" className="ghost-button" onClick={() => hydrateDraftFromRecord(record)} disabled={saving || isDeleting}>
-                            <Pencil size={14} />
-                            Editar
-                          </button>
-                          <button type="button" className="ghost-button" onClick={() => void handleDeleteRecord(record)} disabled={saving || isDeleting}>
-                            {isDeleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
-                            Excluir
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <Fragment key={recordId || `${record.type}-${record.name}-${record.content}`}>
+                      <tr className={isSelected ? 'cfdns-row-selected' : ''}>
+                        <td>{String(record.type ?? '').toUpperCase() || '—'}</td>
+                        <td>{String(record.name ?? '') || '—'}</td>
+                        <td className="cfdns-cell-content">{formatRecordContent(record)}</td>
+                        <td>{record.ttl ?? 'auto'}</td>
+                        <td>{record.proxied ? 'Proxied' : 'DNS only'}</td>
+                        <td title={formatDateTimeFull(record.modified_on)}>{formatDateTime(record.modified_on)}</td>
+                        <td>
+                          <div className="cfdns-row-actions">
+                            <button type="button" className="ghost-button cfrow-action-btn" onClick={() => hydrateDraftFromRecord(record)} disabled={saving || isDeleting}>
+                              <Pencil size={13} />
+                              Editar
+                            </button>
+                            <button type="button" className="ghost-button cfrow-action-btn" onClick={() => void handleDeleteRecord(record)} disabled={saving || isDeleting}>
+                              {isDeleting ? <Loader2 size={13} className="spin" /> : <Trash2 size={13} />}
+                              Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {showRecordForm && isSelected && isEditing ? (
+                        <tr className="cfdns-inline-editor-row">
+                          <td colSpan={7}>
+                            <div className="cfdns-inline-editor">
+                              <div className="cfdns-inline-editor__header">
+                                <strong>Editar registro {draft.type} {draft.name}</strong>
+                                <div className="cfdns-row-actions">
+                                  <button type="button" className="ghost-button cfrow-action-btn" onClick={closeRecordForm} disabled={saving}>
+                                    Cancelar
+                                  </button>
+                                  <button type="button" className="primary-button cfrow-action-btn" onClick={() => void handleSaveRecord()} disabled={saving || !selectedZoneId}>
+                                    {saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                                    Salvar
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="cfdns-inline-grid">
+                                <div className="field-group">
+                                  <label htmlFor={`cfdns-inline-type-${recordId}`}>Tipo</label>
+                                  <select
+                                    id={`cfdns-inline-type-${recordId}`}
+                                    value={draft.type}
+                                    onChange={(event) => {
+                                      const nextType = event.target.value.toUpperCase()
+                                      setDraft((current) => ({
+                                        ...current,
+                                        type: nextType,
+                                        proxied: PROXY_COMPATIBLE_TYPES.has(nextType) ? current.proxied : false,
+                                      }))
+                                    }}
+                                    disabled={saving}
+                                  >
+                                    {RECORD_TYPES.map((type) => (
+                                      <option key={type} value={type}>{type}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="field-group">
+                                  <label htmlFor={`cfdns-inline-name-${recordId}`}>Nome</label>
+                                  <input
+                                    id={`cfdns-inline-name-${recordId}`}
+                                    type="text"
+                                    value={draft.name}
+                                    onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value.toLowerCase() }))}
+                                    disabled={saving}
+                                  />
+                                </div>
+
+                                <div className="field-group">
+                                  <label htmlFor={`cfdns-inline-ttl-${recordId}`}>TTL</label>
+                                  <input
+                                    id={`cfdns-inline-ttl-${recordId}`}
+                                    type="number"
+                                    min={1}
+                                    max={86400}
+                                    value={draft.ttl}
+                                    onChange={(event) => setDraft((current) => ({ ...current, ttl: event.target.value }))}
+                                    disabled={saving}
+                                  />
+                                </div>
+
+                                {!isSrvDraft && (
+                                  <div className="field-group">
+                                    <label htmlFor={`cfdns-inline-priority-${recordId}`}>Priority</label>
+                                    <input
+                                      id={`cfdns-inline-priority-${recordId}`}
+                                      type="number"
+                                      min={0}
+                                      max={65535}
+                                      value={draft.priority}
+                                      onChange={(event) => setDraft((current) => ({ ...current, priority: event.target.value }))}
+                                      disabled={saving}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              {!isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && (
+                                <div className="field-group">
+                                  <label htmlFor={`cfdns-inline-content-${recordId}`}>Conteúdo</label>
+                                  <textarea
+                                    id={`cfdns-inline-content-${recordId}`}
+                                    className="json-textarea"
+                                    rows={3}
+                                    value={draft.content}
+                                    onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
+                                    disabled={saving}
+                                  />
+                                </div>
+                              )}
+
+                              {isSrvDraft && (
+                                <div className="cfdns-inline-grid">
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-srv-service-${recordId}`}>Service</label><input id={`cfdns-inline-srv-service-${recordId}`} value={draft.srvService} onChange={(event) => setDraft((current) => ({ ...current, srvService: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-srv-proto-${recordId}`}>Proto</label><input id={`cfdns-inline-srv-proto-${recordId}`} value={draft.srvProto} onChange={(event) => setDraft((current) => ({ ...current, srvProto: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-srv-target-${recordId}`}>Target</label><input id={`cfdns-inline-srv-target-${recordId}`} value={draft.srvTarget} onChange={(event) => setDraft((current) => ({ ...current, srvTarget: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-srv-port-${recordId}`}>Port</label><input id={`cfdns-inline-srv-port-${recordId}`} type="number" value={draft.srvPort} onChange={(event) => setDraft((current) => ({ ...current, srvPort: event.target.value }))} disabled={saving} /></div>
+                                </div>
+                              )}
+
+                              {isCaaDraft && (
+                                <div className="cfdns-inline-grid">
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-caa-flags-${recordId}`}>Flags</label><input id={`cfdns-inline-caa-flags-${recordId}`} type="number" min={0} max={255} value={draft.caaFlags} onChange={(event) => setDraft((current) => ({ ...current, caaFlags: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-caa-tag-${recordId}`}>Tag</label><select id={`cfdns-inline-caa-tag-${recordId}`} value={draft.caaTag} onChange={(event) => setDraft((current) => ({ ...current, caaTag: event.target.value }))} disabled={saving}><option value="issue">issue</option><option value="issuewild">issuewild</option><option value="iodef">iodef</option></select></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-caa-value-${recordId}`}>Value</label><input id={`cfdns-inline-caa-value-${recordId}`} value={draft.caaValue} onChange={(event) => setDraft((current) => ({ ...current, caaValue: event.target.value }))} disabled={saving} /></div>
+                                </div>
+                              )}
+
+                              {isUriDraft && (
+                                <div className="cfdns-inline-grid">
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-uri-priority-${recordId}`}>URI Priority</label><input id={`cfdns-inline-uri-priority-${recordId}`} type="number" value={draft.uriPriority} onChange={(event) => setDraft((current) => ({ ...current, uriPriority: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-uri-weight-${recordId}`}>URI Weight</label><input id={`cfdns-inline-uri-weight-${recordId}`} type="number" value={draft.uriWeight} onChange={(event) => setDraft((current) => ({ ...current, uriWeight: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-uri-target-${recordId}`}>URI Target</label><input id={`cfdns-inline-uri-target-${recordId}`} value={draft.uriTarget} onChange={(event) => setDraft((current) => ({ ...current, uriTarget: event.target.value }))} disabled={saving} /></div>
+                                </div>
+                              )}
+
+                              {isHttpsDraft && (
+                                <div className="cfdns-inline-grid">
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-https-priority-${recordId}`}>{draft.type} Priority</label><input id={`cfdns-inline-https-priority-${recordId}`} type="number" value={draft.httpsPriority} onChange={(event) => setDraft((current) => ({ ...current, httpsPriority: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-https-target-${recordId}`}>{draft.type} Target</label><input id={`cfdns-inline-https-target-${recordId}`} value={draft.httpsTarget} onChange={(event) => setDraft((current) => ({ ...current, httpsTarget: event.target.value }))} disabled={saving} /></div>
+                                  <div className="field-group"><label htmlFor={`cfdns-inline-https-value-${recordId}`}>{draft.type} Value</label><input id={`cfdns-inline-https-value-${recordId}`} value={draft.httpsValue} onChange={(event) => setDraft((current) => ({ ...current, httpsValue: event.target.value }))} disabled={saving} /></div>
+                                </div>
+                              )}
+
+                              <div className="cfdns-inline-grid">
+                                <div className="field-group">
+                                  <label htmlFor={`cfdns-inline-comment-${recordId}`}>Comentário</label>
+                                  <input
+                                    id={`cfdns-inline-comment-${recordId}`}
+                                    type="text"
+                                    value={draft.comment}
+                                    onChange={(event) => setDraft((current) => ({ ...current, comment: event.target.value }))}
+                                    disabled={saving}
+                                  />
+                                </div>
+                                <div className="field-group">
+                                  <label htmlFor={`cfdns-inline-proxy-${recordId}`}>Proxy</label>
+                                  <select
+                                    id={`cfdns-inline-proxy-${recordId}`}
+                                    value={draft.proxied ? 'true' : 'false'}
+                                    onChange={(event) => setDraft((current) => ({ ...current, proxied: event.target.value === 'true' }))}
+                                    disabled={saving || !PROXY_COMPATIBLE_TYPES.has(draft.type)}
+                                  >
+                                    <option value="false">DNS only</option>
+                                    <option value="true">Proxied</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -1204,7 +1367,7 @@ export function CfDnsModule() {
         )}
       </article>
 
-      {showRecordForm && (
+      {showRecordForm && !isEditing && (
       <article className="form-card">
         <div className="result-toolbar">
           <div>
@@ -1219,10 +1382,7 @@ export function CfDnsModule() {
             <button
               type="button"
               className="ghost-button"
-              onClick={() => {
-                resetDraft()
-                setShowRecordForm(false)
-              }}
+              onClick={closeRecordForm}
               disabled={saving || recordsLoading}
             >
               <Trash2 size={16} />
