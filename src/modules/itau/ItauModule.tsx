@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Database, Loader2, RefreshCw, Save } from 'lucide-react'
+import { Database, Loader2, RefreshCw, Save, BrainCircuit } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+
+export interface CalculadoraConfig {
+  modeloIA?: string
+}
+
+const DEFAULT_CONFIG: CalculadoraConfig = { modeloIA: '' }
+
+function loadConfig(): CalculadoraConfig {
+  try {
+    const s = localStorage.getItem('calculadora-config')
+    return s ? { ...DEFAULT_CONFIG, ...JSON.parse(s) } : DEFAULT_CONFIG
+  } catch { return DEFAULT_CONFIG }
+}
+
+export interface GeminiModelItem { id: string; displayName: string; api: string; vision: boolean }
 
 type ParametrosForm = {
   iof_cartao_percent: number
@@ -36,6 +51,31 @@ export function CalculadoraModule() {
   const [adminActor] = useState('admin@app.lcv')
   const [parametrosForm, setParametrosForm] = useState<ParametrosForm>(initialParametrosForm)
 
+  const [config, setConfig] = useState<CalculadoraConfig>(loadConfig)
+  const [geminiModels, setGeminiModels] = useState<GeminiModelItem[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+
+  const saveConfig = (newValues: Partial<CalculadoraConfig>) => {
+    setConfig(prev => {
+      const next = { ...prev, ...newValues }
+      localStorage.setItem('calculadora-config', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const carregarModelos = async () => {
+    setModelsLoading(true)
+    try {
+      const res = await fetch('/api/calculadora/modelos')
+      const data = await res.json() as { ok: boolean; models?: GeminiModelItem[] }
+      if (data.ok && data.models) setGeminiModels(data.models)
+    } catch {
+      // ignora erro
+    } finally {
+      setModelsLoading(false)
+    }
+  }
+
   const loadParametros = useCallback(async (shouldNotify = false) => {
     setLoadingParametros(true)
     try {
@@ -63,7 +103,9 @@ export function CalculadoraModule() {
 
   useEffect(() => {
     void loadParametros()
-  }, [loadParametros])
+    void carregarModelos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleParametroChange = (field: keyof ParametrosForm, value: string) => {
     const parsed = Number(value)
@@ -175,6 +217,48 @@ export function CalculadoraModule() {
           </button>
         </div>
       </form>
+
+      <div className="form-card" style={{ marginTop: '24px' }}>
+        <div className="result-toolbar">
+          <div>
+            <h4><BrainCircuit size={16} /> Modelos de IA (Gemini)</h4>
+            <p className="field-hint">
+              Selecione o motor utilizado pelas heurísticas e backtests deste módulo.{' '}
+              {!modelsLoading && geminiModels.length > 0 && <>· {geminiModels.length} modelos disponíveis</>}
+            </p>
+          </div>
+        </div>
+
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+          <div className="field-group">
+            <label htmlFor="calculadora-modelo-ia">Modelo de Processamento</label>
+            <div className="select-wrapper">
+              <select 
+                id="calculadora-modelo-ia" 
+                value={config.modeloIA || ''} 
+                onChange={e => saveConfig({ modeloIA: e.target.value })}
+              >
+                {modelsLoading ? (
+                  <option value={config.modeloIA || ''}>Carregando modelos do Cloudflare...</option>
+                ) : (
+                  <>
+                    <option value="">Automático (Padrão)</option>
+                    {geminiModels.length === 0 && config.modeloIA && <option value={config.modeloIA}>{config.modeloIA}</option>}
+                    {geminiModels.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+            <p className="field-hint" style={{ marginTop: '8px' }}>
+              Esta alteração é persistida localmente (no seu navegador) e aplicada instantaneamente sem recarregar a página.
+            </p>
+          </div>
+        </div>
+      </div>
 
     </section>
   )
