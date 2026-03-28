@@ -446,12 +446,12 @@ export function ConfigModule() {
         </div>
       </div>
 
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        style={{ display: 'none' }} 
-        accept="image/*" 
-        onChange={handleBgUpload} 
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        accept="image/*"
+        onChange={handleBgUpload}
       />
 
       <form className="form-card" onSubmit={saveConfig}>
@@ -692,20 +692,20 @@ export function ConfigModule() {
           <div className="field-group">
             <label htmlFor="cfg-dark-bg-image">Imagem de Fundo (URL ou R2)</label>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input 
-                id="cfg-dark-bg-image" 
-                name="cfgDarkBgImage" 
-                value={msAppearance.dark.bgImage} 
-                onChange={(e) => setMsAppearance({ ...msAppearance, dark: { ...msAppearance.dark, bgImage: formatImageUrl(e.target.value) } })} 
-                placeholder="https://..." 
+              <input
+                id="cfg-dark-bg-image"
+                name="cfgDarkBgImage"
+                value={msAppearance.dark.bgImage}
+                onChange={(e) => setMsAppearance({ ...msAppearance, dark: { ...msAppearance.dark, bgImage: formatImageUrl(e.target.value) } })}
+                placeholder="https://..."
                 style={{ flex: 1 }}
               />
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="toolbar-btn"
                 style={{ height: '42px', width: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
-                onClick={() => { setUploadTarget('dark'); fileInputRef.current?.click(); }} 
-                disabled={isUploadingBg} 
+                onClick={() => { setUploadTarget('dark'); fileInputRef.current?.click(); }}
+                disabled={isUploadingBg}
                 title="Fazer upload para o Storage R2"
               >
                 {isUploadingBg && uploadTarget === 'dark' ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
@@ -725,20 +725,20 @@ export function ConfigModule() {
           <div className="field-group">
             <label htmlFor="cfg-light-bg-image">Imagem de Fundo (URL ou R2)</label>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input 
-                id="cfg-light-bg-image" 
-                name="cfgLightBgImage" 
-                value={msAppearance.light.bgImage} 
-                onChange={(e) => setMsAppearance({ ...msAppearance, light: { ...msAppearance.light, bgImage: formatImageUrl(e.target.value) } })} 
-                placeholder="https://..." 
+              <input
+                id="cfg-light-bg-image"
+                name="cfgLightBgImage"
+                value={msAppearance.light.bgImage}
+                onChange={(e) => setMsAppearance({ ...msAppearance, light: { ...msAppearance.light, bgImage: formatImageUrl(e.target.value) } })}
+                placeholder="https://..."
                 style={{ flex: 1 }}
               />
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="toolbar-btn"
                 style={{ height: '42px', width: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
-                onClick={() => { setUploadTarget('light'); fileInputRef.current?.click(); }} 
-                disabled={isUploadingBg} 
+                onClick={() => { setUploadTarget('light'); fileInputRef.current?.click(); }}
+                disabled={isUploadingBg}
                 title="Fazer upload para o Storage R2"
               >
                 {isUploadingBg && uploadTarget === 'light' ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
@@ -817,10 +817,10 @@ export function ConfigModule() {
       )}
 
 
-      {/* ══════════════ Governança de Deployments ══════════════ */}
+      {/* ══════════════ Purge de Deployments ══════════════ */}
       <article className="result-card">
         <header className="result-header">
-          <h4><Rocket size={16} /> Governança de Deployments — Cloudflare Pages</h4>
+          <h4><Rocket size={16} /> Purge de Deployments — Cloudflare Pages</h4>
           <p className="field-hint">Varre todos os projetos Pages da conta e expurga deployments obsoletos, mantendo apenas o mais recente de cada projeto.</p>
         </header>
         <DeploymentCleanupPanel />
