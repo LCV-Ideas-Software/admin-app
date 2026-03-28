@@ -39,11 +39,6 @@ type MapaDetalhado = {
   created_at: string | null
 }
 
-// Tipos para dados astrológicos parseados (paridade com astrologo-admin)
-type AstroData = { astro: string; signo: string; simbolo: string }
-type UmbandaData = { posicao: string; orixa: string; simbolo: string }
-type DadosGlobais = { tatwa: { principal: string; sub: string }; numerologia: { expressao: number; caminhoVida: number; vibracaoHora: number } }
-type DadosSistema = { astrologia: AstroData[]; umbanda: UmbandaData[] }
 type ConfirmDelete = { show: boolean; id: string; nome: string }
 
 const sanitizeRichHtml = (html: string): string => DOMPurify.sanitize(html, {
@@ -108,18 +103,7 @@ export function AstrologoModule() {
   const [emailModalMapaId, setEmailModalMapaId] = useState<string | null>(null)
   const [emailModalInput, setEmailModalInput] = useState('')
 
-  // Dados parseados para o viewer estruturado
-  const parsedData = useMemo(() => {
-    if (!selectedMapa) return null
-    try {
-      const globais = selectedMapa.dados_globais ? JSON.parse(selectedMapa.dados_globais) as DadosGlobais : null
-      const tropical = selectedMapa.dados_tropical ? JSON.parse(selectedMapa.dados_tropical) as DadosSistema : null
-      const astronomica = selectedMapa.dados_astronomica ? JSON.parse(selectedMapa.dados_astronomica) as DadosSistema : null
-      return { globais, tropical, astronomica }
-    } catch {
-      return null
-    }
-  }, [selectedMapa])
+
 
   const disabled = useMemo(() => loading, [loading])
 
@@ -345,6 +329,129 @@ export function AstrologoModule() {
       setLoading(false)
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderMapaCard = (mapa: any, index?: number) => {
+    let globais = null
+    let tropical = null
+    let astronomica = null
+    try {
+      globais = mapa.dados_globais ? (typeof mapa.dados_globais === 'string' ? JSON.parse(mapa.dados_globais) : mapa.dados_globais) : null
+      tropical = mapa.dados_tropical ? (typeof mapa.dados_tropical === 'string' ? JSON.parse(mapa.dados_tropical) : mapa.dados_tropical) : null
+      astronomica = mapa.dados_astronomica ? (typeof mapa.dados_astronomica === 'string' ? JSON.parse(mapa.dados_astronomica) : mapa.dados_astronomica) : null
+    } catch { /* ignorar parsing errors */ }
+
+    return (
+      <article className="result-card" key={index ?? mapa.id ?? Math.random()} style={{ marginBottom: index !== undefined ? '1rem' : 0 }}>
+        <header className="result-header">
+          <h4><Sparkles size={16} /> Ficha Oculta: {mapa.nome || 'Consulente'}</h4>
+          <span>{mapa.data_nascimento ? formatarData(mapa.data_nascimento) : ''} {mapa.hora_nascimento ? `às ${mapa.hora_nascimento}` : ''}</span>
+        </header>
+
+        {mapa.local_nascimento && (
+          <p className="field-hint astro-local-hint">{mapa.local_nascimento}</p>
+        )}
+
+        {globais && (
+          <div className="astro-section">
+            <div className="form-grid">
+              <div className="field-group">
+                <label>Forças Globais: Tatwas</label>
+                <div className="astro-kv-list">
+                  <div className="astro-kv"><span className="astro-kv__label">Principal</span><strong>{String(globais.tatwa?.principal || '')}</strong></div>
+                  <div className="astro-kv"><span className="astro-kv__label">Sub-tatwa</span><strong>{String(globais.tatwa?.sub || '')}</strong></div>
+                </div>
+              </div>
+              <div className="field-group">
+                <label>Forças Globais: Numerologia</label>
+                <div className="astro-kv-list">
+                  <div className="astro-kv"><span className="astro-kv__label">Expressão</span><strong>{String(globais.numerologia?.expressao || '')}</strong></div>
+                  <div className="astro-kv"><span className="astro-kv__label">Caminho</span><strong>{String(globais.numerologia?.caminhoVida || '')}</strong></div>
+                  <div className="astro-kv"><span className="astro-kv__label">Hora</span><strong>{String(globais.numerologia?.vibracaoHora || '')}</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tropical && (
+          <div className="astro-section">
+            <h5 className="astro-section__title astro-section__title--tropical">Módulo I: Astrológico Tropical</h5>
+            {tropical.astrologia?.length > 0 && (
+              <>
+                <label>Astrologia ({tropical.astrologia.length > 12 ? '13 Signos' : '12 Signos'})</label>
+                <div className="astro-grid astro-grid--4">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {tropical.astrologia.map((a: any, i: number) => (
+                    <div key={`trop-astro-${i}`} className="astro-card">
+                      <span className="astro-card__label">{a.astro}</span>
+                      <span className="astro-card__value">{a.simbolo} {a.signo}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {tropical.umbanda?.length > 0 && (
+              <>
+                <label>Umbanda</label>
+                <div className="astro-grid astro-grid--3">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {tropical.umbanda.map((u: any, i: number) => (
+                    <div key={`trop-umb-${i}`} className="astro-umbanda-card">
+                      <span className="astro-umbanda-card__simbolo">{u.simbolo}</span>
+                      <span className="astro-umbanda-card__posicao">{u.posicao}</span>
+                      <span className="astro-umbanda-card__orixa astro-umbanda-card__orixa--tropical">{u.orixa}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {astronomica && (
+          <div className="astro-section">
+            <h5 className="astro-section__title astro-section__title--astronomica">Módulo II: Astronômico Constelacional</h5>
+            {astronomica.astrologia?.length > 0 && (
+              <>
+                <label>Astrologia ({astronomica.astrologia.length > 12 ? '13 Signos' : '12 Signos'})</label>
+                <div className="astro-grid astro-grid--4">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {astronomica.astrologia.map((a: any, i: number) => (
+                    <div key={`ast-astro-${i}`} className="astro-card">
+                      <span className="astro-card__label">{a.astro}</span>
+                      <span className="astro-card__value">{a.simbolo} {a.signo}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {astronomica.umbanda?.length > 0 && (
+              <>
+                <label>Umbanda</label>
+                <div className="astro-grid astro-grid--3">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {astronomica.umbanda.map((u: any, i: number) => (
+                    <div key={`ast-umb-${i}`} className="astro-umbanda-card">
+                      <span className="astro-umbanda-card__simbolo">{u.simbolo}</span>
+                      <span className="astro-umbanda-card__posicao">{u.posicao}</span>
+                      <span className="astro-umbanda-card__orixa astro-umbanda-card__orixa--astronomica">{u.orixa}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {mapa.analise_ia && (
+          <div className="astro-section">
+            <h5 className="astro-section__title">Síntese do Mestre (IA)</h5>
+            <div className="astro-ia-content" dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(mapa.analise_ia) }} />
+          </div>
+        )}
+      </article>
+    )
+  }
 
   return (
     <section className="detail-panel module-shell module-shell-astrologo">
@@ -516,112 +623,7 @@ export function AstrologoModule() {
       {/* Viewer estruturado do mapa (paridade com astrologo-admin) */}
       {selectedMapa && (
         <>
-        <article className="result-card">
-          <header className="result-header">
-            <h4><Sparkles size={16} /> Ficha Oculta: {selectedMapa.nome}</h4>
-            <span>{selectedMapa.data_nascimento ? formatarData(selectedMapa.data_nascimento) : ''} {selectedMapa.hora_nascimento ? `às ${selectedMapa.hora_nascimento}` : ''}</span>
-          </header>
-
-          {selectedMapa.local_nascimento && (
-            <p className="field-hint astro-local-hint">{selectedMapa.local_nascimento}</p>
-          )}
-
-          {parsedData?.globais && (
-            <div className="astro-section">
-              <div className="form-grid">
-                <div className="field-group">
-                  <label>Forças Globais: Tatwas</label>
-                  <div className="astro-kv-list">
-                    <div className="astro-kv"><span className="astro-kv__label">Principal</span><strong>{String(parsedData.globais.tatwa.principal)}</strong></div>
-                    <div className="astro-kv"><span className="astro-kv__label">Sub-tatwa</span><strong>{String(parsedData.globais.tatwa.sub)}</strong></div>
-                  </div>
-                </div>
-                <div className="field-group">
-                  <label>Forças Globais: Numerologia</label>
-                  <div className="astro-kv-list">
-                    <div className="astro-kv"><span className="astro-kv__label">Expressão</span><strong>{String(parsedData.globais.numerologia.expressao)}</strong></div>
-                    <div className="astro-kv"><span className="astro-kv__label">Caminho</span><strong>{String(parsedData.globais.numerologia.caminhoVida)}</strong></div>
-                    <div className="astro-kv"><span className="astro-kv__label">Hora</span><strong>{String(parsedData.globais.numerologia.vibracaoHora)}</strong></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {parsedData?.tropical && (
-            <div className="astro-section">
-              <h5 className="astro-section__title astro-section__title--tropical">Módulo I: Astrológico Tropical</h5>
-              {parsedData.tropical.astrologia?.length > 0 && (
-                <>
-                  <label>Astrologia ({parsedData.tropical.astrologia.length > 12 ? '13 Signos' : '12 Signos'})</label>
-                  <div className="astro-grid astro-grid--4">
-                    {parsedData.tropical.astrologia.map((a, i) => (
-                      <div key={i} className="astro-card">
-                        <span className="astro-card__label">{a.astro}</span>
-                        <span className="astro-card__value">{a.simbolo} {a.signo}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-              {parsedData.tropical.umbanda?.length > 0 && (
-                <>
-                  <label>Umbanda</label>
-                  <div className="astro-grid astro-grid--3">
-                    {parsedData.tropical.umbanda.map((u, i) => (
-                      <div key={i} className="astro-umbanda-card">
-                        <span className="astro-umbanda-card__simbolo">{u.simbolo}</span>
-                        <span className="astro-umbanda-card__posicao">{u.posicao}</span>
-                        <span className="astro-umbanda-card__orixa astro-umbanda-card__orixa--tropical">{u.orixa}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {parsedData?.astronomica && (
-            <div className="astro-section">
-              <h5 className="astro-section__title astro-section__title--astronomica">Módulo II: Astronômico Constelacional</h5>
-              {parsedData.astronomica.astrologia?.length > 0 && (
-                <>
-                  <label>Astrologia (13 Signos)</label>
-                  <div className="astro-grid astro-grid--4">
-                    {parsedData.astronomica.astrologia.map((a, i) => (
-                      <div key={i} className="astro-card">
-                        <span className="astro-card__label">{a.astro}</span>
-                        <span className="astro-card__value">{a.simbolo} {a.signo}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-              {parsedData.astronomica.umbanda?.length > 0 && (
-                <>
-                  <label>Umbanda</label>
-                  <div className="astro-grid astro-grid--3">
-                    {parsedData.astronomica.umbanda.map((u, i) => (
-                      <div key={i} className="astro-umbanda-card">
-                        <span className="astro-umbanda-card__simbolo">{u.simbolo}</span>
-                        <span className="astro-umbanda-card__posicao">{u.posicao}</span>
-                        <span className="astro-umbanda-card__orixa astro-umbanda-card__orixa--astronomica">{u.orixa}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {selectedMapa.analise_ia && (
-            <div className="astro-section">
-              <h5 className="astro-section__title">Síntese do Mestre (IA)</h5>
-              <div className="astro-ia-content" dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(selectedMapa.analise_ia) }} />
-            </div>
-          )}
-
-        </article>
+        {renderMapaCard(selectedMapa)}
         </>
       )}
 
@@ -665,11 +667,8 @@ export function AstrologoModule() {
                   </button>
                 </div>
 
-                <div className="astro-section">
-                  <h5 className="astro-section__title">Conteúdo Salvo</h5>
-                  <pre style={{ background: '#f5f4f4', padding: '1rem', borderRadius: 8, fontSize: 13, overflow: 'auto' }}>
-                    {JSON.stringify(parsed, null, 2)}
-                  </pre>
+                <div className="astro-users-render" style={{ marginTop: '2rem' }}>
+                  {Array.isArray(parsed) ? parsed.map((m, i) => renderMapaCard(m, i)) : renderMapaCard(parsed, 0)}
                 </div>
               </div>
             )

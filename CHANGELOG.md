@@ -1,5 +1,9 @@
 # Changelog — Admin App
 
+## [v01.61.02] — 2026-03-28
+### Corrigido
+- **AstrologoModule**: Corrigidos erros de linting relacionados à validação explícita de `any` emitidos pelo `@typescript-eslint/no-explicit-any`. O supressor de lint (`// eslint-disable-next-line`) foi adotado especificamente na assinatura e nas iterações de `renderMapaCard` para estabilizar rigorosamente o painel, sem perdas na maleabilidade essencial do modelo dinâmico do banco (que recebe mapas mistos da API ou registros de ficha). 
+
 ## [v01.61.01] — 2026-03-28
 ### Alterado
 - **MainsiteModule**: Removido o botão "Novo Rascunho" da barra de ferramentas.
