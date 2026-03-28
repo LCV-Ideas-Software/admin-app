@@ -26,11 +26,6 @@ type EnvWithCloudflareToken = {
 }
 
 const resolveToken = (env: EnvWithCloudflareToken) => {
-  const byCfToken = env.CF_API_TOKEN?.trim()
-  if (byCfToken) {
-    return byCfToken
-  }
-
   const byDnsToken = env.CLOUDFLARE_DNS?.trim()
   if (byDnsToken) {
     return byDnsToken
@@ -39,6 +34,11 @@ const resolveToken = (env: EnvWithCloudflareToken) => {
   const byApiToken = env.CLOUDFLARE_API_TOKEN?.trim()
   if (byApiToken) {
     return byApiToken
+  }
+
+  const byCfToken = env.CF_API_TOKEN?.trim()
+  if (byCfToken) {
+    return byCfToken
   }
 
   return ''
