@@ -1,5 +1,9 @@
 # Changelog — Admin App
 
+## [v01.61.00] — 2026-03-28
+### Adicionado
+- **Calculadora**: Implementado seletor de modelos de inteligência artificial (Gemini) na calculadora administrativa, operando em paridade visual e funcional com o *Oráculo* e *Astrólogo*, com persistência via `localStorage` e carregamento de endpoint dinâmico (`/api/calculadora/modelos`).
+
 ## [v01.60.02] — 2026-03-28
 ### Corrigido
 - **MTA-STS & Cloudflare DNS API**: Refatorada a lógica de resolução de tokens (`functions/api/_lib/cloudflare-api.ts`) para priorizar a variável de ambiente `CLOUDFLARE_DNS` antes da `CF_API_TOKEN` e `CLOUDFLARE_API_TOKEN`. Isso resolve um Conflito de Permissões Crítico onde o token reservado ao Oráculo (`CF_API_TOKEN`, com privilégios limitados apenas a Worker Scripts) estava sendo acionado inadvertidamente pelos módulos de auditoria de DNS do app, causando Erros 403 (Authentication Error). A integração agora honra a diretiva do menor privilégio, lendo cada token restritamente para sua finalidade e priorizando chaves de DNS em rotas de zona.
