@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.67.00] — 2026-03-28
+### Adicionado
+- **Governança de Deployments — Cloudflare Pages**: nova seção em Configurações que replica a funcionalidade do script PowerShell `Clean-CloudflarePagesDeployments.ps1` via APIs nativas Cloudflare.
+- **[NEW] `functions/api/cfpw/cleanup-deployments.ts`**: endpoint GET (scan de todos os projetos Pages + deployments) e POST (delete unitário de deployment obsoleto). Arquitetura frontend-driven para progresso em tempo real.
+- **[NEW] `src/components/DeploymentCleanupPanel.tsx`**: componente com máquina de estados (idle→scanning→scanned→purging→complete), terminal estilizado com logs em tempo real, barra de progresso animada, cards de projeto com status e fluxo de confirmação.
+- **[NEW] `src/components/DeploymentCleanupPanel.css`**: estilos dedicados com design de terminal macOS, animações de shimmer/fade e color-coding de status.
+- **Backend helper**: adicionada `deleteCloudflarePagesDeployment()` em `cfpw-api.ts` com suporte a `?force=true`.
+### Corrigido
+- **CF DNS — Lint cleanup**: removidos 16 escapes desnecessários em template literals e corrigidas dependências de `useMemo` no `operationalAlerts`.
+
 ## [v01.66.01] — 2026-03-28
 ### Corrigido
 - **CF DNS — Falsos positivos de auditoria**: alertas operacionais como `CFDNS-A-INVALID` ("Nome obrigatório", "Conteúdo obrigatório") eram gerados ao carregar o módulo com draft vazio, sem nenhuma interação do usuário. Alertas de validação de draft agora só aparecem quando o formulário de criação/edição está ativo (`showRecordForm || isEditing`). Alertas de zona (`CFDNS-ZONE-MISSING`) permanecem incondicionais.

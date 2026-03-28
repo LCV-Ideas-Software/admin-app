@@ -363,6 +363,32 @@ export const deleteCloudflarePagesProject = async (env: EnvWithCloudflarePwToken
   )
 }
 
+export const deleteCloudflarePagesDeployment = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  projectName: string,
+  deploymentId: string,
+  force = false,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  const normalizedDeploymentId = deploymentId.trim()
+  if (!normalizedAccountId || !normalizedProject || !normalizedDeploymentId) {
+    throw new Error('Account ID, projectName e deploymentId são obrigatórios para remover deployment de Pages.')
+  }
+
+  const queryString = force ? '?force=true' : ''
+
+  await cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/deployments/${encodeURIComponent(normalizedDeploymentId)}${queryString}`,
+    `Falha ao remover deployment ${normalizedDeploymentId} do projeto ${normalizedProject}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
 export const getCloudflareWorkerSchedules = async (env: EnvWithCloudflarePwToken, accountId: string, scriptName: string) => {
   const normalizedAccountId = accountId.trim()
   const normalizedScript = scriptName.trim()

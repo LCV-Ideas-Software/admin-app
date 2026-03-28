@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Save, Search, Settings2, ShieldCheck, Trash2, Zap, Upload } from 'lucide-react'
+import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Rocket, Save, Search, Settings2, ShieldCheck, Trash2, Zap, Upload } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { RateLimitPanel } from '../../components/RateLimitPanel'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
+import { DeploymentCleanupPanel } from '../../components/DeploymentCleanupPanel'
 import {
   loadNewsSettings, saveNewsSettings, dispatchNewsSettingsChange,
   slugify, type NewsSettings, type NewsSource
@@ -814,6 +815,16 @@ export function ConfigModule() {
       {selectedSyncModule === 'mtasts' && (
         <SyncStatusCard module="mtasts" endpoint="/api/mtasts/sync" title="Sincronização do MTA-STS" description="Atualiza histórico, domínios e políticas de segurança de e-mail." />
       )}
+
+
+      {/* ══════════════ Governança de Deployments ══════════════ */}
+      <article className="result-card">
+        <header className="result-header">
+          <h4><Rocket size={16} /> Governança de Deployments — Cloudflare Pages</h4>
+          <p className="field-hint">Varre todos os projetos Pages da conta e expurga deployments obsoletos, mantendo apenas o mais recente de cada projeto.</p>
+        </header>
+        <DeploymentCleanupPanel />
+      </article>
 
       {/* ══════════════ Painel de Notícias ══════════════ */}
       <article className="form-card">
