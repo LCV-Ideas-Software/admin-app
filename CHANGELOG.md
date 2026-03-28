@@ -1,5 +1,19 @@
 # Changelog — Admin App
 
+## [v01.65.00] — 2026-03-28
+### Adicionado
+- **CF P&W — Criação operacional de recursos**: novas ações avançadas para criação de Worker por template (`create-worker-from-template`) e criação de projeto Pages (`create-page-project`) diretamente do módulo unificado.
+- **CF P&W — Versões e rotas (Workers)**: adicionadas ações para listar versões, promover versão (`deploy-worker-version`) e gerir rotas por zona (`list/add/delete-worker-route`).
+- **CF P&W — Operação raw controlada**: adicionada ação `raw-cloudflare-request` com método/path/body para cobrir endpoints Cloudflare ainda não modelados no helper, com validação de escopo (`/accounts` e `/zones`).
+
+### Alterado
+- **CF P&W helper (`cfpw-api.ts`)**: expandido com novos métodos de criação/configuração avançada (Worker template, Pages project/settings, versões, rotas) e suporte robusto a `multipart/form-data` para publish inicial de Worker.
+- **CF P&W painel (`CfPwModule`)**: ampliado com novos campos e ações de paridade total para execução operacional avançada em uma única tela.
+- **CF DNS alerting**: alertas operacionais agora exibem explicitamente o contexto de zona/domínio ativo em `cause/action`, eliminando ambiguidade sobre o domínio afetado.
+
+### Controle de versão
+- `admin-app`: APP v01.64.00 → APP v01.65.00
+
 ## [v01.64.00] — 2026-03-28
 ### Adicionado
 - **CF P&W — Operações avançadas de paridade**: novo endpoint unificado `POST /api/cfpw/ops` com suporte operacional para schedules, usage model e secrets de Workers, além de domains e ações de deployment em Pages (retry, rollback e logs).

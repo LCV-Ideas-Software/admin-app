@@ -537,6 +537,20 @@ export function CfDnsModule() {
     return parseCommonRecordDraft(draft.type, draft.name, draft.content, draft.priority)
   }, [draft.type, draft.name, draft.content, draft.priority, isSrvDraft, isCaaDraft, isUriDraft, isHttpsDraft])
 
+  const zoneContextLabel = useMemo(() => {
+    const zoneName = selectedZoneName.trim()
+    if (zoneName) {
+      return zoneName
+    }
+
+    const zoneId = selectedZoneId.trim()
+    if (zoneId) {
+      return `zone_id:${zoneId}`
+    }
+
+    return 'não selecionada'
+  }, [selectedZoneId, selectedZoneName])
+
   const operationalAlerts = useMemo<DnsOperationalAlert[]>(() => {
     const next: DnsOperationalAlert[] = []
 
@@ -553,8 +567,8 @@ export function CfDnsModule() {
       if (Number.isFinite(ttl) && ttl > 0 && ttl < 300) {
         next.push({
           code: 'CFDNS-TTL-LOW',
-          cause: `TTL configurado em ${ttl}s, abaixo do recomendado para estabilidade operacional.`,
-          action: 'Use TTL >= 300s para reduzir flapping de cache, salvo quando houver necessidade real de propagação rápida.',
+          cause: `TTL configurado em ${ttl}s, abaixo do recomendado para estabilidade operacional na zona ${zoneContextLabel}.`,
+          action: `Use TTL >= 300s para reduzir flapping de cache na zona ${zoneContextLabel}, salvo quando houver necessidade real de propagação rápida.`,
         })
       }
     }
@@ -562,16 +576,16 @@ export function CfDnsModule() {
     if (draft.proxied && !PROXY_COMPATIBLE_TYPES.has(draft.type)) {
       next.push({
         code: 'CFDNS-PROXY-INCOMPATIBLE',
-        cause: `O tipo ${draft.type} não suporta proxy laranja na Cloudflare.`,
-        action: 'Defina Proxy como "DNS only" para esse tipo antes de salvar.',
+        cause: `O tipo ${draft.type} não suporta proxy laranja na Cloudflare para a zona ${zoneContextLabel}.`,
+        action: `Defina Proxy como "DNS only" para esse tipo antes de salvar na zona ${zoneContextLabel}.`,
       })
     }
 
     if (draft.type === 'MX' && !draft.priority.trim()) {
       next.push({
         code: 'CFDNS-MX-PRIORITY-MISSING',
-        cause: 'Registro MX sem valor de prioridade.',
-        action: 'Informe prioridade (0-65535) para ordenar servidores de e-mail corretamente.',
+        cause: `Registro MX sem valor de prioridade na zona ${zoneContextLabel}.`,
+        action: `Informe prioridade (0-65535) para ordenar servidores de e-mail corretamente na zona ${zoneContextLabel}.`,
       })
     }
 
@@ -579,8 +593,8 @@ export function CfDnsModule() {
       if (!draft.srvService.trim() || !draft.srvProto.trim() || !draft.srvTarget.trim() || !draft.srvPort.trim()) {
         next.push({
           code: 'CFDNS-SRV-REQUIRED-FIELDS',
-          cause: 'Registro SRV sem um ou mais campos obrigatórios (service/proto/port/target).',
-          action: 'Preencha todos os campos essenciais do SRV antes de salvar.',
+          cause: `Registro SRV sem um ou mais campos obrigatórios (service/proto/port/target) na zona ${zoneContextLabel}.`,
+          action: `Preencha todos os campos essenciais do SRV antes de salvar na zona ${zoneContextLabel}.`,
         })
       }
     }
@@ -588,8 +602,8 @@ export function CfDnsModule() {
     if (isCaaDraft && (!draft.caaTag.trim() || !draft.caaValue.trim())) {
       next.push({
         code: 'CFDNS-CAA-REQUIRED-FIELDS',
-        cause: 'Registro CAA sem tag e/ou value.',
-        action: 'Preencha tag e value para definir corretamente a política de emissão de certificados.',
+        cause: `Registro CAA sem tag e/ou value na zona ${zoneContextLabel}.`,
+        action: `Preencha tag e value para definir corretamente a política de emissão de certificados na zona ${zoneContextLabel}.`,
       })
     }
 
@@ -597,8 +611,8 @@ export function CfDnsModule() {
       for (const issue of caaValidation.issues) {
         next.push({
           code: 'CFDNS-CAA-INVALID',
-          cause: issue,
-          action: 'Corrija o(s) campo(s) CAA com erro e salve novamente.',
+          cause: `${issue} Zona: ${zoneContextLabel}.`,
+          action: `Corrija o(s) campo(s) CAA com erro e salve novamente na zona ${zoneContextLabel}.`,
         })
       }
     }
@@ -606,8 +620,8 @@ export function CfDnsModule() {
     if (isUriDraft && !draft.uriTarget.trim()) {
       next.push({
         code: 'CFDNS-URI-TARGET-MISSING',
-        cause: 'Registro URI sem target.',
-        action: 'Informe o target URI completo (ex.: https://servico.exemplo/rota).',
+        cause: `Registro URI sem target na zona ${zoneContextLabel}.`,
+        action: `Informe o target URI completo (ex.: https://servico.exemplo/rota) para a zona ${zoneContextLabel}.`,
       })
     }
 
@@ -615,8 +629,8 @@ export function CfDnsModule() {
       for (const issue of uriValidation.issues) {
         next.push({
           code: 'CFDNS-URI-INVALID',
-          cause: issue,
-          action: 'Ajuste o target URI para formato válido e salve novamente.',
+          cause: `${issue} Zona: ${zoneContextLabel}.`,
+          action: `Ajuste o target URI para formato válido e salve novamente na zona ${zoneContextLabel}.`,
         })
       }
     }
@@ -624,8 +638,8 @@ export function CfDnsModule() {
     if (isHttpsDraft && !draft.httpsValue.trim()) {
       next.push({
         code: 'CFDNS-HTTPS-VALUE-MISSING',
-        cause: `${draft.type} sem parâmetros em value.`,
-        action: 'Informe parâmetros como alpn, port e hints de IP conforme o cenário.',
+        cause: `${draft.type} sem parâmetros em value na zona ${zoneContextLabel}.`,
+        action: `Informe parâmetros como alpn, port e hints de IP conforme o cenário na zona ${zoneContextLabel}.`,
       })
     }
 
@@ -633,8 +647,8 @@ export function CfDnsModule() {
       for (const issue of httpsValidation.issues) {
         next.push({
           code: 'CFDNS-HTTPS-SEMANTIC-INVALID',
-          cause: issue,
-          action: 'Ajuste o parâmetro indicado em value para sintaxe chave=valor válida.',
+          cause: `${issue} Zona: ${zoneContextLabel}.`,
+          action: `Ajuste o parâmetro indicado em value para sintaxe chave=valor válida na zona ${zoneContextLabel}.`,
         })
       }
     }
@@ -643,8 +657,8 @@ export function CfDnsModule() {
       for (const issue of commonValidation.issues) {
         next.push({
           code: `CFDNS-${draft.type}-INVALID`,
-          cause: issue,
-          action: `Corrija o campo inválido do registro ${draft.type} antes de salvar.`,
+          cause: `${issue} Zona: ${zoneContextLabel}.`,
+          action: `Corrija o campo inválido do registro ${draft.type} antes de salvar na zona ${zoneContextLabel}.`,
         })
       }
     }
@@ -672,6 +686,8 @@ export function CfDnsModule() {
     isSrvDraft,
     isUriDraft,
     selectedZoneId,
+    selectedZoneName,
+    zoneContextLabel,
   ])
 
   const statusTone = useMemo(() => {

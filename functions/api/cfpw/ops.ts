@@ -3,17 +3,26 @@ import type { D1Database } from '../_lib/operational'
 import { createResponseTrace } from '../_lib/request-trace'
 import {
   addCloudflarePagesDomain,
+  addCloudflareWorkerRoute,
   addCloudflareWorkerSecret,
+  createCloudflarePagesProject,
+  createCloudflareWorkerFromTemplate,
   deleteCloudflarePagesDomain,
+  deleteCloudflareWorkerRoute,
   deleteCloudflareWorkerSecret,
+  deployCloudflareWorkerVersion,
   getCloudflarePagesDeploymentLogs,
   getCloudflareWorkerSchedules,
   getCloudflareWorkerUsageModel,
   listCloudflarePagesDomains,
+  listCloudflareWorkerRoutes,
   listCloudflareWorkerSecrets,
+  listCloudflareWorkerVersions,
   resolveCloudflarePwAccount,
   retryCloudflarePagesDeployment,
   rollbackCloudflarePagesDeployment,
+  runCloudflareRawRequest,
+  updateCloudflarePagesProjectSettings,
   updateCloudflareWorkerSchedules,
   updateCloudflareWorkerUsageModel,
 } from '../_lib/cfpw-api'
@@ -39,6 +48,16 @@ type OpsPayload = {
   secretValue?: unknown
   usageModel?: unknown
   schedules?: unknown
+  templateCode?: unknown
+  projectBranch?: unknown
+  pageSettingsJson?: unknown
+  versionId?: unknown
+  zoneId?: unknown
+  routeId?: unknown
+  routePattern?: unknown
+  rawMethod?: unknown
+  rawPath?: unknown
+  rawBodyJson?: unknown
 }
 
 const toHeaders = () => ({
@@ -90,6 +109,16 @@ export async function onRequestPost(context: Context) {
   const secretValue = String(payload.secretValue ?? '')
   const usageModel = toText(payload.usageModel)
   const schedules = normalizeSchedules(payload.schedules)
+  const templateCode = String(payload.templateCode ?? '')
+  const projectBranch = toText(payload.projectBranch)
+  const pageSettingsJson = String(payload.pageSettingsJson ?? '')
+  const versionId = toText(payload.versionId)
+  const zoneId = toText(payload.zoneId)
+  const routeId = toText(payload.routeId)
+  const routePattern = toText(payload.routePattern)
+  const rawMethod = toText(payload.rawMethod)
+  const rawPath = toText(payload.rawPath)
+  const rawBodyJson = String(payload.rawBodyJson ?? '')
 
   try {
     const accountInfo = await resolveCloudflarePwAccount(context.env)
@@ -97,6 +126,14 @@ export async function onRequestPost(context: Context) {
     let result: unknown = null
 
     switch (action) {
+      case 'create-worker-from-template': {
+        if (!scriptName) {
+          return toError('scriptName é obrigatório para create-worker-from-template.', trace, 400)
+        }
+        result = await createCloudflareWorkerFromTemplate(context.env, accountInfo.accountId, scriptName, templateCode, usageModel)
+        break
+      }
+
       case 'get-worker-schedules': {
         if (!scriptName) {
           return toError('scriptName é obrigatório para get-worker-schedules.', trace, 400)
@@ -153,6 +190,32 @@ export async function onRequestPost(context: Context) {
         break
       }
 
+      case 'create-page-project': {
+        if (!projectName) {
+          return toError('projectName é obrigatório para create-page-project.', trace, 400)
+        }
+        result = await createCloudflarePagesProject(context.env, accountInfo.accountId, projectName, projectBranch)
+        break
+      }
+
+      case 'update-page-project-settings': {
+        if (!projectName) {
+          return toError('projectName é obrigatório para update-page-project-settings.', trace, 400)
+        }
+
+        let parsedSettings: Record<string, unknown> = {}
+        if (pageSettingsJson.trim()) {
+          try {
+            parsedSettings = JSON.parse(pageSettingsJson) as Record<string, unknown>
+          } catch {
+            return toError('pageSettingsJson inválido: informe JSON válido para update-page-project-settings.', trace, 400)
+          }
+        }
+
+        result = await updateCloudflarePagesProjectSettings(context.env, accountInfo.accountId, projectName, parsedSettings)
+        break
+      }
+
       case 'list-page-domains': {
         if (!projectName) {
           return toError('projectName é obrigatório para list-page-domains.', trace, 400)
@@ -198,6 +261,54 @@ export async function onRequestPost(context: Context) {
           return toError('projectName e deploymentId são obrigatórios para get-page-deployment-logs.', trace, 400)
         }
         result = await getCloudflarePagesDeploymentLogs(context.env, accountInfo.accountId, projectName, deploymentId)
+        break
+      }
+
+      case 'list-worker-versions': {
+        if (!scriptName) {
+          return toError('scriptName é obrigatório para list-worker-versions.', trace, 400)
+        }
+        result = await listCloudflareWorkerVersions(context.env, accountInfo.accountId, scriptName)
+        break
+      }
+
+      case 'deploy-worker-version': {
+        if (!scriptName || !versionId) {
+          return toError('scriptName e versionId são obrigatórios para deploy-worker-version.', trace, 400)
+        }
+        result = await deployCloudflareWorkerVersion(context.env, accountInfo.accountId, scriptName, versionId)
+        break
+      }
+
+      case 'list-worker-routes': {
+        if (!zoneId) {
+          return toError('zoneId é obrigatório para list-worker-routes.', trace, 400)
+        }
+        result = await listCloudflareWorkerRoutes(context.env, zoneId)
+        break
+      }
+
+      case 'add-worker-route': {
+        if (!zoneId || !routePattern || !scriptName) {
+          return toError('zoneId, routePattern e scriptName são obrigatórios para add-worker-route.', trace, 400)
+        }
+        result = await addCloudflareWorkerRoute(context.env, zoneId, routePattern, scriptName)
+        break
+      }
+
+      case 'delete-worker-route': {
+        if (!zoneId || !routeId) {
+          return toError('zoneId e routeId são obrigatórios para delete-worker-route.', trace, 400)
+        }
+        result = await deleteCloudflareWorkerRoute(context.env, zoneId, routeId)
+        break
+      }
+
+      case 'raw-cloudflare-request': {
+        if (!rawMethod || !rawPath) {
+          return toError('rawMethod e rawPath são obrigatórios para raw-cloudflare-request.', trace, 400)
+        }
+        result = await runCloudflareRawRequest(context.env, rawMethod, rawPath, rawBodyJson)
         break
       }
 

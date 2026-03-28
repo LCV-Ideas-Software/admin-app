@@ -137,12 +137,17 @@ const cloudflareRequest = async <T>(
     throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_PW, CLOUDFLARE_API_TOKEN ou CF_API_TOKEN).')
   }
 
+  const hasContentTypeHeader = Boolean(
+    init?.headers && new Headers(init.headers).has('Content-Type'),
+  )
+  const isFormDataBody = typeof FormData !== 'undefined' && init?.body instanceof FormData
+
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     method: init?.method ?? 'GET',
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      ...(hasContentTypeHeader || isFormDataBody ? {} : { 'Content-Type': 'application/json' }),
       ...(init?.headers ?? {}),
     },
     body: init?.body,
@@ -157,6 +162,36 @@ const cloudflareRequest = async <T>(
   }
 
   return payload.result as T
+}
+
+const validateCloudflareApiPath = (path: string) => {
+  const normalized = path.trim()
+  if (!normalized.startsWith('/')) {
+    throw new Error('O path precisa iniciar com "/" para acessar a API Cloudflare.')
+  }
+
+  if (normalized.includes('..')) {
+    throw new Error('Path inválido para operação avançada: uso de ".." não é permitido.')
+  }
+
+  if (!normalized.startsWith('/accounts/') && !normalized.startsWith('/zones/')) {
+    throw new Error('Path inválido: use endpoints iniciando com /accounts/... ou /zones/...')
+  }
+
+  return normalized
+}
+
+const parseJsonSafe = (value: string, fieldName: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    return JSON.parse(trimmed) as unknown
+  } catch {
+    throw new Error(`JSON inválido no campo ${fieldName}.`)
+  }
 }
 
 const normalizeAccount = (account: { id?: string; name?: string }) => ({
@@ -587,5 +622,243 @@ export const getCloudflarePagesDeploymentLogs = async (
     env,
     `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/deployments/${encodeURIComponent(normalizedDeploymentId)}/history/logs`,
     `Falha ao ler logs do deployment ${normalizedDeploymentId}`,
+  )
+}
+
+export const createCloudflareWorkerFromTemplate = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  scriptName: string,
+  templateCode: string,
+  usageModel?: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para criar Worker.')
+  }
+
+  const compatibilityDate = new Date().toISOString().slice(0, 10)
+  const metadata = {
+    main_module: 'index.js',
+    compatibility_date: compatibilityDate,
+    usage_model: usageModel?.trim() || 'standard',
+  }
+
+  const content = templateCode.trim() || `export default {\n  async fetch(request) {\n    return new Response('Worker ${normalizedScript} ativo', {\n      status: 200,\n      headers: { 'content-type': 'text/plain; charset=utf-8' },\n    })\n  },\n}\n`
+
+  const form = new FormData()
+  form.append('metadata', JSON.stringify(metadata))
+  form.append('index.js', new Blob([content], { type: 'application/javascript' }), 'index.js')
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}`,
+    `Falha ao criar Worker ${normalizedScript}`,
+    {
+      method: 'PUT',
+      headers: {
+        // fetch define boundary automaticamente para multipart/form-data
+      },
+      body: form,
+    },
+  )
+}
+
+export const createCloudflarePagesProject = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  projectName: string,
+  productionBranch?: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  if (!normalizedAccountId || !normalizedProject) {
+    throw new Error('Account ID e projectName são obrigatórios para criar projeto Pages.')
+  }
+
+  const branch = productionBranch?.trim() || 'main'
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects`,
+    `Falha ao criar projeto Pages ${normalizedProject}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        name: normalizedProject,
+        production_branch: branch,
+      }),
+    },
+  )
+}
+
+export const updateCloudflarePagesProjectSettings = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  projectName: string,
+  settings: Record<string, unknown>,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  if (!normalizedAccountId || !normalizedProject) {
+    throw new Error('Account ID e projectName são obrigatórios para atualizar settings do Pages.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}`,
+    `Falha ao atualizar settings do projeto ${normalizedProject}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    },
+  )
+}
+
+export const listCloudflareWorkerVersions = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  scriptName: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedAccountId || !normalizedScript) {
+    throw new Error('Account ID e scriptName são obrigatórios para listar versões do Worker.')
+  }
+
+  const versions = await cloudflareRequest<Array<Record<string, unknown>>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/versions`,
+    `Falha ao listar versões do Worker ${normalizedScript}`,
+  )
+
+  return Array.isArray(versions) ? versions : []
+}
+
+export const deployCloudflareWorkerVersion = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  scriptName: string,
+  versionId: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedScript = scriptName.trim()
+  const normalizedVersion = versionId.trim()
+  if (!normalizedAccountId || !normalizedScript || !normalizedVersion) {
+    throw new Error('Account ID, scriptName e versionId são obrigatórios para promover versão do Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/deployments`,
+    `Falha ao promover versão ${normalizedVersion} do Worker ${normalizedScript}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        versions: [
+          {
+            version_id: normalizedVersion,
+            percentage: 100,
+          },
+        ],
+      }),
+    },
+  )
+}
+
+export const listCloudflareWorkerRoutes = async (
+  env: EnvWithCloudflarePwToken,
+  zoneId: string,
+) => {
+  const normalizedZoneId = zoneId.trim()
+  if (!normalizedZoneId) {
+    throw new Error('zoneId é obrigatório para listar rotas de Worker.')
+  }
+
+  const routes = await cloudflareRequest<Array<Record<string, unknown>>>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/workers/routes`,
+    `Falha ao listar rotas de Worker da zona ${normalizedZoneId}`,
+  )
+
+  return Array.isArray(routes) ? routes : []
+}
+
+export const addCloudflareWorkerRoute = async (
+  env: EnvWithCloudflarePwToken,
+  zoneId: string,
+  pattern: string,
+  scriptName: string,
+) => {
+  const normalizedZoneId = zoneId.trim()
+  const normalizedPattern = pattern.trim()
+  const normalizedScript = scriptName.trim()
+  if (!normalizedZoneId || !normalizedPattern || !normalizedScript) {
+    throw new Error('zoneId, pattern e scriptName são obrigatórios para adicionar rota de Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/workers/routes`,
+    `Falha ao adicionar rota ${normalizedPattern}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        pattern: normalizedPattern,
+        script: normalizedScript,
+      }),
+    },
+  )
+}
+
+export const deleteCloudflareWorkerRoute = async (
+  env: EnvWithCloudflarePwToken,
+  zoneId: string,
+  routeId: string,
+) => {
+  const normalizedZoneId = zoneId.trim()
+  const normalizedRouteId = routeId.trim()
+  if (!normalizedZoneId || !normalizedRouteId) {
+    throw new Error('zoneId e routeId são obrigatórios para remover rota de Worker.')
+  }
+
+  return cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/workers/routes/${encodeURIComponent(normalizedRouteId)}`,
+    `Falha ao remover rota ${normalizedRouteId}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
+export const runCloudflareRawRequest = async (
+  env: EnvWithCloudflarePwToken,
+  method: string,
+  path: string,
+  bodyJson?: string,
+) => {
+  const normalizedPath = validateCloudflareApiPath(path)
+  const normalizedMethod = method.trim().toUpperCase()
+
+  if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod)) {
+    throw new Error(`Método não suportado para operação raw: ${normalizedMethod}`)
+  }
+
+  const parsedBody = parseJsonSafe(bodyJson ?? '', 'rawBodyJson')
+  const requestInit: RequestInit = {
+    method: normalizedMethod,
+  }
+
+  if (parsedBody != null && normalizedMethod !== 'GET') {
+    requestInit.body = JSON.stringify(parsedBody)
+  }
+
+  return cloudflareRequest<Record<string, unknown> | Array<Record<string, unknown>>>(
+    env,
+    normalizedPath,
+    `Falha na operação raw ${normalizedMethod} ${normalizedPath}`,
+    requestInit,
   )
 }

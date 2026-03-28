@@ -180,6 +180,16 @@ export function CfPwModule() {
   const [opsSecretValue, setOpsSecretValue] = useState('')
   const [opsUsageModel, setOpsUsageModel] = useState('standard')
   const [opsSchedulesRaw, setOpsSchedulesRaw] = useState('0 5 * * *')
+  const [opsTemplateCode, setOpsTemplateCode] = useState('')
+  const [opsProjectBranch, setOpsProjectBranch] = useState('main')
+  const [opsPageSettingsJson, setOpsPageSettingsJson] = useState('')
+  const [opsVersionId, setOpsVersionId] = useState('')
+  const [opsZoneId, setOpsZoneId] = useState('')
+  const [opsRouteId, setOpsRouteId] = useState('')
+  const [opsRoutePattern, setOpsRoutePattern] = useState('')
+  const [opsRawMethod, setOpsRawMethod] = useState('GET')
+  const [opsRawPath, setOpsRawPath] = useState('')
+  const [opsRawBodyJson, setOpsRawBodyJson] = useState('')
   const [opsResult, setOpsResult] = useState<unknown>(null)
 
   const operationalAlerts = useMemo<OperationalAlert[]>(() => {
@@ -425,6 +435,16 @@ export function CfPwModule() {
           secretValue: opsSecretValue,
           usageModel: opsUsageModel,
           schedules,
+          templateCode: opsTemplateCode,
+          projectBranch: opsProjectBranch,
+          pageSettingsJson: opsPageSettingsJson,
+          versionId: opsVersionId,
+          zoneId: opsZoneId,
+          routeId: opsRouteId,
+          routePattern: opsRoutePattern,
+          rawMethod: opsRawMethod,
+          rawPath: opsRawPath,
+          rawBodyJson: opsRawBodyJson,
         }),
       })
 
@@ -441,7 +461,29 @@ export function CfPwModule() {
     } finally {
       setOpsLoading(false)
     }
-  }, [adminActor, opsAction, opsDeploymentId, opsDomainName, opsProjectName, opsSchedulesRaw, opsScriptName, opsSecretName, opsSecretValue, opsUsageModel, showNotification])
+  }, [
+    adminActor,
+    opsAction,
+    opsDeploymentId,
+    opsDomainName,
+    opsPageSettingsJson,
+    opsProjectBranch,
+    opsProjectName,
+    opsRawBodyJson,
+    opsRawMethod,
+    opsRawPath,
+    opsRouteId,
+    opsRoutePattern,
+    opsSchedulesRaw,
+    opsScriptName,
+    opsSecretName,
+    opsSecretValue,
+    opsTemplateCode,
+    opsUsageModel,
+    opsVersionId,
+    opsZoneId,
+    showNotification,
+  ])
 
   useEffect(() => {
     void loadOverview()
@@ -775,6 +817,7 @@ export function CfPwModule() {
                   onChange={(event) => setOpsAction(event.target.value)}
                   disabled={opsLoading}
                 >
+                  <option value="create-worker-from-template">Worker: criar (template)</option>
                   <option value="get-worker-schedules">Worker: ler cron triggers</option>
                   <option value="update-worker-schedules">Worker: atualizar cron triggers</option>
                   <option value="get-worker-usage-model">Worker: ler usage model</option>
@@ -782,12 +825,20 @@ export function CfPwModule() {
                   <option value="list-worker-secrets">Worker: listar secrets</option>
                   <option value="add-worker-secret">Worker: adicionar secret</option>
                   <option value="delete-worker-secret">Worker: remover secret</option>
+                  <option value="list-worker-versions">Worker: listar versões</option>
+                  <option value="deploy-worker-version">Worker: promover versão</option>
+                  <option value="list-worker-routes">Worker: listar rotas (zone)</option>
+                  <option value="add-worker-route">Worker: adicionar rota (zone)</option>
+                  <option value="delete-worker-route">Worker: remover rota (zone)</option>
+                  <option value="create-page-project">Pages: criar projeto</option>
+                  <option value="update-page-project-settings">Pages: atualizar settings projeto</option>
                   <option value="list-page-domains">Pages: listar domínios</option>
                   <option value="add-page-domain">Pages: adicionar domínio</option>
                   <option value="delete-page-domain">Pages: remover domínio</option>
                   <option value="retry-page-deployment">Pages: retry deployment</option>
                   <option value="rollback-page-deployment">Pages: rollback deployment</option>
                   <option value="get-page-deployment-logs">Pages: logs deployment</option>
+                  <option value="raw-cloudflare-request">Cloudflare API: operação raw controlada</option>
                 </select>
               </div>
 
@@ -829,6 +880,33 @@ export function CfPwModule() {
               </div>
             </div>
 
+            <div className="form-grid">
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-project-branch">projectBranch</label>
+                <input id="cfpw-ops-project-branch" name="cfpw-ops-project-branch" value={opsProjectBranch} onChange={(event) => setOpsProjectBranch(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-version-id">versionId</label>
+                <input id="cfpw-ops-version-id" name="cfpw-ops-version-id" value={opsVersionId} onChange={(event) => setOpsVersionId(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-zone-id">zoneId</label>
+                <input id="cfpw-ops-zone-id" name="cfpw-ops-zone-id" value={opsZoneId} onChange={(event) => setOpsZoneId(event.target.value)} disabled={opsLoading} />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-route-id">routeId</label>
+                <input id="cfpw-ops-route-id" name="cfpw-ops-route-id" value={opsRouteId} onChange={(event) => setOpsRouteId(event.target.value)} disabled={opsLoading} />
+              </div>
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfpw-ops-route-pattern">routePattern</label>
+              <input id="cfpw-ops-route-pattern" name="cfpw-ops-route-pattern" value={opsRoutePattern} onChange={(event) => setOpsRoutePattern(event.target.value)} disabled={opsLoading} />
+            </div>
+
             <div className="field-group">
               <label htmlFor="cfpw-ops-schedules">Schedules (1 cron por linha)</label>
               <textarea
@@ -838,6 +916,69 @@ export function CfPwModule() {
                 rows={3}
                 value={opsSchedulesRaw}
                 onChange={(event) => setOpsSchedulesRaw(event.target.value)}
+                disabled={opsLoading}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfpw-ops-template-code">Worker template code (JS)</label>
+              <textarea
+                id="cfpw-ops-template-code"
+                name="cfpw-ops-template-code"
+                className="json-textarea"
+                rows={5}
+                value={opsTemplateCode}
+                onChange={(event) => setOpsTemplateCode(event.target.value)}
+                disabled={opsLoading}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfpw-ops-page-settings">pageSettingsJson (PATCH Pages)</label>
+              <textarea
+                id="cfpw-ops-page-settings"
+                name="cfpw-ops-page-settings"
+                className="json-textarea"
+                rows={5}
+                value={opsPageSettingsJson}
+                onChange={(event) => setOpsPageSettingsJson(event.target.value)}
+                disabled={opsLoading}
+              />
+            </div>
+
+            <div className="form-grid">
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-raw-method">rawMethod</label>
+                <select
+                  id="cfpw-ops-raw-method"
+                  name="cfpw-ops-raw-method"
+                  value={opsRawMethod}
+                  onChange={(event) => setOpsRawMethod(event.target.value)}
+                  disabled={opsLoading}
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="PATCH">PATCH</option>
+                  <option value="DELETE">DELETE</option>
+                </select>
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="cfpw-ops-raw-path">rawPath (/accounts/... ou /zones/...)</label>
+                <input id="cfpw-ops-raw-path" name="cfpw-ops-raw-path" value={opsRawPath} onChange={(event) => setOpsRawPath(event.target.value)} disabled={opsLoading} />
+              </div>
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfpw-ops-raw-body">rawBodyJson</label>
+              <textarea
+                id="cfpw-ops-raw-body"
+                name="cfpw-ops-raw-body"
+                className="json-textarea"
+                rows={5}
+                value={opsRawBodyJson}
+                onChange={(event) => setOpsRawBodyJson(event.target.value)}
                 disabled={opsLoading}
               />
             </div>
