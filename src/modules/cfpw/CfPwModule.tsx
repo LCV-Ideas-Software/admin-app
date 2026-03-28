@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Eye, EyeOff, Loader2, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
 type AccountSummary = {
@@ -386,6 +386,7 @@ export function CfPwModule() {
   const [opsRawPath, setOpsRawPath] = useState('')
   const [opsRawBodyJson, setOpsRawBodyJson] = useState('')
   const [opsResult, setOpsResult] = useState<unknown>(null)
+  const [showSecret, setShowSecret] = useState(false)
 
   const currentOpsAction = useMemo(() => findOpsAction(opsAction), [opsAction])
   const visibleOpsFields = useMemo(() => new Set(currentOpsAction.fields), [currentOpsAction])
@@ -610,7 +611,23 @@ export function CfPwModule() {
     }
   }, [adminActor, deleteConfirmation, deleteTarget, details, loadOverview, showNotification])
 
+  const isDestructiveOp = useMemo(() => {
+    const destructiveActions = ['delete-worker-secret', 'delete-worker-route', 'raw-cloudflare-request']
+    if (destructiveActions.includes(opsAction)) {
+      if (opsAction === 'raw-cloudflare-request' && opsRawMethod !== 'DELETE') return false
+      return true
+    }
+    return false
+  }, [opsAction, opsRawMethod])
+
   const runAdvancedOp = useCallback(async () => {
+    if (isDestructiveOp) {
+      const confirmed = window.confirm(
+        `Esta é uma operação destrutiva (${currentOpsAction.label}). Confirma a execução?`
+      )
+      if (!confirmed) return
+    }
+
     setOpsLoading(true)
     try {
       const schedules = opsSchedulesRaw
@@ -663,6 +680,8 @@ export function CfPwModule() {
     }
   }, [
     adminActor,
+    currentOpsAction.label,
+    isDestructiveOp,
     opsAction,
     opsDeploymentId,
     opsDomainName,
@@ -1051,7 +1070,7 @@ export function CfPwModule() {
 
             <div className="form-grid cfpw-ops-grid">
               {visibleOpsFields.has('scriptName') ? (
-                <div className="field-group">
+                <div className="field-group cfpw-field-animated">
                   <label htmlFor="cfpw-ops-script">Worker</label>
                   <input id="cfpw-ops-script" name="cfpw-ops-script" list="cfpw-workers-list" value={opsScriptName} onChange={(event) => setOpsScriptName(event.target.value)} placeholder="Selecione ou digite o scriptName" disabled={opsLoading} />
                   <datalist id="cfpw-workers-list">
@@ -1063,7 +1082,7 @@ export function CfPwModule() {
               ) : null}
 
               {visibleOpsFields.has('projectName') ? (
-                <div className="field-group">
+                <div className="field-group cfpw-field-animated">
                   <label htmlFor="cfpw-ops-project">Projeto Pages</label>
                   <input id="cfpw-ops-project" name="cfpw-ops-project" list="cfpw-pages-list" value={opsProjectName} onChange={(event) => setOpsProjectName(event.target.value)} placeholder="Selecione ou digite o projectName" disabled={opsLoading} />
                   <datalist id="cfpw-pages-list">
@@ -1075,30 +1094,35 @@ export function CfPwModule() {
               ) : null}
 
               {visibleOpsFields.has('deploymentId') ? (
-                <div className="field-group">
+                <div className="field-group cfpw-field-animated">
                   <label htmlFor="cfpw-ops-deployment">Deployment ID</label>
                   <input id="cfpw-ops-deployment" name="cfpw-ops-deployment" value={opsDeploymentId} onChange={(event) => setOpsDeploymentId(event.target.value)} placeholder="Cole o ID do deployment" disabled={opsLoading} />
                 </div>
               ) : null}
 
               {visibleOpsFields.has('domainName') ? (
-                <div className="field-group">
+                <div className="field-group cfpw-field-animated">
                   <label htmlFor="cfpw-ops-domain">Dominio</label>
                   <input id="cfpw-ops-domain" name="cfpw-ops-domain" value={opsDomainName} onChange={(event) => setOpsDomainName(event.target.value)} placeholder="ex.: app.exemplo.com" disabled={opsLoading} />
                 </div>
               ) : null}
 
               {visibleOpsFields.has('secretName') ? (
-                <div className="field-group">
+                <div className="field-group cfpw-field-animated">
                   <label htmlFor="cfpw-ops-secret-name">Nome do secret</label>
                   <input id="cfpw-ops-secret-name" name="cfpw-ops-secret-name" value={opsSecretName} onChange={(event) => setOpsSecretName(event.target.value)} placeholder="ex.: API_KEY" disabled={opsLoading} />
                 </div>
               ) : null}
 
               {visibleOpsFields.has('secretValue') ? (
-                <div className="field-group">
+                <div className="field-group cfpw-field-animated">
                   <label htmlFor="cfpw-ops-secret-value">Valor do secret</label>
-                  <input id="cfpw-ops-secret-value" name="cfpw-ops-secret-value" type="password" value={opsSecretValue} onChange={(event) => setOpsSecretValue(event.target.value)} placeholder="Digite o valor apenas na hora de gravar" disabled={opsLoading} />
+                  <div className="cfpw-secret-wrap">
+                    <input id="cfpw-ops-secret-value" name="cfpw-ops-secret-value" type={showSecret ? 'text' : 'password'} value={opsSecretValue} onChange={(event) => setOpsSecretValue(event.target.value)} placeholder="Digite o valor apenas na hora de gravar" disabled={opsLoading} />
+                    <button type="button" className="cfpw-secret-toggle" onClick={() => setShowSecret((v) => !v)} title={showSecret ? 'Ocultar valor' : 'Mostrar valor'}>
+                      {showSecret ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </div>
               ) : null}
 
@@ -1256,12 +1280,45 @@ export function CfPwModule() {
               </button>
             </div>
 
-            {opsResult != null ? (
-              <div className="cfpw-json-preview">
-                <div className="cfpw-json-preview__title">{currentOpsAction.outcomeLabel}</div>
-                <pre>{JSON.stringify(opsResult, null, 2)}</pre>
-              </div>
-            ) : null}
+            {opsResult != null ? (() => {
+              const resultObj = typeof opsResult === 'object' && opsResult !== null && !Array.isArray(opsResult) ? (opsResult as Record<string, unknown>) : null
+              const kvEntries = resultObj
+                ? Object.entries(resultObj).filter(([, v]) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null)
+                : []
+              const hasComplexValues = resultObj
+                ? Object.values(resultObj).some((v) => typeof v === 'object' && v !== null)
+                : true
+              const fullJson = JSON.stringify(opsResult, null, 2)
+
+              return (
+                <div className="cfpw-result-container">
+                  <div className="cfpw-result-header">
+                    <span className="cfpw-result-header__badge cfpw-result-header__badge--ok">
+                      <CheckCircle size={12} /> Concluído
+                    </span>
+                    <span className="cfpw-result-header__label">{currentOpsAction.outcomeLabel}</span>
+                  </div>
+
+                  {kvEntries.length > 0 ? (
+                    <div className="cfpw-result-kv">
+                      {kvEntries.map(([key, value]) => (
+                        <div key={key} className="cfpw-result-kv__row">
+                          <div className="cfpw-result-kv__key">{key}</div>
+                          <div className="cfpw-result-kv__value">{String(value ?? '—')}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {(hasComplexValues || kvEntries.length === 0) ? (
+                    <details className="cfpw-result-details">
+                      <summary>{kvEntries.length > 0 ? 'Ver JSON completo' : 'Dados retornados'}</summary>
+                      <pre>{fullJson}</pre>
+                    </details>
+                  ) : null}
+                </div>
+              )
+            })() : null}
           </article>
         </div>
 

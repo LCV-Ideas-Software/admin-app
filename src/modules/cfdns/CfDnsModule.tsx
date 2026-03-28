@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
+import { AlertTriangle, Cloud, Loader2, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 
 type ZoneItem = {
@@ -1241,9 +1241,9 @@ export function CfDnsModule() {
                       <tr className={isSelected ? 'cfdns-row-selected' : ''}>
                         <td>{String(record.type ?? '').toUpperCase() || '—'}</td>
                         <td>{String(record.name ?? '') || '—'}</td>
-                        <td className="cfdns-cell-content">{formatRecordContent(record)}</td>
-                        <td>{record.ttl ?? 'auto'}</td>
-                        <td>{record.proxied ? 'Proxied' : 'DNS only'}</td>
+                        <td className="cfdns-cell-content" title={formatRecordContent(record)}>{(() => { const c = formatRecordContent(record); return c.length > 60 ? c.slice(0, 57) + '…' : c; })()}</td>
+                        <td>{record.ttl === 1 ? <span className="cfdns-ttl-auto">Auto</span> : (record.ttl ?? 'Auto')}</td>
+                        <td>{record.proxied ? <span className="cfdns-proxy-badge cfdns-proxy-badge--proxied" title="Registro proxied — validação gerenciada pela Cloudflare"><Cloud size={11} /> Proxied</span> : <span className="cfdns-proxy-badge cfdns-proxy-badge--dns">DNS only</span>}</td>
                         <td title={formatDateTimeFull(record.modified_on)}>{formatDateTime(record.modified_on)}</td>
                         <td>
                           <div className="cfdns-row-actions">
