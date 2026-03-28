@@ -1,5 +1,16 @@
 # Changelog — Admin App
 
+## [v01.65.02] — 2026-03-28
+### Corrigido
+- **CF DNS — Proxy laranja soberano**: qualquer registro marcado como `proxied = true` passa a ser tratado como operacionalmente correto no painel, independentemente do tipo ou do conteudo informado. Foram removidos bloqueios e alertas semanticos locais quando o proxy esta ativo.
+
+### Alterado
+- **CF DNS — UX de proxy sem restricao por tipo**: o seletor de proxy deixou de rebaixar automaticamente registros ao trocar o tipo, preservando a intencao operacional do operador.
+- **CF P&W — Operacoes avancadas guiadas**: o painel deixou de exibir todos os campos crus ao mesmo tempo e passou a mostrar apenas os controles relevantes para a acao escolhida, com descricoes operacionais, agrupamento por categoria, preenchimento assistido por inventario e preview de retorno mais legivel.
+
+### Controle de versão
+- `admin-app`: APP v01.65.01 → APP v01.65.02
+
 ## [v01.65.01] — 2026-03-28
 ### Corrigido
 - **CF DNS — Validação de registros proxied**: registros DNS com status `proxied = true` são agora considerados válidos automaticamente. Conteúdo vazio ou inválido é aceito para registros proxied, pois o gerenciamento do IP é feito pela Cloudflare. Resolve alertas falsos `CFDNS-A-INVALID` e `CFDNS-AAAA-INVALID` para registros em proxy laranja.

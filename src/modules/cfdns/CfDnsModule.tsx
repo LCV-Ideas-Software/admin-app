@@ -105,8 +105,6 @@ const DEFAULT_DRAFT: EditorDraft = {
   httpsValue: '',
 }
 
-const PROXY_COMPATIBLE_TYPES = new Set(['A', 'AAAA', 'CNAME'])
-
 const parseApiPayload = async <T,>(response: Response, fallback: string): Promise<T> => {
   const rawText = await response.text()
   const trimmed = rawText.trim()
@@ -504,6 +502,7 @@ export function CfDnsModule() {
   const isCaaDraft = draft.type === 'CAA'
   const isUriDraft = draft.type === 'URI'
   const isHttpsDraft = draft.type === 'HTTPS' || draft.type === 'SVCB'
+  const isProxyValidated = draft.proxied
 
   const httpsValidation = useMemo(() => {
     if (!isHttpsDraft) {
@@ -567,7 +566,7 @@ export function CfDnsModule() {
       })
     }
 
-    if (draft.ttl && draft.ttl !== '1') {
+    if (!isProxyValidated && draft.ttl && draft.ttl !== '1') {
       const ttl = Number(draft.ttl)
       if (Number.isFinite(ttl) && ttl > 0 && ttl < 300) {
         next.push({
@@ -578,15 +577,7 @@ export function CfDnsModule() {
       }
     }
 
-    if (draft.proxied && !PROXY_COMPATIBLE_TYPES.has(draft.type)) {
-      next.push({
-        code: 'CFDNS-PROXY-INCOMPATIBLE',
-        cause: `O tipo ${draft.type} não suporta proxy laranja na Cloudflare para a zona ${zoneContextLabel}.`,
-        action: `Defina Proxy como "DNS only" para esse tipo antes de salvar na zona ${zoneContextLabel}.`,
-      })
-    }
-
-    if (draft.type === 'MX' && !draft.priority.trim()) {
+    if (!isProxyValidated && draft.type === 'MX' && !draft.priority.trim()) {
       next.push({
         code: 'CFDNS-MX-PRIORITY-MISSING',
         cause: `Registro MX sem valor de prioridade na zona ${zoneContextLabel}.`,
@@ -594,7 +585,7 @@ export function CfDnsModule() {
       })
     }
 
-    if (isSrvDraft) {
+    if (!isProxyValidated && isSrvDraft) {
       if (!draft.srvService.trim() || !draft.srvProto.trim() || !draft.srvTarget.trim() || !draft.srvPort.trim()) {
         next.push({
           code: 'CFDNS-SRV-REQUIRED-FIELDS',
@@ -604,7 +595,7 @@ export function CfDnsModule() {
       }
     }
 
-    if (isCaaDraft && (!draft.caaTag.trim() || !draft.caaValue.trim())) {
+    if (!isProxyValidated && isCaaDraft && (!draft.caaTag.trim() || !draft.caaValue.trim())) {
       next.push({
         code: 'CFDNS-CAA-REQUIRED-FIELDS',
         cause: `Registro CAA sem tag e/ou value na zona ${zoneContextLabel}.`,
@@ -612,7 +603,7 @@ export function CfDnsModule() {
       })
     }
 
-    if (isCaaDraft && caaValidation.issues.length > 0) {
+    if (!isProxyValidated && isCaaDraft && caaValidation.issues.length > 0) {
       for (const issue of caaValidation.issues) {
         next.push({
           code: 'CFDNS-CAA-INVALID',
@@ -622,7 +613,7 @@ export function CfDnsModule() {
       }
     }
 
-    if (isUriDraft && !draft.uriTarget.trim()) {
+    if (!isProxyValidated && isUriDraft && !draft.uriTarget.trim()) {
       next.push({
         code: 'CFDNS-URI-TARGET-MISSING',
         cause: `Registro URI sem target na zona ${zoneContextLabel}.`,
@@ -630,7 +621,7 @@ export function CfDnsModule() {
       })
     }
 
-    if (isUriDraft && uriValidation.issues.length > 0) {
+    if (!isProxyValidated && isUriDraft && uriValidation.issues.length > 0) {
       for (const issue of uriValidation.issues) {
         next.push({
           code: 'CFDNS-URI-INVALID',
@@ -640,7 +631,7 @@ export function CfDnsModule() {
       }
     }
 
-    if (isHttpsDraft && !draft.httpsValue.trim()) {
+    if (!isProxyValidated && isHttpsDraft && !draft.httpsValue.trim()) {
       next.push({
         code: 'CFDNS-HTTPS-VALUE-MISSING',
         cause: `${draft.type} sem parâmetros em value na zona ${zoneContextLabel}.`,
@@ -648,7 +639,7 @@ export function CfDnsModule() {
       })
     }
 
-    if (isHttpsDraft && httpsValidation.issues.length > 0) {
+    if (!isProxyValidated && isHttpsDraft && httpsValidation.issues.length > 0) {
       for (const issue of httpsValidation.issues) {
         next.push({
           code: 'CFDNS-HTTPS-SEMANTIC-INVALID',
@@ -658,7 +649,7 @@ export function CfDnsModule() {
       }
     }
 
-    if (!isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && commonValidation.issues.length > 0) {
+    if (!isProxyValidated && !isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && commonValidation.issues.length > 0) {
       for (const issue of commonValidation.issues) {
         next.push({
           code: `CFDNS-${draft.type}-INVALID`,
@@ -693,6 +684,7 @@ export function CfDnsModule() {
     selectedZoneId,
     selectedZoneName,
     zoneContextLabel,
+    isProxyValidated,
   ])
 
   const statusTone = useMemo(() => {
@@ -906,47 +898,47 @@ export function CfDnsModule() {
       return
     }
 
-    if (!isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && !draft.content.trim()) {
+    if (!isProxyValidated && !isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && !draft.content.trim()) {
       showNotification('Conteúdo é obrigatório para este tipo de registro.', 'error')
       return
     }
 
-    if (isSrvDraft && (!draft.srvService.trim() || !draft.srvProto.trim() || !draft.srvTarget.trim() || !draft.srvPort.trim())) {
+    if (!isProxyValidated && isSrvDraft && (!draft.srvService.trim() || !draft.srvProto.trim() || !draft.srvTarget.trim() || !draft.srvPort.trim())) {
       showNotification('SRV exige service, proto, port e target.', 'error')
       return
     }
 
-    if (isCaaDraft && (!draft.caaTag.trim() || !draft.caaValue.trim())) {
+    if (!isProxyValidated && isCaaDraft && (!draft.caaTag.trim() || !draft.caaValue.trim())) {
       showNotification('CAA exige tag e value.', 'error')
       return
     }
 
-    if (isCaaDraft && caaValidation.issues.length > 0) {
+    if (!isProxyValidated && isCaaDraft && caaValidation.issues.length > 0) {
       showNotification('CAA com valor inválido. Revise os campos antes de salvar.', 'error')
       return
     }
 
-    if (isUriDraft && !draft.uriTarget.trim()) {
+    if (!isProxyValidated && isUriDraft && !draft.uriTarget.trim()) {
       showNotification('URI exige target.', 'error')
       return
     }
 
-    if (isUriDraft && uriValidation.issues.length > 0) {
+    if (!isProxyValidated && isUriDraft && uriValidation.issues.length > 0) {
       showNotification('URI com target inválido. Revise o valor antes de salvar.', 'error')
       return
     }
 
-    if (isHttpsDraft && !draft.httpsValue.trim()) {
+    if (!isProxyValidated && isHttpsDraft && !draft.httpsValue.trim()) {
       showNotification('HTTPS/SVCB exige parâmetros em value.', 'error')
       return
     }
 
-    if (isHttpsDraft && httpsValidation.issues.length > 0) {
+    if (!isProxyValidated && isHttpsDraft && httpsValidation.issues.length > 0) {
       showNotification('HTTPS/SVCB com value inválido. Revise os parâmetros antes de salvar.', 'error')
       return
     }
 
-    if (!isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && commonValidation.issues.length > 0) {
+    if (!isProxyValidated && !isSrvDraft && !isCaaDraft && !isUriDraft && !isHttpsDraft && commonValidation.issues.length > 0) {
       showNotification(`Registro ${draft.type} inválido. Revise os campos antes de salvar.`, 'error')
       return
     }
@@ -1008,7 +1000,7 @@ export function CfDnsModule() {
             content: isSrvDraft || isCaaDraft || isUriDraft || isHttpsDraft ? '' : draft.content.trim(),
             data: recordData,
             ttl: toTtlValue(draft.ttl),
-            proxied: PROXY_COMPATIBLE_TYPES.has(draft.type) ? draft.proxied : false,
+            proxied: draft.proxied,
             priority: isSrvDraft
               ? null
               : draft.priority.trim()
@@ -1295,7 +1287,7 @@ export function CfDnsModule() {
                                       setDraft((current) => ({
                                         ...current,
                                         type: nextType,
-                                        proxied: PROXY_COMPATIBLE_TYPES.has(nextType) ? current.proxied : false,
+                                        proxied: current.proxied,
                                       }))
                                     }}
                                     disabled={saving}
@@ -1410,13 +1402,17 @@ export function CfDnsModule() {
                                     id={`cfdns-inline-proxy-${recordId}`}
                                     value={draft.proxied ? 'true' : 'false'}
                                     onChange={(event) => setDraft((current) => ({ ...current, proxied: event.target.value === 'true' }))}
-                                    disabled={saving || !PROXY_COMPATIBLE_TYPES.has(draft.type)}
+                                    disabled={saving}
                                   >
                                     <option value="false">DNS only</option>
                                     <option value="true">Proxied</option>
                                   </select>
                                 </div>
                               </div>
+
+                              {draft.proxied ? (
+                                <p className="field-hint">Proxy laranja ativo: este registro passa a ser tratado como operacionalmente correto pelo painel, sem bloqueio por validação semântica.</p>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -1488,7 +1484,7 @@ export function CfDnsModule() {
                 setDraft((current) => ({
                   ...current,
                   type: nextType,
-                  proxied: PROXY_COMPATIBLE_TYPES.has(nextType) ? current.proxied : false,
+                  proxied: current.proxied,
                 }))
               }}
               disabled={saving}
@@ -1527,10 +1523,10 @@ export function CfDnsModule() {
               onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
               disabled={saving}
             />
-            {commonValidation.issues.length > 0 && (
+            {!isProxyValidated && commonValidation.issues.length > 0 && (
               <p className="field-error" role="alert">{commonValidation.issues[0]}</p>
             )}
-            {commonValidation.hints.length > 0 && (
+            {!isProxyValidated && commonValidation.hints.length > 0 && (
               <p className="field-hint">{commonValidation.hints[0]}</p>
             )}
           </div>
@@ -1689,10 +1685,10 @@ export function CfDnsModule() {
                 onChange={(event) => setDraft((current) => ({ ...current, caaValue: event.target.value }))}
                 disabled={saving}
               />
-              {isCaaDraft && caaValidation.issues.length > 0 && (
+              {!isProxyValidated && isCaaDraft && caaValidation.issues.length > 0 && (
                 <p className="field-error" role="alert">{caaValidation.issues[0]}</p>
               )}
-              {isCaaDraft && caaValidation.hints.length > 0 && (
+              {!isProxyValidated && isCaaDraft && caaValidation.hints.length > 0 && (
                 <p className="field-hint">{caaValidation.hints[0]}</p>
               )}
             </div>
@@ -1743,10 +1739,10 @@ export function CfDnsModule() {
                 onChange={(event) => setDraft((current) => ({ ...current, uriTarget: event.target.value }))}
                 disabled={saving}
               />
-              {isUriDraft && uriValidation.issues.length > 0 && (
+              {!isProxyValidated && isUriDraft && uriValidation.issues.length > 0 && (
                 <p className="field-error" role="alert">{uriValidation.issues[0]}</p>
               )}
-              {isUriDraft && uriValidation.hints.length > 0 && (
+              {!isProxyValidated && isUriDraft && uriValidation.hints.length > 0 && (
                 <p className="field-hint">{uriValidation.hints[0]}</p>
               )}
             </div>
@@ -1797,17 +1793,17 @@ export function CfDnsModule() {
                 onChange={(event) => setDraft((current) => ({ ...current, httpsValue: event.target.value }))}
                 disabled={saving}
               />
-              {isHttpsDraft && httpsValidation.issues.length > 0 && (
+              {!isProxyValidated && isHttpsDraft && httpsValidation.issues.length > 0 && (
                 <p className="field-error" role="alert">
                   {httpsValidation.issues[0]}
                 </p>
               )}
-              {isHttpsDraft && httpsValidation.hints.length > 0 && (
+              {!isProxyValidated && isHttpsDraft && httpsValidation.hints.length > 0 && (
                 <p className="field-hint">
                   {httpsValidation.hints[0]}
                 </p>
               )}
-              {isHttpsDraft && httpsValidation.tokens.length > 0 && (
+              {!isProxyValidated && isHttpsDraft && httpsValidation.tokens.length > 0 && (
                 <p className="field-hint">
                   Tokens parseados: {httpsValidation.tokens.join(' | ')}
                 </p>
@@ -1871,13 +1867,17 @@ export function CfDnsModule() {
               name="cfDnsDraftProxied"
               value={draft.proxied ? 'true' : 'false'}
               onChange={(event) => setDraft((current) => ({ ...current, proxied: event.target.value === 'true' }))}
-              disabled={saving || !PROXY_COMPATIBLE_TYPES.has(draft.type)}
+              disabled={saving}
             >
               <option value="false">DNS only (cinza)</option>
               <option value="true">Proxied (laranja)</option>
             </select>
           </div>
         </div>
+
+        {draft.proxied ? (
+          <p className="field-hint">Proxy laranja ativo: todo registro marcado como proxied passa a ser considerado correto pelo módulo, independentemente do tipo ou do conteúdo informado.</p>
+        ) : null}
 
         <div className="form-actions">
           <button type="button" className="primary-button" onClick={() => void handleSaveRecord()} disabled={saving || !selectedZoneId}>
