@@ -1,5 +1,55 @@
 # Changelog — Admin App
 
+## [v01.63.00] — 2026-03-28
+### Adicionado
+- **Módulo CF P&W (novo)**: criado o painel `CF P&W` no `admin-app` para gestão operacional de Cloudflare Pages e Workers via API nativa.
+- **Overview operacional**: endpoint consolidado com contexto da conta ativa, total de Workers e total de projetos Pages.
+- **Detalhes e deployments**: leitura dedicada de detalhes de Worker/projeto e histórico de deploys por recurso.
+- **Exclusão com confirmação forte**: remoção de Worker e Pages com confirmação explícita por redigitação do identificador.
+
+### Alterado
+- **Menu lateral com regra fixa**: mantido o padrão obrigatório no `admin-app` com `Visão Geral` sempre em primeiro, `Configurações` sempre em último e os demais módulos em ordem alfabética.
+
+## [v01.62.04] — 2026-03-28
+### Melhorado
+- **CF DNS — Validação semântica completa**: expandido o motor de validação do formulário para cobrir tipos estruturados e tipos comuns com bloqueio preventivo de save quando o payload está inválido.
+- **URI (strict target)**: validação de formato URL/URI, checagem de tamanho e feedback contextual no campo `target`.
+- **CAA (strict flags/tag/value)**: validação de `flags` (0-255), `tag` permitida (`issue`, `issuewild`, `iodef`) e coerência de `value` para `iodef` (`mailto:`/`http(s)://`).
+- **Tipos comuns (A/AAAA/CNAME/MX/TXT)**: validações de conteúdo por tipo (IPv4/IPv6/hostname), prioridade obrigatória para MX e hints operacionais para TXT extenso.
+- **UX de diagnóstico em tempo real**: mensagens inline de erro/hint por campo e gate de salvamento orientado por validação, reduzindo falhas de round-trip com a API da Cloudflare.
+
+## [v01.62.03] — 2026-03-28
+### Melhorado
+- **CF DNS — Parser semântico para HTTPS/SVCB**: implementado parsing inteligente de `value` com validações de sintaxe para tokens `alpn`, `port`, `ipv4hint`, `ipv6hint` e `ech`.
+- **Validação preventiva no save**: registros HTTPS/SVCB agora bloqueiam salvamento quando o parser detecta inconsistências semânticas.
+- **UX assistida no formulário**: o campo `value` exibe feedback em tempo real (primeiro erro detectado, dicas e tokens parseados), reduzindo tentativa e erro na configuração de endpoints modernos.
+
+## [v01.62.02] — 2026-03-28
+### Melhorado
+- **CF DNS — Tipos estruturados ampliados**: o editor avançado do módulo `CF DNS` recebeu suporte dedicado para **URI**, **HTTPS** e **SVCB**, seguindo o mesmo padrão de UX aplicado em SRV/CAA.
+- **URI data payload**: adicionados campos específicos `priority`, `weight` e `target`, com validação e serialização para `record.data`.
+- **HTTPS/SVCB data payload**: adicionados campos específicos `priority`, `target` e `value`, com validação e serialização para `record.data`.
+- **Preview da listagem melhorado**: a coluna de conteúdo agora renderiza resumo legível de registros estruturados URI/HTTPS/SVCB quando `content` estiver vazio.
+
+## [v01.62.01] — 2026-03-28
+### Melhorado
+- **CF DNS — Edição avançada por tipo**: o editor do módulo `CF DNS` agora suporta campos estruturados para registros **SRV** e **CAA**, incluindo leitura/hidratação de `data`, edição assistida e persistência completa via API.
+- **SRV (Cloudflare data payload)**: adicionados campos dedicados `service`, `proto`, `name`, `priority`, `weight`, `port` e `target`, com validações de obrigatoriedade e serialização automática para `record.data`.
+- **CAA (Cloudflare data payload)**: adicionados campos dedicados `flags`, `tag` (`issue`, `issuewild`, `iodef`) e `value`, com validações de consistência e serialização automática para `record.data`.
+- **Listagem inteligente**: quando `content` estiver vazio em tipos estruturados, a tabela de registros exibe uma prévia legível baseada em `data` (SRV/CAA), evitando células vazias e melhorando auditoria operacional.
+
+## [v01.62.00] — 2026-03-28
+### Adicionado
+- **Módulo CF DNS (novo)**: criado o painel completo `CF DNS` no `admin-app`, com gestão de DNS da Cloudflare em fluxo end-to-end.
+- **Dropdown automático de domínios**: listagem dinâmica de zonas ativas via API nativa da Cloudflare (`/api/cfdns/zones`) com seleção inteligente de zona.
+- **Leitura e filtro de registros DNS**: tabela operacional com paginação, filtro por tipo e busca por nome (`/api/cfdns/records`), incluindo metadados de TTL, proxy e data de atualização.
+- **CRUD de registros (create/update/delete)**: inclusão e edição via `POST /api/cfdns/upsert` e exclusão via `DELETE /api/cfdns/delete`, com validação de campos críticos (TTL, priority, type/name/content).
+- **Confirmações e feedback visual**: confirmações explícitas para criar/editar/excluir, estado operacional com chip dinâmico e alertas inteligentes no formulário (warnings preventivos para configurações potencialmente arriscadas).
+
+### Alterado
+- **Cloudflare API helper**: `functions/api/_lib/cloudflare-api.ts` expandido para operações genéricas de DNS (listar registros, criar, atualizar e remover) preservando a prioridade de token por `CLOUDFLARE_DNS`.
+- **Telemetria operacional**: `functions/api/_lib/operational.ts` atualizado para incluir o módulo `cfdns` no trilho padronizado de eventos operacionais.
+
 ## [v01.61.02] — 2026-03-28
 ### Corrigido
 - **AstrologoModule**: Corrigidos erros de linting relacionados à validação explícita de `any` emitidos pelo `@typescript-eslint/no-explicit-any`. O supressor de lint (`// eslint-disable-next-line`) foi adotado especificamente na assinatura e nas iterações de `renderMapaCard` para estabilizar rigorosamente o painel, sem perdas na maleabilidade essencial do modelo dinâmico do banco (que recebe mapas mistos da API ou registros de ficha). 

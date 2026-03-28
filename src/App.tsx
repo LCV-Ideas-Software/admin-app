@@ -127,23 +127,29 @@ const MtastsModule = lazyWithAccessRecovery(() => import('./modules/mtasts/Mtast
 const CardHubModule = lazyWithAccessRecovery(() => import('./modules/hubs/CardHubModule').then(m => ({ default: m.CardHubModule })))
 const TelemetriaModule = lazyWithAccessRecovery(() => import('./modules/telemetria/TelemetriaModule').then(m => ({ default: m.TelemetriaModule })))
 const FinanceiroModule = lazyWithAccessRecovery(() => import('./modules/financeiro/FinanceiroModule').then(m => ({ default: m.FinanceiroModule })))
+const CfDnsModule = lazyWithAccessRecovery(() => import('./modules/cfdns/CfDnsModule').then(m => ({ default: m.CfDnsModule })))
+const CfPwModule = lazyWithAccessRecovery(() => import('./modules/cfpw/CfPwModule').then(m => ({ default: m.CfPwModule })))
 const OraculoModule = lazyWithAccessRecovery(() => import('./modules/oraculo/OraculoModule').then(m => ({ default: m.OraculoModule })))
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 const TlsrptModule = lazyWithAccessRecovery(() => import('./modules/tlsrpt/TlsrptModule').then(m => ({ default: m.TlsrptModule })))
 
-const APP_VERSION = 'APP v01.61.02'
-type ModuleId = 'overview' | 'astrologo' | 'config' | 'financeiro' | 'oraculo' | 'calculadora' | 'mainsite' | 'mtasts' | 'cardhub' | 'telemetria' | 'tlsrpt'
+const APP_VERSION = 'APP v01.63.00'
+type ModuleId = 'overview' | 'astrologo' | 'cardhub' | 'cfdns' | 'cfpw' | 'config' | 'financeiro' | 'oraculo' | 'calculadora' | 'mainsite' | 'mtasts' | 'telemetria' | 'tlsrpt'
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
-  astrologo: 'Astrólogo', cardhub: 'Card Hub', financeiro: 'Financeiro', oraculo: 'Oráculo',
+  astrologo: 'Astrólogo', cardhub: 'Card Hub', cfdns: 'CF DNS', cfpw: 'CF P&W', financeiro: 'Financeiro', oraculo: 'Oráculo',
   calculadora: 'Calculadora', mainsite: 'MainSite', mtasts: 'MTA-STS',
   telemetria: 'Telemetria', config: 'Configurações', tlsrpt: 'TLS-RPT',
 }
 
+// Regra do menu lateral: Visão Geral sempre primeiro, Configurações sempre último,
+// e todos os demais módulos em ordem alfabética.
 const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
   { id: 'overview', label: 'Visão Geral', icon: PanelsTopLeft },
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
   { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
+  { id: 'cfdns', label: 'CF DNS', icon: Globe },
+  { id: 'cfpw', label: 'CF P&W', icon: Globe },
   { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
   { id: 'calculadora', label: 'Calculadora', icon: Database },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
@@ -231,6 +237,10 @@ function App() {
             <MainsiteModule />
           ) : activeModule === 'mtasts' ? (
             <MtastsModule />
+          ) : activeModule === 'cfdns' ? (
+            <CfDnsModule />
+          ) : activeModule === 'cfpw' ? (
+            <CfPwModule />
           ) : activeModule === 'cardhub' ? (
             <CardHubModule />
           ) : activeModule === 'financeiro' ? (
