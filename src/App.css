@@ -1314,13 +1314,49 @@ input[type="color"]:focus-visible {
 
 .cfdns-table-wrap {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .cfdns-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 960px;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.cfdns-table th:nth-child(1),
+.cfdns-table td:nth-child(1) {
+  width: 8%;
+}
+
+.cfdns-table th:nth-child(2),
+.cfdns-table td:nth-child(2) {
+  width: 18%;
+}
+
+.cfdns-table th:nth-child(3),
+.cfdns-table td:nth-child(3) {
+  width: 34%;
+}
+
+.cfdns-table th:nth-child(4),
+.cfdns-table td:nth-child(4) {
+  width: 8%;
+}
+
+.cfdns-table th:nth-child(5),
+.cfdns-table td:nth-child(5) {
+  width: 10%;
+}
+
+.cfdns-table th:nth-child(6),
+.cfdns-table td:nth-child(6) {
+  width: 12%;
+}
+
+.cfdns-table th:nth-child(7),
+.cfdns-table td:nth-child(7) {
+  width: 10%;
 }
 
 .cfdns-table thead th {
@@ -1349,10 +1385,11 @@ input[type="color"]:focus-visible {
 }
 
 .cfdns-cell-content {
-  max-width: 340px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .cfdns-row-actions {
@@ -1409,6 +1446,16 @@ input[type="color"]:focus-visible {
 
 .cfpw-detail-card-full {
   grid-column: 1 / -1;
+}
+
+.cfpw-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cfpw-section-card {
+  width: 100%;
 }
 
 .cfpw-json-preview {

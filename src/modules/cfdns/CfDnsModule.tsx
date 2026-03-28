@@ -160,6 +160,25 @@ const formatDateTime = (value?: string) => {
     return value
   }
 
+  return parsed.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const formatDateTimeFull = (value?: string) => {
+  if (!value) {
+    return '—'
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
   return parsed.toLocaleString('pt-BR')
 }
 
@@ -467,6 +486,7 @@ export function CfDnsModule() {
   const [draft, setDraft] = useState<EditorDraft>(DEFAULT_DRAFT)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState('')
+  const [showRecordForm, setShowRecordForm] = useState(false)
 
   const isEditing = Boolean(draft.recordId)
   const isSrvDraft = draft.type === 'SRV'
@@ -622,6 +642,11 @@ export function CfDnsModule() {
     setDraft(DEFAULT_DRAFT)
   }
 
+  const openNewRecordForm = () => {
+    resetDraft()
+    setShowRecordForm(true)
+  }
+
   const hydrateDraftFromRecord = (record: DnsRecord) => {
     const recordData = record.data && typeof record.data === 'object' ? record.data : {}
     const recordType = String(record.type ?? 'A').toUpperCase()
@@ -652,6 +677,7 @@ export function CfDnsModule() {
       httpsTarget: String(recordData.target ?? '.').trim() || '.',
       httpsValue: String(recordData.value ?? '').trim(),
     })
+    setShowRecordForm(true)
   }
 
   const loadZones = useCallback(async (shouldNotify = false) => {
@@ -768,6 +794,7 @@ export function CfDnsModule() {
     setSelectedZoneName(zone?.name ?? '')
     setPage(1)
     resetDraft()
+    setShowRecordForm(false)
   }
 
   const handleApplyFilters = () => {
@@ -1084,9 +1111,20 @@ export function CfDnsModule() {
       <article className="result-card">
         <header className="result-header">
           <h4><ShieldCheck size={16} /> Registros DNS da zona</h4>
-          <span>
-            {pagination.totalCount} registro(s) · página {pagination.page}/{pagination.totalPages}
-          </span>
+          <div className="inline-actions">
+            <span>
+              {pagination.totalCount} registro(s) · página {pagination.page}/{pagination.totalPages}
+            </span>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={openNewRecordForm}
+              disabled={!selectedZoneId || recordsLoading || saving}
+            >
+              <Plus size={16} />
+              Novo Registro DNS
+            </button>
+          </div>
         </header>
 
         {!selectedZoneId ? (
@@ -1122,7 +1160,7 @@ export function CfDnsModule() {
                       <td className="cfdns-cell-content">{formatRecordContent(record)}</td>
                       <td>{record.ttl ?? 'auto'}</td>
                       <td>{record.proxied ? 'Proxied' : 'DNS only'}</td>
-                      <td>{formatDateTime(record.modified_on)}</td>
+                      <td title={formatDateTimeFull(record.modified_on)}>{formatDateTime(record.modified_on)}</td>
                       <td>
                         <div className="cfdns-row-actions">
                           <button type="button" className="ghost-button" onClick={() => hydrateDraftFromRecord(record)} disabled={saving || isDeleting}>
@@ -1166,6 +1204,7 @@ export function CfDnsModule() {
         )}
       </article>
 
+      {showRecordForm && (
       <article className="form-card">
         <div className="result-toolbar">
           <div>
@@ -1176,6 +1215,18 @@ export function CfDnsModule() {
             <button type="button" className="ghost-button" onClick={resetDraft} disabled={saving || recordsLoading}>
               <RefreshCw size={16} />
               Limpar formulário
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                resetDraft()
+                setShowRecordForm(false)
+              }}
+              disabled={saving || recordsLoading}
+            >
+              <Trash2 size={16} />
+              Fechar formulário
             </button>
           </div>
         </div>
@@ -1590,6 +1641,7 @@ export function CfDnsModule() {
           </button>
         </div>
       </article>
+      )}
     </section>
   )
 }

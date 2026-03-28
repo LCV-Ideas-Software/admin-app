@@ -77,6 +77,12 @@ type DetailState = {
   payload: WorkerDetailsPayload | PageDetailsPayload
 }
 
+type OperationalAlert = {
+  code: string
+  cause: string
+  action: string
+}
+
 const parseApiPayload = async <T,>(response: Response, fallback: string): Promise<T> => {
   const rawText = await response.text()
   const trimmed = rawText.trim()
@@ -133,6 +139,60 @@ export function CfPwModule() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deleting, setDeleting] = useState(false)
 
+  const operationalAlerts = useMemo<OperationalAlert[]>(() => {
+    const next: OperationalAlert[] = []
+
+    if (!account && !loadingOverview) {
+      next.push({
+        code: 'CFPW-ACCOUNT-UNAVAILABLE',
+        cause: 'A conta ativa não foi carregada nesta sessão.',
+        action: 'Execute "Atualizar" para sincronizar o contexto da conta.',
+      })
+    }
+
+    if (loadingOverview) {
+      next.push({
+        code: 'CFPW-SYNC-RUNNING',
+        cause: 'A sincronização de Workers e Pages está em execução.',
+        action: 'Aguarde a conclusão da leitura antes de tomar ações críticas.',
+      })
+    }
+
+    if (detailsLoading) {
+      next.push({
+        code: 'CFPW-DETAILS-RUNNING',
+        cause: 'A consulta de detalhes/deployments ainda está em processamento.',
+        action: 'Aguarde a resposta para validar estado real do recurso.',
+      })
+    }
+
+    if (deleteTarget && !deleting) {
+      next.push({
+        code: 'CFPW-DELETE-ARMED',
+        cause: `Existe uma exclusão armada para ${deleteTarget.type === 'worker' ? 'Worker' : 'Page'} (${deleteTarget.id}).`,
+        action: 'Revise o identificador e confirme apenas se a remoção for intencional.',
+      })
+    }
+
+    if (deleting) {
+      next.push({
+        code: 'CFPW-DELETE-RUNNING',
+        cause: 'Uma exclusão está em execução e a operação é irreversível.',
+        action: 'Aguarde a conclusão e valide o inventário após o término.',
+      })
+    }
+
+    if (!loadingOverview && account && workers.length === 0 && pages.length === 0) {
+      next.push({
+        code: 'CFPW-EMPTY-INVENTORY',
+        cause: 'Nenhum Worker ou projeto Pages foi detectado na conta ativa.',
+        action: 'Verifique o account/token e confirme se os recursos existem neste escopo.',
+      })
+    }
+
+    return next
+  }, [account, deleteTarget, deleting, detailsLoading, loadingOverview, pages.length, workers.length])
+
   const statusTone = useMemo(() => {
     if (loadingOverview || detailsLoading || deleting) {
       return 'warning'
@@ -140,8 +200,11 @@ export function CfPwModule() {
     if (!account) {
       return 'idle'
     }
+    if (operationalAlerts.length > 0) {
+      return 'warning'
+    }
     return 'ok'
-  }, [account, deleting, detailsLoading, loadingOverview])
+  }, [account, deleting, detailsLoading, loadingOverview, operationalAlerts.length])
 
   const statusLabel = useMemo(() => {
     if (loadingOverview || detailsLoading || deleting) {
@@ -150,8 +213,11 @@ export function CfPwModule() {
     if (!account) {
       return 'Aguardando sincronização'
     }
+    if (operationalAlerts.length > 0) {
+      return `${operationalAlerts.length} alerta(s)`
+    }
     return 'Sincronizado'
-  }, [account, deleting, detailsLoading, loadingOverview])
+  }, [account, deleting, detailsLoading, loadingOverview, operationalAlerts.length])
 
   const loadOverview = useCallback(async (notify = false) => {
     setLoadingOverview(true)
@@ -320,14 +386,18 @@ export function CfPwModule() {
           </span>
         </article>
 
-        <article className="integrity-banner integrity-banner--warning" role="status" aria-live="polite">
-          <h4 className="integrity-banner__header"><AlertTriangle size={16} /> Zona de risco operacional</h4>
-          <ul className="integrity-banner__list">
-            <li>Exclusões de Worker e Pages são permanentes e exigem redigitação do identificador.</li>
-            <li>Use token dedicado em CLOUDFLARE_PW para manter separação de privilégios.</li>
-            <li>Preferencialmente execute manutenção fora de janela de pico.</li>
-          </ul>
-        </article>
+        {operationalAlerts.length > 0 ? (
+          <article className="integrity-banner integrity-banner--warning" role="status" aria-live="polite">
+            <h4 className="integrity-banner__header"><AlertTriangle size={16} /> Alertas operacionais do Pages &amp; Workers</h4>
+            <ul className="integrity-banner__list">
+              {operationalAlerts.map((alert) => (
+                <li key={alert.code}>
+                  <strong>{alert.code}</strong> · {alert.cause} Ação recomendada: {alert.action}
+                </li>
+              ))}
+            </ul>
+          </article>
+        ) : null}
 
         <article className="form-card">
           <div className="result-toolbar">
@@ -365,8 +435,8 @@ export function CfPwModule() {
           </div>
         </article>
 
-        <div className="detail-grid">
-          <article className="result-card">
+        <div className="detail-grid cfpw-stack">
+          <article className="result-card cfpw-section-card">
             <div className="result-toolbar">
               <h4>Workers</h4>
             </div>
@@ -420,7 +490,7 @@ export function CfPwModule() {
             </div>
           </article>
 
-          <article className="result-card">
+          <article className="result-card cfpw-section-card">
             <div className="result-toolbar">
               <h4>Pages</h4>
             </div>
