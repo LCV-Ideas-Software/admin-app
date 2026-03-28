@@ -6,6 +6,13 @@ type CloudflareApiResponse<T> = {
   success?: boolean
   errors?: CloudflareApiError[]
   result?: T
+  result_info?: {
+    page?: number
+    per_page?: number
+    total_pages?: number
+    count?: number
+    total_count?: number
+  }
 }
 
 export type CloudflareZone = {
@@ -15,8 +22,40 @@ export type CloudflareZone = {
 
 type CloudflareDnsRecord = {
   id?: string
+  type?: string
   content?: string
   name?: string
+  ttl?: number
+  proxied?: boolean
+  priority?: number
+  comment?: string
+  tags?: string[]
+  created_on?: string
+  modified_on?: string
+  data?: Record<string, unknown>
+}
+
+type CloudflareDnsRecordListResult = {
+  records: CloudflareDnsRecord[]
+  pagination: {
+    page: number
+    perPage: number
+    totalPages: number
+    totalCount: number
+    count: number
+  }
+}
+
+export type CloudflareDnsRecordInput = {
+  type: string
+  name: string
+  content?: string | null
+  ttl?: number | null
+  proxied?: boolean | null
+  priority?: number | null
+  comment?: string | null
+  tags?: string[] | null
+  data?: Record<string, unknown> | null
 }
 
 type EnvWithCloudflareToken = {
@@ -75,6 +114,16 @@ const cloudflareRequest = async <T>(
   fallback: string,
   init?: RequestInit,
 ) => {
+  const payload = await cloudflareRequestPayload<T>(env, path, fallback, init)
+  return payload.result as T
+}
+
+const cloudflareRequestPayload = async <T>(
+  env: EnvWithCloudflareToken,
+  path: string,
+  fallback: string,
+  init?: RequestInit,
+) => {
   const token = resolveToken(env)
   if (!token) {
     throw new Error('Token Cloudflare ausente no runtime (configure CF_API_TOKEN, CLOUDFLARE_DNS ou CLOUDFLARE_API_TOKEN).')
@@ -99,7 +148,7 @@ const cloudflareRequest = async <T>(
     throw new Error(message ? `${fallback}: ${message}` : `${fallback}: HTTP ${response.status}`)
   }
 
-  return payload.result as T
+  return payload
 }
 
 export const listCloudflareZones = async (env: EnvWithCloudflareToken) => {
@@ -126,6 +175,111 @@ const extractDnsResult = async (env: EnvWithCloudflareToken, path: string, fallb
 const quoteTxtContent = (content: string) => {
   const normalized = content.trim().replace(/^"|"$/g, '')
   return `"${normalized}"`
+}
+
+const normalizeZoneId = (zoneId: string) => {
+  const normalized = zoneId.trim()
+  if (!normalized) {
+    throw new Error('Zone ID é obrigatório.')
+  }
+  return normalized
+}
+
+const normalizeRecordId = (recordId: string) => {
+  const normalized = recordId.trim()
+  if (!normalized) {
+    throw new Error('Record ID é obrigatório.')
+  }
+  return normalized
+}
+
+const normalizeRecordType = (recordType: string) => {
+  const normalized = recordType.trim().toUpperCase()
+  if (!normalized) {
+    throw new Error('Tipo de registro DNS é obrigatório.')
+  }
+  return normalized
+}
+
+const normalizeRecordName = (recordName: string) => {
+  const normalized = recordName.trim().toLowerCase()
+  if (!normalized) {
+    throw new Error('Nome do registro DNS é obrigatório.')
+  }
+  return normalized
+}
+
+const normalizeRecordInput = (input: CloudflareDnsRecordInput) => {
+  const type = normalizeRecordType(input.type)
+  const name = normalizeRecordName(input.name)
+  const content = String(input.content ?? '').trim()
+  const ttl = Number(input.ttl ?? 1)
+  const proxied = input.proxied == null ? null : Boolean(input.proxied)
+  const priority = input.priority == null || Number.isNaN(Number(input.priority))
+    ? null
+    : Number(input.priority)
+  const comment = String(input.comment ?? '').trim()
+  const tags = Array.isArray(input.tags)
+    ? input.tags
+      .map((tag) => String(tag).trim())
+      .filter(Boolean)
+    : []
+  const data = input.data && typeof input.data === 'object' ? input.data : null
+
+  if (!content && !data) {
+    throw new Error('Informe content ou data para o registro DNS.')
+  }
+
+  if (!Number.isFinite(ttl) || (ttl !== 1 && (ttl < 60 || ttl > 86400))) {
+    throw new Error('TTL inválido. Use 1 (auto) ou um valor entre 60 e 86400 segundos.')
+  }
+
+  if (priority != null && (!Number.isInteger(priority) || priority < 0 || priority > 65535)) {
+    throw new Error('Priority inválido. Use um inteiro entre 0 e 65535.')
+  }
+
+  return {
+    type,
+    name,
+    content,
+    ttl,
+    proxied,
+    priority,
+    comment,
+    tags,
+    data,
+  }
+}
+
+const buildDnsRecordPayload = (input: CloudflareDnsRecordInput) => {
+  const normalized = normalizeRecordInput(input)
+
+  const payload: Record<string, unknown> = {
+    type: normalized.type,
+    name: normalized.name,
+    ttl: normalized.ttl,
+  }
+
+  if (normalized.content) {
+    payload.content = normalized.content
+  }
+  if (normalized.proxied != null) {
+    payload.proxied = normalized.proxied
+  }
+  if (normalized.priority != null) {
+    payload.priority = normalized.priority
+  }
+  if (normalized.comment) {
+    payload.comment = normalized.comment
+  }
+  if (normalized.tags.length > 0) {
+    payload.tags = normalized.tags
+  }
+  if (normalized.data) {
+    payload.data = normalized.data
+  }
+
+  return payload
 }
 
 export const upsertCloudflareTxtRecord = async (
@@ -238,4 +392,121 @@ export const getCloudflareDnsSnapshot = async (
     dnsTlsRptEmail,
     dnsMtaStsId,
   }
+}
+
+export const listCloudflareDnsRecords = async (
+  env: EnvWithCloudflareToken,
+  zoneId: string,
+  options?: {
+    page?: number
+    perPage?: number
+    type?: string
+    search?: string
+  },
+): Promise<CloudflareDnsRecordListResult> => {
+  const normalizedZoneId = normalizeZoneId(zoneId)
+  const page = Number.isFinite(Number(options?.page)) && Number(options?.page) > 0
+    ? Math.trunc(Number(options?.page))
+    : 1
+  const perPage = Number.isFinite(Number(options?.perPage)) && Number(options?.perPage) > 0
+    ? Math.min(Math.trunc(Number(options?.perPage)), 500)
+    : 100
+  const type = String(options?.type ?? '').trim().toUpperCase()
+  const search = String(options?.search ?? '').trim().toLowerCase()
+
+  const query = new URLSearchParams({
+    page: String(page),
+    per_page: String(perPage),
+    order: 'type',
+    direction: 'asc',
+  })
+
+  if (type) {
+    query.set('type', type)
+  }
+
+  if (search) {
+    query.set('name', search)
+  }
+
+  const payload = await cloudflareRequestPayload<CloudflareDnsRecord[]>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records?${query.toString()}`,
+    'Falha ao listar registros DNS da zona',
+  )
+
+  const records = Array.isArray(payload.result) ? payload.result : []
+  const info = payload.result_info ?? {}
+
+  return {
+    records,
+    pagination: {
+      page: Number(info.page ?? page),
+      perPage: Number(info.per_page ?? perPage),
+      totalPages: Number(info.total_pages ?? 1),
+      totalCount: Number(info.total_count ?? records.length),
+      count: Number(info.count ?? records.length),
+    },
+  }
+}
+
+export const createCloudflareDnsRecord = async (
+  env: EnvWithCloudflareToken,
+  zoneId: string,
+  input: CloudflareDnsRecordInput,
+) => {
+  const normalizedZoneId = normalizeZoneId(zoneId)
+  const payload = buildDnsRecordPayload(input)
+  const created = await cloudflareRequest<CloudflareDnsRecord>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records`,
+    `Falha ao criar registro DNS ${String(payload.type ?? '').toUpperCase()} ${String(payload.name ?? '')}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+
+  return created
+}
+
+export const updateCloudflareDnsRecord = async (
+  env: EnvWithCloudflareToken,
+  zoneId: string,
+  recordId: string,
+  input: CloudflareDnsRecordInput,
+) => {
+  const normalizedZoneId = normalizeZoneId(zoneId)
+  const normalizedRecordId = normalizeRecordId(recordId)
+  const payload = buildDnsRecordPayload(input)
+
+  const updated = await cloudflareRequest<CloudflareDnsRecord>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records/${encodeURIComponent(normalizedRecordId)}`,
+    `Falha ao atualizar registro DNS ${String(payload.type ?? '').toUpperCase()} ${String(payload.name ?? '')}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  )
+
+  return updated
+}
+
+export const deleteCloudflareDnsRecord = async (
+  env: EnvWithCloudflareToken,
+  zoneId: string,
+  recordId: string,
+) => {
+  const normalizedZoneId = normalizeZoneId(zoneId)
+  const normalizedRecordId = normalizeRecordId(recordId)
+
+  await cloudflareRequest<CloudflareDnsRecord>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records/${encodeURIComponent(normalizedRecordId)}`,
+    'Falha ao remover registro DNS',
+    {
+      method: 'DELETE',
+    },
+  )
 }

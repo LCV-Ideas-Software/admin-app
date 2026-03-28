@@ -335,20 +335,26 @@ export function AstrologoModule() {
     let tropical = null
     let astronomica = null
     try {
-      globais = mapa.dados_globais ? (typeof mapa.dados_globais === 'string' ? JSON.parse(mapa.dados_globais) : mapa.dados_globais) : null
-      tropical = mapa.dados_tropical ? (typeof mapa.dados_tropical === 'string' ? JSON.parse(mapa.dados_tropical) : mapa.dados_tropical) : null
-      astronomica = mapa.dados_astronomica ? (typeof mapa.dados_astronomica === 'string' ? JSON.parse(mapa.dados_astronomica) : mapa.dados_astronomica) : null
+      globais = mapa.dados_globais ? (typeof mapa.dados_globais === 'string' ? JSON.parse(mapa.dados_globais) : mapa.dados_globais) : (mapa.dadosGlobais || null)
+      tropical = mapa.dados_tropical ? (typeof mapa.dados_tropical === 'string' ? JSON.parse(mapa.dados_tropical) : mapa.dados_tropical) : (mapa.dadosTropical || null)
+      astronomica = mapa.dados_astronomica ? (typeof mapa.dados_astronomica === 'string' ? JSON.parse(mapa.dados_astronomica) : mapa.dados_astronomica) : (mapa.dadosAstronomica || null)
     } catch { /* ignorar parsing errors */ }
+
+    const nome = mapa.nome || mapa.query?.nome || 'Consulente'
+    const dataNascimento = mapa.data_nascimento || mapa.query?.dataNascimento || ''
+    const horaNascimento = mapa.hora_nascimento || mapa.query?.horaNascimento || ''
+    const localNascimento = mapa.local_nascimento || mapa.query?.localNascimento || ''
+    const analiseIa = mapa.analise_ia || mapa.analiseIa || ''
 
     return (
       <article className="result-card" key={index ?? mapa.id ?? Math.random()} style={{ marginBottom: index !== undefined ? '1rem' : 0 }}>
         <header className="result-header">
-          <h4><Sparkles size={16} /> Ficha Oculta: {mapa.nome || 'Consulente'}</h4>
-          <span>{mapa.data_nascimento ? formatarData(mapa.data_nascimento) : ''} {mapa.hora_nascimento ? `às ${mapa.hora_nascimento}` : ''}</span>
+          <h4><Sparkles size={16} /> Ficha Oculta: {nome}</h4>
+          <span>{dataNascimento ? formatarData(dataNascimento) : ''} {horaNascimento ? `às ${horaNascimento}` : ''}</span>
         </header>
 
-        {mapa.local_nascimento && (
-          <p className="field-hint astro-local-hint">{mapa.local_nascimento}</p>
+        {localNascimento && (
+          <p className="field-hint astro-local-hint">{localNascimento}</p>
         )}
 
         {globais && (
@@ -443,10 +449,10 @@ export function AstrologoModule() {
           </div>
         )}
 
-        {mapa.analise_ia && (
+        {analiseIa && (
           <div className="astro-section">
             <h5 className="astro-section__title">Síntese do Mestre (IA)</h5>
-            <div className="astro-ia-content" dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(mapa.analise_ia) }} />
+            <div className="astro-ia-content" dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(analiseIa) }} />
           </div>
         )}
       </article>
@@ -653,7 +659,9 @@ export function AstrologoModule() {
             let parsed: unknown = []
             try { 
               const d = JSON.parse(selectedUser.dadosJson) 
-              parsed = d
+              if (Array.isArray(d)) parsed = d
+              else if (d.mapasSalvos && Array.isArray(d.mapasSalvos)) parsed = d.mapasSalvos
+              else parsed = d
             } catch { /* */ }
 
             return (
@@ -689,6 +697,7 @@ export function AstrologoModule() {
                     try {
                       const d = JSON.parse(row.dadosJson)
                       if (Array.isArray(d)) preview = `${d.length} mapa(s) salvo(s)`
+                      else if (d.mapasSalvos && Array.isArray(d.mapasSalvos)) preview = `${d.mapasSalvos.length} mapa(s) salvo(s)`
                       else preview = 'Dados de perfil salvos'
                     } catch { preview = 'Dados inválidos' }
                     return (
