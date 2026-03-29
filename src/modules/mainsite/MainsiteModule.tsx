@@ -936,7 +936,7 @@ export function MainsiteModule() {
           </div>
         </div>
 
-        {/* Ações de geração em massa + seletor de modelo */}
+        {/* Ações de geração em massa */}
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
           <button
             type="button"
@@ -956,17 +956,39 @@ export function MainsiteModule() {
             {bulkGenerating ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
             Regenerar Todos
           </button>
-          <select
-            style={{ marginLeft: 'auto', minWidth: '220px', fontSize: '13px' }}
-            value={msConfig.summaryModeloIA || ''}
-            onChange={e => saveMsConfig({ summaryModeloIA: e.target.value })}
-            disabled={bulkGenerating}
-          >
-            <option value="">Modelo (auto)</option>
-            {geminiModels.map(m => (
-              <option key={m.id} value={m.id}>{m.displayName} ({m.api})</option>
-            ))}
-          </select>
+        </div>
+
+        {/* Modelo IA para geração de resumos */}
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)', marginBottom: '16px' }}>
+          <div className="field-group">
+            <label htmlFor="summary-modelo-ia">Modelo de Geração de Resumos</label>
+            <div className="select-wrapper">
+              <select
+                id="summary-modelo-ia"
+                name="summaryModeloIa"
+                value={msConfig.summaryModeloIA || ''}
+                onChange={e => saveMsConfig({ summaryModeloIA: e.target.value })}
+                disabled={bulkGenerating}
+              >
+                {modelsLoading ? (
+                  <option value={msConfig.summaryModeloIA || ''}>Carregando modelos...</option>
+                ) : (
+                  <>
+                    <option value="">Automático (Padrão)</option>
+                    {geminiModels.length === 0 && msConfig.summaryModeloIA && <option value={msConfig.summaryModeloIA}>{msConfig.summaryModeloIA}</option>}
+                    {geminiModels.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+            <p className="field-hint" style={{ marginTop: '8px' }}>
+              Motor Gemini utilizado para gerar os resumos de compartilhamento social (OG e LD).
+            </p>
+          </div>
         </div>
 
         {/* Progresso da geração em massa */}
