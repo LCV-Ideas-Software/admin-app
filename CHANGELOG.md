@@ -1,5 +1,18 @@
 # Changelog — Admin App
 
+## [v01.69.01] — 2026-03-29
+### Alterado
+- **AI Status / GCP Tab — Quota humanizada**: nomes de métricas de quota GCP migrados de `snake_case` cru para labels humanas via mapa `QUOTA_HUMAN_NAMES` (ex: `generate_content_requests` → "Generate Content").
+- **AI Status / GCP Tab — Quota ilimitada**: valores de quota `int64 MAX` (≥9e18) agora exibem badge "Ilimitado ∞" em violeta, com barra de progresso diferenciada.
+- **AI Status / Usage Tab — Empty state**: substituído bloco de código cru por design limpo com badge "Instrumentação ativa ✓" e mensagem informativa.
+
+### Adicionado
+- **Telemetria — `mainsite/ai/transform.ts`**: instrumentação fire-and-forget para `ai_usage_logs` (D1) após cada chamada Gemini, registrando módulo, modelo, tokens, latência e status.
+- **Telemetria — `news/discover.ts`**: mesma instrumentação para descoberta de feeds RSS via Gemini API.
+
+### Controle de versão
+- `admin-app`: APP v01.69.00 → APP v01.69.01
+
 ## [v01.69.00] — 2026-03-29
 ### Adicionado (MAJOR)
 - **AI Status — módulo novo**: dashboard de monitoramento completo para Gemini AI, com arquitetura de 3 tiers:
