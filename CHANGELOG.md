@@ -1,5 +1,13 @@
 # Changelog — Admin App
 
+## [v01.69.04] — 2026-03-29
+### Corrigido
+- **Notificações — Migração para padrão mainsite**: componente `Notification.tsx` e `Notification.css` reescritos para aderir ao padrão visual "toast inteligente" do mainsite — pill centrada no topo, `backdrop-filter: blur`, `border-radius: 100px`, variantes cromáticas (success verde, error vermelho, info translúcido), animação spring-based. O layout anterior (card retangular no canto superior-direito com barra de progresso) foi descontinuado.
+- **Build cache stale**: adicionado script `prebuild` (`rmSync dist`) no `package.json` para prevenir deploys com assets de hash idêntico ao build anterior, que era o root cause das notificações não aparecendo em produção.
+
+### Controle de versão
+- `admin-app`: APP v01.69.03 → APP v01.69.04
+
 ## [v01.69.03] — 2026-03-29
 ### Corrigido
 - **Purge de Deployments — Compliance de notificações**: componente `DeploymentCleanupPanel` violava a diretiva global de notificações (toast). Feedbacks de scan ok/erro, purge concluído/parcial e operação abortada agora emitem toast via `useNotification()`, além do log no terminal interno.

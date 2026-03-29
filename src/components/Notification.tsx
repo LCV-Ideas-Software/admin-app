@@ -33,10 +33,6 @@ const iconMap = {
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<NotificationItem[]>([])
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    return window.matchMedia('(max-width: 768px)').matches
-  })
   const ids = useRef(0)
   const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 
@@ -51,23 +47,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const showNotification = useCallback((message: string, type: NotificationTone = 'info') => {
     const id = ids.current++
+    // Mantém no máximo 3 toasts visíveis
     setItems((current) => [...current.slice(-2), { id, message, type }])
-    const timer = setTimeout(() => removeNotification(id), 5000)
+    const timer = setTimeout(() => removeNotification(id), 4000)
     timers.current.set(id, timer)
   }, [removeNotification])
 
+  // Cleanup de timers ao desmontar
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const media = window.matchMedia('(max-width: 768px)')
-    const handler = (event: MediaQueryListEvent) => setIsMobile(event.matches)
-    media.addEventListener('change', handler)
-    return () => media.removeEventListener('change', handler)
+    const currentTimers = timers.current
+    return () => {
+      currentTimers.forEach((t) => clearTimeout(t))
+    }
   }, [])
 
   return (
     <NotificationContext.Provider value={{ showNotification }}>
       {children}
-      <div className={`notification-container ${isMobile ? 'notification-container-mobile' : 'notification-container-desktop'}`}>
+      <div className="notification-container">
         {items.map((item) => {
           const Icon = iconMap[item.type]
           return (
@@ -79,7 +76,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                   ×
                 </button>
               </div>
-              <span className="notification-progress" />
             </div>
           )
         })}
