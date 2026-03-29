@@ -10,7 +10,7 @@ export type D1Database = {
 }
 
 type ModuleEventInput = {
-  module: 'astrologo' | 'cfdns' | 'cfpw' | 'itau' | 'mainsite' | 'mtasts' | 'oraculo' | 'apphub' | 'adminhub'
+  module: 'ai-status' | 'astrologo' | 'cfdns' | 'cfpw' | 'itau' | 'mainsite' | 'mtasts' | 'oraculo' | 'apphub' | 'adminhub'
   source: 'bigdata_db' | 'bootstrap-default'
   fallbackUsed: boolean
   ok: boolean
@@ -19,7 +19,7 @@ type ModuleEventInput = {
 }
 
 type SyncRunStart = {
-  module: 'astrologo' | 'cfdns' | 'cfpw' | 'itau' | 'mainsite' | 'mtasts' | 'oraculo' | 'apphub' | 'adminhub'
+  module: 'ai-status' | 'astrologo' | 'cfdns' | 'cfpw' | 'itau' | 'mainsite' | 'mtasts' | 'oraculo' | 'apphub' | 'adminhub'
   status: 'running'
   startedAt: number
   metadata?: Record<string, unknown>
