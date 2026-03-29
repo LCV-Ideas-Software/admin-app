@@ -3,6 +3,7 @@ import {
   listCloudflarePagesProjects,
   listCloudflarePagesDeployments,
   deleteCloudflarePagesDeployment,
+  getCloudflarePagesProject,
 } from '../_lib/cfpw-api'
 
 type Context = {
@@ -82,8 +83,23 @@ export async function onRequestGet(context: Context) {
             return dateB - dateA
           })
 
-          const latest = sorted[0] ?? null
-          const obsolete = sorted.slice(1)
+          // O deployment "ativo" é o que está servindo tráfego agora.
+          // Nem sempre é o mais recente (ex: preview deploys, deploys falhados).
+          // Obtemos via projeto.latest_deployment ou via API direta.
+          const activeDeploymentId = String(project.latest_deployment?.id ?? '').trim()
+
+          // Conjunto de IDs protegidos: o mais recente por data + o ativo servindo
+          const protectedIds = new Set<string>()
+          if (sorted[0]?.id) protectedIds.add(String(sorted[0].id))
+          if (activeDeploymentId) protectedIds.add(activeDeploymentId)
+
+          // O "latest" exibido ao operador é o deployment ativo (se existir), senão o mais recente
+          const latestForDisplay = activeDeploymentId
+            ? sorted.find(d => String(d.id) === activeDeploymentId) ?? sorted[0] ?? null
+            : sorted[0] ?? null
+
+          // Obsoletos = tudo que NÃO está no set protegido
+          const obsolete = sorted.filter(d => !protectedIds.has(String(d.id ?? '')))
 
           totalDeployments += sorted.length
           totalObsolete += obsolete.length
@@ -91,12 +107,12 @@ export async function onRequestGet(context: Context) {
           return {
             name: projectName,
             totalDeployments: sorted.length,
-            latestDeployment: latest
+            latestDeployment: latestForDisplay
               ? {
-                  id: String(latest.id ?? ''),
-                  created_on: String(latest.created_on ?? ''),
-                  environment: String(latest.environment ?? ''),
-                  url: String(latest.url ?? ''),
+                  id: String(latestForDisplay.id ?? ''),
+                  created_on: String(latestForDisplay.created_on ?? ''),
+                  environment: String(latestForDisplay.environment ?? ''),
+                  url: String(latestForDisplay.url ?? ''),
                 }
               : null,
             obsoleteDeployments: obsolete.map((d) => ({
@@ -149,6 +165,20 @@ export async function onRequestPost(context: Context) {
     }
 
     const { accountId } = await resolveCloudflarePwAccount(context.env)
+
+    // Safety guard: previne exclusão do deployment ativo (servindo tráfego)
+    try {
+      const project = await getCloudflarePagesProject(context.env, accountId, projectName)
+      const activeId = String(project?.latest_deployment?.id ?? '').trim()
+      if (activeId && activeId === deploymentId) {
+        return jsonResponse({
+          error: `Deployment ${deploymentId} é o deployment ATIVO do projeto ${projectName}. Exclusão bloqueada.`,
+          ok: false,
+        }, 403)
+      }
+    } catch {
+      // Se não conseguiu verificar, prossegue com cautela
+    }
 
     await deleteCloudflarePagesDeployment(context.env, accountId, projectName, deploymentId)
 

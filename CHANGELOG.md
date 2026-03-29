@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.70.00] — 2026-03-29
+### Corrigido
+- **DeploymentCleanupPanel — Purge logic fix**: lógica de identificação de deployments obsoletos corrigida no backend (`cleanup-deployments.ts`). Agora protege tanto o deployment mais recente (por data) quanto o deployment ativo do projeto (`project.latest_deployment.id`). Safety guard adicionado no endpoint POST: retorna `403 Forbidden` se tentar deletar o deployment ativo.
+- **CfDnsModule — Confirmação nativa removida**: ambas as chamadas `window.confirm()` (save e delete de registros DNS) substituídas por modais in-app com backdrop blur, ícone `AlertTriangle`, botões estilizados. Zero diálogos nativos do browser remanescentes no codebase.
+- **CfPwModule — Confirmação nativa removida**: `window.confirm()` em operações destrutivas avançadas substituído por modal customizado com mesmo design system. Deps desnecessários no `useCallback` removidos.
+
+### Controle de versão
+- `admin-app`: APP v01.69.05 → APP v01.70.00
+
 ## [v01.69.05] — 2026-03-29
 ### Corrigido
 - **DeploymentCleanupPanel — Confirmação customizada**: substituído `window.confirm()` nativo do browser por modal in-app com backdrop blur, ícone `AlertTriangle`, botões estilizados e animação spring. Alinhamento com padrão de UX do design system do admin-app — nenhum componente deve usar diálogos nativos do browser.

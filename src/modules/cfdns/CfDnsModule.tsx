@@ -496,6 +496,8 @@ export function CfDnsModule() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState('')
   const [showRecordForm, setShowRecordForm] = useState(false)
+  const [pendingSaveConfirm, setPendingSaveConfirm] = useState(false)
+  const [pendingDeleteRecord, setPendingDeleteRecord] = useState<DnsRecord | null>(null)
 
   const isEditing = Boolean(draft.recordId)
   const isSrvDraft = draft.type === 'SRV'
@@ -952,14 +954,13 @@ export function CfDnsModule() {
       return
     }
 
-    const modeLabel = isEditing ? 'atualizar' : 'criar'
-    const confirmMessage = isEditing
-      ? `Confirmar atualização do registro ${draft.type} ${draft.name}?`
-      : `Confirmar criação do registro ${draft.type} ${draft.name}?`
+    setPendingSaveConfirm(true)
+    return
+  }
 
-    if (!window.confirm(confirmMessage)) {
-      return
-    }
+  const executeSaveRecord = async () => {
+    setPendingSaveConfirm(false)
+    const modeLabel = isEditing ? 'atualizar' : 'criar'
 
     setSaving(true)
     try {
@@ -1045,10 +1046,17 @@ export function CfDnsModule() {
       return
     }
 
-    const type = String(record.type ?? '').toUpperCase()
-    const name = String(record.name ?? '')
-    const confirmed = window.confirm(`Confirma a exclusão do registro ${type} ${name}? Esta ação é irreversível.`)
-    if (!confirmed) {
+    setPendingDeleteRecord(record)
+  }
+
+  const executeDeleteRecord = async () => {
+    const record = pendingDeleteRecord
+    if (!record) return
+    setPendingDeleteRecord(null)
+
+    const recordId = String(record.id ?? '').trim()
+    if (!selectedZoneId || !recordId) {
+      showNotification('Registro inválido para exclusão.', 'error')
       return
     }
 
@@ -1086,6 +1094,7 @@ export function CfDnsModule() {
   }
 
   return (
+    <>
     <section className="detail-panel module-shell module-shell-cfdns">
       <div className="detail-header">
         <div className="detail-icon"><ShieldCheck size={22} /></div>
@@ -1897,5 +1906,60 @@ export function CfDnsModule() {
       </article>
       )}
     </section>
+
+    {/* ── Confirm Modal DNS Save (substitui window.confirm) ── */}
+    {pendingSaveConfirm && (
+      <div className="cleanup-confirm-overlay" onClick={() => setPendingSaveConfirm(false)}>
+        <div className="cleanup-confirm-modal" onClick={(e) => e.stopPropagation()}>
+          <AlertTriangle size={32} className="cleanup-confirm-icon" />
+          <h3>{isEditing ? 'Atualizar registro DNS' : 'Criar registro DNS'}</h3>
+          <p>Confirma a {isEditing ? 'atualização' : 'criação'} do registro <strong>{draft.type} {draft.name}</strong>?</p>
+          <div className="cleanup-confirm-actions">
+            <button
+              type="button"
+              className="cleanup-confirm-cancel"
+              onClick={() => setPendingSaveConfirm(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="cleanup-confirm-proceed"
+              onClick={() => void executeSaveRecord()}
+            >
+              Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Confirm Modal DNS Delete (substitui window.confirm) ── */}
+    {pendingDeleteRecord && (
+      <div className="cleanup-confirm-overlay" onClick={() => setPendingDeleteRecord(null)}>
+        <div className="cleanup-confirm-modal" onClick={(e) => e.stopPropagation()}>
+          <AlertTriangle size={32} className="cleanup-confirm-icon" />
+          <h3>Excluir registro DNS</h3>
+          <p>Confirma a exclusão do registro <strong>{String(pendingDeleteRecord?.type ?? '')} {String(pendingDeleteRecord?.name ?? '')}</strong>?<br/>Esta ação é irreversível.</p>
+          <div className="cleanup-confirm-actions">
+            <button
+              type="button"
+              className="cleanup-confirm-cancel"
+              onClick={() => setPendingDeleteRecord(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="cleanup-confirm-proceed"
+              onClick={() => void executeDeleteRecord()}
+            >
+              Confirmar exclusão
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

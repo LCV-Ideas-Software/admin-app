@@ -387,6 +387,7 @@ export function CfPwModule() {
   const [opsRawBodyJson, setOpsRawBodyJson] = useState('')
   const [opsResult, setOpsResult] = useState<unknown>(null)
   const [showSecret, setShowSecret] = useState(false)
+  const [showDestructiveModal, setShowDestructiveModal] = useState(false)
 
   const currentOpsAction = useMemo(() => findOpsAction(opsAction), [opsAction])
   const visibleOpsFields = useMemo(() => new Set(currentOpsAction.fields), [currentOpsAction])
@@ -620,13 +621,8 @@ export function CfPwModule() {
     return false
   }, [opsAction, opsRawMethod])
 
-  const runAdvancedOp = useCallback(async () => {
-    if (isDestructiveOp) {
-      const confirmed = window.confirm(
-        `Esta é uma operação destrutiva (${currentOpsAction.label}). Confirma a execução?`
-      )
-      if (!confirmed) return
-    }
+  const executeAdvancedOp = useCallback(async () => {
+    setShowDestructiveModal(false)
 
     setOpsLoading(true)
     try {
@@ -680,8 +676,6 @@ export function CfPwModule() {
     }
   }, [
     adminActor,
-    currentOpsAction.label,
-    isDestructiveOp,
     opsAction,
     opsDeploymentId,
     opsDomainName,
@@ -703,6 +697,14 @@ export function CfPwModule() {
     opsZoneId,
     showNotification,
   ])
+
+  const runAdvancedOp = useCallback(() => {
+    if (isDestructiveOp) {
+      setShowDestructiveModal(true)
+      return
+    }
+    void executeAdvancedOp()
+  }, [isDestructiveOp, executeAdvancedOp])
 
   useEffect(() => {
     void loadOverview()
@@ -1368,6 +1370,33 @@ export function CfPwModule() {
           </article>
         ) : null}
       </div>
+
+      {/* ── Confirm Modal para operações destrutivas (substitui window.confirm) ── */}
+      {showDestructiveModal && (
+        <div className="cleanup-confirm-overlay" onClick={() => setShowDestructiveModal(false)}>
+          <div className="cleanup-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <AlertTriangle size={32} className="cleanup-confirm-icon" />
+            <h3>Operação destrutiva</h3>
+            <p>Confirma a execução de <strong>{currentOpsAction.label}</strong>?<br/>Esta ação pode ser irreversível.</p>
+            <div className="cleanup-confirm-actions">
+              <button
+                type="button"
+                className="cleanup-confirm-cancel"
+                onClick={() => setShowDestructiveModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="cleanup-confirm-proceed"
+                onClick={() => void executeAdvancedOp()}
+              >
+                Confirmar execução
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
