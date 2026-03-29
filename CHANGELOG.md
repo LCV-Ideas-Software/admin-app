@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.71.00] — 2026-03-29
+### Adicionado
+- **Resumos IA para Compartilhamento Social**: sistema completo de geração de resumos por IA para enriquecer metatags OG/Twitter ao compartilhar posts do mainsite.
+- **Backend (`post-summaries.ts`)**: endpoint dedicado com integração self-contained ao Gemini 2.0 Flash via `GEMINI_API_KEY`. Suporte a geração em massa (modos `missing` e `all`), regeneração individual e edição manual com flag `is_manual`. Tabela `mainsite_post_ai_summaries` com auto-migração via `ensureTable`.
+- **Frontend (`MainsiteModule.tsx`)**: painel "Resumos IA ✨" com geração bulk, progresso em tempo real (spinner + logs por post), edição inline com contadores de caracteres (OG: 200, LD: 300), marcação de override manual, e regeneração individual por post.
+- **UX/Feedback**: spinners, toasts de sucesso/erro, progresso detalhado com log de cada post (sucesso/falha/skip), padronizado com design system existente.
+
+### Controle de versão
+- `admin-app`: APP v01.70.04 → APP v01.71.00
+
 ## [v01.70.04] — 2026-03-29
 ### Corrigido
 - **Financeiro — Alinhamento visual das tabelas (SumUp/MP)**: alinhamento de colunas entre cabeçalho e linhas de transações estabilizado no `FinanceiroModule` com malha de colunas compartilhada por provedor (SumUp e Mercado Pago). Ajuste estritamente de layout, sem alterações de textos, regras de negócio, cores ou ações.

@@ -4,7 +4,8 @@ import {
   AlertTriangle, BrainCircuit, DollarSign,
   FilePlus2, Globe, GripVertical,
   Loader2, Pencil, Pin, RefreshCw,
-  Save, Trash2, X,
+  Save, Sparkles, Trash2, X,
+  CheckCircle, XCircle,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { PopupPortal } from '../../components/PopupPortal'
@@ -67,6 +68,22 @@ const DEFAULT_FEES: FeeConfig = {
 
 interface GeminiModelItem { id: string; displayName: string; api: string; vision: boolean }
 
+// ── Resumos IA para compartilhamento social ──
+type AiSummary = {
+  id: number
+  post_id: number
+  summary_og: string
+  summary_ld: string | null
+  content_hash: string
+  model: string
+  is_manual: number
+  created_at: string
+  updated_at: string
+  post_title?: string
+}
+
+type BulkDetail = { postId: number; title: string; status: string }
+
 const DEFAULT_MS_CONFIG: MainsiteConfig = { modeloIA: '' }
 
 function loadMsConfig(): MainsiteConfig {
@@ -106,6 +123,18 @@ export function MainsiteModule() {
   const [fees, setFees] = useState<FeeConfig>(DEFAULT_FEES)
   const [feesLoading, setFeesLoading] = useState(false)
   const [feesSaving, setFeesSaving] = useState(false)
+
+  // ── Resumos IA state ──
+  const [summaries, setSummaries] = useState<AiSummary[]>([])
+  const [summariesLoading, setSummariesLoading] = useState(false)
+  const [bulkGenerating, setBulkGenerating] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<{ generated: number; skipped: number; failed: number; total: number; details: BulkDetail[] } | null>(null)
+  const [regeneratingId, setRegeneratingId] = useState<number | null>(null)
+  const [editingSummaryId, setEditingSummaryId] = useState<number | null>(null)
+  const [editOg, setEditOg] = useState('')
+  const [editLd, setEditLd] = useState('')
+  const [savingSummary, setSavingSummary] = useState(false)
+  const [postsWithoutSummary, setPostsWithoutSummary] = useState<Array<{ id: number; title: string }>>([])
 
   const saveMsConfig = (newValues: Partial<MainsiteConfig>) => {
     setMsConfig(prev => {
@@ -211,12 +240,108 @@ export function MainsiteModule() {
     }
   }
 
+  // ── Resumos IA handlers ──
+  const loadSummaries = useCallback(async (shouldNotify = false) => {
+    setSummariesLoading(true)
+    try {
+      const res = await fetch('/api/mainsite/post-summaries')
+      const data = await res.json() as { ok: boolean; summaries?: AiSummary[]; postsWithoutSummary?: Array<{ id: number; title: string }>; error?: string }
+      if (!data.ok) throw new Error(data.error ?? 'Falha ao listar resumos.')
+      setSummaries(data.summaries || [])
+      setPostsWithoutSummary(data.postsWithoutSummary || [])
+      if (shouldNotify) showNotification('Resumos IA atualizados.', 'success')
+    } catch {
+      showNotification('Erro ao carregar resumos IA.', 'error')
+    } finally {
+      setSummariesLoading(false)
+    }
+  }, [showNotification])
+
+  const handleBulkGenerate = async (mode: 'missing' | 'all') => {
+    setBulkGenerating(true)
+    setBulkProgress(null)
+    showNotification(`Gerando resumos IA (${mode === 'missing' ? 'apenas ausentes' : 'todos'})... Isso pode levar alguns segundos.`, 'info')
+    try {
+      const res = await fetch('/api/mainsite/post-summaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate-all', mode }),
+      })
+      const data = await res.json() as { ok: boolean; generated?: number; skipped?: number; failed?: number; total?: number; details?: BulkDetail[]; error?: string }
+      if (!data.ok) throw new Error(data.error ?? 'Falha na geração em massa.')
+      setBulkProgress({
+        generated: data.generated ?? 0,
+        skipped: data.skipped ?? 0,
+        failed: data.failed ?? 0,
+        total: data.total ?? 0,
+        details: data.details ?? [],
+      })
+      showNotification(`Geração concluída: ${data.generated} gerados, ${data.skipped} pulados, ${data.failed} falhas.`, data.failed ? 'error' : 'success')
+      await loadSummaries()
+    } catch (err) {
+      showNotification(`Erro na geração em massa: ${err instanceof Error ? err.message : 'Erro desconhecido.'}`, 'error')
+    } finally {
+      setBulkGenerating(false)
+    }
+  }
+
+  const handleRegenerate = async (postId: number) => {
+    setRegeneratingId(postId)
+    showNotification('Regenerando resumo IA...', 'info')
+    try {
+      const res = await fetch('/api/mainsite/post-summaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate', postId }),
+      })
+      const data = await res.json() as { ok: boolean; summary_og?: string; error?: string }
+      if (!data.ok) throw new Error(data.error ?? 'Falha na regeneração.')
+      showNotification('Resumo regenerado com sucesso.', 'success')
+      await loadSummaries()
+    } catch (err) {
+      showNotification(`Erro ao regenerar: ${err instanceof Error ? err.message : 'Erro'}`, 'error')
+    } finally {
+      setRegeneratingId(null)
+    }
+  }
+
+  const handleSaveSummaryEdit = async (postId: number) => {
+    if (!editOg.trim()) {
+      showNotification('O resumo OG é obrigatório.', 'error')
+      return
+    }
+    setSavingSummary(true)
+    try {
+      const res = await fetch('/api/mainsite/post-summaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'edit', postId, summary_og: editOg, summary_ld: editLd }),
+      })
+      const data = await res.json() as { ok: boolean; error?: string }
+      if (!data.ok) throw new Error(data.error ?? 'Falha ao salvar edição.')
+      showNotification('Resumo editado e marcado como override manual.', 'success')
+      setEditingSummaryId(null)
+      await loadSummaries()
+    } catch (err) {
+      showNotification(`Erro ao salvar: ${err instanceof Error ? err.message : 'Erro'}`, 'error')
+    } finally {
+      setSavingSummary(false)
+    }
+  }
+
+  const startEdit = (s: AiSummary) => {
+    setEditingSummaryId(s.post_id)
+    setEditOg(s.summary_og)
+    setEditLd(s.summary_ld || '')
+  }
+
   useEffect(() => {
     void loadManagedPosts()
     void loadPublicSettings()
     void carregarModelos()
     void carregarTaxas()
-  }, [loadManagedPosts, loadPublicSettings])
+    void loadSummaries()
+  }, [loadManagedPosts, loadPublicSettings, loadSummaries])
 
   const resetPostEditor = () => {
     setEditingPostId(null)
@@ -788,6 +913,181 @@ export function MainsiteModule() {
 
         <p className="field-hint" style={{ marginTop: '12px', fontStyle: 'italic', opacity: 0.7 }}>
           Estas taxas são lidas pelo worker em cada checkout para calcular o valor final com repasse. Alterações refletem imediatamente após salvar.
+        </p>
+      </div>
+
+      {/* ── Resumos IA para Compartilhamento Social ── */}
+      <div className="form-card" style={{ marginTop: '24px' }}>
+        <div className="result-toolbar">
+          <div>
+            <h4><Sparkles size={16} /> Resumos IA — Compartilhamento Social</h4>
+            <p className="field-hint">
+              Resumos gerados automaticamente por IA para previews de links em redes sociais (WhatsApp, Facebook, Twitter, etc.).
+              {summaries.length > 0 && <> · {summaries.length} resumos gerados</>}
+              {postsWithoutSummary.length > 0 && <> · <strong style={{ color: 'var(--color-warning, #f59e0b)' }}>{postsWithoutSummary.length} posts sem resumo</strong></>}
+            </p>
+          </div>
+          <div className="inline-actions">
+            <button type="button" className="ghost-button" onClick={() => void loadSummaries(true)} disabled={summariesLoading}>
+              {summariesLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+              Recarregar
+            </button>
+          </div>
+        </div>
+
+        {/* Ações de geração em massa */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={bulkGenerating}
+            onClick={() => void handleBulkGenerate('missing')}
+          >
+            {bulkGenerating ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
+            Gerar Ausentes
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={bulkGenerating}
+            onClick={() => void handleBulkGenerate('all')}
+          >
+            {bulkGenerating ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+            Regenerar Todos
+          </button>
+        </div>
+
+        {/* Progresso da geração em massa */}
+        {bulkGenerating && (
+          <div className="result-card" style={{ padding: '16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Loader2 size={20} className="spin" style={{ color: 'var(--color-primary, #4285f4)' }} />
+            <span style={{ fontSize: '14px', opacity: 0.85 }}>Gerando resumos via Gemini... Isso pode levar alguns segundos por post.</span>
+          </div>
+        )}
+
+        {/* Resultado da última geração em massa */}
+        {bulkProgress && !bulkGenerating && (
+          <div className="result-card" style={{ padding: '16px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              {bulkProgress.failed === 0
+                ? <CheckCircle size={18} style={{ color: 'var(--color-success, #34a853)' }} />
+                : <XCircle size={18} style={{ color: 'var(--color-error, #ea4335)' }} />
+              }
+              <strong style={{ fontSize: '14px' }}>
+                Geração concluída — {bulkProgress.generated} gerados, {bulkProgress.skipped} pulados{bulkProgress.failed > 0 && `, ${bulkProgress.failed} falhas`}
+              </strong>
+            </div>
+            {bulkProgress.details.length > 0 && (
+              <details style={{ fontSize: '13px' }}>
+                <summary style={{ cursor: 'pointer', opacity: 0.7, marginBottom: '8px' }}>Ver detalhes ({bulkProgress.details.length} posts)</summary>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '200px', overflowY: 'auto' }}>
+                  {bulkProgress.details.map(d => (
+                    <li key={d.postId} style={{ padding: '4px 0', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(128,128,128,0.1)' }}>
+                      {d.status === 'generated'
+                        ? <CheckCircle size={14} style={{ color: 'var(--color-success, #34a853)', flexShrink: 0 }} />
+                        : d.status.startsWith('skipped')
+                          ? <span style={{ color: 'var(--color-text-muted, #999)', flexShrink: 0 }}>⏭️</span>
+                          : <XCircle size={14} style={{ color: 'var(--color-error, #ea4335)', flexShrink: 0 }} />
+                      }
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#{d.postId} {d.title}</span>
+                      <span className={`badge ${d.status === 'generated' ? 'badge-em-implantacao' : 'badge-planejado'}`} style={{ fontSize: '11px', flexShrink: 0 }}>
+                        {d.status.replace('skipped_', '').replace('_', ' ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        {/* Lista de resumos existentes */}
+        {summariesLoading ? (
+          <div className="module-loading" style={{ padding: '24px' }}><Loader2 size={24} className="spin" /></div>
+        ) : summaries.length === 0 ? (
+          <p className="result-empty">Nenhum resumo gerado ainda. Use o botão &ldquo;Gerar Ausentes&rdquo; para gerar resumos para todos os posts existentes.</p>
+        ) : (
+          <ul className="result-list astro-akashico-scroll" style={{ maxHeight: '500px' }}>
+            {summaries.map(s => {
+              const isEditing = editingSummaryId === s.post_id
+              const isRegenerating = regeneratingId === s.post_id
+              return (
+                <li key={s.post_id} className="post-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        #{s.post_id} {s.post_title || '(sem título)'}
+                      </strong>
+                      <span style={{ fontSize: '12px', opacity: 0.6 }}>
+                        {s.is_manual ? '✋ Manual' : '🤖 IA'} · {s.model} · Atualizado {new Date(s.updated_at + (s.updated_at.includes('Z') ? '' : 'Z')).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+                      </span>
+                    </div>
+                    <div className="post-row-actions" style={{ flexShrink: 0, display: 'flex', gap: '4px' }}>
+                      <button type="button" className="ghost-button" onClick={() => void handleRegenerate(s.post_id)} disabled={isRegenerating || bulkGenerating} title="Regenerar via IA">
+                        {isRegenerating ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
+                      </button>
+                      <button type="button" className="ghost-button" onClick={() => startEdit(s)} disabled={isRegenerating || bulkGenerating} title="Editar manualmente">
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', background: 'rgba(128,128,128,0.05)', borderRadius: '8px' }}>
+                      <div className="field-group">
+                        <label style={{ fontSize: '12px', fontWeight: 600 }}>Resumo OG (máx. 200 chars — preview social)</label>
+                        <textarea
+                          rows={2}
+                          maxLength={200}
+                          value={editOg}
+                          onChange={e => setEditOg(e.target.value)}
+                          style={{ fontSize: '13px' }}
+                        />
+                        <span style={{ fontSize: '11px', opacity: 0.5, textAlign: 'right' }}>{editOg.length}/200</span>
+                      </div>
+                      <div className="field-group">
+                        <label style={{ fontSize: '12px', fontWeight: 600 }}>Resumo LD (máx. 300 chars — Schema.org/SEO)</label>
+                        <textarea
+                          rows={3}
+                          maxLength={300}
+                          value={editLd}
+                          onChange={e => setEditLd(e.target.value)}
+                          style={{ fontSize: '13px' }}
+                        />
+                        <span style={{ fontSize: '11px', opacity: 0.5, textAlign: 'right' }}>{editLd.length}/300</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button type="button" className="primary-button" style={{ fontSize: '13px', padding: '6px 14px' }} disabled={savingSummary} onClick={() => void handleSaveSummaryEdit(s.post_id)}>
+                          {savingSummary ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                          Salvar
+                        </button>
+                        <button type="button" className="ghost-button" style={{ fontSize: '13px', padding: '6px 14px' }} onClick={() => setEditingSummaryId(null)}>
+                          <X size={14} /> Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>OG</span>{' '}
+                        <span style={{ opacity: 0.85 }}>{s.summary_og}</span>
+                      </div>
+                      {s.summary_ld && s.summary_ld !== s.summary_og && (
+                        <div>
+                          <span style={{ fontSize: '11px', fontWeight: 600, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>LD</span>{' '}
+                          <span style={{ opacity: 0.7 }}>{s.summary_ld}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        <p className="field-hint" style={{ marginTop: '12px', fontStyle: 'italic', opacity: 0.7 }}>
+          Esses resumos são usados automaticamente nos previews de links compartilhados (og:description, twitter:description, Schema.org). Edições manuais não serão sobrescritas pela IA.
         </p>
       </div>
 
