@@ -123,7 +123,7 @@ CONTEÚDO: ${cleanContent}`
   }
 }
 
-// ── Ensure table ──
+// ── Ensure table + self-healing migration for missing columns ──
 async function ensureTable(db: D1Database): Promise<void> {
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS mainsite_post_ai_summaries (
@@ -138,6 +138,17 @@ async function ensureTable(db: D1Database): Promise<void> {
       updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `).run()
+
+  // Self-healing: add columns that may be missing on pre-existing tables.
+  // SQLite throws "duplicate column name" if column already exists — safe to ignore.
+  const migrations = [
+    `ALTER TABLE mainsite_post_ai_summaries ADD COLUMN is_manual INTEGER DEFAULT 0`,
+    `ALTER TABLE mainsite_post_ai_summaries ADD COLUMN content_hash TEXT DEFAULT ''`,
+    `ALTER TABLE mainsite_post_ai_summaries ADD COLUMN model TEXT DEFAULT 'gemini-2.0-flash'`,
+  ]
+  for (const sql of migrations) {
+    try { await db.prepare(sql).run() } catch { /* column already exists — ok */ }
+  }
 }
 
 const json = (data: unknown, status = 200) =>
