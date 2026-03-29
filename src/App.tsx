@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense, useState, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import {
   BarChart3,
+  Brain,
   BrainCircuit,
   Database,
   DollarSign,
@@ -119,6 +120,7 @@ function lazyWithAccessRecovery<T extends ComponentType<unknown>>(
   })
 }
 
+const AiStatusModule = lazyWithAccessRecovery(() => import('./modules/ai-status/AiStatusModule').then(m => ({ default: m.AiStatusModule })))
 const AstrologoModule = lazyWithAccessRecovery(() => import('./modules/astrologo/AstrologoModule').then(m => ({ default: m.AstrologoModule })))
 const ConfigModule = lazyWithAccessRecovery(() => import('./modules/config/ConfigModule').then(m => ({ default: m.ConfigModule })))
 const CalculadoraModule = lazyWithAccessRecovery(() => import('./modules/calculadora/CalculadoraModule').then(m => ({ default: m.CalculadoraModule })))
@@ -133,11 +135,11 @@ const OraculoModule = lazyWithAccessRecovery(() => import('./modules/oraculo/Ora
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 const TlsrptModule = lazyWithAccessRecovery(() => import('./modules/tlsrpt/TlsrptModule').then(m => ({ default: m.TlsrptModule })))
 
-const APP_VERSION = 'APP v01.68.00'
-type ModuleId = 'overview' | 'astrologo' | 'cardhub' | 'cfdns' | 'cfpw' | 'config' | 'financeiro' | 'oraculo' | 'calculadora' | 'mainsite' | 'mtasts' | 'telemetria' | 'tlsrpt'
+const APP_VERSION = 'APP v01.69.00'
+type ModuleId = 'overview' | 'ai-status' | 'astrologo' | 'cardhub' | 'cfdns' | 'cfpw' | 'config' | 'financeiro' | 'oraculo' | 'calculadora' | 'mainsite' | 'mtasts' | 'telemetria' | 'tlsrpt'
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
-  astrologo: 'Astrólogo', cardhub: 'Card Hub', cfdns: 'CF DNS', cfpw: 'CF P&W', financeiro: 'Financeiro', oraculo: 'Oráculo',
+  'ai-status': 'AI Status', astrologo: 'Astrólogo', cardhub: 'Card Hub', cfdns: 'CF DNS', cfpw: 'CF P&W', financeiro: 'Financeiro', oraculo: 'Oráculo',
   calculadora: 'Calculadora', mainsite: 'MainSite', mtasts: 'MTA-STS',
   telemetria: 'Telemetria', config: 'Configurações', tlsrpt: 'TLS-RPT',
 }
@@ -146,6 +148,7 @@ const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
 // e todos os demais módulos em ordem alfabética.
 const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
   { id: 'overview', label: 'Visão Geral', icon: PanelsTopLeft },
+  { id: 'ai-status', label: 'AI Status', icon: Brain },
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
   { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
   { id: 'cfdns', label: 'CF DNS', icon: Globe },
@@ -227,6 +230,8 @@ function App() {
           <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
           {activeModule === 'overview' ? (
             <NewsPanel />
+          ) : activeModule === 'ai-status' ? (
+            <AiStatusModule />
           ) : activeModule === 'astrologo' ? (
             <AstrologoModule />
           ) : activeModule === 'config' ? (

@@ -1,5 +1,18 @@
 # Changelog — Admin App
 
+## [v01.69.00] — 2026-03-29
+### Adicionado (MAJOR)
+- **AI Status — módulo novo**: dashboard de monitoramento completo para Gemini AI, com arquitetura de 3 tiers:
+  - **Tier A — Modelos & Rate Limits**: catálogo live de modelos Gemini via API (`/api/ai-status/models`), health check com latência (`/api/ai-status/health`), e tabelas de referência estática de rate limits Free/Paid por modelo e região.
+  - **Tier B — Uso & Telemetria (self-managed)**: endpoint `/api/ai-status/usage` com auto-migração da tabela `ai_usage_logs` no `BIGDATA_DB` (D1). Suporta GET (aggregação por período, módulo, modelo) e POST (log de consumo). Resumo com total de tokens, custo estimado, chamadas, e breakdown por módulo/modelo. Gráfico diário CSS (bar chart) sem dependência de bibliotecas.
+  - **Tier C — GCP Cloud Monitoring**: autenticação JWT → OAuth2 com Service Account (`GCP_SA_KEY` + `GCP_PROJECT_ID`). Consulta `generativelanguage.googleapis.com/` metrics via Cloud Monitoring API. Guia interativo de setup integrado ao painel quando credenciais ausentes.
+- **Frontend**: `AiStatusModule.tsx` com 3 tabs, health badge dinâmico (🟢/🔴/⚪), spinner de carregamento, e fallback de erro com retry. Visual coerente com design system existente (cards, pills, tipografia).
+- **CSS**: tokens `--module-accent` emerald (#10b981), `.ai-rate-table`, `.ai-daily-chart`, `.ai-model-card`, animação `fadeSlideIn`.
+- **Telemetria**: tipo `ai-status` adicionado às unions `ModuleEventInput` e `SyncRunStart` em `operational.ts`.
+
+### Controle de versão
+- `admin-app`: APP v01.68.00 → APP v01.69.00
+
 ## [v01.68.00] — 2026-03-29
 ### Alterado (MAJOR)
 - **Financeiro — Migração Live API**: Dashboard financeiro migrado de arquitetura D1-dependent para **Live API-first**. Transações, status e saldos agora vêm direto das APIs SumUp SDK e Mercado Pago REST.
