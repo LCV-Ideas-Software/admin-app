@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Suspense, lazy } from 'react'
 import {
-  AlertTriangle,
+  AlertTriangle, BrainCircuit, DollarSign,
   FilePlus2, Globe, GripVertical,
   Loader2, Pencil, Pin, RefreshCw,
   Save, Trash2, X,
@@ -45,6 +45,36 @@ type DisclaimersSettings = {
 
 const DEFAULT_DISCLAIMERS: DisclaimersSettings = { enabled: true, items: [] }
 
+// ── Configuração local do modelo IA (paridade com Itaú/Oráculo/Astrólogo) ──
+interface MainsiteConfig {
+  modeloIA?: string
+}
+
+// ── Configuração de taxas dos gateways de pagamento ──
+interface FeeConfig {
+  sumupRate: number
+  sumupFixed: number
+  mpRate: number
+  mpFixed: number
+}
+
+const DEFAULT_FEES: FeeConfig = {
+  sumupRate: 0.0267,
+  sumupFixed: 0,
+  mpRate: 0.0499,
+  mpFixed: 0.40,
+}
+
+interface GeminiModelItem { id: string; displayName: string; api: string; vision: boolean }
+
+const DEFAULT_MS_CONFIG: MainsiteConfig = { modeloIA: '' }
+
+function loadMsConfig(): MainsiteConfig {
+  try {
+    const s = localStorage.getItem('mainsite-config')
+    return s ? { ...DEFAULT_MS_CONFIG, ...JSON.parse(s) } : DEFAULT_MS_CONFIG
+  } catch { return DEFAULT_MS_CONFIG }
+}
 
 export function MainsiteModule() {
   const { showNotification } = useNotification()
@@ -66,6 +96,37 @@ export function MainsiteModule() {
   const [disclaimers, setDisclaimers] = useState<DisclaimersSettings>(DEFAULT_DISCLAIMERS)
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' })
   const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null)
+
+  // ── Modelo IA state ──
+  const [msConfig, setMsConfig] = useState<MainsiteConfig>(loadMsConfig)
+  const [geminiModels, setGeminiModels] = useState<GeminiModelItem[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+
+  // ── Taxas state ──
+  const [fees, setFees] = useState<FeeConfig>(DEFAULT_FEES)
+  const [feesLoading, setFeesLoading] = useState(false)
+  const [feesSaving, setFeesSaving] = useState(false)
+
+  const saveMsConfig = (newValues: Partial<MainsiteConfig>) => {
+    setMsConfig(prev => {
+      const next = { ...prev, ...newValues }
+      localStorage.setItem('mainsite-config', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const carregarModelos = async () => {
+    setModelsLoading(true)
+    try {
+      const res = await fetch('/api/mainsite/modelos')
+      const data = await res.json() as { ok: boolean; models?: GeminiModelItem[] }
+      if (data.ok && data.models) setGeminiModels(data.models)
+    } catch {
+      // ignora erro — dropdown mostra fallback
+    } finally {
+      setModelsLoading(false)
+    }
+  }
 
 
   const loadManagedPosts = useCallback(async (shouldNotify = false) => {
@@ -118,9 +179,43 @@ export function MainsiteModule() {
     }
   }, [adminActor, showNotification])
 
+  const carregarTaxas = async () => {
+    setFeesLoading(true)
+    try {
+      const res = await fetch('/api/mainsite/fees')
+      const data = await res.json() as { ok: boolean; fees?: FeeConfig }
+      if (data.ok && data.fees) setFees(data.fees)
+    } catch {
+      // usa defaults
+    } finally {
+      setFeesLoading(false)
+    }
+  }
+
+  const salvarTaxas = async () => {
+    setFeesSaving(true)
+    try {
+      const res = await fetch('/api/mainsite/fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fees),
+      })
+      const data = await res.json() as { ok: boolean; fees?: FeeConfig; error?: string }
+      if (!data.ok) throw new Error(data.error ?? 'Erro desconhecido.')
+      if (data.fees) setFees(data.fees)
+      showNotification('Taxas salvas com sucesso. O worker usará os novos valores no próximo checkout.', 'success')
+    } catch (err) {
+      showNotification(`Falha ao salvar taxas: ${err instanceof Error ? err.message : 'Erro desconhecido.'}`, 'error')
+    } finally {
+      setFeesSaving(false)
+    }
+  }
+
   useEffect(() => {
     void loadManagedPosts()
     void loadPublicSettings()
+    void carregarModelos()
+    void carregarTaxas()
   }, [loadManagedPosts, loadPublicSettings])
 
   const resetPostEditor = () => {
@@ -551,6 +646,148 @@ export function MainsiteModule() {
           </button>
         </div>
       </form>
+
+      {/* ── Modelos de IA (Gemini) — paridade com Itaú/Oráculo/Astrólogo ── */}
+      <div className="form-card" style={{ marginTop: '24px' }}>
+        <div className="result-toolbar">
+          <div>
+            <h4><BrainCircuit size={16} /> Modelos de IA (Gemini)</h4>
+            <p className="field-hint">
+              Selecione o motor utilizado pelo chatbot e funcionalidades de IA deste módulo.{' '}
+              {!modelsLoading && geminiModels.length > 0 && <>· {geminiModels.length} modelos disponíveis</>}
+            </p>
+          </div>
+        </div>
+
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+          <div className="field-group">
+            <label htmlFor="mainsite-modelo-ia">Modelo de Processamento</label>
+            <div className="select-wrapper">
+              <select
+                id="mainsite-modelo-ia"
+                name="mainsiteModeloIa"
+                value={msConfig.modeloIA || ''}
+                onChange={e => saveMsConfig({ modeloIA: e.target.value })}
+              >
+                {modelsLoading ? (
+                  <option value={msConfig.modeloIA || ''}>Carregando modelos do Cloudflare...</option>
+                ) : (
+                  <>
+                    <option value="">Automático (Padrão)</option>
+                    {geminiModels.length === 0 && msConfig.modeloIA && <option value={msConfig.modeloIA}>{msConfig.modeloIA}</option>}
+                    {geminiModels.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+            <p className="field-hint" style={{ marginTop: '8px' }}>
+              Esta alteração é persistida localmente (no seu navegador) e aplicada instantaneamente sem recarregar a página.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Taxas dos Gateways de Pagamento ── */}
+      <div className="form-card" style={{ marginTop: '24px' }}>
+        <div className="result-toolbar">
+          <div>
+            <h4><DollarSign size={16} /> Taxas dos Gateways de Pagamento</h4>
+            <p className="field-hint">
+              Configure as taxas cobradas pela SumUp e Mercado Pago para cálculo automático de repasse ao valor da doação.
+            </p>
+          </div>
+          <div className="inline-actions">
+            <button type="button" className="ghost-button" onClick={() => void carregarTaxas()} disabled={feesLoading}>
+              {feesLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+              Recarregar
+            </button>
+          </div>
+        </div>
+
+        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {/* SumUp */}
+          <fieldset className="settings-fieldset">
+            <legend>SumUp</legend>
+            <div className="field-group">
+              <label htmlFor="sumup-fee-rate">Taxa Percentual (%)</label>
+              <input
+                id="sumup-fee-rate"
+                name="sumupFeeRate"
+                type="number"
+                step="0.01"
+                min="0"
+                max="99.99"
+                value={parseFloat((fees.sumupRate * 100).toFixed(4))}
+                onChange={e => setFees(prev => ({ ...prev, sumupRate: Math.max(0, Math.min(0.9999, parseFloat(e.target.value) / 100 || 0)) }))}
+              />
+              <p className="field-hint">Ex: 2.67 = 2,67% por transação</p>
+            </div>
+            <div className="field-group">
+              <label htmlFor="sumup-fee-fixed">Taxa Fixa (R$)</label>
+              <input
+                id="sumup-fee-fixed"
+                name="sumupFeeFixed"
+                type="number"
+                step="0.01"
+                min="0"
+                value={fees.sumupFixed}
+                onChange={e => setFees(prev => ({ ...prev, sumupFixed: Math.max(0, parseFloat(e.target.value) || 0) }))}
+              />
+              <p className="field-hint">Valor fixo cobrado por transação (0 = desabilitado)</p>
+            </div>
+          </fieldset>
+
+          {/* Mercado Pago */}
+          <fieldset className="settings-fieldset">
+            <legend>Mercado Pago</legend>
+            <div className="field-group">
+              <label htmlFor="mp-fee-rate">Taxa Percentual (%)</label>
+              <input
+                id="mp-fee-rate"
+                name="mpFeeRate"
+                type="number"
+                step="0.01"
+                min="0"
+                max="99.99"
+                value={parseFloat((fees.mpRate * 100).toFixed(4))}
+                onChange={e => setFees(prev => ({ ...prev, mpRate: Math.max(0, Math.min(0.9999, parseFloat(e.target.value) / 100 || 0)) }))}
+              />
+              <p className="field-hint">Ex: 4.99 = 4,99% por transação</p>
+            </div>
+            <div className="field-group">
+              <label htmlFor="mp-fee-fixed">Taxa Fixa (R$)</label>
+              <input
+                id="mp-fee-fixed"
+                name="mpFeeFixed"
+                type="number"
+                step="0.01"
+                min="0"
+                value={fees.mpFixed}
+                onChange={e => setFees(prev => ({ ...prev, mpFixed: Math.max(0, parseFloat(e.target.value) || 0) }))}
+              />
+              <p className="field-hint">Valor fixo cobrado por transação (ex: R$ 0,40)</p>
+            </div>
+          </fieldset>
+        </div>
+
+        <div className="form-actions" style={{ marginTop: '16px' }}>
+          <button type="button" className="primary-button" onClick={() => void salvarTaxas()} disabled={feesSaving}>
+            {feesSaving ? <Loader2 size={18} className="spin" /> : <Save size={18} />}
+            Salvar Taxas
+          </button>
+          <button type="button" className="ghost-button" onClick={() => { setFees(DEFAULT_FEES); showNotification('Taxas restauradas para os valores padrão. Salve para confirmar.', 'info') }}>
+            Restaurar Padrão
+          </button>
+        </div>
+
+        <p className="field-hint" style={{ marginTop: '12px', fontStyle: 'italic', opacity: 0.7 }}>
+          Estas taxas são lidas pelo worker em cada checkout para calcular o valor final com repasse. Alterações refletem imediatamente após salvar.
+        </p>
+      </div>
 
     </section>
   )
