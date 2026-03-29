@@ -91,10 +91,8 @@ export async function onRequestGet(context: Context) {
             return dateB - dateA
           })
 
-          // O deployment ativo de produção pode vir como canonical_deployment.
-          const canonicalDeploymentId = String(
-            projectDetails?.canonical_deployment?.id ?? project.canonical_deployment?.id ?? '',
-          ).trim()
+          // O deployment ativo de produção vem do canonical_deployment do projeto.
+          const canonicalDeploymentId = String(projectDetails?.canonical_deployment?.id ?? '').trim()
 
           // Fallback adicional: alguns cenários de rollout/rollback expõem o ativo
           // diretamente no status do stage do deployment.
@@ -105,22 +103,22 @@ export async function onRequestGet(context: Context) {
               .filter(Boolean),
           )
 
+          // Fallback seguro: deployment(s) do ambiente production.
+          const activeProductionIds = new Set(
+            sorted
+              .filter((d) => String(d.environment ?? '').trim().toLowerCase() === 'production')
+              .map((d) => String(d.id ?? '').trim())
+              .filter(Boolean),
+          )
+
           // Conjunto de IDs protegidos: somente deployments ativos.
           const protectedIds = new Set<string>()
           if (canonicalDeploymentId) protectedIds.add(canonicalDeploymentId)
           for (const stageActiveId of activeFromStageIds) {
             protectedIds.add(stageActiveId)
           }
-
-          // Fallback defensivo: se a API não expuser canonical nem stage active,
-          // usa latest_deployment como possível ativo para evitar exclusão indevida.
-          if (protectedIds.size === 0) {
-            const fallbackActiveId = String(
-              projectDetails?.latest_deployment?.id ?? project.latest_deployment?.id ?? '',
-            ).trim()
-            if (fallbackActiveId) {
-              protectedIds.add(fallbackActiveId)
-            }
+          for (const productionId of activeProductionIds) {
+            protectedIds.add(productionId)
           }
 
           // Exibe o deployment ativo (ou fallback visual para o mais recente).
@@ -130,7 +128,10 @@ export async function onRequestGet(context: Context) {
             : sorted[0] ?? null
 
           // Obsoletos = tudo que NÃO está no set de ativos.
-          const obsolete = sorted.filter(d => !protectedIds.has(String(d.id ?? '')))
+          // Fail-safe: se não identificou nenhum ativo, não expurga esse projeto.
+          const obsolete = protectedIds.size > 0
+            ? sorted.filter(d => !protectedIds.has(String(d.id ?? '')))
+            : []
 
           totalDeployments += sorted.length
           totalObsolete += obsolete.length
@@ -214,6 +215,13 @@ export async function onRequestPost(context: Context) {
           .filter(Boolean),
       )
 
+      const activeProductionIds = new Set(
+        deployments
+          .filter((d) => String(d.environment ?? '').trim().toLowerCase() === 'production')
+          .map((d) => String(d.id ?? '').trim())
+          .filter(Boolean),
+      )
+
       const protectedActiveIds = new Set<string>()
       if (canonicalId) {
         protectedActiveIds.add(canonicalId)
@@ -221,12 +229,8 @@ export async function onRequestPost(context: Context) {
       for (const stageActiveId of activeStageIds) {
         protectedActiveIds.add(stageActiveId)
       }
-
-      if (protectedActiveIds.size === 0) {
-        const fallbackActiveId = String(project?.latest_deployment?.id ?? '').trim()
-        if (fallbackActiveId) {
-          protectedActiveIds.add(fallbackActiveId)
-        }
+      for (const productionId of activeProductionIds) {
+        protectedActiveIds.add(productionId)
       }
 
       if (protectedActiveIds.has(deploymentId)) {

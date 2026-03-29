@@ -331,7 +331,7 @@ export function DeploymentCleanupPanel() {
               <span className="deploy-cleanup__terminal-dot" />
               <span className="deploy-cleanup__terminal-dot" />
             </div>
-            <span>cloudflare-pages-governança</span>
+            <span>Cloudflare Pages Deploys</span>
             {state === 'purging' && (
               <span className="deploy-cleanup__scanning-label">● processando</span>
             )}
