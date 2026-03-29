@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.67.03] — 2026-03-29
+### Corrigido
+- **Financeiro/SumUp — frontend sobrescrevia status correto do backend**: `parseSumupPayload` em `financeiro-helpers.ts` lia apenas `transactions[0].status` (SUCCESSFUL — pagamento original), fazendo o frontend exibir `APROVADO` mesmo quando o backend já havia resolvido `REFUNDED`. Corrigido para escanear todo `transactions[]` e detectar refunds com a mesma lógica do backend.
+- **Root cause**: a cadeia `resolveStatusConfig` → `parseSumupPayload` → `resolveEffectiveSumupStatus` no frontend priorizava `txStatus` extraído do raw_payload (que vinha de `transactions[0]`) sobre o `log.status` correto do backend, invertendo a prioridade de dados.
+
 ## [v01.67.02] — 2026-03-29
 ### Corrigido
 - **Financeiro/SumUp — detecção inteligente de reembolsos**: `sumup-sync.ts` e `financeiro.ts` agora iteram todo o array `transactions[]` do checkout SumUp em vez de ler apenas `transactions[0]`. Transações com `type: "REFUND"` são somadas para determinar status `REFUNDED` (total) ou `PARTIALLY_REFUNDED` (parcial).
