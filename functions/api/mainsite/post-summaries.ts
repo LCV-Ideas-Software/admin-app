@@ -67,7 +67,7 @@ async function generateShareSummary(
   title: string,
   htmlContent: string,
   apiKey: string,
-): Promise<{ summary_og: string; summary_ld: string } | null> {
+): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const cleanContent = stripHtml(htmlContent).substring(0, 3000)
 
   const prompt = `Você é um editor especializado em SEO e compartilhamento social.
@@ -102,24 +102,27 @@ CONTEÚDO: ${cleanContent}`
       },
     )
 
-    if (!res.ok) return null
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '(no body)')
+      return { error: `Gemini API ${res.status}: ${errBody.substring(0, 200)}` }
+    }
 
     const data = await res.json() as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
     }
 
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!rawText) return null
+    if (!rawText) return { error: 'Gemini retornou resposta vazia (sem candidates/text).' }
 
     const parsed = JSON.parse(rawText) as { summary_og?: string; summary_ld?: string }
-    if (!parsed.summary_og) return null
+    if (!parsed.summary_og) return { error: `Gemini retornou JSON sem summary_og: ${rawText.substring(0, 100)}` }
 
     return {
       summary_og: parsed.summary_og.substring(0, 200),
       summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
     }
-  } catch {
-    return null
+  } catch (err) {
+    return { error: `Exception: ${err instanceof Error ? err.message : String(err)}` }
   }
 }
 
@@ -262,9 +265,9 @@ export async function onRequestPost(context: SummaryContext) {
 
         try {
           const result = await generateShareSummary(post.title, post.content, apiKey)
-          if (!result) {
+          if ('error' in result) {
             failed++
-            details.push({ postId: post.id, title: post.title, status: 'failed_ai' })
+            details.push({ postId: post.id, title: post.title, status: result.error })
             continue
           }
 
@@ -313,7 +316,7 @@ export async function onRequestPost(context: SummaryContext) {
       if (!post) return json({ ok: false, error: 'Post não encontrado.', ...trace }, 404)
 
       const result = await generateShareSummary(post.title, post.content, apiKey)
-      if (!result) return json({ ok: false, error: 'Falha na geração do resumo pela IA.', ...trace }, 502)
+      if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 502)
 
       const contentHash = await hashContent(stripHtml(post.content))
 
