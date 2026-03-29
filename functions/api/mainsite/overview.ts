@@ -5,6 +5,7 @@ type D1PreparedStatement = {
   bind: (...values: Array<string | number | null>) => D1PreparedStatement
   first: <T>() => Promise<T | null>
   all: <T>() => Promise<{ results?: T[] }>
+  run: () => Promise<unknown>
 }
 
 type D1Database = {
@@ -80,11 +81,9 @@ const mapPost = (post: MainsitePostRow) => {
 }
 
 const queryBigdata = async (db: D1Database, limit: number): Promise<MainsiteOverviewResponse> => {
-  const [totalPostsRow, totalPinnedRow, totalFinancialRow, totalApprovedFinancialRow, latestRows] = await Promise.all([
+  const [totalPostsRow, totalPinnedRow, latestRows] = await Promise.all([
     db.prepare('SELECT COUNT(1) AS total FROM mainsite_posts').first<{ total?: number }>(),
     db.prepare('SELECT COUNT(1) AS total FROM mainsite_posts WHERE is_pinned = 1').first<{ total?: number }>(),
-    db.prepare('SELECT COUNT(1) AS total FROM mainsite_financial_logs').first<{ total?: number }>(),
-    db.prepare("SELECT COUNT(1) AS total FROM mainsite_financial_logs WHERE lower(status) IN ('approved', 'successful')").first<{ total?: number }>(),
     db.prepare('SELECT id, title, created_at, is_pinned FROM mainsite_posts ORDER BY is_pinned DESC, display_order ASC, created_at DESC LIMIT ?').bind(limit).all<MainsitePostRow>(),
   ])
 
@@ -100,8 +99,8 @@ const queryBigdata = async (db: D1Database, limit: number): Promise<MainsiteOver
     resumo: {
       totalPosts: Number(totalPostsRow?.total ?? 0),
       totalPinned: Number(totalPinnedRow?.total ?? 0),
-      totalFinancialLogs: Number(totalFinancialRow?.total ?? 0),
-      totalApprovedFinancialLogs: Number(totalApprovedFinancialRow?.total ?? 0),
+      totalFinancialLogs: null,
+      totalApprovedFinancialLogs: null,
     },
     ultimosPosts,
   }

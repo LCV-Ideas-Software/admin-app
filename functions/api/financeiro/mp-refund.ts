@@ -1,16 +1,16 @@
 // admin-app/functions/api/financeiro/mp-refund.ts
 // POST — Efetua estorno no Mercado Pago via SDK oficial
-// Portado 1:1 do mainsite-worker /api/mp-payment/:id/refund
+// Dados live: SDK é a fonte de verdade, sem D1
 
 import { MercadoPagoConfig, PaymentRefund } from 'mercadopago'
 
 interface Env {
-  BIGDATA_DB: D1Database
   MP_ACCESS_TOKEN: string
 }
 
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const db = context.env.BIGDATA_DB
+type RefundContext = { request: Request; env: Env }
+
+export const onRequestPost = async (context: RefundContext) => {
   const url = new URL(context.request.url)
   const id = url.searchParams.get('id')
 
@@ -24,7 +24,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const refundApi = new PaymentRefund(client)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const refundBody: Record<string, any> = { payment_id: id }
+    const refundBody: any = { payment_id: id }
 
     try {
       const body = await context.request.json() as { amount?: number }
@@ -34,9 +34,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     await refundApi.create(refundBody)
 
     const newStatus = refundBody.body?.amount ? 'partially_refunded' : 'refunded'
-    await db.prepare(
-      'UPDATE mainsite_financial_logs SET status = ? WHERE payment_id = ?'
-    ).bind(newStatus, id).run()
 
     return Response.json({ success: true, status: newStatus })
   } catch (err) {

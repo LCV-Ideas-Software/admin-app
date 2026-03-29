@@ -1,36 +1,54 @@
 // admin-app/functions/api/financeiro/sumup-balance.ts
-// GET — Consulta saldo SumUp via logs D1 (approved)
+// GET — Calcula saldo SumUp via SDK live (transactions-advanced)
+// Soma transações por status direto do provider, sem D1
+
+import SumUp from '@sumup/sdk'
 
 interface Env {
-  BIGDATA_DB: D1Database
+  SUMUP_API_KEY_PRIVATE: string
+  SUMUP_MERCHANT_CODE: string
 }
 
-const FINANCIAL_CUTOFF_DB_UTC = '2026-03-01 03:00:00'
+type BalanceContext = { request: Request; env: Env }
 
-const getStartDbWithCutoff = (rawDate: string | null): string => {
-  if (!rawDate) return FINANCIAL_CUTOFF_DB_UTC
-  return rawDate < '2026-03-01' ? FINANCIAL_CUTOFF_DB_UTC : rawDate
-}
+const FINANCIAL_CUTOFF = '2026-03-01'
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const db = context.env.BIGDATA_DB
+export const onRequestGet = async (context: BalanceContext) => {
+  const token = context.env.SUMUP_API_KEY_PRIVATE
+  const merchantCode = context.env.SUMUP_MERCHANT_CODE
+  if (!token || !merchantCode) return Response.json({ available_balance: 0, unavailable_balance: 0 })
+
   const url = new URL(context.request.url)
-  const startDb = getStartDbWithCutoff(url.searchParams.get('start_date'))
+  const rawStart = url.searchParams.get('start_date') || FINANCIAL_CUTOFF
+  const startDate = rawStart < FINANCIAL_CUTOFF ? FINANCIAL_CUTOFF : rawStart
 
   try {
-    const [available, unavailable] = await Promise.all([
-      db.prepare(
-        "SELECT COALESCE(SUM(amount), 0) as total FROM mainsite_financial_logs WHERE method = 'sumup_card' AND datetime(created_at) >= datetime(?) AND UPPER(status) IN ('SUCCESSFUL','PAID','APPROVED')"
-      ).bind(startDb).first<{ total: number }>(),
-      db.prepare(
-        "SELECT COALESCE(SUM(amount), 0) as total FROM mainsite_financial_logs WHERE method = 'sumup_card' AND datetime(created_at) >= datetime(?) AND UPPER(status) IN ('PENDING','IN_PROCESS','PROCESSING')"
-      ).bind(startDb).first<{ total: number }>(),
-    ])
+    const client = new SumUp({ apiKey: token })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const txData = await (client.transactions as any).list({
+      merchantCode,
+      changes_since: `${startDate}T00:00:00-03:00`,
+      limit: 100,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any
 
-    return Response.json({
-      available_balance: Number(available?.total ?? 0),
-      unavailable_balance: Number(unavailable?.total ?? 0),
-    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: any[] = Array.isArray(txData?.items) ? txData.items : []
+
+    let available = 0
+    let unavailable = 0
+
+    for (const tx of items) {
+      const status = String(tx?.status || '').toUpperCase()
+      const amount = Number(tx?.amount || 0)
+      if (['SUCCESSFUL', 'PAID', 'APPROVED'].includes(status)) {
+        available += amount
+      } else if (['PENDING', 'IN_PROCESS', 'PROCESSING'].includes(status)) {
+        unavailable += amount
+      }
+    }
+
+    return Response.json({ available_balance: available, unavailable_balance: unavailable })
   } catch {
     return Response.json({ available_balance: 0, unavailable_balance: 0 })
   }

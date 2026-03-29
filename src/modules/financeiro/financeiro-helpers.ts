@@ -31,17 +31,27 @@ export type AdvancedTx = {
   amount: number
   currency: string
   status: string
+  statusDetail?: string | null
   type: string
   paymentType: string
+  entryMode?: string | null
   cardType: string | null
   timestamp: string | null
   user: string | null
+  payerEmail?: string | null
   refundedAmount: number
+  authCode?: string | null
+  internalId?: string | null
+  installments?: number | null
+  externalRef?: string | null
+  netReceivedAmount?: number | null
+  feeAmount?: number | null
+  dateApproved?: string | null
 }
 
 export type ModalAction = {
   type: 'refund' | 'cancel' | 'delete'
-  log: FinancialLog
+  tx: AdvancedTx
 } | null
 
 // ── Constantes ──

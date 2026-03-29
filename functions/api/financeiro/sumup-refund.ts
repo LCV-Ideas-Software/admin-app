@@ -1,11 +1,10 @@
 // admin-app/functions/api/financeiro/sumup-refund.ts
 // POST - Efetua estorno SumUp via SDK oficial
+// Dados live: busca txnId direto do SDK, sem depender de D1
 
 import SumUp from '@sumup/sdk'
-import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
-  BIGDATA_DB: D1Database
   SUMUP_API_KEY_PRIVATE: string
 }
 
@@ -14,19 +13,7 @@ type RefundContext = {
   env: Env
 }
 
-const updateSumupLogStatus = async (
-  db: D1Database,
-  checkoutId: string,
-  transactionId: string,
-  status: string,
-) => {
-  await db.prepare(
-    "UPDATE mainsite_financial_logs SET payment_id = ?, status = ? WHERE method = 'sumup_card' AND (payment_id = ? OR payment_id = ?)"
-  ).bind(checkoutId, status, checkoutId, transactionId).run()
-}
-
 export const onRequestPost = async (context: RefundContext) => {
-  const db = context.env.BIGDATA_DB
   const url = new URL(context.request.url)
   const id = url.searchParams.get('id')
 
@@ -40,39 +27,25 @@ export const onRequestPost = async (context: RefundContext) => {
     try {
       const body = await context.request.json() as { amount?: number }
       if (body?.amount) amount = Number(body.amount)
-    } catch {
-      // Estorno total quando body nao existir.
-    }
+    } catch { /* Estorno total quando body nao existir. */ }
 
     const client = new SumUp({ apiKey: token })
 
-  const checkoutId = id
-  let txnId = id
+    // Buscar txnId direto do provider (SDK) — sem D1
+    let txnId = id
+    let originalAmount = 0
 
     try {
-      const record = await db.prepare(
-        "SELECT raw_payload FROM mainsite_financial_logs WHERE payment_id = ? AND method = 'sumup_card' LIMIT 1"
-      ).bind(id).first() as { raw_payload?: string } | null
-
-      if (record?.raw_payload) {
-        const payload = JSON.parse(record.raw_payload)
-        const extracted = payload?.transactions?.[0]?.id || payload?.transaction_id
-        if (extracted) txnId = extracted
+      const checkout = await client.checkouts.get(id) as {
+        amount?: number
+        transactions?: Array<{ id?: string; amount?: number }>
       }
-    } catch {
-      // Fallback para consulta direta no provider.
-    }
+      const extracted = checkout?.transactions?.[0]?.id
+      if (extracted) txnId = extracted
+      originalAmount = Number(checkout?.amount || checkout?.transactions?.[0]?.amount || 0)
+    } catch { /* Mantem fallback com o proprio id. */ }
 
-    if (txnId === id) {
-      try {
-        const checkout = await client.checkouts.get(id)
-        const extracted = checkout?.transactions?.[0]?.id
-        if (extracted) txnId = extracted
-      } catch {
-        // Mantem fallback com o proprio id.
-      }
-    }
-
+    // Executar estorno via SDK
     try {
       const refundPayload = amount ? { amount } : undefined
       await client.transactions.refund(txnId, refundPayload)
@@ -87,32 +60,17 @@ export const onRequestPost = async (context: RefundContext) => {
           if (parsed?.error_code === 'NOT FOUND') errMsg = 'Transacao nao encontrada ou aguardando compensacao.'
           if (parsed?.error_code === 'CONFLICT') errMsg = 'A transacao nao pode ser estornada no estado atual.'
         }
-      } catch {
-        // Mantem mensagem original.
-      }
-
+      } catch { /* Mantem mensagem original. */ }
       return Response.json({ success: false, error: `Estorno recusado pela SumUp: ${errMsg}` }, { status: 400 })
     }
 
-    // Determinar se é estorno total ou parcial:
-    // - sem amount → estorno total
-    // - amount >= valor original da transação → estorno total
-    // - amount < valor original → estorno parcial
+    // Determinar status com dados live
     let newStatus = 'REFUNDED'
-    if (amount) {
-      try {
-        const logRow = await db.prepare(
-          "SELECT amount FROM mainsite_financial_logs WHERE payment_id = ? AND method = 'sumup_card' LIMIT 1"
-        ).bind(checkoutId).first<{ amount?: number }>()
-        const originalAmount = Number(logRow?.amount || 0)
-        // Se o valor solicitado é igual ou superior ao original, é estorno total
-        newStatus = (originalAmount > 0 && amount < originalAmount) ? 'PARTIALLY_REFUNDED' : 'REFUNDED'
-      } catch {
-        // Sem acesso ao valor original, inferir parcial por segurança
-        newStatus = 'PARTIALLY_REFUNDED'
-      }
+    if (amount && originalAmount > 0 && amount < originalAmount) {
+      newStatus = 'PARTIALLY_REFUNDED'
     }
-    await updateSumupLogStatus(db, checkoutId, txnId, newStatus)
+
+    // D1 write removido — dados live dos provedores são a fonte de verdade
 
     return Response.json({ success: true, status: newStatus })
   } catch (err) {

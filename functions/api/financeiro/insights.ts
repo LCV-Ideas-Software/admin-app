@@ -119,10 +119,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           status: tx?.status || 'UNKNOWN',
           type: tx?.type || 'UNKNOWN',
           paymentType: tx?.payment_type || 'UNKNOWN',
+          entryMode: tx?.entry_mode || null,
           cardType: tx?.card_type || null,
           timestamp: tx?.timestamp || null,
           user: tx?.user || null,
+          payerEmail: typeof tx?.user === 'string' && tx.user.includes('@') ? tx.user : null,
           refundedAmount: Number(tx?.refunded_amount || 0),
+          authCode: tx?.auth_code || null,
+          internalId: tx?.internal_id || null,
+          installments: tx?.installments_count || null,
         }))
 
         return Response.json({ success: true, total: normalized.length, items: normalized })
@@ -279,12 +284,21 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           amount: Number(tx?.transaction_amount || 0),
           currency: tx?.currency_id || 'BRL',
           status: tx?.status || 'unknown',
+          statusDetail: tx?.status_detail || null,
           type: tx?.payment_type_id || 'unknown',
           paymentType: tx?.payment_method_id || 'unknown',
+          entryMode: null,
           cardType: tx?.card?.last_four_digits ? `****${tx.card.last_four_digits}` : null,
           timestamp: tx?.date_created || null,
           user: tx?.payer?.email || null,
+          payerEmail: tx?.payer?.email || null,
           refundedAmount: Number(tx?.transaction_amount_refunded || 0),
+          authCode: tx?.authorization_code || null,
+          installments: tx?.installments || null,
+          externalRef: tx?.external_reference || null,
+          netReceivedAmount: Number(tx?.transaction_details?.net_received_amount || 0),
+          feeAmount: tx?.fee_details?.[0]?.amount != null ? Number(tx.fee_details[0].amount) : null,
+          dateApproved: tx?.date_approved || null,
         }))
 
         const paging = payload?.paging || { total: 0, limit, offset: 0 }

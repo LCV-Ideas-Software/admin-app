@@ -1,5 +1,26 @@
 # AI Memory Log — Admin-App
 
+## 2026-03-29 — APP v01.68.00 — Financeiro Live API Migration
+### Alterado (MAJOR)
+- Dashboard financeiro migrado de D1-dependent para **Live API-first**. Transações, status e saldos via SumUp SDK e MP REST.
+- Frontend reescrito (`FinanceiroModule.tsx`): `insights.advancedTx` como fonte única.
+- Backend enriquecido (`insights.ts`): `payer_email`, `entryMode`, `statusDetail`, `authCode`.
+- Ações (`sumup-refund/cancel`, `mp-refund/cancel`): pure-SDK, zero D1.
+- Balanços (`sumup-balance`, `mp-balance`): migrados para SDK/REST.
+- `overview.ts` e `sync.ts`: referências a `mainsite_financial_logs` removidas.
+
+### Removido
+- 5 endpoints D1-only deletados: `financeiro.ts`, `sumup-sync.ts`, `mp-sync.ts`, `reindex-gateways.ts`, `delete.ts`.
+- Todos os best-effort D1 writes em endpoints de ação.
+
+### Nota
+- `mainsite_financial_logs` permanece no D1 (escrita pelo mainsite-worker).
+- Fee Config (taxas pré-transação) permanece na D1 — configuração, não transação.
+
+### Controle de versão
+- `APP_VERSION`: APP v01.67.03 → APP v01.68.00
+- `CHANGELOG.md`: entrada v01.68.00 registrada.
+
 ## 2026-03-28 — APP v01.65.02 — CF DNS Proxied Sovereignty + CF P&W Guided Ops
 ### Corrigido
 - `src/modules/cfdns/CfDnsModule.tsx`: qualquer registro com `proxied = true` passou a neutralizar alertas e bloqueios semanticos do painel. O proxy nao e mais rebaixado automaticamente por tipo.

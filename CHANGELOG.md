@@ -1,5 +1,23 @@
 # Changelog — Admin App
 
+## [v01.68.00] — 2026-03-29
+### Alterado (MAJOR)
+- **Financeiro — Migração Live API**: Dashboard financeiro migrado de arquitetura D1-dependent para **Live API-first**. Transações, status e saldos agora vêm direto das APIs SumUp SDK e Mercado Pago REST.
+- **Frontend (`FinanceiroModule.tsx`)**: Reescrito para usar `insights.advancedTx` como fonte única. Tabs SumUp/MP com tabela unificada, controles de estorno/cancelamento inline e sem dependência de D1.
+- **Backend enrichment (`insights.ts`)**: Endpoint `transactions-advanced` enriquecido com `payer_email`, `entryMode`, `statusDetail`, `authCode` para paridade total.
+- **Ações financeiras**: `sumup-refund.ts`, `sumup-cancel.ts`, `mp-refund.ts`, `mp-cancel.ts` refatorados para operação pure-SDK. Todo código D1 removido.
+- **Balanços**: `sumup-balance.ts` migrado para SDK, `mp-balance.ts` migrado para REST API. Zero dependência D1.
+- **Tipos**: `AdvancedTx` e `ModalAction` atualizados em `financeiro-helpers.ts` para suportar dados live.
+- **Overview/Sync**: Referências a `mainsite_financial_logs` removidas de `overview.ts` e `sync.ts`.
+
+### Removido
+- **Endpoints D1-only deletados**: `financeiro.ts` (listagem D1), `sumup-sync.ts`, `mp-sync.ts`, `reindex-gateways.ts`, `delete.ts` — sem consumidor frontend.
+- **D1 writes eliminados**: Todos os best-effort UPDATEs em `mainsite_financial_logs` removidos dos endpoints de ação.
+
+### Nota
+- A tabela `mainsite_financial_logs` permanece no D1 pois ainda é escrita pelo `mainsite-worker` (webhooks de pagamento). Migração do worker é escopo separado.
+- **Fee Config** (taxas de provedores para repasse ao doador) permanece na D1 via `loadFeeConfig()` — são dados de *configuração*, não de transação.
+
 ## [v01.67.03] — 2026-03-29
 ### Corrigido
 - **Financeiro/SumUp — frontend sobrescrevia status correto do backend**: `parseSumupPayload` em `financeiro-helpers.ts` lia apenas `transactions[0].status` (SUCCESSFUL — pagamento original), fazendo o frontend exibir `APROVADO` mesmo quando o backend já havia resolvido `REFUNDED`. Corrigido para escanear todo `transactions[]` e detectar refunds com a mesma lógica do backend.

@@ -86,9 +86,8 @@ export async function onRequestPost(context: Context) {
   })
 
   try {
-    const [postsCountRow, financialCountRow, settingsRowsRaw] = await Promise.all([
+    const [postsCountRow, settingsRowsRaw] = await Promise.all([
       env.BIGDATA_DB.prepare('SELECT COUNT(1) AS total FROM mainsite_posts').first<CountRow>(),
-      env.BIGDATA_DB.prepare('SELECT COUNT(1) AS total FROM mainsite_financial_logs').first<CountRow>(),
       env.BIGDATA_DB.prepare('SELECT id, payload FROM mainsite_settings').all<SettingRow>(),
     ])
 
@@ -125,7 +124,6 @@ export async function onRequestPost(context: Context) {
     }
 
     const recordsRead = Number(postsCountRow?.total ?? 0)
-      + Number(financialCountRow?.total ?? 0)
       + settingsRows.length
 
     const recordsUpserted = settingsInserted + settingsFixed
@@ -147,7 +145,7 @@ export async function onRequestPost(context: Context) {
         action: 'sync',
         pulledFrom: 'bigdata_db',
         postsLidos: Number(postsCountRow?.total ?? 0),
-        financeirosLidos: Number(financialCountRow?.total ?? 0),
+        financeirosLidos: 0,
         settingsLidos: settingsRows.length,
         settingsInseridos: settingsInserted,
         settingsCorrigidos: settingsFixed,
@@ -163,7 +161,7 @@ export async function onRequestPost(context: Context) {
         lidos: Number(postsCountRow?.total ?? 0),
       },
       financialLogs: {
-        lidos: Number(financialCountRow?.total ?? 0),
+        lidos: 0,
       },
       settings: {
         lidos: settingsRows.length,

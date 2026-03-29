@@ -1,16 +1,16 @@
 // admin-app/functions/api/financeiro/mp-cancel.ts
 // POST — Cancela pagamento pendente no Mercado Pago via SDK oficial
-// Portado 1:1 do mainsite-worker /api/mp-payment/:id/cancel
+// Dados live: SDK é a fonte de verdade, sem D1
 
 import { MercadoPagoConfig, Payment } from 'mercadopago'
 
 interface Env {
-  BIGDATA_DB: D1Database
   MP_ACCESS_TOKEN: string
 }
 
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const db = context.env.BIGDATA_DB
+type CancelContext = { request: Request; env: Env }
+
+export const onRequestPost = async (context: CancelContext) => {
   const url = new URL(context.request.url)
   const id = url.searchParams.get('id')
 
@@ -24,10 +24,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const paymentApi = new Payment(client)
 
     await paymentApi.cancel({ id })
-
-    await db.prepare(
-      "UPDATE mainsite_financial_logs SET status = 'cancelled' WHERE payment_id = ?"
-    ).bind(id).run()
 
     return Response.json({ success: true })
   } catch (err) {
