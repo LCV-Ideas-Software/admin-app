@@ -16,12 +16,38 @@ function json(data: unknown, status = 200) {
 }
 
 // Helper: gerar JWT para OAuth2 com service account
+async function parseSaKey(raw: string): Promise<{ client_email: string; private_key: string; token_uri: string }> {
+  // Tentativa 1: parse direto (formato mais comum — JSON colado como string plana)
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed.client_email && parsed.private_key) return parsed
+  } catch { /* fallthrough */ }
+
+  // Tentativa 2: base64-encoded (alguns dashboards codificam secrets assim)
+  try {
+    const decoded = atob(raw)
+    const parsed = JSON.parse(decoded)
+    if (parsed.client_email && parsed.private_key) return parsed
+  } catch { /* fallthrough */ }
+
+  // Tentativa 3: double-escaped JSON (ex.: "{\\"client_email\\"...}")
+  try {
+    const unescaped = raw.replace(/\\"/g, '"').replace(/^\"|\"$/g, '')
+    const parsed = JSON.parse(unescaped)
+    if (parsed.client_email && parsed.private_key) return parsed
+  } catch { /* fallthrough */ }
+
+  // Diagnóstico: preview seguro (sem expor chave privada)
+  const preview = raw.substring(0, 40)
+  throw new Error(
+    `GCP_SA_KEY não é um JSON válido de Service Account. ` +
+    `Preview: "${preview}...". ` +
+    `Verifique se o conteúdo completo do arquivo JSON foi colado no secret do Cloudflare.`
+  )
+}
+
 async function getAccessToken(saKey: string): Promise<string> {
-  const sa = JSON.parse(saKey) as {
-    client_email: string
-    private_key: string
-    token_uri: string
-  }
+  const sa = await parseSaKey(saKey)
 
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'RS256', typ: 'JWT' }
