@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.70.02] — 2026-03-29
+### Corrigido
+- **DeploymentCleanupPanel — Active-only purge hardening**: endpoint `cleanup-deployments.ts` refatorado para expurgar deployments por escopo de branch (`main`/`production`/`preview`) preservando exclusivamente o deployment ativo atual do branch `main`. Regras de safety guard reforçadas para bloquear delete de deployment ativo com fail-safe quando a identificação do ativo falha.
+
+### Alterado
+- **CI/CD branch governance**: workflow `deploy.yml` padronizado para branch `main` e grupo de concorrência renomeado para `deploy-main`.
+
+### Controle de versão
+- `admin-app`: APP v01.70.01 → APP v01.70.02
+
 ## [v01.70.01] — 2026-03-29
 ### Corrigido
 - **PostEditor — Feedback em popup window**: notificações de salvamento agora exibem banner inline diretamente na janela popup do editor. Anteriormente, `showNotification` disparava toasts apenas na janela principal (invisíveis ao usuário no popup). Assinatura de `onSave` alterada para `Promise<boolean>` para retornar resultado do salvamento. CSS dedicado com variantes success/error e animação spring.

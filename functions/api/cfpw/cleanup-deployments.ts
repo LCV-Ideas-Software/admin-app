@@ -53,7 +53,7 @@ const isActiveStageStatus = (status: string) => {
   return normalized === 'active'
 }
 
-const TARGET_BRANCHES = new Set(['production', 'main'])
+const TARGET_BRANCHES = new Set(['production', 'main', 'preview'])
 
 const getDeploymentBranch = (deployment: {
   deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
@@ -71,6 +71,11 @@ const isInCleanupScope = (deployment: {
   environment?: string
   deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
 }) => {
+  const environment = String(deployment.environment ?? '').trim().toLowerCase()
+  if (environment === 'preview') {
+    return true
+  }
+
   const branch = getDeploymentBranch(deployment)
   return TARGET_BRANCHES.has(branch)
 }
@@ -154,7 +159,7 @@ export async function onRequestGet(context: Context) {
             return dateB - dateA
           })
 
-          // Escopo de governança: branches production/main, excluindo preview.
+          // Escopo de governança: branches main/production/preview (inclui environment preview).
           const scopedDeployments = sorted.filter((d) => isInCleanupScope(d))
 
           // O deployment ativo de produção vem do canonical_deployment do projeto.
@@ -258,7 +263,7 @@ export async function onRequestPost(context: Context) {
 
       if (!isInCleanupScope(target)) {
         return jsonResponse({
-          error: `Deployment ${deploymentId} fora do escopo de expurgo (somente branches production/main e não-preview).`,
+          error: `Deployment ${deploymentId} fora do escopo de expurgo (somente branches main/production/preview).`,
           ok: false,
         }, 403)
       }

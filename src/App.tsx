@@ -135,7 +135,7 @@ const OraculoModule = lazyWithAccessRecovery(() => import('./modules/oraculo/Ora
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 const TlsrptModule = lazyWithAccessRecovery(() => import('./modules/tlsrpt/TlsrptModule').then(m => ({ default: m.TlsrptModule })))
 
-const APP_VERSION = 'APP v01.70.01'
+const APP_VERSION = 'APP v01.70.02'
 type ModuleId = 'overview' | 'ai-status' | 'astrologo' | 'cardhub' | 'cfdns' | 'cfpw' | 'config' | 'financeiro' | 'oraculo' | 'itau' | 'mainsite' | 'mtasts' | 'telemetria' | 'tlsrpt'
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
