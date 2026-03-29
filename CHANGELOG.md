@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.67.02] — 2026-03-29
+### Corrigido
+- **Financeiro/SumUp — detecção inteligente de reembolsos**: `sumup-sync.ts` e `financeiro.ts` agora iteram todo o array `transactions[]` do checkout SumUp em vez de ler apenas `transactions[0]`. Transações com `type: "REFUND"` são somadas para determinar status `REFUNDED` (total) ou `PARTIALLY_REFUNDED` (parcial).
+- **Financeiro — prioridade do provedor**: dados vindos das APIs SumUp/MP sempre sobrescrevem registros D1 locais, que servem apenas como cache offline.
+- **TypeScript — lint errors eliminados**: importações de `D1Database` de `@cloudflare/workers-types`, interfaces explícitas (`SumUpTransaction`, `SumUpCheckout`, `FinancialLog`), e tipagem estrita dos handlers substituíram todos os `any` implícitos em `financeiro.ts` e `sumup-sync.ts`.
+- **Deps — vulnerabilidades corrigidas**: `brace-expansion` (moderate, ReDoS) e `picomatch` (high, method injection + ReDoS) atualizados via `npm audit fix`. 0 vulnerabilidades restantes.
+
 ## [v01.67.01] — 2026-03-28
 ### Adicionado
 - **Rate Limit — Paridade `contato`**: rota `contato` (Formulário de Contato) adicionada aos módulos **Astrólogo**, **Calculadora** e **MainSite**, equiparando ao Oráculo que já possuía essa rota. Default: 5 req / 30 min, habilitado.
