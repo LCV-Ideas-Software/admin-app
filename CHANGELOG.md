@@ -1,5 +1,13 @@
 # Changelog — Admin App
 
+## [v01.70.03] — 2026-03-29
+### Corrigido
+- **DeploymentCleanupPanel — Preview delete confirmation intelligence**: endpoint `cleanup-deployments.ts` passou a aplicar exclusão de deployments `preview` com confirmação programática (`force=true`) via API oficial Cloudflare, espelhando o requisito de confirmação manual do Dashboard sem intervenção humana.
+- **Purge scope updated**: mecanismo agora inclui branch/environment `preview` no escopo de expurgo e mantém como exceção única o deployment ativo atual do branch `main`.
+
+### Controle de versão
+- `admin-app`: APP v01.70.02 → APP v01.70.03
+
 ## [v01.70.02] — 2026-03-29
 ### Corrigido
 - **DeploymentCleanupPanel — Active-only purge hardening**: endpoint `cleanup-deployments.ts` refatorado para expurgar deployments por escopo de branch (`main`/`production`/`preview`) preservando exclusivamente o deployment ativo atual do branch `main`. Regras de safety guard reforçadas para bloquear delete de deployment ativo com fail-safe quando a identificação do ativo falha.
