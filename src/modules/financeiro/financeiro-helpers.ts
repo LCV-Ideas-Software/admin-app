@@ -183,19 +183,39 @@ export const parseSumupPayload = (raw: string | null) => {
   if (!raw) return {} as Record<string, unknown>
   try {
     const p = JSON.parse(raw)
-    const tx = p?.transactions?.[0] || p?.transaction || {}
+    const allTxns: Record<string, unknown>[] = p?.transactions || []
+    // Transação de pagamento original (primeira com type !== REFUND, ou fallback para [0])
+    const paymentTx = allTxns.find(
+      (t: Record<string, unknown>) => String(t.type || '').toUpperCase() !== 'REFUND'
+    ) || allTxns[0] || p?.transaction || {}
+
+    // Detectar refunds escaneando TODAS as transações do checkout
+    const refundTxns = allTxns.filter(
+      (t: Record<string, unknown>) =>
+        String(t.type || '').toUpperCase() === 'REFUND' &&
+        String(t.status || '').toUpperCase() === 'SUCCESSFUL'
+    )
+    let resolvedStatus = String(paymentTx?.status || p?.status || '—')
+    if (refundTxns.length > 0) {
+      const totalRefunded = refundTxns.reduce(
+        (sum: number, t: Record<string, unknown>) => sum + Number(t.amount || 0), 0
+      )
+      const checkoutAmount = Number(p?.amount || 0)
+      resolvedStatus = totalRefunded >= checkoutAmount ? 'REFUNDED' : 'PARTIALLY_REFUNDED'
+    }
+
     return {
       checkoutStatus: p?.status || '—',
       checkoutRef: p?.checkout_reference || p?.checkoutReference || '—',
-      transactionCode: tx?.transaction_code || tx?.transactionCode || p?.transaction_code || '—',
-      transactionUUID: tx?.id || tx?.transaction_id || p?.id || '—',
-      paymentType: tx?.payment_type || tx?.paymentType || p?.payment_type || '—',
-      authCode: tx?.auth_code || tx?.authCode || '—',
-      entryMode: tx?.entry_mode || tx?.entryMode || '—',
-      currency: tx?.currency || p?.currency || 'BRL',
-      txTimestamp: tx?.timestamp || tx?.created_at || null,
-      internalId: tx?.internal_id || tx?.internalId || '—',
-      txStatus: tx?.status || p?.status || '—',
+      transactionCode: paymentTx?.transaction_code || paymentTx?.transactionCode || p?.transaction_code || '—',
+      transactionUUID: paymentTx?.id || paymentTx?.transaction_id || p?.id || '—',
+      paymentType: paymentTx?.payment_type || paymentTx?.paymentType || p?.payment_type || '—',
+      authCode: paymentTx?.auth_code || paymentTx?.authCode || '—',
+      entryMode: paymentTx?.entry_mode || paymentTx?.entryMode || '—',
+      currency: paymentTx?.currency || p?.currency || 'BRL',
+      txTimestamp: paymentTx?.timestamp || paymentTx?.created_at || null,
+      internalId: paymentTx?.internal_id || paymentTx?.internalId || '—',
+      txStatus: resolvedStatus,
     }
   } catch { return {} as Record<string, unknown> }
 }
@@ -266,6 +286,9 @@ export const resolveStatusConfig = (log: FinancialLog): StatusConfig => {
     const p = parseMPPayload(log.raw_payload)
     return getMPStatusConfig(log.status, String(p.statusDetail ?? ''))
   }
+  // O backend já resolve o status corretamente escaneando todas as transações.
+  // O frontend re-analisa o raw_payload como fallback de segurança, usando
+  // parseSumupPayload que agora também escaneia todo transactions[] para refunds.
   const info = parseSumupPayload(log.raw_payload)
   const effective = resolveEffectiveSumupStatus(log.status, info as { txStatus?: unknown; checkoutStatus?: unknown })
   return getSumupStatusConfig(String(effective))
