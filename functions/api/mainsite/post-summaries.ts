@@ -63,11 +63,15 @@ async function hashContent(text: string): Promise<string> {
     .join('')
 }
 
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+
 async function generateShareSummary(
   title: string,
   htmlContent: string,
   apiKey: string,
+  model?: string,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
+  const resolvedModel = model || DEFAULT_GEMINI_MODEL
   const cleanContent = stripHtml(htmlContent).substring(0, 3000)
 
   const prompt = `Você é um editor especializado em SEO e compartilhamento social.
@@ -87,7 +91,7 @@ CONTEÚDO: ${cleanContent}`
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +139,7 @@ async function ensureTable(db: D1Database): Promise<void> {
       summary_og   TEXT NOT NULL,
       summary_ld   TEXT,
       content_hash TEXT NOT NULL,
-      model        TEXT DEFAULT 'gemini-2.0-flash',
+      model        TEXT DEFAULT '',
       is_manual    INTEGER DEFAULT 0,
       created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -147,7 +151,7 @@ async function ensureTable(db: D1Database): Promise<void> {
   const migrations = [
     `ALTER TABLE mainsite_post_ai_summaries ADD COLUMN is_manual INTEGER DEFAULT 0`,
     `ALTER TABLE mainsite_post_ai_summaries ADD COLUMN content_hash TEXT DEFAULT ''`,
-    `ALTER TABLE mainsite_post_ai_summaries ADD COLUMN model TEXT DEFAULT 'gemini-2.0-flash'`,
+    `ALTER TABLE mainsite_post_ai_summaries ADD COLUMN model TEXT DEFAULT ''`,
   ]
   for (const sql of migrations) {
     try { await db.prepare(sql).run() } catch { /* column already exists — ok */ }
@@ -208,6 +212,7 @@ export async function onRequestPost(context: SummaryContext) {
       summary_og?: string
       summary_ld?: string
       mode?: string // 'missing' | 'all'
+      model?: string // modelo Gemini selecionado pelo usuário
     }
 
     const apiKey = context.env.GEMINI_API_KEY
@@ -264,24 +269,25 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, apiKey)
+          const result = await generateShareSummary(post.title, post.content, apiKey, body.model)
           if ('error' in result) {
             failed++
             details.push({ postId: post.id, title: post.title, status: result.error })
             continue
           }
 
+          const usedModel = body.model || DEFAULT_GEMINI_MODEL
           await db.prepare(`
-            INSERT INTO mainsite_post_ai_summaries (post_id, summary_og, summary_ld, content_hash, is_manual, updated_at)
-            VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+            INSERT INTO mainsite_post_ai_summaries (post_id, summary_og, summary_ld, content_hash, is_manual, model, updated_at)
+            VALUES (?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(post_id) DO UPDATE SET
               summary_og = excluded.summary_og,
               summary_ld = excluded.summary_ld,
               content_hash = excluded.content_hash,
               is_manual = 0,
-              model = 'gemini-2.0-flash',
+              model = excluded.model,
               updated_at = CURRENT_TIMESTAMP
-          `).bind(post.id, result.summary_og, result.summary_ld, newHash).run()
+          `).bind(post.id, result.summary_og, result.summary_ld, newHash, usedModel).run()
 
           generated++
           details.push({ postId: post.id, title: post.title, status: 'generated' })
@@ -315,22 +321,23 @@ export async function onRequestPost(context: SummaryContext) {
 
       if (!post) return json({ ok: false, error: 'Post não encontrado.', ...trace }, 404)
 
-      const result = await generateShareSummary(post.title, post.content, apiKey)
+      const result = await generateShareSummary(post.title, post.content, apiKey, body.model)
       if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 502)
 
       const contentHash = await hashContent(stripHtml(post.content))
 
+      const usedModel = body.model || DEFAULT_GEMINI_MODEL
       await db.prepare(`
-        INSERT INTO mainsite_post_ai_summaries (post_id, summary_og, summary_ld, content_hash, is_manual, updated_at)
-        VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+        INSERT INTO mainsite_post_ai_summaries (post_id, summary_og, summary_ld, content_hash, is_manual, model, updated_at)
+        VALUES (?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(post_id) DO UPDATE SET
           summary_og = excluded.summary_og,
           summary_ld = excluded.summary_ld,
           content_hash = excluded.content_hash,
           is_manual = 0,
-          model = 'gemini-2.0-flash',
+          model = excluded.model,
           updated_at = CURRENT_TIMESTAMP
-      `).bind(body.postId, result.summary_og, result.summary_ld, contentHash).run()
+      `).bind(body.postId, result.summary_og, result.summary_ld, contentHash, usedModel).run()
 
       return json({ ok: true, ...result, ...trace })
     }

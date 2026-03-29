@@ -49,6 +49,7 @@ const DEFAULT_DISCLAIMERS: DisclaimersSettings = { enabled: true, items: [] }
 // ── Configuração local do modelo IA (paridade com Calculadora/Oráculo/Astrólogo) ──
 interface MainsiteConfig {
   modeloIA?: string
+  summaryModeloIA?: string
 }
 
 // ── Configuração de taxas dos gateways de pagamento ──
@@ -84,7 +85,7 @@ type AiSummary = {
 
 type BulkDetail = { postId: number; title: string; status: string }
 
-const DEFAULT_MS_CONFIG: MainsiteConfig = { modeloIA: '' }
+const DEFAULT_MS_CONFIG: MainsiteConfig = { modeloIA: '', summaryModeloIA: '' }
 
 function loadMsConfig(): MainsiteConfig {
   try {
@@ -265,7 +266,7 @@ export function MainsiteModule() {
       const res = await fetch('/api/mainsite/post-summaries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate-all', mode }),
+        body: JSON.stringify({ action: 'generate-all', mode, model: msConfig.summaryModeloIA || undefined }),
       })
       const data = await res.json() as { ok: boolean; generated?: number; skipped?: number; failed?: number; total?: number; details?: BulkDetail[]; error?: string }
       if (!data.ok) throw new Error(data.error ?? 'Falha na geração em massa.')
@@ -292,7 +293,7 @@ export function MainsiteModule() {
       const res = await fetch('/api/mainsite/post-summaries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate', postId }),
+        body: JSON.stringify({ action: 'regenerate', postId, model: msConfig.summaryModeloIA || undefined }),
       })
       const data = await res.json() as { ok: boolean; summary_og?: string; error?: string }
       if (!data.ok) throw new Error(data.error ?? 'Falha na regeneração.')
@@ -935,8 +936,8 @@ export function MainsiteModule() {
           </div>
         </div>
 
-        {/* Ações de geração em massa */}
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+        {/* Ações de geração em massa + seletor de modelo */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
           <button
             type="button"
             className="primary-button"
@@ -955,6 +956,17 @@ export function MainsiteModule() {
             {bulkGenerating ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
             Regenerar Todos
           </button>
+          <select
+            style={{ marginLeft: 'auto', minWidth: '220px', fontSize: '13px' }}
+            value={msConfig.summaryModeloIA || ''}
+            onChange={e => saveMsConfig({ summaryModeloIA: e.target.value })}
+            disabled={bulkGenerating}
+          >
+            <option value="">Modelo (auto)</option>
+            {geminiModels.map(m => (
+              <option key={m.id} value={m.id}>{m.displayName} ({m.api})</option>
+            ))}
+          </select>
         </div>
 
         {/* Progresso da geração em massa */}
