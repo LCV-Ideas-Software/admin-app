@@ -80,6 +80,18 @@ const isInCleanupScope = (deployment: {
   return TARGET_BRANCHES.has(branch)
 }
 
+const isPreviewDeployment = (deployment: {
+  environment?: string
+  deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
+}) => {
+  const environment = String(deployment.environment ?? '').trim().toLowerCase()
+  if (environment === 'preview') {
+    return true
+  }
+
+  return getDeploymentBranch(deployment) === 'preview'
+}
+
 const resolveMainActiveIds = (
   canonicalId: string,
   deployments: Array<{
@@ -244,6 +256,10 @@ export async function onRequestPost(context: Context) {
     }
 
     const { accountId } = await resolveCloudflarePwAccount(context.env)
+    let targetDeployment: {
+      environment?: string
+      deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
+    } | null = null
 
     // Safety guard fail-safe: previne exclusão do deployment ativo.
     // Se não for possível validar com segurança, bloqueia a exclusão.
@@ -260,6 +276,7 @@ export async function onRequestPost(context: Context) {
           ok: false,
         }, 404)
       }
+      targetDeployment = target
 
       if (!isInCleanupScope(target)) {
         return jsonResponse({
@@ -296,13 +313,16 @@ export async function onRequestPost(context: Context) {
       }, 503)
     }
 
-    await deleteCloudflarePagesDeployment(context.env, accountId, projectName, deploymentId)
+    const forceDelete = targetDeployment ? isPreviewDeployment(targetDeployment) : false
+    await deleteCloudflarePagesDeployment(context.env, accountId, projectName, deploymentId, forceDelete)
 
     return jsonResponse({
       ok: true,
       projectName,
       deploymentId,
-      message: `Deployment ${deploymentId} removido com sucesso.`,
+      message: forceDelete
+        ? `Deployment ${deploymentId} removido com sucesso (preview com confirmação programática).`
+        : `Deployment ${deploymentId} removido com sucesso.`,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido ao remover deployment.'
