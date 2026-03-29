@@ -40,7 +40,7 @@ const normalizeSumupStatus = (status: string): string => {
 const resolveSumupStatusFromSources = (rowStatus: string, payloadStatus: string | null): string => {
   const row = normalizeSumupStatus(rowStatus || 'UNKNOWN')
   const payload = normalizeSumupStatus(payloadStatus || 'UNKNOWN')
-  const terminalPriority = ['PARTIALLY_REFUNDED', 'REFUNDED', 'CANCELLED', 'CHARGE_BACK', 'FAILED', 'EXPIRED']
+  const terminalPriority = ['REFUNDED', 'PARTIALLY_REFUNDED', 'CANCELLED', 'CHARGE_BACK', 'FAILED', 'EXPIRED']
 
   for (const status of terminalPriority) {
     if (row === status || payload === status) return status

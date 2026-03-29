@@ -209,7 +209,7 @@ export const resolveEffectiveSumupStatus = (
   const tx = normalize(raw?.txStatus)
   const checkout = normalize(raw?.checkoutStatus)
 
-  const terminalPriority = ['PARTIALLY_REFUNDED', 'REFUNDED', 'CANCELLED', 'CHARGE_BACK', 'FAILED', 'EXPIRED']
+  const terminalPriority = ['REFUNDED', 'PARTIALLY_REFUNDED', 'CANCELLED', 'CHARGE_BACK', 'FAILED', 'EXPIRED']
   for (const st of terminalPriority) {
     if (row === st || tx === st || checkout === st) return st
   }
