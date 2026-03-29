@@ -104,9 +104,11 @@ export function DeploymentCleanupPanel() {
 
       if (data.totalObsolete === 0) {
         addLog('✓ Infraestrutura otimizada — nenhum deployment obsoleto encontrado.', 'success')
+        console.log('[DCP-DEBUG] calling showNotification for clean scan, fn=', typeof showNotification)
         showNotification('Infraestrutura otimizada — nenhum deployment obsoleto.', 'success')
       } else {
         addLog(`⚠ ${data.totalObsolete} deployment(s) obsoleto(s) identificado(s) para expurgo.`, 'warn')
+        console.log('[DCP-DEBUG] calling showNotification for dirty scan, fn=', typeof showNotification)
         showNotification(`${data.totalObsolete} deployment(s) obsoleto(s) identificado(s).`, 'info')
       }
 
@@ -123,6 +125,7 @@ export function DeploymentCleanupPanel() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido'
       addLog(`✗ Falha no scan: ${msg}`, 'error')
+      console.log('[DCP-DEBUG] calling showNotification for scan error')
       showNotification(`Falha no scan: ${msg}`, 'error')
       setState('idle')
     }
@@ -194,12 +197,15 @@ export function DeploymentCleanupPanel() {
 
     addLog('', 'dim')
     if (abortRef.current) {
+      console.log('[DCP-DEBUG] calling showNotification for abort')
       showNotification('Operação interrompida pelo operador.', 'info')
     } else if (failedCount === 0) {
       addLog(`✓ Governança concluída — ${successCount} deployment(s) destruído(s).`, 'success')
+      console.log('[DCP-DEBUG] calling showNotification for purge complete')
       showNotification(`Governança concluída — ${successCount} deployment(s) destruído(s).`, 'success')
     } else {
       addLog(`⚠ Concluído — ${successCount} sucesso(s), ${failedCount} falha(s).`, 'warn')
+      console.log('[DCP-DEBUG] calling showNotification for partial purge')
       showNotification(`Expurgo parcial: ${successCount} sucesso(s), ${failedCount} falha(s).`, 'error')
     }
 
