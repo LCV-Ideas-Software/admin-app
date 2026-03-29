@@ -285,7 +285,9 @@ export function FinanceiroModule() {
         if (!data.ok) throw new Error(data.error)
         showNotification(`Registro #${log.id} excluído.`, 'success')
       } else if (type === 'refund') {
-        const body = refundAmount ? JSON.stringify({ amount: Number(refundAmount) }) : '{}'
+        // Converter valor BRL (vírgula) para número. Vazio = estorno total.
+        const parsedAmount = refundAmount ? Number(refundAmount.replace(',', '.')) : null
+        const body = (parsedAmount && parsedAmount > 0) ? JSON.stringify({ amount: parsedAmount }) : '{}'
         const endpoint = provider === 'sumup'
           ? `/api/financeiro/sumup-refund?id=${txId}`
           : `/api/financeiro/mp-refund?id=${txId}`
@@ -774,10 +776,46 @@ export function FinanceiroModule() {
             </p>
             {modal.type === 'refund' && (
               <div className="field-group field-group--mt">
-                <label htmlFor="fin-refund-amount">Valor do estorno (vazio = total)</label>
-                <input id="fin-refund-amount" type="number" step="0.01" min="0.01" max={modal.log.amount}
-                  placeholder={`R$ Máximo: ${modal.log.amount.toFixed(2)}`}
-                  value={refundAmount} onChange={e => setRefundAmount(e.target.value)} autoComplete="transaction-amount" />
+                <label htmlFor="fin-refund-amount">Valor do estorno (deixe vazio para estorno total)</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                    color: 'var(--text-secondary, #6b7280)', fontWeight: 600, fontSize: 14, pointerEvents: 'none',
+                  }}>R$</span>
+                  <input
+                    id="fin-refund-amount"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={`Máximo: ${modal.log.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    value={refundAmount}
+                    onChange={e => {
+                      // Permite apenas dígitos, vírgula e ponto
+                      let raw = e.target.value.replace(/[^\d.,]/g, '')
+                      // Normaliza: aceita vírgula como decimal
+                      // Remove pontos extras (separadores de milhar)
+                      const parts = raw.replace(/\./g, ',').split(',')
+                      if (parts.length > 2) {
+                        raw = parts.slice(0, -1).join('') + ',' + parts[parts.length - 1]
+                      } else {
+                        raw = parts.join(',')
+                      }
+                      // Limita casas decimais a 2
+                      const decSplit = raw.split(',')
+                      if (decSplit.length === 2 && decSplit[1].length > 2) {
+                        raw = decSplit[0] + ',' + decSplit[1].slice(0, 2)
+                      }
+                      setRefundAmount(raw)
+                    }}
+                    autoComplete="off"
+                    style={{ paddingLeft: 38 }}
+                  />
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary, #6b7280)', marginTop: 4, display: 'block' }}>
+                  {refundAmount
+                    ? `Estorno parcial: R$ ${refundAmount}`
+                    : `Estorno total: ${formatBRL(modal.log.amount)}`
+                  }
+                </span>
               </div>
             )}
             <div className="fin-modal-actions">
