@@ -74,7 +74,10 @@ export async function onRequestGet(context: Context) {
         }
 
         try {
-          const deployments = await listCloudflarePagesDeployments(context.env, accountId, projectName)
+          const [projectDetails, deployments] = await Promise.all([
+            getCloudflarePagesProject(context.env, accountId, projectName).catch(() => null),
+            listCloudflarePagesDeployments(context.env, accountId, projectName),
+          ])
 
           // Ordenação cronológica estrita (mais recente primeiro)
           const sorted = [...deployments].sort((a, b) => {
@@ -84,9 +87,10 @@ export async function onRequestGet(context: Context) {
           })
 
           // O deployment "ativo" é o que está servindo tráfego agora.
-          // Nem sempre é o mais recente (ex: preview deploys, deploys falhados).
-          // Obtemos via projeto.latest_deployment ou via API direta.
-          const activeDeploymentId = String(project.latest_deployment?.id ?? '').trim()
+          // A fonte primária é o endpoint de detalhe do projeto.
+          const activeDeploymentId = String(
+            projectDetails?.latest_deployment?.id ?? project.latest_deployment?.id ?? '',
+          ).trim()
 
           // Conjunto de IDs protegidos: o mais recente por data + o ativo servindo
           const protectedIds = new Set<string>()
@@ -166,18 +170,44 @@ export async function onRequestPost(context: Context) {
 
     const { accountId } = await resolveCloudflarePwAccount(context.env)
 
-    // Safety guard: previne exclusão do deployment ativo (servindo tráfego)
+    // Safety guard fail-safe: previne exclusão do deployment ativo e do mais recente por data.
+    // Se não for possível validar com segurança, bloqueia a exclusão.
     try {
-      const project = await getCloudflarePagesProject(context.env, accountId, projectName)
+      const [project, deployments] = await Promise.all([
+        getCloudflarePagesProject(context.env, accountId, projectName),
+        listCloudflarePagesDeployments(context.env, accountId, projectName),
+      ])
+
       const activeId = String(project?.latest_deployment?.id ?? '').trim()
+
+      const sorted = [...deployments].sort((a, b) => {
+        const dateA = new Date(a.created_on ?? '').getTime() || 0
+        const dateB = new Date(b.created_on ?? '').getTime() || 0
+        return dateB - dateA
+      })
+      const latestByDateId = String(sorted[0]?.id ?? '').trim()
+
       if (activeId && activeId === deploymentId) {
         return jsonResponse({
           error: `Deployment ${deploymentId} é o deployment ATIVO do projeto ${projectName}. Exclusão bloqueada.`,
           ok: false,
         }, 403)
       }
-    } catch {
-      // Se não conseguiu verificar, prossegue com cautela
+
+      if (latestByDateId && latestByDateId === deploymentId) {
+        return jsonResponse({
+          error: `Deployment ${deploymentId} é o deployment MAIS RECENTE do projeto ${projectName}. Exclusão bloqueada.`,
+          ok: false,
+        }, 403)
+      }
+    } catch (guardErr) {
+      const guardMessage = guardErr instanceof Error
+        ? guardErr.message
+        : 'Não foi possível validar o deployment ativo/mais recente.'
+      return jsonResponse({
+        error: `Validação de segurança falhou para ${projectName}. Exclusão bloqueada: ${guardMessage}`,
+        ok: false,
+      }, 503)
     }
 
     await deleteCloudflarePagesDeployment(context.env, accountId, projectName, deploymentId)
