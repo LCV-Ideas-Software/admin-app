@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.69.05] — 2026-03-29
+### Corrigido
+- **DeploymentCleanupPanel — Confirmação customizada**: substituído `window.confirm()` nativo do browser por modal in-app com backdrop blur, ícone `AlertTriangle`, botões estilizados e animação spring. Alinhamento com padrão de UX do design system do admin-app — nenhum componente deve usar diálogos nativos do browser.
+
+### Controle de versão
+- `admin-app`: APP v01.69.04 → APP v01.69.05
+
+
+
 ## [v01.69.04] — 2026-03-29
 ### Corrigido
 - **Notificações — Migração para padrão mainsite**: componente `Notification.tsx` e `Notification.css` reescritos para aderir ao padrão visual "toast inteligente" do mainsite — pill centrada no topo, `backdrop-filter: blur`, `border-radius: 100px`, variantes cromáticas (success verde, error vermelho, info translúcido), animação spring-based. O layout anterior (card retangular no canto superior-direito com barra de progresso) foi descontinuado.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Cloud, Loader2, Play, RotateCcw, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, Cloud, Loader2, Play, RotateCcw, Search, Trash2 } from 'lucide-react'
 import { useNotification } from './Notification'
 import './DeploymentCleanupPanel.css'
 
@@ -65,6 +65,7 @@ export function DeploymentCleanupPanel() {
   const [logs, setLogs] = useState<LogLine[]>([])
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [purgeResults, setPurgeResults] = useState({ success: 0, failed: 0 })
+  const [pendingConfirm, setPendingConfirm] = useState(false)
   const terminalRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef(false)
 
@@ -128,19 +129,24 @@ export function DeploymentCleanupPanel() {
     }
   }, [addLog, showNotification])
 
-  /* ── PURGE ── */
-  const handlePurge = useCallback(async () => {
+  /* ── PURGE — abre modal de confirmação ── */
+  const handlePurge = useCallback(() => {
     if (!scanData) return
+    const allObsolete = scanData.projects.flatMap((p) =>
+      p.obsoleteDeployments.map((d) => ({ projectName: p.name, ...d })),
+    )
+    if (allObsolete.length === 0) return
+    setPendingConfirm(true)
+  }, [scanData])
+
+  /* ── PURGE — execução real após confirmação ── */
+  const executePurge = useCallback(async () => {
+    if (!scanData) return
+    setPendingConfirm(false)
 
     const allObsolete = scanData.projects.flatMap((p) =>
       p.obsoleteDeployments.map((d) => ({ projectName: p.name, ...d })),
     )
-
-    if (allObsolete.length === 0) return
-
-    if (!window.confirm(`Confirma a exclusão de ${allObsolete.length} deployment(s) obsoleto(s)?\n\nO deployment mais recente de cada projeto será preservado.`)) {
-      return
-    }
 
     setState('purging')
     abortRef.current = false
@@ -440,6 +446,41 @@ export function DeploymentCleanupPanel() {
           </>
         )}
       </div>
+
+      {/* ── Confirm Modal (substitui window.confirm) ── */}
+      {pendingConfirm && (
+        <div className="deploy-cleanup__confirm-overlay" onClick={() => setPendingConfirm(false)}>
+          <div className="deploy-cleanup__confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="deploy-cleanup__confirm-icon">
+              <AlertTriangle size={28} />
+            </div>
+            <h4 className="deploy-cleanup__confirm-title">Confirmar Expurgo</h4>
+            <p className="deploy-cleanup__confirm-text">
+              Confirma a exclusão de <strong>{scanData?.totalObsolete ?? 0}</strong> deployment(s) obsoleto(s)?
+            </p>
+            <p className="deploy-cleanup__confirm-sub">
+              O deployment mais recente de cada projeto será preservado.
+            </p>
+            <div className="deploy-cleanup__confirm-actions">
+              <button
+                type="button"
+                className="deploy-cleanup__btn deploy-cleanup__btn--danger"
+                onClick={executePurge}
+              >
+                <Trash2 size={14} />
+                Confirmar Expurgo
+              </button>
+              <button
+                type="button"
+                className="deploy-cleanup__btn deploy-cleanup__btn--ghost"
+                onClick={() => setPendingConfirm(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
