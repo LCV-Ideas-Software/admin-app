@@ -92,12 +92,8 @@ export async function onRequestGet(context: Context) {
           })
 
           // O deployment ativo de produção pode vir como canonical_deployment.
-          // latest_deployment pode apontar para preview mais novo.
           const canonicalDeploymentId = String(
             projectDetails?.canonical_deployment?.id ?? project.canonical_deployment?.id ?? '',
-          ).trim()
-          const latestDeploymentId = String(
-            projectDetails?.latest_deployment?.id ?? project.latest_deployment?.id ?? '',
           ).trim()
 
           // Fallback adicional: alguns cenários de rollout/rollback expõem o ativo
@@ -109,23 +105,31 @@ export async function onRequestGet(context: Context) {
               .filter(Boolean),
           )
 
-          // Conjunto de IDs protegidos: o mais recente por data + o ativo servindo
+          // Conjunto de IDs protegidos: somente deployments ativos.
           const protectedIds = new Set<string>()
-          if (sorted[0]?.id) protectedIds.add(String(sorted[0].id))
           if (canonicalDeploymentId) protectedIds.add(canonicalDeploymentId)
-          if (latestDeploymentId) protectedIds.add(latestDeploymentId)
           for (const stageActiveId of activeFromStageIds) {
             protectedIds.add(stageActiveId)
           }
 
-          // O "latest" exibido ao operador é o deployment ativo (se existir), senão o mais recente
-          const latestForDisplay = canonicalDeploymentId
-            ? sorted.find(d => String(d.id) === canonicalDeploymentId) ?? sorted[0] ?? null
-            : latestDeploymentId
-              ? sorted.find(d => String(d.id) === latestDeploymentId) ?? sorted[0] ?? null
+          // Fallback defensivo: se a API não expuser canonical nem stage active,
+          // usa latest_deployment como possível ativo para evitar exclusão indevida.
+          if (protectedIds.size === 0) {
+            const fallbackActiveId = String(
+              projectDetails?.latest_deployment?.id ?? project.latest_deployment?.id ?? '',
+            ).trim()
+            if (fallbackActiveId) {
+              protectedIds.add(fallbackActiveId)
+            }
+          }
+
+          // Exibe o deployment ativo (ou fallback visual para o mais recente).
+          const activeForDisplayId = Array.from(protectedIds)[0] ?? ''
+          const latestForDisplay = activeForDisplayId
+            ? sorted.find(d => String(d.id) === activeForDisplayId) ?? sorted[0] ?? null
             : sorted[0] ?? null
 
-          // Obsoletos = tudo que NÃO está no set protegido
+          // Obsoletos = tudo que NÃO está no set de ativos.
           const obsolete = sorted.filter(d => !protectedIds.has(String(d.id ?? '')))
 
           totalDeployments += sorted.length
@@ -193,7 +197,7 @@ export async function onRequestPost(context: Context) {
 
     const { accountId } = await resolveCloudflarePwAccount(context.env)
 
-    // Safety guard fail-safe: previne exclusão do deployment ativo e do mais recente por data.
+    // Safety guard fail-safe: previne exclusão do deployment ativo.
     // Se não for possível validar com segurança, bloqueia a exclusão.
     try {
       const [project, deployments] = await Promise.all([
@@ -202,52 +206,39 @@ export async function onRequestPost(context: Context) {
       ])
 
       const canonicalId = String(project?.canonical_deployment?.id ?? '').trim()
-      const latestId = String(project?.latest_deployment?.id ?? '').trim()
 
-      const sorted = [...deployments].sort((a, b) => {
-        const dateA = new Date(a.created_on ?? '').getTime() || 0
-        const dateB = new Date(b.created_on ?? '').getTime() || 0
-        return dateB - dateA
-      })
-      const latestByDateId = String(sorted[0]?.id ?? '').trim()
       const activeStageIds = new Set(
-        sorted
+        deployments
           .filter((d) => isActiveStageStatus(String(d.latest_stage?.status ?? '')))
           .map((d) => String(d.id ?? '').trim())
           .filter(Boolean),
       )
 
-      if (canonicalId && canonicalId === deploymentId) {
-        return jsonResponse({
-          error: `Deployment ${deploymentId} é o deployment CANÔNICO (produção ativa) do projeto ${projectName}. Exclusão bloqueada.`,
-          ok: false,
-        }, 403)
+      const protectedActiveIds = new Set<string>()
+      if (canonicalId) {
+        protectedActiveIds.add(canonicalId)
+      }
+      for (const stageActiveId of activeStageIds) {
+        protectedActiveIds.add(stageActiveId)
       }
 
-      if (latestId && latestId === deploymentId) {
-        return jsonResponse({
-          error: `Deployment ${deploymentId} é o deployment LATEST do projeto ${projectName}. Exclusão bloqueada.`,
-          ok: false,
-        }, 403)
+      if (protectedActiveIds.size === 0) {
+        const fallbackActiveId = String(project?.latest_deployment?.id ?? '').trim()
+        if (fallbackActiveId) {
+          protectedActiveIds.add(fallbackActiveId)
+        }
       }
 
-      if (latestByDateId && latestByDateId === deploymentId) {
+      if (protectedActiveIds.has(deploymentId)) {
         return jsonResponse({
-          error: `Deployment ${deploymentId} é o deployment MAIS RECENTE do projeto ${projectName}. Exclusão bloqueada.`,
-          ok: false,
-        }, 403)
-      }
-
-      if (activeStageIds.has(deploymentId)) {
-        return jsonResponse({
-          error: `Deployment ${deploymentId} está marcado como ACTIVE no stage do projeto ${projectName}. Exclusão bloqueada.`,
+          error: `Deployment ${deploymentId} é o deployment ATIVO do projeto ${projectName}. Exclusão bloqueada.`,
           ok: false,
         }, 403)
       }
     } catch (guardErr) {
       const guardMessage = guardErr instanceof Error
         ? guardErr.message
-        : 'Não foi possível validar o deployment ativo/mais recente.'
+        : 'Não foi possível validar o deployment ativo.'
       return jsonResponse({
         error: `Validação de segurança falhou para ${projectName}. Exclusão bloqueada: ${guardMessage}`,
         ok: false,

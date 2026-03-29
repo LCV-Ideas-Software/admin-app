@@ -459,7 +459,7 @@ export function DeploymentCleanupPanel() {
               Confirma a exclusão de <strong>{scanData?.totalObsolete ?? 0}</strong> deployment(s) obsoleto(s)?
             </p>
             <p className="deploy-cleanup__confirm-sub">
-              O deployment mais recente de cada projeto será preservado.
+              Apenas o deployment ativo de cada projeto será preservado.
             </p>
             <div className="deploy-cleanup__confirm-actions">
               <button
