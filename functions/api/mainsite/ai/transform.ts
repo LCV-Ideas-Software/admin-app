@@ -11,6 +11,11 @@
 
 export interface Env {
   GEMINI_API_KEY: string
+  BIGDATA_DB?: D1Database
+}
+
+interface D1Database {
+  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown> } }
 }
 
 interface GeminiResponse {
@@ -136,6 +141,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return new Response(JSON.stringify({ error: "GEMINI_API_KEY não configurada." }), { status: 500 });
   }
 
+  const _telemetryStart = Date.now();
   structuredLog('info', 'transform API call starting', { endpoint: 'transform' });
 
   try {
@@ -210,6 +216,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           structuredLog('info', 'Gemini request succeeded', {
             endpoint: 'transform', attempt: tentativa + 1, status: response.status, usageMetadata: usage
           });
+
+          // Telemetria → ai_usage_logs (fire-and-forget)
+          logAiUsage(context.env.BIGDATA_DB, {
+            module: 'mainsite',
+            model: GEMINI_CONFIG.model,
+            input_tokens: usage.promptTokens,
+            output_tokens: usage.outputTokens,
+            latency_ms: Date.now() - _telemetryStart,
+            status: 'ok',
+          });
           
           finalResponse = data;
           break;
@@ -246,7 +262,37 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     });
 
   } catch (error) {
+    // Telemetria de erro
+    logAiUsage(context.env.BIGDATA_DB, {
+      module: 'mainsite',
+      model: GEMINI_CONFIG.model,
+      input_tokens: 0,
+      output_tokens: 0,
+      latency_ms: Date.now() - _telemetryStart,
+      status: 'error',
+      error_detail: error instanceof Error ? error.message : 'unknown',
+    });
     structuredLog('error', 'transform fatal error', { error: error instanceof Error ? error.message : "Erro desconhecido" });
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erro desconhecido na geração por IA." }), { status: 500 });
   }
 };
+
+/* ── Helper de telemetria (fire-and-forget, nunca bloqueia o fluxo) ── */
+interface TelemetryPayload {
+  module: string; model: string;
+  input_tokens: number; output_tokens: number;
+  latency_ms: number; status: string;
+  error_detail?: string;
+}
+function logAiUsage(db: D1Database | undefined, payload: TelemetryPayload) {
+  if (!db) return;
+  db.prepare(`
+    INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    payload.module, payload.model,
+    payload.input_tokens, payload.output_tokens,
+    payload.latency_ms, payload.status,
+    payload.error_detail || null,
+  ).run().catch(() => { /* telemetria não deve quebrar o fluxo */ });
+}

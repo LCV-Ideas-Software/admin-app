@@ -19,6 +19,10 @@ interface Env {
   GEMINI_API_KEY?: string
 }
 
+interface D1Binding {
+  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown> } }
+}
+
 interface RssSuggestion {
   id: string
   name: string
@@ -281,7 +285,8 @@ function buildGoogleNewsSuggestion(query: string): RssSuggestion | null {
 // Layer 3: Gemini AI — descoberta inteligente de feeds
 // ══════════════════════════════════════════════════════════
 
-async function discoverWithGemini(query: string, apiKey: string): Promise<RssSuggestion[]> {
+async function discoverWithGemini(query: string, apiKey: string, db?: D1Binding): Promise<RssSuggestion[]> {
+  const _telStart = Date.now();
   try {
     const prompt = `Você é um especialista em feeds RSS de notícias.
 O usuário está buscando fontes de notícias para o termo: "${query}"
@@ -334,7 +339,7 @@ REGRAS:
     const parsed = JSON.parse(text) as Array<{ name?: string; url?: string; category?: string }>
     if (!Array.isArray(parsed)) return []
 
-    return parsed
+    const results = parsed
       .filter(item => item.name && item.url && item.category)
       .slice(0, 5)
       .map((item, index) => ({
@@ -344,6 +349,17 @@ REGRAS:
         category: item.category!,
         source: 'gemini-ai' as const,
       }))
+
+    // Telemetria fire-and-forget
+    if (db) {
+      db.prepare(`
+        INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind('news-discover', 'gemini-2.5-flash-lite', 0, 0, Date.now() - _telStart, 'ok'
+      ).run().catch(() => {});
+    }
+
+    return results;
   } catch (error) {
     console.warn('[discover] Gemini discovery failed:', error)
     return []
@@ -495,7 +511,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (apiKey && query.length >= 3) {
     try {
       const geminiResults = await Promise.race([
-        discoverWithGemini(query, apiKey),
+        discoverWithGemini(query, apiKey, context.env.BIGDATA_DB as unknown as D1Binding),
         new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), 6000)),
       ])
       addUnique(geminiResults)

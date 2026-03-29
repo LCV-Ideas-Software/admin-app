@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Activity, AlertTriangle, BarChart3, BookOpen, Brain, CheckCircle,
   ChevronDown, ChevronRight, Clock, Cloud, CloudOff, Copy, CpuIcon,
-  ExternalLink, HelpCircle, Info, Layers, Loader2, RefreshCw,
+  ExternalLink, HelpCircle, Layers, Loader2, RefreshCw,
   Server, Settings, Sparkles, TrendingUp, Zap
 } from 'lucide-react'
 
@@ -133,6 +133,19 @@ function tierBadge(tier: string): { bg: string; color: string; label: string } {
     default: return { bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280', label: tier }
   }
 }
+
+/* Mapa de nomes amigáveis para métricas de quota GCP (Generative Language API) */
+const QUOTA_HUMAN_NAMES: Record<string, string> = {
+  generate_content_requests: 'Generate Content',
+  api_requests: 'API Requests',
+  model_requests: 'Chamadas ao Modelo',
+  tokens_per_minute: 'Tokens / min',
+  images_per_minute: 'Imagens / min',
+  embedding_requests: 'Embeddings',
+  batch_requests: 'Batch Requests',
+}
+/* int64 MAX (~9.22e18) indica quota ilimitada no GCP */
+const INT64_MAX_THRESHOLD = 9e18
 
 /* Tabela de Rate Limits — referência estática (fonte: ai.google.dev/gemini-api/docs/rate-limits + pricing)
    Atualizada manualmente conforme documentação oficial */
@@ -610,35 +623,25 @@ function UsageTab() {
 
       {!hasData ? (
         <div className="form-card" style={{ textAlign: 'center', padding: 40 }}>
-          <Info size={40} style={{ color: '#9ca3af', marginBottom: 12 }} />
-          <p style={{ fontSize: '1rem', fontWeight: 600, color: '#514b48' }}>Nenhum dado de uso registrado ainda</p>
-          <p style={{ fontSize: '0.85rem', color: '#9ca3af', maxWidth: 500, margin: '8px auto 0' }}>
-            Os endpoints de AI do admin-app precisam ser instrumentados para registrar logs no <code>ai_usage_logs</code>.
-            Uma vez instrumentados, este dashboard exibirá consumo em tempo real.
+          <div style={{
+            width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(14,165,233,0.08))',
+            margin: '0 auto 16px',
+          }}>
+            <BarChart3 size={32} style={{ color: '#059669' }} />
+          </div>
+          <p style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px' }}>Aguardando primeiros dados</p>
+          <p style={{ fontSize: '0.85rem', color: '#9ca3af', maxWidth: 480, margin: '0 auto', lineHeight: 1.6 }}>
+            Os endpoints de IA estão instrumentados. Assim que a primeira chamada à Gemini API
+            for processada, este painel exibirá consumo, tokens e latência em tempo real.
           </p>
-          <div style={{ marginTop: 20, padding: 16, borderRadius: 16, background: 'rgba(26, 115, 232, 0.05)', border: '1px solid rgba(26, 115, 232, 0.15)' }}>
-            <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1a73e8', margin: '0 0 8px' }}>
-              <Settings size={14} style={{ verticalAlign: 'middle' }} /> Como instrumentar
-            </p>
-            <p style={{ fontSize: '0.78rem', color: '#514b48', margin: 0, lineHeight: 1.6 }}>
-              Em cada endpoint que chama a Gemini API (ex: Oráculo, Astrólogo, Calculadora), adicione um <code>POST /api/ai-status/usage</code> após a chamada:
-            </p>
-            <pre style={{
-              margin: '10px 0 0', padding: 12, borderRadius: 10, background: '#1a1a2e', color: '#e2e8f0',
-              fontSize: '0.75rem', overflow: 'auto', lineHeight: 1.5
-            }}>{`// Após a chamada Gemini:
-await fetch('/api/ai-status/usage', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    module: 'oraculo',      // módulo
-    model: 'gemini-2.5-flash',
-    input_tokens: usage.promptTokenCount,
-    output_tokens: usage.candidatesTokenCount,
-    latency_ms: Date.now() - start,
-    status: 'ok'
-  })
-})`}</pre>
+          <div style={{
+            marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '8px 16px', borderRadius: 100,
+            background: 'rgba(16,185,129,0.08)', color: '#059669',
+            fontSize: '0.82rem', fontWeight: 600,
+          }}>
+            <CheckCircle size={14} /> Instrumentação ativa
           </div>
         </div>
       ) : (
@@ -822,15 +825,18 @@ function GcpTab() {
     }).filter(l => l.count > 0).sort((a, b) => b.count - a.count)
   }, [ts])
 
-  // Quota limits
+
   const quotaLimits = useMemo(() => {
     const series = ts['serviceruntime.googleapis.com/quota/limit'] || []
     return series.map(s => {
       const quotaMetric = s.metric?.labels?.quota_metric || 'unknown'
+      const shortName = quotaMetric.split('/').pop() || quotaMetric
       const limitName = s.metric?.labels?.limit_name || ''
       const pt = s.points?.[0]
-      const limit = parseInt(pt?.value?.int64Value || '0', 10) || pt?.value?.doubleValue || 0
-      return { quotaMetric: quotaMetric.split('/').pop() || quotaMetric, limitName, limit }
+      const rawLimit = parseInt(pt?.value?.int64Value || '0', 10) || pt?.value?.doubleValue || 0
+      const isUnlimited = rawLimit >= INT64_MAX_THRESHOLD
+      const humanName = QUOTA_HUMAN_NAMES[shortName] || shortName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      return { quotaMetric: shortName, humanName, limitName, limit: rawLimit, isUnlimited }
     }).filter(q => q.limit > 0)
   }, [ts])
 
@@ -1212,24 +1218,36 @@ function GcpTab() {
                       background: 'rgba(0,0,0,0.015)', border: '1px solid rgba(0,0,0,0.04)',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, fontFamily: 'var(--font-mono, monospace)', color: '#334155' }}>
-                          {q.quotaMetric}
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                          {q.humanName}
                         </span>
-                        <span style={{
-                          fontSize: '0.78rem', fontWeight: 700, padding: '2px 10px', borderRadius: 100,
-                          background: 'rgba(16, 185, 129, 0.08)', color: '#059669',
-                        }}>
-                          {fmtNum(q.limit)} / min
-                        </span>
+                        {q.isUnlimited ? (
+                          <span style={{
+                            fontSize: '0.78rem', fontWeight: 700, padding: '2px 12px', borderRadius: 100,
+                            background: 'linear-gradient(135deg, rgba(14,165,233,0.1), rgba(124,58,237,0.08))',
+                            color: '#7c3aed',
+                          }}>
+                            Ilimitado ∞
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: '0.78rem', fontWeight: 700, padding: '2px 10px', borderRadius: 100,
+                            background: 'rgba(16, 185, 129, 0.08)', color: '#059669',
+                          }}>
+                            {fmtNum(q.limit)} / min
+                          </span>
+                        )}
                       </div>
-                      {/* Barra de progresso visual (sem uso real, mostra o limite como escala) */}
+                      {/* Barra de progresso visual */}
                       <div style={{
                         height: 6, borderRadius: 100, background: 'rgba(0,0,0,0.04)', overflow: 'hidden',
                       }}>
                         <div style={{
-                          height: '100%', borderRadius: 100, width: '100%',
-                          background: 'linear-gradient(90deg, #059669, #10b981)',
-                          opacity: 0.3,
+                          height: '100%', borderRadius: 100, width: q.isUnlimited ? '100%' : '30%',
+                          background: q.isUnlimited
+                            ? 'linear-gradient(90deg, #7c3aed, #a78bfa)'
+                            : 'linear-gradient(90deg, #059669, #10b981)',
+                          opacity: q.isUnlimited ? 0.2 : 0.4,
                         }} />
                       </div>
                     </div>
