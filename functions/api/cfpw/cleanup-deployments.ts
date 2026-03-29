@@ -53,6 +53,33 @@ const isActiveStageStatus = (status: string) => {
   return normalized === 'active'
 }
 
+const TARGET_BRANCHES = new Set(['production', 'main'])
+
+const getDeploymentBranch = (deployment: {
+  deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
+}) => {
+  const byBranch = String(deployment.deployment_trigger?.metadata?.branch ?? '').trim().toLowerCase()
+  if (byBranch) {
+    return byBranch
+  }
+
+  const byCommitRef = String(deployment.deployment_trigger?.metadata?.commit_ref ?? '').trim().toLowerCase()
+  return byCommitRef
+}
+
+const isInCleanupScope = (deployment: {
+  environment?: string
+  deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
+}) => {
+  const environment = String(deployment.environment ?? '').trim().toLowerCase()
+  if (environment === 'preview') {
+    return false
+  }
+
+  const branch = getDeploymentBranch(deployment)
+  return TARGET_BRANCHES.has(branch)
+}
+
 /**
  * GET — Scan: lista todos os projetos Pages e seus deployments,
  * identificando os obsoletos (tudo menos o mais recente).
@@ -91,6 +118,9 @@ export async function onRequestGet(context: Context) {
             return dateB - dateA
           })
 
+          // Escopo de governança: branches production/main, excluindo preview.
+          const scopedDeployments = sorted.filter((d) => isInCleanupScope(d))
+
           // O deployment ativo de produção vem do canonical_deployment do projeto.
           const canonicalDeploymentId = String(projectDetails?.canonical_deployment?.id ?? '').trim()
 
@@ -105,7 +135,7 @@ export async function onRequestGet(context: Context) {
 
           // Fallback seguro: deployment(s) do ambiente production.
           const activeProductionIds = new Set(
-            sorted
+            scopedDeployments
               .filter((d) => String(d.environment ?? '').trim().toLowerCase() === 'production')
               .map((d) => String(d.id ?? '').trim())
               .filter(Boolean),
@@ -124,21 +154,21 @@ export async function onRequestGet(context: Context) {
           // Exibe o deployment ativo (ou fallback visual para o mais recente).
           const activeForDisplayId = Array.from(protectedIds)[0] ?? ''
           const latestForDisplay = activeForDisplayId
-            ? sorted.find(d => String(d.id) === activeForDisplayId) ?? sorted[0] ?? null
-            : sorted[0] ?? null
+            ? scopedDeployments.find(d => String(d.id) === activeForDisplayId) ?? scopedDeployments[0] ?? null
+            : scopedDeployments[0] ?? null
 
           // Obsoletos = tudo que NÃO está no set de ativos.
           // Fail-safe: se não identificou nenhum ativo, não expurga esse projeto.
           const obsolete = protectedIds.size > 0
-            ? sorted.filter(d => !protectedIds.has(String(d.id ?? '')))
+            ? scopedDeployments.filter(d => !protectedIds.has(String(d.id ?? '')))
             : []
 
-          totalDeployments += sorted.length
+          totalDeployments += scopedDeployments.length
           totalObsolete += obsolete.length
 
           return {
             name: projectName,
-            totalDeployments: sorted.length,
+            totalDeployments: scopedDeployments.length,
             latestDeployment: latestForDisplay
               ? {
                   id: String(latestForDisplay.id ?? ''),
@@ -206,10 +236,26 @@ export async function onRequestPost(context: Context) {
         listCloudflarePagesDeployments(context.env, accountId, projectName),
       ])
 
+      const target = deployments.find((d) => String(d.id ?? '').trim() === deploymentId)
+      if (!target) {
+        return jsonResponse({
+          error: `Deployment ${deploymentId} não encontrado no projeto ${projectName}.`,
+          ok: false,
+        }, 404)
+      }
+
+      if (!isInCleanupScope(target)) {
+        return jsonResponse({
+          error: `Deployment ${deploymentId} fora do escopo de expurgo (somente branches production/main e não-preview).`,
+          ok: false,
+        }, 403)
+      }
+
       const canonicalId = String(project?.canonical_deployment?.id ?? '').trim()
 
       const activeStageIds = new Set(
         deployments
+          .filter((d) => isInCleanupScope(d))
           .filter((d) => isActiveStageStatus(String(d.latest_stage?.status ?? '')))
           .map((d) => String(d.id ?? '').trim())
           .filter(Boolean),
@@ -217,6 +263,7 @@ export async function onRequestPost(context: Context) {
 
       const activeProductionIds = new Set(
         deployments
+          .filter((d) => isInCleanupScope(d))
           .filter((d) => String(d.environment ?? '').trim().toLowerCase() === 'production')
           .map((d) => String(d.id ?? '').trim())
           .filter(Boolean),
@@ -231,6 +278,13 @@ export async function onRequestPost(context: Context) {
       }
       for (const productionId of activeProductionIds) {
         protectedActiveIds.add(productionId)
+      }
+
+      if (protectedActiveIds.size === 0) {
+        return jsonResponse({
+          error: `Não foi possível identificar deployment ativo elegível para ${projectName}. Exclusão bloqueada por segurança.`,
+          ok: false,
+        }, 503)
       }
 
       if (protectedActiveIds.has(deploymentId)) {

@@ -58,6 +58,12 @@ export type CfpwPageDeployment = {
   created_on?: string
   environment?: string
   url?: string
+  deployment_trigger?: {
+    metadata?: {
+      branch?: string
+      commit_ref?: string
+    }
+  }
   latest_stage?: {
     name?: string
     status?: string
