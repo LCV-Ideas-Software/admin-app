@@ -71,13 +71,49 @@ const isInCleanupScope = (deployment: {
   environment?: string
   deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
 }) => {
-  const environment = String(deployment.environment ?? '').trim().toLowerCase()
-  if (environment === 'preview') {
-    return false
-  }
-
   const branch = getDeploymentBranch(deployment)
   return TARGET_BRANCHES.has(branch)
+}
+
+const resolveMainActiveIds = (
+  canonicalId: string,
+  deployments: Array<{
+    id?: string
+    deployment_trigger?: { metadata?: { branch?: string; commit_ref?: string } }
+    latest_stage?: { status?: string }
+    created_on?: string
+  }>,
+) => {
+  const inMain = deployments.filter((d) => getDeploymentBranch(d) === 'main')
+  const protectedIds = new Set<string>()
+
+  if (canonicalId && inMain.some((d) => String(d.id ?? '').trim() === canonicalId)) {
+    protectedIds.add(canonicalId)
+    return protectedIds
+  }
+
+  for (const deployment of inMain) {
+    const id = String(deployment.id ?? '').trim()
+    if (!id) continue
+    if (isActiveStageStatus(String(deployment.latest_stage?.status ?? ''))) {
+      protectedIds.add(id)
+    }
+  }
+  if (protectedIds.size > 0) {
+    return protectedIds
+  }
+
+  const sortedMain = [...inMain].sort((a, b) => {
+    const dateA = new Date(a.created_on ?? '').getTime() || 0
+    const dateB = new Date(b.created_on ?? '').getTime() || 0
+    return dateB - dateA
+  })
+  const fallbackMainId = String(sortedMain[0]?.id ?? '').trim()
+  if (fallbackMainId) {
+    protectedIds.add(fallbackMainId)
+  }
+
+  return protectedIds
 }
 
 /**
@@ -124,41 +160,17 @@ export async function onRequestGet(context: Context) {
           // O deployment ativo de produção vem do canonical_deployment do projeto.
           const canonicalDeploymentId = String(projectDetails?.canonical_deployment?.id ?? '').trim()
 
-          // Fallback adicional: alguns cenários de rollout/rollback expõem o ativo
-          // diretamente no status do stage do deployment.
-          const activeFromStageIds = new Set(
-            sorted
-              .filter((d) => isActiveStageStatus(String(d.latest_stage?.status ?? '')))
-              .map((d) => String(d.id ?? '').trim())
-              .filter(Boolean),
-          )
+          // Regra de proteção: preservar somente o deployment ativo do branch main.
+          const protectedIds = resolveMainActiveIds(canonicalDeploymentId, scopedDeployments)
 
-          // Fallback seguro: deployment(s) do ambiente production.
-          const activeProductionIds = new Set(
-            scopedDeployments
-              .filter((d) => String(d.environment ?? '').trim().toLowerCase() === 'production')
-              .map((d) => String(d.id ?? '').trim())
-              .filter(Boolean),
-          )
-
-          // Conjunto de IDs protegidos: somente deployments ativos.
-          const protectedIds = new Set<string>()
-          if (canonicalDeploymentId) protectedIds.add(canonicalDeploymentId)
-          for (const stageActiveId of activeFromStageIds) {
-            protectedIds.add(stageActiveId)
-          }
-          for (const productionId of activeProductionIds) {
-            protectedIds.add(productionId)
-          }
-
-          // Exibe o deployment ativo (ou fallback visual para o mais recente).
+          // Exibe o deployment ativo protegido no painel.
           const activeForDisplayId = Array.from(protectedIds)[0] ?? ''
           const latestForDisplay = activeForDisplayId
             ? scopedDeployments.find(d => String(d.id) === activeForDisplayId) ?? scopedDeployments[0] ?? null
             : scopedDeployments[0] ?? null
 
-          // Obsoletos = tudo que NÃO está no set de ativos.
-          // Fail-safe: se não identificou nenhum ativo, não expurga esse projeto.
+          // Obsoletos = tudo que NÃO é o ativo do branch main.
+          // Fail-safe: se não identificou ativo do main, não expurga esse projeto.
           const obsolete = protectedIds.size > 0
             ? scopedDeployments.filter(d => !protectedIds.has(String(d.id ?? '')))
             : []
@@ -253,36 +265,12 @@ export async function onRequestPost(context: Context) {
 
       const canonicalId = String(project?.canonical_deployment?.id ?? '').trim()
 
-      const activeStageIds = new Set(
-        deployments
-          .filter((d) => isInCleanupScope(d))
-          .filter((d) => isActiveStageStatus(String(d.latest_stage?.status ?? '')))
-          .map((d) => String(d.id ?? '').trim())
-          .filter(Boolean),
-      )
-
-      const activeProductionIds = new Set(
-        deployments
-          .filter((d) => isInCleanupScope(d))
-          .filter((d) => String(d.environment ?? '').trim().toLowerCase() === 'production')
-          .map((d) => String(d.id ?? '').trim())
-          .filter(Boolean),
-      )
-
-      const protectedActiveIds = new Set<string>()
-      if (canonicalId) {
-        protectedActiveIds.add(canonicalId)
-      }
-      for (const stageActiveId of activeStageIds) {
-        protectedActiveIds.add(stageActiveId)
-      }
-      for (const productionId of activeProductionIds) {
-        protectedActiveIds.add(productionId)
-      }
+      const scopedDeployments = deployments.filter((d) => isInCleanupScope(d))
+      const protectedActiveIds = resolveMainActiveIds(canonicalId, scopedDeployments)
 
       if (protectedActiveIds.size === 0) {
         return jsonResponse({
-          error: `Não foi possível identificar deployment ativo elegível para ${projectName}. Exclusão bloqueada por segurança.`,
+          error: `Não foi possível identificar o deployment ativo do branch main para ${projectName}. Exclusão bloqueada por segurança.`,
           ok: false,
         }, 503)
       }

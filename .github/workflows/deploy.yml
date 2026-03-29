@@ -10,7 +10,7 @@ env:
   WRANGLER_VERSION: "latest"
 
 concurrency:
-  group: deploy-production
+  group: deploy-main
   cancel-in-progress: true
 
 jobs:
