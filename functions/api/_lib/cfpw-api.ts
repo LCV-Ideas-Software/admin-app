@@ -38,6 +38,12 @@ export type CfpwPageProject = {
   domains?: string[]
   production_branch?: string
   created_on?: string
+  canonical_deployment?: {
+    id?: string
+    created_on?: string
+    environment?: string
+    url?: string
+  }
   latest_deployment?: {
     id?: string
     created_on?: string

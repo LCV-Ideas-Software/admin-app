@@ -91,9 +91,12 @@ export async function onRequestGet(context: Context) {
             return dateB - dateA
           })
 
-          // O deployment "ativo" é o que está servindo tráfego agora.
-          // A fonte primária é o endpoint de detalhe do projeto.
-          const activeDeploymentId = String(
+          // O deployment ativo de produção pode vir como canonical_deployment.
+          // latest_deployment pode apontar para preview mais novo.
+          const canonicalDeploymentId = String(
+            projectDetails?.canonical_deployment?.id ?? project.canonical_deployment?.id ?? '',
+          ).trim()
+          const latestDeploymentId = String(
             projectDetails?.latest_deployment?.id ?? project.latest_deployment?.id ?? '',
           ).trim()
 
@@ -109,14 +112,17 @@ export async function onRequestGet(context: Context) {
           // Conjunto de IDs protegidos: o mais recente por data + o ativo servindo
           const protectedIds = new Set<string>()
           if (sorted[0]?.id) protectedIds.add(String(sorted[0].id))
-          if (activeDeploymentId) protectedIds.add(activeDeploymentId)
+          if (canonicalDeploymentId) protectedIds.add(canonicalDeploymentId)
+          if (latestDeploymentId) protectedIds.add(latestDeploymentId)
           for (const stageActiveId of activeFromStageIds) {
             protectedIds.add(stageActiveId)
           }
 
           // O "latest" exibido ao operador é o deployment ativo (se existir), senão o mais recente
-          const latestForDisplay = activeDeploymentId
-            ? sorted.find(d => String(d.id) === activeDeploymentId) ?? sorted[0] ?? null
+          const latestForDisplay = canonicalDeploymentId
+            ? sorted.find(d => String(d.id) === canonicalDeploymentId) ?? sorted[0] ?? null
+            : latestDeploymentId
+              ? sorted.find(d => String(d.id) === latestDeploymentId) ?? sorted[0] ?? null
             : sorted[0] ?? null
 
           // Obsoletos = tudo que NÃO está no set protegido
@@ -195,7 +201,8 @@ export async function onRequestPost(context: Context) {
         listCloudflarePagesDeployments(context.env, accountId, projectName),
       ])
 
-      const activeId = String(project?.latest_deployment?.id ?? '').trim()
+      const canonicalId = String(project?.canonical_deployment?.id ?? '').trim()
+      const latestId = String(project?.latest_deployment?.id ?? '').trim()
 
       const sorted = [...deployments].sort((a, b) => {
         const dateA = new Date(a.created_on ?? '').getTime() || 0
@@ -210,9 +217,16 @@ export async function onRequestPost(context: Context) {
           .filter(Boolean),
       )
 
-      if (activeId && activeId === deploymentId) {
+      if (canonicalId && canonicalId === deploymentId) {
         return jsonResponse({
-          error: `Deployment ${deploymentId} é o deployment ATIVO do projeto ${projectName}. Exclusão bloqueada.`,
+          error: `Deployment ${deploymentId} é o deployment CANÔNICO (produção ativa) do projeto ${projectName}. Exclusão bloqueada.`,
+          ok: false,
+        }, 403)
+      }
+
+      if (latestId && latestId === deploymentId) {
+        return jsonResponse({
+          error: `Deployment ${deploymentId} é o deployment LATEST do projeto ${projectName}. Exclusão bloqueada.`,
           ok: false,
         }, 403)
       }
