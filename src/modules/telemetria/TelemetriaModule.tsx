@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, AlertTriangle, BarChart3, Bot, Calendar,
-  Database, Loader2, MessageSquare, RefreshCw, Share2,
+  Database, Loader2, RefreshCw, Share2,
   Trash2, Mail, X,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
@@ -94,8 +94,7 @@ const TABS = [
   { key: 'sync', label: 'Sync', icon: Database },
   { key: 'contatos', label: 'Contatos', icon: Mail },
   { key: 'shares', label: 'Compartilhamentos', icon: Share2 },
-  { key: 'chatbot', label: 'Chatbot', icon: Bot },
-  { key: 'auditoria', label: 'Auditoria IA', icon: MessageSquare },
+  { key: 'chatbot', label: 'Chatbot IA', icon: Bot },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
@@ -313,89 +312,91 @@ export function TelemetriaModule() {
   )
 
   const renderChatbot = () => (
-    <article className="result-card">
-      <header className="result-header">
-        <h4><Bot size={16} /> Logs da Consciência Auxiliar (IA)</h4>
-        <span>{chatLogs.length} registro(s)</span>
-      </header>
-      {chatLogs.length === 0 ? (
-        <p className="result-empty">Nenhum log de IA registrado.</p>
-      ) : (
-        <ul className="result-list telemetria-chat-list">
-          {chatLogs.map((log) => (
-            <li key={log.id} className={`telemetria-chat-row ${log.role === 'user' ? 'telemetria-chat-user' : 'telemetria-chat-bot'}`}>
-              <div className="telemetria-chat-header">
-                <span className={`telemetria-role-badge ${log.role === 'user' ? 'telemetria-role-user' : 'telemetria-role-bot'}`}>
-                  {log.role === 'user' ? '👤 Usuário' : '🤖 IA'}
-                </span>
-                {log.context_title && <span className="field-hint">Contexto: {log.context_title}</span>}
-              </div>
-              <p className="telemetria-chat-message">{log.message}</p>
-              <div className="telemetria-contact-footer">
-                <span className="telemetria-date-badge"><Calendar size={12} /> {formatDate(log.created_at)}</span>
-                <button type="button" className="telemetria-delete-btn" title="Excluir log" onClick={() => askDelete('mainsite_chat_logs', log.id, `chat #${log.id}`)}>
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </article>
-  )
+    <>
+      {/* ── Seção 1: Conversas ── */}
+      <article className="result-card">
+        <header className="result-header">
+          <h4><Bot size={16} /> Conversas da Consciência Auxiliar</h4>
+          <span>{chatLogs.length} mensagem(ns)</span>
+        </header>
+        {chatLogs.length === 0 ? (
+          <p className="result-empty">Nenhuma conversa registrada.</p>
+        ) : (
+          <ul className="result-list telemetria-chat-list">
+            {chatLogs.map((log) => (
+              <li key={log.id} className={`telemetria-chat-row ${log.role === 'user' ? 'telemetria-chat-user' : 'telemetria-chat-bot'}`}>
+                <div className="telemetria-chat-header">
+                  <span className={`telemetria-role-badge ${log.role === 'user' ? 'telemetria-role-user' : 'telemetria-role-bot'}`}>
+                    {log.role === 'user' ? '👤 Usuário' : '🤖 IA'}
+                  </span>
+                  {log.context_title && <span className="field-hint">Contexto: {log.context_title}</span>}
+                </div>
+                <p className="telemetria-chat-message">{log.message}</p>
+                <div className="telemetria-contact-footer">
+                  <span className="telemetria-date-badge"><Calendar size={12} /> {formatDate(log.created_at)}</span>
+                  <button type="button" className="telemetria-delete-btn" title="Excluir log" onClick={() => askDelete('mainsite_chat_logs', log.id, `chat #${log.id}`)}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
 
-  const renderAuditoria = () => (
-    <article className="result-card">
-      <header className="result-header">
-        <h4><MessageSquare size={16} /> Auditoria de contexto do chatbot</h4>
-        <span>{chatAudit.length} registro(s)</span>
-      </header>
-      {chatAudit.length === 0 ? (
-        <p className="result-empty">Nenhum registro de auditoria de contexto.</p>
-      ) : (
-        <div className="telemetria-audit-list">
-          {chatAudit.map((a) => {
-            const posts = parseJsonArray<{ id?: number; title?: string; score?: number; created_at?: string }>(a.selected_posts_json)
-            const terms = parseJsonArray<string>(a.terms_json)
-            return (
-              <div key={a.id} className="telemetria-audit-card">
-                <div className="telemetria-audit-header">
-                  <div>
-                    <span className="telemetria-audit-badge">🧠 CONTEXTO IA</span>
-                    <span className="field-hint">Contexto: {a.context_title || 'Global'}</span>
+      {/* ── Seção 2: Auditoria de Contexto ── */}
+      <article className="result-card">
+        <header className="result-header">
+          <h4>🧠 Auditoria de Contexto</h4>
+          <span>{chatAudit.length} registro(s)</span>
+        </header>
+        {chatAudit.length === 0 ? (
+          <p className="result-empty">Nenhum registro de auditoria de contexto.</p>
+        ) : (
+          <div className="telemetria-audit-list">
+            {chatAudit.map((a) => {
+              const posts = parseJsonArray<{ id?: number; title?: string; score?: number; created_at?: string }>(a.selected_posts_json)
+              const terms = parseJsonArray<string>(a.terms_json)
+              return (
+                <div key={a.id} className="telemetria-audit-card">
+                  <div className="telemetria-audit-header">
+                    <div>
+                      <span className="telemetria-audit-badge">🧠 CONTEXTO IA</span>
+                      <span className="field-hint">Contexto: {a.context_title || 'Global'}</span>
+                    </div>
+                    <div className="telemetria-audit-actions">
+                      <span className="telemetria-date-badge"><Calendar size={12} /> {formatDate(a.created_at)}</span>
+                      <button type="button" className="telemetria-delete-btn" title="Excluir auditoria" onClick={() => askDelete('mainsite_chat_context_audit', a.id, `auditoria #${a.id}`)}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="telemetria-audit-actions">
-                    <span className="telemetria-date-badge"><Calendar size={12} /> {formatDate(a.created_at)}</span>
-                    <button type="button" className="telemetria-delete-btn" title="Excluir auditoria" onClick={() => askDelete('mainsite_chat_context_audit', a.id, `auditoria #${a.id}`)}>
-                      <Trash2 size={13} />
-                    </button>
+                  <div className="telemetria-audit-question"><strong>Pergunta:</strong> {a.question}</div>
+                  <div className="telemetria-audit-metrics">
+                    <span className="telemetria-date-badge">Acervo: {a.total_posts_scanned}</span>
+                    <span className="telemetria-date-badge">Contexto: {a.context_posts_used}</span>
                   </div>
+                  {terms.length > 0 && (
+                    <div className="telemetria-audit-terms"><strong>Termos:</strong> {terms.join(', ')}</div>
+                  )}
+                  {posts.length > 0 && (
+                    <div className="telemetria-audit-posts">
+                      <strong className="telemetria-audit-posts-label">Publicações selecionadas ({posts.length})</strong>
+                      {posts.map((p, idx) => (
+                        <div key={`${a.id}-${p.id || idx}`} className="telemetria-audit-post-item">
+                          <div>#{p.id ?? 'N/A'} — {p.title || 'Sem título'}</div>
+                          <div className="field-hint">Score: {p.score ?? 0}{p.created_at ? ` | ${formatDate(p.created_at)}` : ''}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="telemetria-audit-question"><strong>Pergunta:</strong> {a.question}</div>
-                <div className="telemetria-audit-metrics">
-                  <span className="telemetria-date-badge">Acervo: {a.total_posts_scanned}</span>
-                  <span className="telemetria-date-badge">Contexto: {a.context_posts_used}</span>
-                </div>
-                {terms.length > 0 && (
-                  <div className="telemetria-audit-terms"><strong>Termos:</strong> {terms.join(', ')}</div>
-                )}
-                {posts.length > 0 && (
-                  <div className="telemetria-audit-posts">
-                    <strong className="telemetria-audit-posts-label">Publicações selecionadas ({posts.length})</strong>
-                    {posts.map((p, idx) => (
-                      <div key={`${a.id}-${p.id || idx}`} className="telemetria-audit-post-item">
-                        <div>#{p.id ?? 'N/A'} — {p.title || 'Sem título'}</div>
-                        <div className="field-hint">Score: {p.score ?? 0}{p.created_at ? ` | ${formatDate(p.created_at)}` : ''}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </article>
+              )
+            })}
+          </div>
+        )}
+      </article>
+    </>
   )
 
   const tabRenderers: Record<TabKey, () => React.ReactNode> = {
@@ -404,7 +405,6 @@ export function TelemetriaModule() {
     contatos: renderContatos,
     shares: renderShares,
     chatbot: renderChatbot,
-    auditoria: renderAuditoria,
   }
 
   return (

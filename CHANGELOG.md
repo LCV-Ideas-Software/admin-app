@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.69.02] — 2026-03-29
+### Alterado
+- **Telemetria — Fusão de abas**: abas "Chatbot" e "Auditoria IA" unificadas em uma única aba "Chatbot IA" com duas seções empilhadas — conversas (chat logs) e auditoria de contexto (posts selecionados, termos, scores). Elimina navegação desnecessária entre dados complementares da mesma feature.
+
+### Removido
+- Import não utilizado `MessageSquare` de lucide-react.
+
+### Controle de versão
+- `admin-app`: APP v01.69.01 → APP v01.69.02
+
 ## [v01.69.01] — 2026-03-29
 ### Alterado
 - **AI Status / GCP Tab — Quota humanizada**: nomes de métricas de quota GCP migrados de `snake_case` cru para labels humanas via mapa `QUOTA_HUMAN_NAMES` (ex: `generate_content_requests` → "Generate Content").
