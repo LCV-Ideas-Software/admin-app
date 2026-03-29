@@ -48,6 +48,11 @@ const jsonResponse = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   })
 
+const isActiveStageStatus = (status: string) => {
+  const normalized = status.trim().toLowerCase()
+  return normalized === 'active'
+}
+
 /**
  * GET — Scan: lista todos os projetos Pages e seus deployments,
  * identificando os obsoletos (tudo menos o mais recente).
@@ -92,10 +97,22 @@ export async function onRequestGet(context: Context) {
             projectDetails?.latest_deployment?.id ?? project.latest_deployment?.id ?? '',
           ).trim()
 
+          // Fallback adicional: alguns cenários de rollout/rollback expõem o ativo
+          // diretamente no status do stage do deployment.
+          const activeFromStageIds = new Set(
+            sorted
+              .filter((d) => isActiveStageStatus(String(d.latest_stage?.status ?? '')))
+              .map((d) => String(d.id ?? '').trim())
+              .filter(Boolean),
+          )
+
           // Conjunto de IDs protegidos: o mais recente por data + o ativo servindo
           const protectedIds = new Set<string>()
           if (sorted[0]?.id) protectedIds.add(String(sorted[0].id))
           if (activeDeploymentId) protectedIds.add(activeDeploymentId)
+          for (const stageActiveId of activeFromStageIds) {
+            protectedIds.add(stageActiveId)
+          }
 
           // O "latest" exibido ao operador é o deployment ativo (se existir), senão o mais recente
           const latestForDisplay = activeDeploymentId
@@ -186,6 +203,12 @@ export async function onRequestPost(context: Context) {
         return dateB - dateA
       })
       const latestByDateId = String(sorted[0]?.id ?? '').trim()
+      const activeStageIds = new Set(
+        sorted
+          .filter((d) => isActiveStageStatus(String(d.latest_stage?.status ?? '')))
+          .map((d) => String(d.id ?? '').trim())
+          .filter(Boolean),
+      )
 
       if (activeId && activeId === deploymentId) {
         return jsonResponse({
@@ -197,6 +220,13 @@ export async function onRequestPost(context: Context) {
       if (latestByDateId && latestByDateId === deploymentId) {
         return jsonResponse({
           error: `Deployment ${deploymentId} é o deployment MAIS RECENTE do projeto ${projectName}. Exclusão bloqueada.`,
+          ok: false,
+        }, 403)
+      }
+
+      if (activeStageIds.has(deploymentId)) {
+        return jsonResponse({
+          error: `Deployment ${deploymentId} está marcado como ACTIVE no stage do projeto ${projectName}. Exclusão bloqueada.`,
           ok: false,
         }, 403)
       }
