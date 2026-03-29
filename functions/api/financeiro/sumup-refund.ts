@@ -94,7 +94,24 @@ export const onRequestPost = async (context: RefundContext) => {
       return Response.json({ success: false, error: `Estorno recusado pela SumUp: ${errMsg}` }, { status: 400 })
     }
 
-    const newStatus = amount ? 'PARTIALLY_REFUNDED' : 'REFUNDED'
+    // Determinar se é estorno total ou parcial:
+    // - sem amount → estorno total
+    // - amount >= valor original da transação → estorno total
+    // - amount < valor original → estorno parcial
+    let newStatus = 'REFUNDED'
+    if (amount) {
+      try {
+        const logRow = await db.prepare(
+          "SELECT amount FROM mainsite_financial_logs WHERE payment_id = ? AND method = 'sumup_card' LIMIT 1"
+        ).bind(checkoutId).first<{ amount?: number }>()
+        const originalAmount = Number(logRow?.amount || 0)
+        // Se o valor solicitado é igual ou superior ao original, é estorno total
+        newStatus = (originalAmount > 0 && amount < originalAmount) ? 'PARTIALLY_REFUNDED' : 'REFUNDED'
+      } catch {
+        // Sem acesso ao valor original, inferir parcial por segurança
+        newStatus = 'PARTIALLY_REFUNDED'
+      }
+    }
     await updateSumupLogStatus(db, checkoutId, txnId, newStatus)
 
     return Response.json({ success: true, status: newStatus })
