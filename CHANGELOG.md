@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.74.01] — 2026-03-29
+### Corrigido
+- **CF DNS — Tabela de registros: overflow de texto**: campos longos (Nome e Conteúdo) agora truncam com `...` via CSS `text-overflow: ellipsis` em vez de quebrar linha e invadir registros adjacentes, espelhando o comportamento visual do painel DNS nativo da Cloudflare.
+- **CF DNS — Ícone da lixeira cortado**: coluna Ações recebeu `overflow: visible` explícito para impedir clipping dos botões Editar/Excluir. Proporção de colunas ajustada (Conteúdo 32%, TTL 6%, Ações 14%).
+- **CF DNS — Tooltip no Nome**: coluna Nome agora exibe `title` com valor completo no hover.
+- **CF DNS — Truncação JS redundante removida**: coluna Conteúdo usava slice JS a 60 caracteres; agora CSS controla truncação nativamente.
+
+### Controle de versão
+- `admin-app`: APP v01.74.00 → APP v01.74.01
+
 ## [v01.74.00] — 2026-03-29
 ### Alterado
 - **Visual Standardization — Google Material Design Palette**: toda a paleta de cores do admin-app padronizada para o sistema oficial do Google (`#1a73e8` Blue, `#34a853` Green, `#ea4335` Red, `#f9ab00` Yellow, `#202124`/`#3c4043`/`#5f6368`/`#80868b` neutrals). Design tokens centralizados em `variables.css`. Todas as 10 module shells unificadas. Inline color overrides removidos de TSX/TS.
