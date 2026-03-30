@@ -1,0 +1,45 @@
+name: Security - NPM Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '43 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run npm audit for all lockfiles
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t lockfiles < <(find . -name package-lock.json -not -path '*/node_modules/*' | sort)
+          if [ ${#lockfiles[@]} -eq 0 ]; then
+            echo "No package-lock.json found. Skipping audit."
+            exit 0
+          fi
+
+          for lockfile in "${lockfiles[@]}"; do
+            dir="$(dirname "$lockfile")"
+            echo "Running npm audit in $dir"
+            pushd "$dir" >/dev/null
+            npm ci --ignore-scripts
+            npm audit --audit-level=high
+            popd >/dev/null
+          done
