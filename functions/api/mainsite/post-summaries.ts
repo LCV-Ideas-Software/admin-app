@@ -111,12 +111,15 @@ CONTEÚDO: ${cleanContent}`
       return { error: `Gemini API ${res.status}: ${errBody.substring(0, 200)}` }
     }
 
-    const data = await res.json() as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-    }
+    const data = await res.json() as Record<string, unknown>
 
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!rawText) return { error: 'Gemini retornou resposta vazia (sem candidates/text).' }
+    const candidates = data.candidates as Array<{ content?: { parts?: Array<{ text?: string }> } }> | undefined
+    const rawText = candidates?.[0]?.content?.parts?.[0]?.text
+    if (!rawText) {
+      // Surfacing the full response so we can diagnose (safety block, model mismatch, etc.)
+      const preview = JSON.stringify(data).substring(0, 300)
+      return { error: `Gemini sem candidates. Modelo: ${resolvedModel}. Resposta: ${preview}` }
+    }
 
     const parsed = JSON.parse(rawText) as { summary_og?: string; summary_ld?: string }
     if (!parsed.summary_og) return { error: `Gemini retornou JSON sem summary_og: ${rawText.substring(0, 100)}` }
