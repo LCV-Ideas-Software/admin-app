@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.72.01] — 2026-03-29
+### Adicionado
+- **Autosave de defaults no first run**: quando D1 está vazio e não há dados no localStorage, os valores padrão de cada módulo são automaticamente persistidos no D1. Garante que toda configuração existe no banco desde o primeiro acesso. Aplicado em `useModuleConfig`, `newsSettings` e `financeiro-helpers`.
+
+### Controle de versão
+- `admin-app`: APP v01.72.00 → APP v01.72.01
+
 ## [v01.72.00] — 2026-03-29
 ### Alterado (MAJOR)
 - **Persistência migrada de localStorage para D1**: todas as configurações de módulos migradas de `localStorage` para o banco D1 (`BIGDATA_DB`), garantindo sincronização cross-device e eliminando dependência de storage local do browser.
