@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { BrainCircuit, Loader2, Mail, Search, Send, Sparkles, Telescope, Trash2, X, RefreshCw } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { generateAstrologicalReport } from '../../lib/astrological-report'
+import { useModuleConfig } from '../../lib/useModuleConfig'
 import DOMPurify from 'dompurify'
 
 type MapaResumo = {
@@ -54,22 +55,20 @@ const formatarData = (dataStr: string): string => {
 
 
 
-// Configs
+// Configs (D1-persisted via useModuleConfig)
 export interface AstroConfig {
   modeloSintese?: string
 }
 const DEFAULT_CONFIG: AstroConfig = { modeloSintese: '' }
-function loadConfig(): AstroConfig {
-  try {
-    const s = localStorage.getItem('astrologo-config')
-    return s ? { ...DEFAULT_CONFIG, ...JSON.parse(s) } : DEFAULT_CONFIG
-  } catch { return DEFAULT_CONFIG }
-}
 export interface GeminiModelItem { id: string; displayName: string; api: string; vision: boolean }
 
 export function AstrologoModule() {
+  const { showNotification } = useNotification()
   const [activeTab, setActiveTab] = useState<'registros' | 'usuarios' | 'configuracoes'>('registros')
-  const [config, setConfig] = useState<AstroConfig>(loadConfig)
+  const [config, saveConfig] = useModuleConfig<AstroConfig>('astrologo-config', DEFAULT_CONFIG, {
+    onSaveSuccess: () => showNotification('Configuração salva.', 'success'),
+    onSaveError: (err) => showNotification(`Erro ao salvar configuração: ${err}`, 'error'),
+  })
   const [geminiModels, setGeminiModels] = useState<GeminiModelItem[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   
@@ -82,7 +81,6 @@ export function AstrologoModule() {
   const [userDataTotal, setUserDataTotal] = useState(0)
   const [selectedUser, setSelectedUser] = useState<UserDataRow | null>(null)
 
-  const { showNotification } = useNotification()
   const withTrace = (message: string, payload?: { request_id?: string }) => (
     payload?.request_id ? `${message} (req ${payload.request_id})` : message
   )
@@ -276,11 +274,8 @@ export function AstrologoModule() {
     }
   }, [activeTab, carregarModelos])
 
-  const saveConfig = (patch: Partial<AstroConfig>) => {
-    const next = { ...config, ...patch }
-    setConfig(next)
-    localStorage.setItem('astrologo-config', JSON.stringify(next))
-    showNotification('Configuração salva.', 'success')
+  const handleSaveConfig = (patch: Partial<AstroConfig>) => {
+    saveConfig(patch)
   }
 
   const renderModelSelect = (label: string, id: string, value: string | undefined, onChange: (v: string) => void) => (
@@ -757,7 +752,7 @@ export function AstrologoModule() {
                 'Modelo de Síntese Astrológica',
                 'model-sintese',
                 config.modeloSintese,
-                v => { setConfig(c => ({ ...c, modeloSintese: v })); saveConfig({ modeloSintese: v }) }
+                v => handleSaveConfig({ modeloSintese: v })
               )}
             </div>
           </fieldset>

@@ -4,6 +4,7 @@ import {
   Globe, Loader2, Mail, RefreshCw, Save, Search, Settings, Trash2, X,
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
+import { useModuleConfig } from '../../lib/useModuleConfig'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ interface GeminiModelItem {
   id: string; displayName: string; api: string; vision: boolean
 }
 
-// ─── CONFIG (localStorage) ────────────────────────────────────────────────────
+// ─── CONFIG (D1-persisted via useModuleConfig) ───────────────────────────────────────────────────────────────
 
 interface OracleConfig {
   csvUrl: string
@@ -46,13 +47,6 @@ const DEFAULT_CONFIG: OracleConfig = {
   csvUrl: 'https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv',
   modeloVision: 'gemini-2.5-pro-preview-05-06',
   modeloAnalise: 'gemini-2.5-pro-preview-05-06',
-}
-
-function loadConfig(): OracleConfig {
-  try {
-    const s = localStorage.getItem('oraculo-config')
-    return s ? { ...DEFAULT_CONFIG, ...JSON.parse(s) } : DEFAULT_CONFIG
-  } catch { return DEFAULT_CONFIG }
 }
 
 /** Converte hora BRT para UTC (BRT = UTC-3) */
@@ -87,8 +81,11 @@ export function OraculoModule() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ show: boolean; id: string; label: string } | null>(null)
 
-  // Config
-  const [config, setConfig] = useState<OracleConfig>(loadConfig)
+  // Config (D1-persisted)
+  const [config, saveConfig] = useModuleConfig<OracleConfig>('oraculo-config', DEFAULT_CONFIG, {
+    onSaveSuccess: () => showNotification('Configuração salva.', 'success'),
+    onSaveError: (err) => showNotification(`Erro ao salvar configuração: ${err}`, 'error'),
+  })
 
   // Cache
   const [taxaCache, setTaxaCache] = useState<TaxaCacheResponse | null>(null)
@@ -247,11 +244,8 @@ export function OraculoModule() {
     }
   }, [activeTab, carregarRegistros, carregarStatusCache, carregarModelos, carregarUserData, carregarCron])
 
-  const saveConfig = (patch: Partial<OracleConfig>) => {
-    const next = { ...config, ...patch }
-    setConfig(next)
-    localStorage.setItem('oraculo-config', JSON.stringify(next))
-    showNotification('Configuração salva.', 'success')
+  const handleSaveConfig = (patch: Partial<OracleConfig>) => {
+    saveConfig(patch)
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
@@ -747,8 +741,8 @@ export function OraculoModule() {
                 <input
                   id="oraculo-csv-url" name="oraculoCsvUrl" type="url" autoComplete="off"
                   value={config.csvUrl}
-                  onChange={e => setConfig({ ...config, csvUrl: e.target.value })}
-                  onBlur={() => saveConfig({ csvUrl: config.csvUrl })}
+                  onChange={e => handleSaveConfig({ csvUrl: e.target.value })}
+                  onBlur={() => {}}
                 />
                 <p className="field-hint">
                   Fonte oficial de dados abertos (licença ODbL). Atualizado diariamente (~13 MB).{' '}
@@ -835,13 +829,13 @@ export function OraculoModule() {
                   'Modelo Vision (OCR de extratos)',
                   'model-vision',
                   config.modeloVision,
-                  v => { setConfig(c => ({ ...c, modeloVision: v })); saveConfig({ modeloVision: v }) }
+                  v => handleSaveConfig({ modeloVision: v })
                 )}
                 {renderModelSelect(
                   'Modelo Análise (Fiduciário)',
                   'model-analise',
                   config.modeloAnalise,
-                  v => { setConfig(c => ({ ...c, modeloAnalise: v })); saveConfig({ modeloAnalise: v }) }
+                  v => handleSaveConfig({ modeloAnalise: v })
                 )}
               </div>
             </fieldset>

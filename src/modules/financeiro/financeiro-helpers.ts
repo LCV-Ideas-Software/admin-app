@@ -65,21 +65,47 @@ export const AUTO_REFRESH_MS = 600_000
 export type ProviderFilters = { statuses: string[]; types: string[]; limit: number }
 export const defaultFilters = (): ProviderFilters => ({ statuses: [], types: [], limit: 50 })
 
-export const loadFilters = (key: string): ProviderFilters => {
+export const loadFilters = async (key: string): Promise<ProviderFilters> => {
+  try {
+    const res = await fetch(`/api/config-store?module=${encodeURIComponent(key)}`)
+    const data = await res.json() as { ok: boolean; config?: ProviderFilters | null }
+    if (data.ok && data.config) {
+      const p = data.config
+      return {
+        statuses: Array.isArray(p?.statuses) ? p.statuses : [],
+        types: Array.isArray(p?.types) ? p.types : [],
+        limit: Number(p?.limit) || 50,
+      }
+    }
+  } catch { /* D1 indisponível */ }
+
+  // Fallback: migração one-shot do localStorage
   try {
     const raw = localStorage.getItem(key)
-    if (!raw) return defaultFilters()
-    const p = JSON.parse(raw)
-    return {
-      statuses: Array.isArray(p?.statuses) ? p.statuses : [],
-      types: Array.isArray(p?.types) ? p.types : [],
-      limit: Number(p?.limit) || 50,
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<ProviderFilters>
+      const filters: ProviderFilters = {
+        statuses: Array.isArray(p?.statuses) ? p.statuses : [],
+        types: Array.isArray(p?.types) ? p.types : [],
+        limit: Number(p?.limit) || 50,
+      }
+      void saveFilters(key, filters)
+      localStorage.removeItem(key)
+      return filters
     }
-  } catch { return defaultFilters() }
+  } catch { /* ignorar */ }
+
+  return defaultFilters()
 }
 
-export const saveFilters = (key: string, f: ProviderFilters) => {
-  try { localStorage.setItem(key, JSON.stringify(f)) } catch { /* quota */ }
+export const saveFilters = async (key: string, f: ProviderFilters): Promise<void> => {
+  try {
+    await fetch('/api/config-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module: key, config: f }),
+    })
+  } catch { /* silencioso */ }
 }
 
 // ── Formatação (pt-BR, dd/mm/aaaa, 24h) ──

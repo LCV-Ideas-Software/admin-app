@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { PopupPortal } from '../../components/PopupPortal'
+import { useModuleConfig } from '../../lib/useModuleConfig'
 
 // Lazy-loaded PostEditor — TipTap chunk only loads when editor is opened
 const PostEditor = lazy(() => import('./PostEditor'))
@@ -87,13 +88,6 @@ type BulkDetail = { postId: number; title: string; status: string }
 
 const DEFAULT_MS_CONFIG: MainsiteConfig = { modeloIA: '', summaryModeloIA: '' }
 
-function loadMsConfig(): MainsiteConfig {
-  try {
-    const s = localStorage.getItem('mainsite-config')
-    return s ? { ...DEFAULT_MS_CONFIG, ...JSON.parse(s) } : DEFAULT_MS_CONFIG
-  } catch { return DEFAULT_MS_CONFIG }
-}
-
 export function MainsiteModule() {
   const { showNotification } = useNotification()
   const withTrace = (message: string, payload?: { request_id?: string }) => (
@@ -115,8 +109,11 @@ export function MainsiteModule() {
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' })
   const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null)
 
-  // ── Modelo IA state ──
-  const [msConfig, setMsConfig] = useState<MainsiteConfig>(loadMsConfig)
+  // ── Modelo IA state (D1-persisted) ──
+  const [msConfig, saveMsConfig] = useModuleConfig<MainsiteConfig>('mainsite-config', DEFAULT_MS_CONFIG, {
+    onSaveSuccess: () => showNotification('Configuração IA salva.', 'success'),
+    onSaveError: (err) => showNotification(`Erro ao salvar configuração: ${err}`, 'error'),
+  })
   const [geminiModels, setGeminiModels] = useState<GeminiModelItem[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
 
@@ -136,14 +133,6 @@ export function MainsiteModule() {
   const [editLd, setEditLd] = useState('')
   const [savingSummary, setSavingSummary] = useState(false)
   const [postsWithoutSummary, setPostsWithoutSummary] = useState<Array<{ id: number; title: string }>>([])
-
-  const saveMsConfig = (newValues: Partial<MainsiteConfig>) => {
-    setMsConfig(prev => {
-      const next = { ...prev, ...newValues }
-      localStorage.setItem('mainsite-config', JSON.stringify(next))
-      return next
-    })
-  }
 
   const carregarModelos = async () => {
     setModelsLoading(true)

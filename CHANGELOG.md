@@ -1,5 +1,20 @@
 # Changelog — Admin App
 
+## [v01.72.00] — 2026-03-29
+### Alterado (MAJOR)
+- **Persistência migrada de localStorage para D1**: todas as configurações de módulos migradas de `localStorage` para o banco D1 (`BIGDATA_DB`), garantindo sincronização cross-device e eliminando dependência de storage local do browser.
+- **Endpoint centralizado (`config-store.ts`)**: novo endpoint CRUD `GET/POST /api/config-store` com tabela `admin_config_store` (auto-migração). Chaves unificadas: `mainsite-config`, `itau-config`, `astrologo-config`, `oraculo-config`, `admin-app/runtime-config/v1`, `lcv-news-settings`, `adminapp_sumup_filters_v1`, `adminapp_mp_filters_v1`.
+- **Hook `useModuleConfig<T>`**: hook genérico de persistência D1 com migração one-shot automática do localStorage, callbacks `onSaveSuccess`/`onSaveError` para notificação obrigatória ao usuário.
+- **Módulos refatorados**: MainsiteModule, ItauModule, AstrologoModule, OraculoModule, ConfigModule — todos utilizam `useModuleConfig` com feedback de sucesso/erro via `showNotification`.
+- **Financeiro — filtros D1-persisted**: `loadFilters`/`saveFilters` em `financeiro-helpers.ts` migrados para async D1. `FinanceiroModule` usa `useRef` + `useEffect` para persistência automática sem writes desnecessários.
+- **NewsSettings async**: `loadNewsSettings`/`saveNewsSettings` em `newsSettings.ts` convertidos para async. `NewsPanel.tsx` e `ConfigModule.tsx` atualizados para carregar via `useEffect` no mount.
+
+### Removido
+- Zero chamadas `localStorage.setItem` remanescentes no codebase.
+
+### Controle de versão
+- `admin-app`: APP v01.71.00 → APP v01.72.00
+
 ## [v01.71.00] — 2026-03-29
 ### Adicionado
 - **Resumos IA para Compartilhamento Social**: sistema completo de geração de resumos por IA para enriquecer metatags OG/Twitter ao compartilhar posts do mainsite.

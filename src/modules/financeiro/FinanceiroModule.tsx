@@ -4,7 +4,7 @@
 // Compliance: SumUp SDK v0.1.2+ / Mercado Pago REST API v1
 // Acessibilidade: WCAG 2.1 AA + eMAG
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DollarSign, Download, Loader2, RefreshCw,
   AlertCircle, RotateCcw, Ban, Wallet,
@@ -15,7 +15,7 @@ import {
   type ModalAction, type ProviderFilters,
   FINANCIAL_CUTOFF_DATE, SUMUP_FILTERS_KEY, MP_FILTERS_KEY,
   AUTO_REFRESH_MS, DATE_PRESETS,
-  loadFilters, saveFilters, clampStartDate,
+  defaultFilters, loadFilters, saveFilters, clampStartDate,
   formatDateTimeBR, formatDateBR, formatBRL,
   getSumupStatusConfig, getMPStatusConfig, getFinancialToneClass,
 } from './financeiro-helpers'
@@ -66,11 +66,33 @@ export function FinanceiroModule() {
   const [provider, setProvider] = useState<ProviderTab>('mercadopago')
   const providerLabel = provider === 'sumup' ? 'SumUp' : 'Mercado Pago'
 
-  // Filtros por provedor (persistidos em localStorage)
-  const [sumupFilters, setSumupFilters] = useState<ProviderFilters>(() => loadFilters(SUMUP_FILTERS_KEY))
-  const [mpFilters, setMpFilters] = useState<ProviderFilters>(() => loadFilters(MP_FILTERS_KEY))
+  // Filtros por provedor (D1-persisted)
+  const [sumupFilters, setSumupFilters] = useState<ProviderFilters>(defaultFilters)
+  const [mpFilters, setMpFilters] = useState<ProviderFilters>(defaultFilters)
   const activeFilters = provider === 'sumup' ? sumupFilters : mpFilters
   const setActiveFilters = provider === 'sumup' ? setSumupFilters : setMpFilters
+
+  // Carregar filtros do D1 no mount
+  useEffect(() => {
+    void loadFilters(SUMUP_FILTERS_KEY).then(setSumupFilters)
+    void loadFilters(MP_FILTERS_KEY).then(setMpFilters)
+  }, [])
+
+  // Persistência de filtros no D1
+  const sumupFiltersRef = useRef(sumupFilters)
+  const mpFiltersRef = useRef(mpFilters)
+  useEffect(() => {
+    if (JSON.stringify(sumupFiltersRef.current) !== JSON.stringify(sumupFilters)) {
+      sumupFiltersRef.current = sumupFilters
+      void saveFilters(SUMUP_FILTERS_KEY, sumupFilters)
+    }
+  }, [sumupFilters])
+  useEffect(() => {
+    if (JSON.stringify(mpFiltersRef.current) !== JSON.stringify(mpFilters)) {
+      mpFiltersRef.current = mpFilters
+      void saveFilters(MP_FILTERS_KEY, mpFilters)
+    }
+  }, [mpFilters])
 
   // Dates por provedor
   const [sumupStartDate, setSumupStartDate] = useState(FINANCIAL_CUTOFF_DATE)
@@ -91,10 +113,6 @@ export function FinanceiroModule() {
   const [modal, setModal] = useState<ModalAction>(null)
   const [actionBusy, setActionBusy] = useState(false)
   const [refundAmount, setRefundAmount] = useState('')
-
-  // Persistência de filtros em localStorage
-  useEffect(() => { saveFilters(SUMUP_FILTERS_KEY, sumupFilters) }, [sumupFilters])
-  useEffect(() => { saveFilters(MP_FILTERS_KEY, mpFilters) }, [mpFilters])
 
   // ── Data fetching ──
 

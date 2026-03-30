@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Loader2, Newspaper, RefreshCw, Search } from 'lucide-react'
-import { loadNewsSettings, type NewsSettings } from '../../lib/newsSettings'
+import { loadNewsSettings, DEFAULT_NEWS_SETTINGS, type NewsSettings } from '../../lib/newsSettings'
 
 /* ─── Types ──────────────────────────────────────────── */
 
@@ -55,14 +55,19 @@ export function NewsPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fetchedAt, setFetchedAt] = useState('')
-  const [settings, setSettings] = useState<NewsSettings>(loadNewsSettings)
+  const [settings, setSettings] = useState<NewsSettings>(DEFAULT_NEWS_SETTINGS)
   const [localKeywords, setLocalKeywords] = useState('')
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Carregar settings do D1 no mount
+  useEffect(() => {
+    void loadNewsSettings().then(setSettings)
+  }, [])
 
   // Recarregar configurações via evento customizado do ConfigModule
   useEffect(() => {
     const onSettingsChange = () => {
-      setSettings(loadNewsSettings())
+      void loadNewsSettings().then(setSettings)
     }
     window.addEventListener('news-settings-changed', onSettingsChange)
     return () => window.removeEventListener('news-settings-changed', onSettingsChange)

@@ -5,9 +5,10 @@ import { useNotification } from '../../components/Notification'
 import { RateLimitPanel } from '../../components/RateLimitPanel'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
 import { DeploymentCleanupPanel } from '../../components/DeploymentCleanupPanel'
+import { useModuleConfig } from '../../lib/useModuleConfig'
 import {
   loadNewsSettings, saveNewsSettings, dispatchNewsSettingsChange,
-  slugify, type NewsSettings, type NewsSource
+  slugify, DEFAULT_NEWS_SETTINGS, type NewsSettings, type NewsSource
 } from '../../lib/newsSettings'
 
 type AdminRuntimeConfig = {
@@ -62,34 +63,13 @@ const DEFAULT_CONFIG: AdminRuntimeConfig = {
 
 const normalizeLimit = (value: number) => Math.max(1, Math.min(100, Math.trunc(value || 1)))
 
-const loadStoredConfig = (): AdminRuntimeConfig => {
-  if (typeof window === 'undefined') {
-    return DEFAULT_CONFIG
-  }
 
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      return DEFAULT_CONFIG
-    }
-
-    const parsed = JSON.parse(raw) as Partial<AdminRuntimeConfig>
-    return {
-      defaultAdminActor: String(parsed.defaultAdminActor ?? DEFAULT_CONFIG.defaultAdminActor).trim() || DEFAULT_CONFIG.defaultAdminActor,
-      defaultOverviewLimit: normalizeLimit(Number(parsed.defaultOverviewLimit ?? DEFAULT_CONFIG.defaultOverviewLimit)),
-      enableOperationalToasts: parsed.enableOperationalToasts !== false,
-      strictValidationMode: parsed.strictValidationMode !== false,
-      requireConfirmBeforeDelete: parsed.requireConfirmBeforeDelete !== false,
-    }
-  } catch {
-    return DEFAULT_CONFIG
-  }
-}
 
 export function ConfigModule() {
   const { showNotification } = useNotification()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [runtimeConfig, saveRuntimeConfig] = useModuleConfig<AdminRuntimeConfig>(STORAGE_KEY, DEFAULT_CONFIG)
   const [config, setConfig] = useState<AdminRuntimeConfig>(DEFAULT_CONFIG)
   const [baselineConfig, setBaselineConfig] = useState<AdminRuntimeConfig>(DEFAULT_CONFIG)
   const [selectedRateModule, setSelectedRateModule] = useState('')
@@ -141,16 +121,22 @@ export function ConfigModule() {
   }
 
   // ── News panel settings ──
-  const [newsSettings, setNewsSettings] = useState<NewsSettings>(loadNewsSettings)
+  const [newsSettings, setNewsSettings] = useState<NewsSettings>(DEFAULT_NEWS_SETTINGS)
+
+  // Carregar do D1 no mount
+  useEffect(() => {
+    void loadNewsSettings().then(setNewsSettings)
+  }, [])
 
   const updateNewsSettings = useCallback((patch: Partial<NewsSettings>) => {
     setNewsSettings(prev => {
       const next = { ...prev, ...patch }
-      saveNewsSettings(next)
+      void saveNewsSettings(next)
       dispatchNewsSettingsChange()
+      showNotification('Configurações de notícias salvas.', 'success')
       return next
     })
-  }, [])
+  }, [showNotification])
 
   const handleNewsSourceToggle = useCallback((sourceId: string) => {
     const current = newsSettings.enabledSources
@@ -301,12 +287,12 @@ export function ConfigModule() {
     JSON.stringify(config) !== JSON.stringify(baselineConfig)
   ), [baselineConfig, config])
 
+  // Sync local state from D1-persisted hook
   useEffect(() => {
-    const loaded = loadStoredConfig()
-    setConfig(loaded)
-    setBaselineConfig(loaded)
+    setConfig(runtimeConfig)
+    setBaselineConfig(runtimeConfig)
     setLoading(false)
-  }, [])
+  }, [runtimeConfig])
 
   useEffect(() => {
     if (!hasUnsavedChanges) {
@@ -402,10 +388,10 @@ export function ConfigModule() {
         defaultOverviewLimit: normalizeLimit(config.defaultOverviewLimit),
       }
 
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+      saveRuntimeConfig(normalized)
       setConfig(normalized)
       setBaselineConfig(normalized)
-      showNotification('Preferências operacionais salvas neste navegador.', 'success')
+      showNotification('Preferências operacionais salvas no banco de dados.', 'success')
     } catch {
       showNotification('Não foi possível salvar preferências operacionais.', 'error')
     } finally {
@@ -414,10 +400,9 @@ export function ConfigModule() {
   }
 
   const restoreStoredSnapshot = () => {
-    const loaded = loadStoredConfig()
-    setConfig(loaded)
-    setBaselineConfig(loaded)
-    showNotification('Preferências restauradas do snapshot salvo.', 'info')
+    setConfig(runtimeConfig)
+    setBaselineConfig(runtimeConfig)
+    showNotification('Preferências restauradas do último snapshot salvo.', 'info')
   }
 
   const restoreFactoryDefaults = () => {

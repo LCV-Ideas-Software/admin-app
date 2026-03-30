@@ -1,6 +1,7 @@
 /**
  * Configurações do painel de notícias — utilitário compartilhado.
- * Salva/lê do localStorage para uso em NewsPanel (leitura) e ConfigModule (edição).
+ * Salva/lê do D1 (via /api/config-store) para uso em NewsPanel (leitura)
+ * e ConfigModule (edição).
  *
  * Fontes são dinâmicas: o usuário pode adicionar quantas fontes quiser.
  * Cada fonte precisa de: id (slug único), name (nome de exibição),
@@ -46,29 +47,58 @@ export const DEFAULT_NEWS_SETTINGS: NewsSettings = {
   sources: [...BUILTIN_SOURCES],
 }
 
-export function loadNewsSettings(): NewsSettings {
+/**
+ * Carrega settings do D1 via /api/config-store.
+ * Fallback: localStorage (migração one-shot).
+ */
+export async function loadNewsSettings(): Promise<NewsSettings> {
+  try {
+    const res = await fetch(`/api/config-store?module=${encodeURIComponent(NEWS_STORAGE_KEY)}`)
+    const data = await res.json() as { ok: boolean; config?: NewsSettings | null }
+    if (data.ok && data.config) {
+      const parsed = data.config
+      const sources = Array.isArray(parsed.sources) && parsed.sources.length > 0
+        ? parsed.sources
+        : [...BUILTIN_SOURCES]
+      return { ...DEFAULT_NEWS_SETTINGS, ...parsed, sources }
+    }
+  } catch { /* D1/rede indisponível — tentar fallback */ }
+
+  // Fallback: migração one-shot do localStorage
   try {
     const raw = localStorage.getItem(NEWS_STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_NEWS_SETTINGS, sources: [...BUILTIN_SOURCES] }
-    const parsed = JSON.parse(raw) as Partial<NewsSettings>
-
-    // Migração: se não tem `sources`, usar BUILTIN
-    const sources = Array.isArray(parsed.sources) && parsed.sources.length > 0
-      ? parsed.sources
-      : [...BUILTIN_SOURCES]
-
-    return {
-      ...DEFAULT_NEWS_SETTINGS,
-      ...parsed,
-      sources,
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<NewsSettings>
+      const sources = Array.isArray(parsed.sources) && parsed.sources.length > 0
+        ? parsed.sources
+        : [...BUILTIN_SOURCES]
+      const settings = { ...DEFAULT_NEWS_SETTINGS, ...parsed, sources }
+      // Migrar para D1
+      void persistNewsSettingsToD1(settings)
+      localStorage.removeItem(NEWS_STORAGE_KEY)
+      return settings
     }
-  } catch {
-    return { ...DEFAULT_NEWS_SETTINGS, sources: [...BUILTIN_SOURCES] }
-  }
+  } catch { /* ignorar */ }
+
+  return { ...DEFAULT_NEWS_SETTINGS, sources: [...BUILTIN_SOURCES] }
 }
 
-export function saveNewsSettings(settings: NewsSettings): void {
-  localStorage.setItem(NEWS_STORAGE_KEY, JSON.stringify(settings))
+/**
+ * Salva settings no D1 via /api/config-store.
+ */
+export async function saveNewsSettings(settings: NewsSettings): Promise<void> {
+  try {
+    await fetch('/api/config-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module: NEWS_STORAGE_KEY, config: settings }),
+    })
+  } catch { /* Silencioso — não bloqueia UX */ }
+}
+
+/** Fire-and-forget D1 write (alias interno) */
+async function persistNewsSettingsToD1(settings: NewsSettings): Promise<void> {
+  await saveNewsSettings(settings)
 }
 
 /** Emite evento customizado para notificar NewsPanel sobre mudanças de config */
