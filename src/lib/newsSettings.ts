@@ -73,14 +73,16 @@ export async function loadNewsSettings(): Promise<NewsSettings> {
         ? parsed.sources
         : [...BUILTIN_SOURCES]
       const settings = { ...DEFAULT_NEWS_SETTINGS, ...parsed, sources }
-      // Migrar para D1
       void persistNewsSettingsToD1(settings)
       localStorage.removeItem(NEWS_STORAGE_KEY)
       return settings
     }
   } catch { /* ignorar */ }
 
-  return { ...DEFAULT_NEWS_SETTINGS, sources: [...BUILTIN_SOURCES] }
+  // First run: D1 vazio + localStorage vazio — persiste defaults automaticamente
+  const defaults = { ...DEFAULT_NEWS_SETTINGS, sources: [...BUILTIN_SOURCES] }
+  void persistNewsSettingsToD1(defaults)
+  return defaults
 }
 
 /**

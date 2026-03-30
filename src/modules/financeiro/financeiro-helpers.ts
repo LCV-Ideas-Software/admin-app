@@ -95,7 +95,10 @@ export const loadFilters = async (key: string): Promise<ProviderFilters> => {
     }
   } catch { /* ignorar */ }
 
-  return defaultFilters()
+  // First run: D1 vazio + localStorage vazio — persiste defaults automaticamente
+  const defaults = defaultFilters()
+  void saveFilters(key, defaults)
+  return defaults
 }
 
 export const saveFilters = async (key: string, f: ProviderFilters): Promise<void> => {
