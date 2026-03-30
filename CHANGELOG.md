@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.73.00] — 2026-03-29
+### Adicionado
+- **Autor dinâmico de posts**: campo "Autor do post" adicionado ao `PostEditor`, persistido na coluna `author` da tabela `mainsite_posts` (D1). Auto-migração de schema via `ensureAuthorColumn`. Backend `posts.ts` atualizado (INSERT/UPDATE/SELECT). Fallback para "Leonardo Cardozo Vargas" quando vazio.
+
+### Controle de versão
+- `admin-app`: APP v01.72.01 → APP v01.73.00
+
 ## [v01.72.01] — 2026-03-29
 ### Adicionado
 - **Autosave de defaults no first run**: quando D1 está vazio e não há dados no localStorage, os valores padrão de cada módulo são automaticamente persistidos no D1. Garante que toda configuração existe no banco desde o primeiro acesso. Aplicado em `useModuleConfig`, `newsSettings` e `financeiro-helpers`.

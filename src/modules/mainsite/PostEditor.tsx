@@ -453,21 +453,23 @@ type SaveFeedback = { message: string; type: 'success' | 'error' } | null
 export type PostEditorProps = {
   editingPostId: number | null
   initialTitle: string
+  initialAuthor: string
   initialContent: string
   savingPost: boolean
   adminActor: string
   showNotification: (msg: string, type: 'info' | 'success' | 'error') => void
-  onSave: (title: string, htmlContent: string) => Promise<boolean>
+  onSave: (title: string, author: string, htmlContent: string) => Promise<boolean>
   onClose: () => void
 }
 
 // ── PostEditor component ──────────────────────────────────────
 export default function PostEditor({
-  editingPostId, initialTitle, initialContent,
+  editingPostId, initialTitle, initialAuthor, initialContent,
   savingPost, showNotification,
   onSave, onClose,
 }: PostEditorProps) {
   const [postTitle, setPostTitle] = useState(initialTitle)
+  const [postAuthor, setPostAuthor] = useState(initialAuthor)
   const [promptModal, setPromptModal] = useState<PromptModalState>(PROMPT_MODAL_INITIAL)
   const [isUploading, setIsUploading] = useState(false)
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
@@ -505,6 +507,10 @@ export default function PostEditor({
   useEffect(() => {
     setPostTitle(initialTitle)
   }, [initialTitle])
+
+  useEffect(() => {
+    setPostAuthor(initialAuthor)
+  }, [initialAuthor])
 
   // ── AI handlers ─────────────────────────────────────────────
 
@@ -755,13 +761,14 @@ export default function PostEditor({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const title = postTitle.trim()
+    const author = postAuthor.trim()
     const content = editor?.getHTML()?.trim() ?? ''
     if (!title || !content || content === '<p></p>') {
       flashFeedback('Título e conteúdo são obrigatórios para salvar o post.', 'error')
       showNotification('Título e conteúdo são obrigatórios para salvar o post.', 'error')
       return
     }
-    const success = await onSave(title, content)
+    const success = await onSave(title, author, content)
     if (success) {
       flashFeedback(editingPostId ? 'Post atualizado com sucesso ✓' : 'Post criado com sucesso ✓', 'success')
     } else {
@@ -771,6 +778,7 @@ export default function PostEditor({
 
   const handleClear = () => {
     setPostTitle('')
+    setPostAuthor('')
     editor?.commands.clearContent()
   }
 
@@ -817,6 +825,18 @@ export default function PostEditor({
           name="mainsitePostTitle"
           value={postTitle}
           onChange={(event) => setPostTitle(event.target.value)}
+          disabled={savingPost}
+        />
+      </div>
+
+      <div className="field-group">
+        <label htmlFor="mainsite-post-author">Autor do post</label>
+        <input
+          id="mainsite-post-author"
+          name="mainsitePostAuthor"
+          value={postAuthor}
+          onChange={(event) => setPostAuthor(event.target.value)}
+          placeholder="Leonardo Cardozo Vargas"
           disabled={savingPost}
         />
       </div>

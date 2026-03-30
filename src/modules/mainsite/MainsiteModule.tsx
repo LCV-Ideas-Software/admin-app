@@ -20,6 +20,7 @@ type ManagedPost = {
   id: number
   title: string
   content: string
+  author?: string
   created_at: string
   updated_at?: string
   is_pinned: number | boolean
@@ -367,7 +368,7 @@ export function MainsiteModule() {
   }
 
   /** Called by PostEditor when user submits */
-  const handleSavePost = async (title: string, htmlContent: string): Promise<boolean> => {
+  const handleSavePost = async (title: string, author: string, htmlContent: string): Promise<boolean> => {
     setSavingPost(true)
     try {
       const isEditing = editingPostId !== null
@@ -380,6 +381,7 @@ export function MainsiteModule() {
         body: JSON.stringify({
           id: editingPostId,
           title,
+          author,
           content: htmlContent,
           adminActor,
         }),
@@ -583,11 +585,12 @@ export function MainsiteModule() {
           <PostEditor
             editingPostId={editingPostId}
             initialTitle={editingPostId ? managedPosts.find(p => p.id === editingPostId)?.title ?? '' : ''}
+            initialAuthor={editingPostId ? managedPosts.find(p => p.id === editingPostId)?.author ?? '' : ''}
             initialContent={editingPostContent}
             savingPost={savingPost}
             adminActor={adminActor}
             showNotification={showNotification}
-            onSave={(title, html) => handleSavePost(title, html)}
+            onSave={(title, author, html) => handleSavePost(title, author, html)}
             onClose={resetPostEditor}
           />
         </Suspense>

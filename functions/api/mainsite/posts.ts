@@ -27,6 +27,7 @@ type PostRow = {
   id?: number
   title?: string
   content?: string
+  author?: string
   created_at?: string
   updated_at?: string
   is_pinned?: number
@@ -42,10 +43,13 @@ const parseId = (rawValue: unknown) => {
 
 const parseText = (rawValue: unknown) => String(rawValue ?? '').trim()
 
+const DEFAULT_AUTHOR = 'Leonardo Cardozo Vargas'
+
 const mapPostRow = (row: PostRow) => {
   const id = Number(row.id)
   const title = String(row.title ?? '').trim()
   const content = String(row.content ?? '').trim()
+  const author = String(row.author ?? '').trim() || DEFAULT_AUTHOR
   const createdAt = String(row.created_at ?? '').trim()
   const updatedAt = row.updated_at ? String(row.updated_at).trim() : null
 
@@ -57,6 +61,7 @@ const mapPostRow = (row: PostRow) => {
     id,
     title,
     content,
+    author,
     created_at: createdAt,
     updated_at: updatedAt,
     is_pinned: Number(row.is_pinned ?? 0) === 1 ? 1 : 0,
@@ -79,6 +84,18 @@ const requireDb = (env: MainsiteEnv) => {
   return env.BIGDATA_DB
 }
 
+/** Auto-migração: adiciona coluna `author` se não existir na tabela mainsite_posts */
+const ensureAuthorColumn = async (db: D1Database) => {
+  try {
+    const info = await db.prepare("PRAGMA table_info(mainsite_posts)").all<{ name: string }>()
+    const cols = (info.results ?? []).map(r => r.name)
+    if (!cols.includes('author')) {
+      await db.prepare("ALTER TABLE mainsite_posts ADD COLUMN author TEXT DEFAULT ''")
+        .run()
+    }
+  } catch { /* tabela pode não existir ainda — ignorar */ }
+}
+
 export async function onRequestGet(context: MainsiteContext) {
   const { request } = context
   const trace = createResponseTrace(request)
@@ -89,8 +106,9 @@ export async function onRequestGet(context: MainsiteContext) {
     const db = requireDb(context.env)
 
     if (id) {
+      await ensureAuthorColumn(db)
       const row = await db.prepare(`
-        SELECT id, title, content, created_at, updated_at, is_pinned
+        SELECT id, title, content, author, created_at, updated_at, is_pinned
         FROM mainsite_posts
         WHERE id = ?
         LIMIT 1
@@ -108,8 +126,9 @@ export async function onRequestGet(context: MainsiteContext) {
       })
     }
 
+    await ensureAuthorColumn(db)
     const rows = await db.prepare(`
-      SELECT id, title, content, created_at, updated_at, is_pinned
+      SELECT id, title, content, author, created_at, updated_at, is_pinned
       FROM mainsite_posts
       ORDER BY is_pinned DESC, display_order ASC, created_at DESC
     `).all<PostRow>()
@@ -150,24 +169,26 @@ export async function onRequestPost(context: MainsiteContext) {
 
   try {
     const db = requireDb(context.env)
-    const body = await context.request.json() as { title?: unknown; content?: unknown }
+    await ensureAuthorColumn(db)
+    const body = await context.request.json() as { title?: unknown; content?: unknown; author?: unknown }
     const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
     const title = parseText(body.title)
     const content = parseText(body.content)
+    const author = parseText(body.author) || DEFAULT_AUTHOR
 
     if (!title || !content) {
       return buildErrorResponse('Título e conteúdo são obrigatórios para criar um post.', trace, 400)
     }
 
     await db.prepare(`
-      INSERT INTO mainsite_posts (title, content, is_pinned, display_order, created_at, updated_at)
-      VALUES (?, ?, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO mainsite_posts (title, content, author, is_pinned, display_order, created_at, updated_at)
+      VALUES (?, ?, ?, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `)
-      .bind(title, content)
+      .bind(title, content, author)
       .run()
 
     const created = await db.prepare(`
-      SELECT id, title, content, created_at, is_pinned
+      SELECT id, title, content, author, created_at, is_pinned
       FROM mainsite_posts
       ORDER BY id DESC
       LIMIT 1
@@ -230,22 +251,24 @@ export async function onRequestPut(context: MainsiteContext) {
 
   try {
     const db = requireDb(context.env)
-    const body = await context.request.json() as { id?: unknown; title?: unknown; content?: unknown }
+    await ensureAuthorColumn(db)
+    const body = await context.request.json() as { id?: unknown; title?: unknown; content?: unknown; author?: unknown }
     const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
     const id = parseId(body.id)
     const title = parseText(body.title)
     const content = parseText(body.content)
+    const author = parseText(body.author) || DEFAULT_AUTHOR
 
     if (!id || !title || !content) {
       return buildErrorResponse('ID, título e conteúdo são obrigatórios para atualizar um post.', trace, 400)
     }
 
-    await db.prepare('UPDATE mainsite_posts SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .bind(title, content, id)
+    await db.prepare('UPDATE mainsite_posts SET title = ?, content = ?, author = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .bind(title, content, author, id)
       .run()
 
     const row = await db.prepare(`
-      SELECT id, title, content, created_at, is_pinned
+      SELECT id, title, content, author, created_at, is_pinned
       FROM mainsite_posts
       WHERE id = ?
       LIMIT 1
