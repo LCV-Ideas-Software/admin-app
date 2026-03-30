@@ -65,6 +65,13 @@ export function validateAdminActor(actor: string): ValidationResult {
 
 const DOMAIN_REGEX = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i
 const MX_HOSTNAME_REGEX = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(\s+\d+)?$/i
+const BLOCKED_URL_SCHEMES = ['javascript:', 'data:'] as const
+
+const normalizeSchemeInput = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[\u0000-\u001f\u007f\s]+/g, '')
 
 /**
  * Validates HTTP/HTTPS URL
@@ -76,6 +83,11 @@ export function validateUrl(url: string): ValidationResult {
 
   if (!trimmed) {
     return { valid: false, error: 'URL não pode estar vazia.' }
+  }
+
+  const normalized = normalizeSchemeInput(trimmed)
+  if (BLOCKED_URL_SCHEMES.some((scheme) => normalized.startsWith(scheme))) {
+    return { valid: false, error: 'URL com protocolo não permitido.' }
   }
 
   try {

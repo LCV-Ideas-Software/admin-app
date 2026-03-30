@@ -58,7 +58,10 @@ const formatPosicaoLabel = (pos: string): string => {
 const sanitizeForEmail = (html: string): string =>
   html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/on\w+="[^"]*"/gi, '')
-      .replace(/javascript:/gi, '')
+  .replace(/\s(href|src)\s*=\s*(['"])\s*(javascript|data|vbscript)\s*:[\s\S]*?\2/gi, '')
+  .replace(/javascript:/gi, '')
+  .replace(/data:/gi, '')
+  .replace(/vbscript:/gi, '')
 
 // ─── Text Report (WhatsApp-style) ────────────────────────────────
 
