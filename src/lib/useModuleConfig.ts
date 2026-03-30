@@ -55,10 +55,11 @@ export function useModuleConfig<T extends Record<string, any>>(
               const parsed = JSON.parse(raw) as Partial<T>
               const merged = { ...defaults, ...parsed }
               setConfig(merged)
-              // Migrar automaticamente para D1
               void persistToD1(moduleKey, merged, optionsRef.current)
-              // Limpar localStorage após migração
               localStorage.removeItem(moduleKey)
+            } else {
+              // First run: D1 vazio + localStorage vazio — persiste defaults automaticamente
+              void persistToD1(moduleKey, defaults)
             }
           } catch { /* localStorage indisponível ou corrompido — usar defaults */ }
         }
