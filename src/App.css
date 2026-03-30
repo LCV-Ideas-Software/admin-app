@@ -1315,7 +1315,6 @@ input[type="color"]:focus-visible {
 
 .cfdns-table-wrap {
   width: 100%;
-  overflow-x: hidden;
 }
 
 .cfdns-table {
@@ -1393,8 +1392,6 @@ input[type="color"]:focus-visible {
 }
 
 .cfdns-cell-content {
-  display: block;
-  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
