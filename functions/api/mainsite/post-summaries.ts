@@ -65,6 +65,36 @@ async function hashContent(text: string): Promise<string> {
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 
+// ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
+const SUMMARY_SAFETY_SETTINGS = [
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+]
+
+// ── v1beta: Thinking Model Support — filtra thought blocks ──
+function extractTextFromParts(parts: Array<{ text?: string; thought?: boolean }> | undefined): string {
+  return (parts || [])
+    .filter(p => p.text && !p.thought)
+    .map(p => p.text)
+    .join('')
+}
+
+// ── v1beta: Robust JSON extraction (fences, texto extra) ──
+function extractJsonFromText(rawText: string): string {
+  let str = rawText.trim()
+  // Remover markdown ```json ... ``` fences
+  const fenceMatch = str.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
+  if (fenceMatch) str = fenceMatch[1].trim()
+  // Extrair objeto JSON { ... } se houver texto extra ao redor
+  if (!str.startsWith('{')) {
+    const objMatch = str.match(/\{[\s\S]*\}/)
+    if (objMatch) str = objMatch[0]
+  }
+  return str
+}
+
 async function generateShareSummary(
   title: string,
   htmlContent: string,
@@ -89,48 +119,73 @@ REGRAS:
 TÍTULO: ${title}
 CONTEÚDO: ${cleanContent}`
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`,
-      {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`
+  const MAX_RETRIES = 2
+  const RETRY_DELAY = 800
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const payload: Record<string, unknown> = {
+        contents: [{ parts: [{ text: prompt }] }],
+        safetySettings: SUMMARY_SAFETY_SETTINGS,
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.8,
+          maxOutputTokens: 1024,
+          responseMimeType: 'application/json',
+          // v1beta: Thinking Model Support
+          ...(attempt === 0 ? { thinkingConfig: { thinkingLevel: 'LOW' } } : {}),
+        },
+      }
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 512,
-            responseMimeType: 'application/json',
-          },
-        }),
-      },
-    )
+        body: JSON.stringify(payload),
+      })
 
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '(no body)')
-      return { error: `Gemini API ${res.status}: ${errBody.substring(0, 200)}` }
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '(no body)')
+        // Se 400/404, pode ser incompatibilidade de thinkingConfig — tentar sem
+        if (attempt === 0 && (res.status === 400 || res.status === 404)) {
+          await new Promise(r => setTimeout(r, RETRY_DELAY))
+          continue
+        }
+        return { error: `Gemini API ${res.status} (attempt ${attempt + 1}): ${errBody.substring(0, 200)}` }
+      }
+
+      const data = await res.json() as Record<string, unknown>
+      const candidates = data.candidates as Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }> | undefined
+
+      // v1beta: extrair texto filtrando thought blocks
+      const rawText = extractTextFromParts(candidates?.[0]?.content?.parts)
+      if (!rawText) {
+        const preview = JSON.stringify(data).substring(0, 300)
+        return { error: `Gemini sem texto útil (attempt ${attempt + 1}). Modelo: ${resolvedModel}. Resposta: ${preview}` }
+      }
+
+      // Parsing JSON robusto
+      const jsonStr = extractJsonFromText(rawText)
+      const parsed = JSON.parse(jsonStr) as { summary_og?: string; summary_ld?: string }
+      if (!parsed.summary_og) {
+        return { error: `JSON sem summary_og. Raw: ${rawText.substring(0, 150)}` }
+      }
+
+      return {
+        summary_og: parsed.summary_og.substring(0, 200),
+        summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
+      }
+    } catch (err) {
+      // Retry: primeira falha pode ser thinkingConfig incompatível
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, RETRY_DELAY))
+        continue
+      }
+      return { error: `Exception (attempt ${attempt + 1}): ${err instanceof Error ? err.message : String(err)}` }
     }
-
-    const data = await res.json() as Record<string, unknown>
-
-    const candidates = data.candidates as Array<{ content?: { parts?: Array<{ text?: string }> } }> | undefined
-    const rawText = candidates?.[0]?.content?.parts?.[0]?.text
-    if (!rawText) {
-      // Surfacing the full response so we can diagnose (safety block, model mismatch, etc.)
-      const preview = JSON.stringify(data).substring(0, 300)
-      return { error: `Gemini sem candidates. Modelo: ${resolvedModel}. Resposta: ${preview}` }
-    }
-
-    const parsed = JSON.parse(rawText) as { summary_og?: string; summary_ld?: string }
-    if (!parsed.summary_og) return { error: `Gemini retornou JSON sem summary_og: ${rawText.substring(0, 100)}` }
-
-    return {
-      summary_og: parsed.summary_og.substring(0, 200),
-      summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
-    }
-  } catch (err) {
-    return { error: `Exception: ${err instanceof Error ? err.message : String(err)}` }
   }
+
+  return { error: 'Gemini API falhou após todas as tentativas.' }
 }
 
 // ── Ensure table + self-healing migration for missing columns ──
