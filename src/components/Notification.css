@@ -36,14 +36,14 @@
 
 /* ─── Variante: success ─── */
 .notification-success {
-  background: var(--semantic-success, #16a34a);
+  background: var(--semantic-success, #34a853);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* ─── Variante: error ─── */
 .notification-error {
-  background: var(--semantic-error, #dc2626);
+  background: var(--semantic-error, #c5221f);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -51,7 +51,7 @@
 /* ─── Variante: info ─── */
 .notification-info {
   background: rgba(255, 255, 255, 0.92);
-  color: #1e293b;
+  color: #202124;
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
@@ -75,7 +75,7 @@
 }
 
 .notification-info .notification-icon {
-  color: #2563eb;
+  color: #1a73e8;
 }
 
 /* ─── Mensagem ─── */

@@ -153,10 +153,10 @@ export const DATE_PRESETS = [
 /** Cores padrão da indústria financeira:
  * Verde (#10b981) — aprovado/sucesso
  * Amarelo (#f59e0b) — pendente/processando
- * Azul (#3b82f6) — em análise
+ * Azul (#4285f4) — em análise
  * Vermelho (#ef4444) — rejeitado/falha
  * Lilás (#8b5cf6) — estornado/devolvido
- * Laranja (#f97316) — cancelado
+ * Laranja (#f9ab00) — cancelado
  * Cinza (#6b7280) — expirado/desconhecido
  * Vermelho escuro (#dc2626) — chargeback/limite
  */
@@ -174,9 +174,9 @@ export const getSumupStatusConfig = (status: string): StatusConfig => {
   if (s === 'REFUNDED')
     return { color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', label: 'ESTORNADO', canRefund: false, canCancel: false }
   if (s === 'PARTIALLY_REFUNDED')
-    return { color: '#a78bfa', bg: 'rgba(167,139,250,0.15)', label: 'EST. PARCIAL', canRefund: true, canCancel: false }
+    return { color: '#8ab4f8', bg: 'rgba(167,139,250,0.15)', label: 'EST. PARCIAL', canRefund: true, canCancel: false }
   if (['CANCELLED', 'CANCEL', 'CANCELED'].includes(s))
-    return { color: '#f97316', bg: 'rgba(249,115,22,0.15)', label: 'CANCELADO', canRefund: false, canCancel: false }
+    return { color: '#f9ab00', bg: 'rgba(249,171,0,0.15)', label: 'CANCELADO', canRefund: false, canCancel: false }
   if (s.includes('CHARGEBACK') || s.includes('CHARGE_BACK'))
     return { color: '#dc2626', bg: 'rgba(220,38,38,0.15)', label: 'CONTESTAÇÃO', canRefund: false, canCancel: false }
   return { color: '#6b7280', bg: 'rgba(107,114,128,0.15)', label: s || '?', canRefund: false, canCancel: false }
@@ -187,11 +187,11 @@ export const getMPStatusConfig = (status: string, statusDetail?: string): Status
   const d = (statusDetail || '').toLowerCase()
   if (s === 'approved') {
     if (d === 'partially_refunded')
-      return { color: '#a78bfa', bg: 'rgba(167,139,250,0.15)', label: 'EST. PARCIAL', canRefund: true, canCancel: false }
+      return { color: '#8ab4f8', bg: 'rgba(167,139,250,0.15)', label: 'EST. PARCIAL', canRefund: true, canCancel: false }
     return { color: '#10b981', bg: 'rgba(16,185,129,0.15)', label: 'APROVADO', canRefund: true, canCancel: false }
   }
   if (s === 'in_process')
-    return { color: '#3b82f6', bg: 'rgba(59,130,246,0.15)', label: 'EM ANÁLISE', canRefund: false, canCancel: true }
+    return { color: '#4285f4', bg: 'rgba(59,130,246,0.15)', label: 'EM ANÁLISE', canRefund: false, canCancel: true }
   if (s === 'pending')
     return { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', label: 'PENDENTE', canRefund: false, canCancel: true }
   if (s === 'rejected') {
@@ -210,7 +210,7 @@ export const getMPStatusConfig = (status: string, statusDetail?: string): Status
   if (s === 'refunded')
     return { color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', label: 'ESTORNADO', canRefund: false, canCancel: false }
   if (s === 'cancelled')
-    return { color: '#f97316', bg: 'rgba(249,115,22,0.15)', label: 'CANCELADO', canRefund: false, canCancel: false }
+    return { color: '#f9ab00', bg: 'rgba(249,171,0,0.15)', label: 'CANCELADO', canRefund: false, canCancel: false }
   if (s === 'charged_back')
     return { color: '#dc2626', bg: 'rgba(220,38,38,0.15)', label: 'CONTESTAÇÃO', canRefund: false, canCancel: false }
   return { color: '#6b7280', bg: 'rgba(107,114,128,0.15)', label: (status || '?').toUpperCase(), canRefund: false, canCancel: false }

@@ -1,16 +1,16 @@
 /* Base — tiptap.dev aesthetic and module shell isolated variables */
 .module-shell-tlsrpt {
-  --color-surface: #f5f4f4;
+  --color-surface: #f8f9fa;
   --color-surface-card: #ffffff;
-  --color-text-primary: #0d0d0d;
-  --color-text-secondary: #514b48;
+  --color-text-primary: #202124;
+  --color-text-secondary: #5f6368;
   --color-border-subtle: rgba(0, 0, 0, 0.06);
-  --color-indigo-600: #4f46e5;
-  --color-indigo-50: #eef2ff;
-  --color-indigo-100: #e0e7ff;
-  --color-indigo-200: #c7d2fe;
-  --color-indigo-400: #818cf8;
-  --color-indigo-500: #6366f1;
+  --color-indigo-600: #1a73e8;
+  --color-indigo-50: #e8f0fe;
+  --color-indigo-100: #d2e3fc;
+  --color-indigo-200: #aecbfa;
+  --color-indigo-400: #4285f4;
+  --color-indigo-500: #1a73e8;
 
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -43,14 +43,14 @@
   left: -6%;
   width: 30%;
   height: 30%;
-  background: rgba(99, 102, 241, 0.25);
+  background: rgba(26, 115, 232, 0.25);
 }
 .module-shell-tlsrpt .bg-orb-2 {
   bottom: -8%;
   right: -6%;
   width: 30%;
   height: 30%;
-  background: rgba(165, 180, 252, 0.20);
+  background: rgba(138, 180, 248, 0.20);
 }
 
 .tlsrpt-header {
@@ -152,7 +152,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: #0d0d0d;
+  background: #202124;
   border-radius: var(--radius-pill);
   font-size: 13px;
   letter-spacing: 0.01em;
@@ -173,14 +173,14 @@
 .tlsrpt-alert {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  background: #fef2f2;
-  color: #dc2626;
+  background: #fce8e6;
+  color: #c5221f;
   font-size: 0.75rem;
   display: flex;
   gap: 0.5rem;
   align-items: flex-start;
   border-radius: 10px;
-  border: 1px solid rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(234, 67, 53, 0.15);
 }
 
 .tlsrpt-report-list {
@@ -226,9 +226,9 @@
   box-shadow: var(--shadow-card-hover);
 }
 .tlsrpt-report-item.is-selected {
-  background: rgba(99, 102, 241, 0.08);
-  border: 2px solid rgba(99, 102, 241, 0.4);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
+  background: rgba(26, 115, 232, 0.08);
+  border: 2px solid rgba(26, 115, 232, 0.4);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.1);
   padding: calc(1rem - 1px); /* Compensa a borda duplicada */
 }
 
@@ -250,7 +250,7 @@
   color: var(--color-indigo-600);
 }
 .tlsrpt-chevron {
-  color: #9ca3af;
+  color: #9aa0a6;
   transition: transform 0.2s;
 }
 .tlsrpt-report-item:hover .tlsrpt-chevron {
@@ -282,13 +282,13 @@
 }
 .tlsrpt-upload-zone:hover {
   border-color: var(--color-indigo-500);
-  background: rgba(99, 102, 241, 0.04);
+  background: rgba(26, 115, 232, 0.04);
 }
 .tlsrpt-upload-zone input {
   display: none;
 }
 .tlsrpt-upload-icon {
-  color: #9ca3af;
+  color: #9aa0a6;
   margin-bottom: 0.5rem;
 }
 .tlsrpt-upload-text {
@@ -316,7 +316,7 @@
   border: 1px solid var(--color-border-subtle);
 }
 .tlsrpt-empty-icon {
-  color: #d1d5db;
+  color: #dadce0;
   margin-bottom: 1.5rem;
 }
 .tlsrpt-empty-text {
@@ -331,7 +331,7 @@
   overflow: hidden;
   background: linear-gradient(135deg, var(--color-indigo-600), var(--color-indigo-500));
   border-radius: var(--radius-card);
-  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.15);
+  box-shadow: 0 4px 16px rgba(26, 115, 232, 0.15);
 }
 .tlsrpt-meta-blur {
   position: absolute;
@@ -425,10 +425,10 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(26, 115, 232, 0.08);
   color: var(--color-indigo-600);
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(26, 115, 232, 0.2);
   letter-spacing: 0.04em;
 }
 
@@ -466,7 +466,7 @@
 .tlsrpt-progress-fill {
   height: 100%;
   transition: all 1s ease-out;
-  background: linear-gradient(90deg, #10b981, #34d399);
+  background: linear-gradient(90deg, #34a853, #81c995);
   border-radius: var(--radius-pill);
 }
 
@@ -483,12 +483,12 @@
   flex-direction: column;
 }
 .tlsrpt-counter-success {
-  background: rgba(16, 185, 129, 0.06);
-  border: 1px solid rgba(16, 185, 129, 0.12);
+  background: rgba(52, 168, 83, 0.06);
+  border: 1px solid rgba(52, 168, 83, 0.12);
 }
 .tlsrpt-counter-fail {
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.12);
+  background: rgba(234, 67, 53, 0.06);
+  border: 1px solid rgba(234, 67, 53, 0.12);
 }
 .tlsrpt-counter-header {
   display: flex;
@@ -497,10 +497,10 @@
   margin-bottom: 0.25rem;
 }
 .tlsrpt-counter-success .tlsrpt-counter-header {
-  color: #059669;
+  color: #34a853;
 }
 .tlsrpt-counter-fail .tlsrpt-counter-header {
-  color: #dc2626;
+  color: #c5221f;
 }
 .tlsrpt-counter-label {
   font-size: 10px;

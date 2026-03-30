@@ -2,7 +2,7 @@
  * Design System - CSS Variables
  * 
  * Centralized design tokens for:
- * - Colors (brand, status, semantic)
+ * - Colors (brand, status, semantic) — Google Standard Palette
  * - Typography (sizes, weights, family)
  * - Spacing (padding, margin, gaps)
  * - Border radius (component sizes)
@@ -22,69 +22,69 @@
 
 :root {
   /* ====================================================================== */
-  /* COLOR PALETTE */
+  /* COLOR PALETTE — Google Standard                                        */
   /* ====================================================================== */
 
   /* Primary Brand Colors — Google Blue */
   --color-primary: #1a73e8;
   --color-primary-light: rgba(26, 115, 232, 0.16);
   --color-primary-lighter: rgba(26, 115, 232, 0.08);
-  --color-primary-dark: #185abc;
+  --color-primary-dark: #1967d2;
   --color-primary-rgb: 26, 115, 232;
 
-  /* Secondary Brand Colors — unified with primary (no purple) */
+  /* Secondary Brand Colors — unified with primary (Google Blue) */
   --color-secondary: #1a73e8;
   --color-secondary-light: rgba(26, 115, 232, 0.16);
   --color-secondary-lighter: rgba(26, 115, 232, 0.08);
 
-  /* Status Colors */
-  --color-success: #16a34a;
-  --color-success-light: #22c55e;
-  --color-success-bg: rgba(22, 163, 74, 0.12);
+  /* Status Colors — Google Standard */
+  --color-success: #34a853;
+  --color-success-light: #81c995;
+  --color-success-bg: rgba(52, 168, 83, 0.12);
 
-  --color-error: #dc2626;
-  --color-error-light: #ef4444;
-  --color-error-bg: rgba(220, 38, 38, 0.12);
+  --color-error: #ea4335;
+  --color-error-light: #f28b82;
+  --color-error-bg: rgba(234, 67, 53, 0.12);
 
-  --color-warning: #ea580c;
-  --color-warning-light: #f97316;
-  --color-warning-bg: rgba(234, 88, 12, 0.12);
+  --color-warning: #f9ab00;
+  --color-warning-light: #fdd663;
+  --color-warning-bg: rgba(249, 171, 0, 0.12);
 
-  --color-info: #0284c7;
-  --color-info-light: #38bdf8;
-  --color-info-bg: rgba(2, 132, 199, 0.12);
+  --color-info: #4285f4;
+  --color-info-light: #8ab4f8;
+  --color-info-bg: rgba(66, 133, 244, 0.12);
 
-  /* Neutral Colors - Light mode (tiptap.dev warm grays) */
-  --color-bg-light: #f5f4f4;
+  /* Neutral Colors - Light mode (Google Material grays) */
+  --color-bg-light: #f8f9fa;
   --color-surface-light: #ffffff;
-  --color-surface-light-secondary: #eeedec;
-  --color-text-light: #0d0d0d;
-  --color-text-light-muted: #514b48;
-  --color-text-light-subtle: #6b6462;
-  --color-border-light: rgba(0, 0, 0, 0.08);
-  --color-border-light-secondary: rgba(0, 0, 0, 0.14);
+  --color-surface-light-secondary: #f1f3f4;
+  --color-text-light: #202124;
+  --color-text-light-muted: #5f6368;
+  --color-text-light-subtle: #80868b;
+  --color-border-light: #dadce0;
+  --color-border-light-secondary: #e8eaed;
 
   /* Neutral Colors - Dark mode */
   --color-bg-dark: #16171d;
   --color-surface-dark: #1e1f26;
   --color-surface-dark-secondary: #131419;
-  --color-text-dark: #d1d5db;
-  --color-text-dark-muted: #9ca3af;
-  --color-text-dark-subtle: #6b7280;
+  --color-text-dark: #e8eaed;
+  --color-text-dark-muted: #9aa0a6;
+  --color-text-dark-subtle: #80868b;
   --color-border-dark: rgba(255, 255, 255, 0.1);
   --color-border-dark-secondary: rgba(255, 255, 255, 0.06);
 
-  /* Status Shades */
-  --color-success-dark: #15803d;
-  --color-error-dark: #991b1b;
-  --color-warning-dark: #92400e;
+  /* Status Shades — Google Standard */
+  --color-success-dark: #1e8e3e;
+  --color-error-dark: #c5221f;
+  --color-warning-dark: #e37400;
 
   /* ====================================================================== */
   /* TYPOGRAPHY */
   /* ====================================================================== */
 
   /* Font Family */
-  --font-family-base: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-base: 'Google Sans', 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-family-mono: ui-monospace, "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
 
   /* Font Sizes */
@@ -179,11 +179,11 @@
   --shadow-admin-raised: 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-admin-glass: 0 4px 12px rgba(0, 0, 0, 0.06);
 
-  /* Status shadows */
-  --shadow-success: 0 8px 24px rgba(22, 163, 74, 0.3);
-  --shadow-error: 0 8px 24px rgba(220, 38, 38, 0.3);
-  --shadow-warning: 0 8px 24px rgba(234, 88, 12, 0.3);
-  --shadow-info: 0 8px 24px rgba(2, 132, 199, 0.3);
+  /* Status shadows — Google palette */
+  --shadow-success: 0 8px 24px rgba(52, 168, 83, 0.3);
+  --shadow-error: 0 8px 24px rgba(234, 67, 53, 0.3);
+  --shadow-warning: 0 8px 24px rgba(249, 171, 0, 0.3);
+  --shadow-info: 0 8px 24px rgba(66, 133, 244, 0.3);
 
   /* ====================================================================== */
   /* BACKDROP & BLUR EFFECTS (Glassmorphism) */
@@ -253,7 +253,7 @@
 @media (prefers-contrast: more) {
   :root {
     --color-border-light-secondary: rgba(0, 0, 0, 0.5);
-    --color-text-light-subtle: #1e293b;
+    --color-text-light-subtle: #3c4043;
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 }

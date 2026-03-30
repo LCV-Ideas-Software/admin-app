@@ -117,7 +117,7 @@ function fmtTokens(n: number): string {
 // Família → cor
 function familyColor(family: string): string {
   switch (family) {
-    case 'pro': return '#7c3aed'       // violeta
+    case 'pro': return '#1a73e8'       // violeta
     case 'flash': return '#1a73e8'     // azul
     case 'flash-lite': return '#0ea5e9' // cyan
     default: return '#6b7280'
@@ -353,7 +353,7 @@ function ModelsTab() {
         </div>
         <div className="metric-card">
           <div className="detail-header" style={{ gap: 10, padding: 0, border: 'none' }}>
-            <div className="metric-icon" style={{ background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed' }}><Sparkles size={18} /></div>
+            <div className="metric-icon" style={{ background: 'rgba(26, 115, 232, 0.1)', color: '#1a73e8' }}><Sparkles size={18} /></div>
             <div>
               <span className="eyebrow">Com Thinking</span>
               <strong style={{ display: 'block', fontSize: '1.3rem' }}>{stats.thinking}</strong>
@@ -499,7 +499,7 @@ function ModelsTab() {
                     {m.thinking && (
                       <span style={{
                         fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 99,
-                        background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed'
+                        background: 'rgba(26, 115, 232, 0.1)', color: '#1a73e8'
                       }}>💭 Thinking</span>
                     )}
                     <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontFamily: 'monospace' }}>{m.family}</span>
@@ -543,7 +543,7 @@ function ModelsTab() {
                     </div>
                   </div>
                   {m.description && (
-                    <p style={{ fontSize: '0.82rem', color: '#514b48', lineHeight: 1.5, margin: 0 }}>
+                    <p style={{ fontSize: '0.82rem', color: '#5f6368', lineHeight: 1.5, margin: 0 }}>
                       {m.description.slice(0, 250)}{m.description.length > 250 ? '…' : ''}
                     </p>
                   )}
@@ -658,7 +658,7 @@ function UsageTab() {
             </div>
             <div className="metric-card">
               <span className="eyebrow">Tokens de Saída</span>
-              <strong style={{ fontSize: '1.3rem', color: '#7c3aed' }}>{fmtTokens(s.total_output_tokens)}</strong>
+              <strong style={{ fontSize: '1.3rem', color: '#1a73e8' }}>{fmtTokens(s.total_output_tokens)}</strong>
             </div>
             <div className="metric-card">
               <span className="eyebrow">Erros</span>
@@ -878,7 +878,7 @@ function GcpTab() {
             <>
               <div style={{
                 padding: 20, borderRadius: 16,
-                background: 'linear-gradient(135deg, rgba(26, 115, 232, 0.04), rgba(124, 58, 237, 0.04))',
+                background: 'linear-gradient(135deg, rgba(26, 115, 232, 0.04), rgba(26, 115, 232, 0.04))',
                 border: '1px solid rgba(26, 115, 232, 0.15)',
               }}>
                 <button type="button" onClick={() => setExpandedGuide(!expandedGuide)}
@@ -978,7 +978,7 @@ function GcpTab() {
   }
   const metricColor: Record<string, string> = {
     request_count: '#1a73e8',
-    request_latencies: '#7c3aed',
+    request_latencies: '#1a73e8',
     usage: '#0ea5e9',
     limit: '#059669',
   }
@@ -989,13 +989,13 @@ function GcpTab() {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '16px 20px', borderRadius: 16, marginBottom: 16,
-        background: 'linear-gradient(135deg, rgba(26, 115, 232, 0.06), rgba(124, 58, 237, 0.04))',
+        background: 'linear-gradient(135deg, rgba(26, 115, 232, 0.06), rgba(26, 115, 232, 0.04))',
         border: '1px solid rgba(26, 115, 232, 0.12)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, #1a73e8, #7c3aed)', color: '#fff',
+            background: 'linear-gradient(135deg, #1a73e8, #1a73e8)', color: '#fff',
           }}>
             <Cloud size={20} />
           </div>
@@ -1073,13 +1073,13 @@ function GcpTab() {
             <div className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
               <div style={{
                 position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%',
-                background: 'rgba(124, 58, 237, 0.06)',
+                background: 'rgba(26, 115, 232, 0.06)',
               }} />
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(124, 58, 237, 0.05))',
-                  color: '#7c3aed',
+                  background: 'linear-gradient(135deg, rgba(26, 115, 232, 0.15), rgba(26, 115, 232, 0.05))',
+                  color: '#1a73e8',
                 }}>
                   <Server size={22} />
                 </div>
@@ -1141,7 +1141,7 @@ function GcpTab() {
                     const pct = h.count / maxVal
                     // Gradiente de cor baseado na intensidade
                     const barColor = pct > 0.8 ? 'linear-gradient(to top, #1a73e8, #5b9cf6)'
-                      : pct > 0.4 ? 'linear-gradient(to top, #3b82f6, #93bbfd)'
+                      : pct > 0.4 ? 'linear-gradient(to top, #4285f4, #93bbfd)'
                       : 'linear-gradient(to top, #93bbfd, #bfdbfe)'
                     return (
                       <div key={h.hour} className="ai-daily-bar-group" title={`${h.hour.slice(11)}h — ${fmtNum(h.count)} requests`}>
@@ -1164,7 +1164,7 @@ function GcpTab() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed',
+                    background: 'rgba(26, 115, 232, 0.1)', color: '#1a73e8',
                   }}>
                     <Clock size={16} />
                   </div>
@@ -1225,7 +1225,7 @@ function GcpTab() {
                           <span style={{
                             fontSize: '0.78rem', fontWeight: 700, padding: '2px 12px', borderRadius: 100,
                             background: 'linear-gradient(135deg, rgba(14,165,233,0.1), rgba(124,58,237,0.08))',
-                            color: '#7c3aed',
+                            color: '#1a73e8',
                           }}>
                             Ilimitado ∞
                           </span>
@@ -1245,7 +1245,7 @@ function GcpTab() {
                         <div style={{
                           height: '100%', borderRadius: 100, width: q.isUnlimited ? '100%' : '30%',
                           background: q.isUnlimited
-                            ? 'linear-gradient(90deg, #7c3aed, #a78bfa)'
+                            ? 'linear-gradient(90deg, #1a73e8, #8ab4f8)'
                             : 'linear-gradient(90deg, #059669, #10b981)',
                           opacity: q.isUnlimited ? 0.2 : 0.4,
                         }} />
@@ -1267,7 +1267,7 @@ function GcpTab() {
                 <Settings size={12} /> Dados brutos (debug)
               </summary>
               <pre style={{
-                marginTop: 8, padding: 16, borderRadius: 12, background: '#1a1a2e', color: '#e2e8f0',
+                marginTop: 8, padding: 16, borderRadius: 12, background: '#1a1a2e', color: '#dadce0',
                 fontSize: '0.68rem', overflow: 'auto', maxHeight: 350, lineHeight: 1.5,
                 border: '1px solid rgba(255,255,255,0.06)',
               }}>

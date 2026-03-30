@@ -420,7 +420,7 @@ const TIPTAP_EXTENSIONS = [
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
   Table.configure({ resizable: true }), TableRow, TableHeader, TableCell,
   TaskList, TaskItem.configure({ nested: true }),
-  Dropcursor.configure({ color: '#3b82f6', width: 2 }),
+  Dropcursor.configure({ color: '#4285f4', width: 2 }),
   CharacterCount,
   Placeholder.configure({ placeholder: 'Comece a escrever o conteúdo do post...' }),
   LinkExtension.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
@@ -895,7 +895,7 @@ export default function PostEditor({
 
             {/* AI Action Tool */}
             <div className="tiptap-ai-group">
-              <Sparkles size={14} color="#0284c7" />
+              <Sparkles size={14} color="#1a73e8" />
               <select id="ai-action" name="aiAction" title="Inteligência Artificial (Gemini 2.5 Pro)" autoComplete="off" onChange={(e) => { if (e.target.value) { handleAITransform(e.target.value); e.target.value = ''; } }} disabled={isGeneratingAI}>
                 <option value="">{isGeneratingAI ? 'Processando...' : 'IA: Aprimorar Texto'}</option>
                 <option value="grammar">Corrigir Gramática</option>
@@ -995,8 +995,8 @@ export default function PostEditor({
                 return ReactDOM.createPortal(
                   <div className="ai-freeform-popover" style={{ position: 'fixed', top: btnRect ? btnRect.bottom + 6 : 100, left: popLeft, width: `${popW}px`, zIndex: 99999 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <Wand2 size={14} color="#0284c7" />
-                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>IA: Instrução Livre</span>
+                      <Wand2 size={14} color="#1a73e8" />
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#1a73e8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>IA: Instrução Livre</span>
                       <span style={{ fontSize: '10px', opacity: 0.5, marginLeft: 'auto' }}>{editor?.state.selection.empty ? 'Texto inteiro' : 'Seleção'}</span>
                     </div>
                     <textarea
@@ -1010,7 +1010,7 @@ export default function PostEditor({
                     />
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px', gap: '8px' }}>
                       <button type="button" onClick={() => setAiChatOpen(false)} style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent', color: 'inherit', opacity: 0.6 }}>Cancelar</button>
-                      <button type="button" onClick={handleAIFreeform} disabled={!aiChatInput.trim()} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', fontSize: '12px', fontWeight: '700', border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#0284c7', color: '#fff', opacity: aiChatInput.trim() ? 1 : 0.5, transition: 'opacity 0.15s' }}>
+                      <button type="button" onClick={handleAIFreeform} disabled={!aiChatInput.trim()} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', fontSize: '12px', fontWeight: '700', border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#1a73e8', color: '#fff', opacity: aiChatInput.trim() ? 1 : 0.5, transition: 'opacity 0.15s' }}>
                         <Send size={12} /> Enviar
                       </button>
                     </div>
