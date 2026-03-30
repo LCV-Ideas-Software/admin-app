@@ -1258,8 +1258,8 @@ export function CfDnsModule() {
                     <Fragment key={recordId || `${record.type}-${record.name}-${record.content}`}>
                       <tr className={isSelected ? 'cfdns-row-selected' : ''}>
                         <td>{String(record.type ?? '').toUpperCase() || '—'}</td>
-                        <td>{String(record.name ?? '') || '—'}</td>
-                        <td className="cfdns-cell-content" title={formatRecordContent(record)}>{(() => { const c = formatRecordContent(record); return c.length > 60 ? c.slice(0, 57) + '…' : c; })()}</td>
+                        <td title={String(record.name ?? '')}>{String(record.name ?? '') || '—'}</td>
+                        <td className="cfdns-cell-content" title={formatRecordContent(record)}>{formatRecordContent(record)}</td>
                         <td>{record.ttl === 1 ? <span className="cfdns-ttl-auto">Auto</span> : (record.ttl ?? 'Auto')}</td>
                         <td>{record.proxied ? <span className="cfdns-proxy-badge cfdns-proxy-badge--proxied" title="Registro proxied — validação gerenciada pela Cloudflare"><Cloud size={11} /> Proxied</span> : <span className="cfdns-proxy-badge cfdns-proxy-badge--dns">DNS only</span>}</td>
                         <td title={formatDateTimeFull(record.modified_on)}>{formatDateTime(record.modified_on)}</td>

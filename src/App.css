@@ -1337,7 +1337,7 @@ input[type="color"]:focus-visible {
 
 .cfdns-table th:nth-child(3),
 .cfdns-table td:nth-child(3) {
-  width: 34%;
+  width: 30%;
 }
 
 .cfdns-table th:nth-child(4),
@@ -1357,7 +1357,7 @@ input[type="color"]:focus-visible {
 
 .cfdns-table th:nth-child(7),
 .cfdns-table td:nth-child(7) {
-  width: 10%;
+  width: 14%;
 }
 
 .cfdns-table thead th {
@@ -1374,9 +1374,12 @@ input[type="color"]:focus-visible {
   padding: 8px 10px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   color: #202124;
-  vertical-align: top;
+  vertical-align: middle;
   font-size: 0.79rem;
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cfdns-table tbody tr:hover {
@@ -1388,11 +1391,11 @@ input[type="color"]:focus-visible {
 }
 
 .cfdns-cell-content {
-  max-width: none;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  word-break: break-word;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cfdns-row-actions {
