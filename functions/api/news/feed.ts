@@ -138,18 +138,25 @@ function extractTag(block: string, tag: string): string {
 }
 
 /**
- * Remove tags HTML e decodifica entidades comuns.
+ * Remove tags HTML e decodifica entidades comuns seguras.
+ * Nao decodifica &lt; e &gt; para evitar recriar delimitadores de tag.
  */
 function cleanHtml(text: string): string {
-  return text
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/<\s*script[\s\S]*?>[\s\S]*?<\s*\/\s*script\s*>/gi, ' ')
-    .replace(/<\s*\/?\s*script\b[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
+  // Decodifica apenas entidades que nao reconstroem tags.
+  let sanitized = text
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&nbsp;/gi, ' ')
+
+  // Remove qualquer tag HTML remanescente, repetindo ate nao haver mais.
+  let previous: string
+  do {
+    previous = sanitized
+    sanitized = sanitized.replace(/<[^>]*>/g, '')
+  } while (sanitized !== previous)
+
+  // Garante que nenhum delimitador de tag escape para o output.
+  return sanitized
     .replace(/[<>]/g, '')
     .trim()
 }

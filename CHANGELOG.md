@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.74.03] — 2026-03-31
+### Corrigido
+- **News Feed — hardening de sanitização HTML para CodeQL**: `cleanHtml` em `functions/api/news/feed.ts` ajustado para remover tags sem regex específico de `<script>` e sem decodificar `&lt;`/`&gt;`, evitando reconstrução de delimitadores HTML e eliminando bloqueio de segurança no gate de PR.
+
+### Controle de versão
+- `admin-app`: APP v01.74.02 → APP v01.74.03
+
 ## [v01.74.02] — 2026-03-31
 ### Alterado
 - **Governança multi-repo com branch `preview`**: fluxo indireto padronizado para todos os repositórios ativos do workspace, com promoção automatizada para `main`.
