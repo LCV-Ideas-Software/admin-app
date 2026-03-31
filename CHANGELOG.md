@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.74.18] - 2026-03-31
+### Corrigido
+- **Hotfix: Migração de Legados**: Corrigido um problema na rede de imports gerada na versão v01.74.17 que forçou a quebra do processo de *build* automatizado no Vite e `tsc`. A função de validação semântica de legendas HTML legadas (`migrateLegacyCaptions`) foi relocada do módulo `NodeViews.tsx` (que precisa ser livre de funções independentes para manter o `Fast Refresh` saudável do React) e implementada de volta como um export puro no módulo utilitário genérico `utils.ts`, re-sincronizada com eficácia no `PostEditor.tsx`.
+
+### Controle de versão
+- `admin-app`: APP v01.74.17 → APP v01.74.18
+
 ## [v01.74.17] - 2026-03-31
 ### Corrigido
 - **PostEditor — Seleção definitiva de Mídias Legadas restaurada**: Solucionado o "bug persistente" de seleção em `FigureNodeView` e mídias sem wrapper (legacy). As imagens em legadas renderizadas como `<figure>` agora recuperaram explicitamente seus ouvintes sintéticos de `onMouseDown` e `onPointerDown`, liberando o redimensionamento nativo. Além disso, o interceptor de `PointerEvents` do iframe de vídeos do YouTube foi configurado para adotar `editor.isEditable` (vazante) ao invés de apenas monitorar visualmente o click, resolvendo finalmente a blindagem invisível que o YouTube aplicava sobre a interface do Admin.
