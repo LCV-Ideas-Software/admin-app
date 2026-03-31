@@ -35,4 +35,3 @@ This repository employs:
 - Use strong authentication (SSH keys, personal access tokens)
 - Review pull requests carefully before merge
 - Report any suspicious activity immediately
-
