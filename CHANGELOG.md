@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.74.11] — 2026-03-31
+### Corrigido
+- **Deploy em produção bloqueado por `npm ci` (`ERESOLVE`)**: alinhado `typescript-eslint` para `^8.58.0` no `admin-app`, compatibilizando a árvore com `typescript@~6.0.2` no CI da GitHub Actions.
+
+### Controle de versão
+- `admin-app`: APP v01.74.10 → APP v01.74.11
+
 ## [v01.74.10] — 2026-03-31
 ### Corrigido
 - **PRs presos no GitHub por check obrigatório sem execução**: adicionado workflow `codeql.yml` no `admin-app` com job `Analyze (javascript-typescript)` para publicar o status check exigido pela branch protection em PRs para `main`, eliminando estado `pending` sem statuses (`total_count: 0`).
