@@ -6258,3 +6258,12 @@ input[type="color"]:focus-visible {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+/* 
+   CHROME-FIRST OPTIMIZATIONS - Modals & Overlays
+   
+*/
+.editor-bubble-menu, .slash-commands-menu, .tiptap-floating-menu {
+  will-change: transform, opacity;
+  contain: paint layout;
+}
+

@@ -195,6 +195,12 @@ export const FigureNodeView = ({ node, updateAttributes, selected, editor, getPo
     editor.commands.focus()
   }
 
+  const handleSelectMedia = (event: React.MouseEvent | React.PointerEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    selectCurrentNode()
+  }
+
   // Sync caption text back to attrs on blur
   const handleCaptionBlur = () => {
     const text = captionRef.current?.innerText?.trim() ?? ''
@@ -208,6 +214,8 @@ export const FigureNodeView = ({ node, updateAttributes, selected, editor, getPo
       className={`tiptap-figure-nv resizable-media media-image tone-${localTone} ${selected ? 'is-selected' : ''}`}
       contentEditable={false}
       style={{ width: node.attrs.width || '100%' }}
+      onMouseDown={handleSelectMedia}
+      onPointerDown={handleSelectMedia}
     >
       <MediaSnapBar onSnap={(size) => updateAttributes({ width: size })} />
       <SelectMediaButton onSelect={selectCurrentNode} />
@@ -219,6 +227,8 @@ export const FigureNodeView = ({ node, updateAttributes, selected, editor, getPo
           title={node.attrs.title || ''}
           style={{ width: '100%', height: 'auto', display: 'block' }}
           draggable="false"
+          onMouseDown={handleSelectMedia}
+          onPointerDown={handleSelectMedia}
         />
         <figcaption
           ref={captionRef as React.RefObject<HTMLElement>}

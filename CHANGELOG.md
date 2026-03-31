@@ -1,7 +1,16 @@
 # Changelog — Admin App
 
-## [v01.74.16] - 2026-03-31
+## [v01.74.17] - 2026-03-31
 ### Corrigido
+- **PostEditor — Seleção definitiva de Mídias Legadas restaurada**: Solucionado o "bug persistente" de seleção em `FigureNodeView` e mídias sem wrapper (legacy). As imagens em legadas renderizadas como `<figure>` agora recuperaram explicitamente seus ouvintes sintéticos de `onMouseDown` e `onPointerDown`, liberando o redimensionamento nativo. Além disso, o interceptor de `PointerEvents` do iframe de vídeos do YouTube foi configurado para adotar `editor.isEditable` (vazante) ao invés de apenas monitorar visualmente o click, resolvendo finalmente a blindagem invisível que o YouTube aplicava sobre a interface do Admin.
+
+### Otimizado
+- **Chrome Optimization no Admin**: Adicionada propriedade `text-rendering: optimizeLegibility` com `antialiasing` global no body para maior suavidade de fontes. Incluídos hooks css `will-change: transform` e `contain: paint layout` visando atenuar travamentos do Chrome nas camadas flutuantes e menus em cascata (`.editor-bubble-menu`, `.slash-commands-menu`, modais TiTap).
+
+### Controle de versão
+- `admin-app`: APP v01.74.16 → APP v01.74.17
+
+## [v01.74.16] - 2026-03-31
 - **PostEditor — seleção de mídias legadas restaurada**: solucionado o bug que impedia o redimensionamento e a seleção de imagens e vídeos antigos do banco de dados (quebra originária com o framework de NodeViews estritos atual). A extensão `CustomResizableYoutube` agora processa `<iframe>` soltas com validação de Regex garantindo paridade em vídeos; o componente `FigureNodeView` agora herda as barras de seleção (`<SelectMediaButton>`), de redimensionamento (`<ResizableMediaHandle>`) e de _snap bar_ (`<MediaSnapBar>`) que antes eram exclusivas de posts novos. Tudo operante sem mexer no conteúdo em si para ambos os vetores antigos.
 
 ### Controle de versão
