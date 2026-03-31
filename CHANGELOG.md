@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.74.12] — 2026-03-31
+### Corrigido
+- **PostEditor — compatibilidade de ícone YouTube sem regressão funcional**: substituída dependência da exportação removida `Youtube` do `lucide-react` por componente local `YoutubeIcon`, preservando integralmente o botão, a ação `addYoutube` e o fluxo existente de inserção de vídeo.
+
+### Controle de versão
+- `admin-app`: APP v01.74.11 → APP v01.74.12
+
 ## [v01.74.11] — 2026-03-31
 ### Corrigido
 - **Deploy em produção bloqueado por `npm ci` (`ERESOLVE`)**: alinhado `typescript-eslint` para `^8.58.0` no `admin-app`, compatibilizando a árvore com `typescript@~6.0.2` no CI da GitHub Actions.
