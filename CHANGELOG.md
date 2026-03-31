@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.74.13] - 2026-03-31
+### Corrigido
+- **Compliance - GNU AGPLv3**: corrigido erro 404 no conteúdo descarregado do arquivo LICENSE, publicando o texto integral e atualizado da licença (~34KB) em conformidade técnica e jurídica.
+
+### Controle de versão
+- `admin-app`: APP v01.74.12   APP v01.74.13
+
 ## [v01.74.12] — 2026-03-31
 ### Corrigido
 - **PostEditor — compatibilidade de ícone YouTube sem regressão funcional**: substituída dependência da exportação removida `Youtube` do `lucide-react` por componente local `YoutubeIcon`, preservando integralmente o botão, a ação `addYoutube` e o fluxo existente de inserção de vídeo.
