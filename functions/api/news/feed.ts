@@ -138,18 +138,20 @@ function extractTag(block: string, tag: string): string {
 }
 
 /**
- * Remove tags HTML e decodifica entidades comuns.
+ * Remove tags HTML e decodifica entidades comuns seguras.
+ * Nao decodifica &lt; e &gt; para evitar reconstruir markup.
  */
 function cleanHtml(text: string): string {
   return text
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/<\s*script[\s\S]*?>[\s\S]*?<\s*\/\s*script\s*>/gi, ' ')
-    .replace(/<\s*\/?\s*script\b[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
+    // Decodifica apenas entidades que nao criam delimitadores de tag.
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&nbsp;/gi, ' ')
+
+    // Remove qualquer tag HTML remanescente.
+    .replace(/<[^>]*>/g, '')
+
+    // Garante que nenhum delimitador de tag escape para o output.
     .replace(/[<>]/g, '')
     .trim()
 }
