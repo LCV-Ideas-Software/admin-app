@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.74.02] — 2026-03-31
+### Alterado
+- **Governança multi-repo com branch `preview`**: fluxo indireto padronizado para todos os repositórios ativos do workspace, com promoção automatizada para `main`.
+- **Auto-PR e auto-merge**: workflow `.github/workflows/preview-auto-pr.yml` implantado/atualizado para abrir ou reutilizar PR `preview -> main`, habilitar auto-merge e tentar merge imediato quando o PR estiver limpo.
+- **Permissões de Actions**: configuração de repositório ajustada para permitir criação/aprovação de PR por workflow, removendo bloqueios operacionais.
+
+### Controle de versão
+- `admin-app`: APP v01.74.01 → APP v01.74.02
+
 ## [v01.74.01] — 2026-03-29
 ### Corrigido
 - **CF DNS — Tabela de registros: overflow de texto**: campos longos (Nome e Conteúdo) agora truncam com `...` via CSS `text-overflow: ellipsis` em vez de quebrar linha e invadir registros adjacentes, espelhando o comportamento visual do painel DNS nativo da Cloudflare.
