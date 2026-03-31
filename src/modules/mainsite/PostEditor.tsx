@@ -809,17 +809,42 @@ export default function PostEditor({
     saveFeedbackTimer.current = setTimeout(() => setSaveFeedback(null), 5000)
   }, [])
 
+  // ── Deterministic link sanitizer at save-time ────────────────
+  // Ensures ALL non-YouTube links get target="_blank" + secure rel,
+  // regardless of whether the ProseMirror plugin had a chance to run.
+  const sanitizeLinksTargetBlank = (html: string): string => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const anchors = doc.querySelectorAll('a[href]')
+    let changed = false
+    anchors.forEach((a) => {
+      const href = a.getAttribute('href') || ''
+      if (isYoutubeUrl(href)) return
+      if (a.getAttribute('target') !== '_blank') {
+        a.setAttribute('target', '_blank')
+        changed = true
+      }
+      if (a.getAttribute('rel') !== 'noopener noreferrer') {
+        a.setAttribute('rel', 'noopener noreferrer')
+        changed = true
+      }
+    })
+    return changed ? doc.body.innerHTML : html
+  }
+
   // ── Form submission ─────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const title = postTitle.trim()
     const author = postAuthor.trim()
-    const content = editor?.getHTML()?.trim() ?? ''
-    if (!title || !content || content === '<p></p>') {
+    const rawContent = editor?.getHTML()?.trim() ?? ''
+    if (!title || !rawContent || rawContent === '<p></p>') {
       flashFeedback('Título e conteúdo são obrigatórios para salvar o post.', 'error')
       showNotification('Título e conteúdo são obrigatórios para salvar o post.', 'error')
       return
     }
+    // Enforce target="_blank" on all non-YouTube links before persisting
+    const content = sanitizeLinksTargetBlank(rawContent)
     const success = await onSave(title, author, content)
     if (success) {
       flashFeedback(editingPostId ? 'Post atualizado com sucesso ✓' : 'Post criado com sucesso ✓', 'success')
