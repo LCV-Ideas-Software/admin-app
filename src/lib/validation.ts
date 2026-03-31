@@ -1,7 +1,3 @@
-/*
- * Copyright (C) 2026 Leonardo Cardozo Vargas
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
 /**
  * Validação centralizada para admin-app
  * Consolidação de regras de negócio com foco em segurança e compliance
@@ -72,11 +68,14 @@ const MX_HOSTNAME_REGEX = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](
 const BLOCKED_URL_SCHEMES = ['javascript:', 'data:', 'vbscript:'] as const
 
 const normalizeSchemeInput = (value: string): string =>
-  value
-    .trim()
-    .toLowerCase()
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f\s]+/g, '')
+  Array.from(value.trim().toLowerCase())
+    .filter((char) => {
+      const code = char.charCodeAt(0)
+      const isControl = code <= 0x1f || code === 0x7f
+      const isWhitespace = /\s/.test(char)
+      return !isControl && !isWhitespace
+    })
+    .join('')
 
 /**
  * Validates HTTP/HTTPS URL

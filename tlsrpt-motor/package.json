@@ -9,12 +9,12 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.12.4",
-		"vitest": "~3.2.0",
-		"wrangler": "^4.69.0"
+		"@cloudflare/vitest-pool-workers": "^0.14.0",
+		"vitest": "~4.1.2",
+		"wrangler": "^4.79.0"
 	},
 	"dependencies": {
-		"postal-mime": "^2.7.3"
+		"postal-mime": "^2.7.4"
 	},
 	"overrides": {
 		"picomatch": "4.0.4",

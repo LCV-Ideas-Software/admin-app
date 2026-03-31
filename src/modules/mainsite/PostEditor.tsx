@@ -1,7 +1,3 @@
-/*
- * Copyright (C) 2026 Leonardo Cardozo Vargas
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import {
@@ -56,25 +52,6 @@ const formatImageUrl = (url: string): string => {
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
-
-const YoutubeIcon = ({ size = 15, className }: { size?: number, className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    aria-hidden="true"
-  >
-    <rect x="2" y="6" width="20" height="12" rx="3" ry="3" />
-    <polygon points="10 9 16 12 10 15 10 9" fill="currentColor" stroke="none" />
-  </svg>
-)
 
 // ── Custom Node Views Components ──────────────────────────────
 
@@ -1042,7 +1019,7 @@ export default function PostEditor({
             <input id="tiptap-file-upload" ref={fileInputRef} name="tiptapFileUpload" type="file" accept="image/*" title="Upload de imagem" className="tiptap-hidden-input" onChange={handleImageUpload} />
             <button type="button" title="Upload de imagem (R2)" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>{isUploading ? <Loader2 size={15} className="spin" /> : <Upload size={15} />}</button>
             <button type="button" title="Imagem por URL / Google Drive" onClick={addImageUrl}><ImageIcon size={15} /></button>
-            <button type="button" title="Vídeo do YouTube" onClick={addYoutube}><YoutubeIcon size={15} /></button>
+            <button type="button" title="Vídeo do YouTube" onClick={addYoutube}><span>YT</span></button>
             <button type="button" title="Reduzir mídia" onClick={() => adjustSelectedMediaSize(-1)} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><ZoomOut size={15} /></button>
             <button type="button" title="Ampliar mídia" onClick={() => adjustSelectedMediaSize(1)} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><ZoomIn size={15} /></button>
             <button type="button" title="Legenda da mídia" onClick={editCaption} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><MessageSquare size={15} /></button>
