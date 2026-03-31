@@ -55,9 +55,23 @@ const formatPosicaoLabel = (pos: string): string => {
 }
 
 /** Sanitiza HTML para uso em e-mail (tags seguras apenas) */
-const sanitizeForEmail = (html: string): string => {
+const htmlToPlainText = (html: string): string => {
   if (typeof DOMParser === 'undefined') {
     return html
+      .split('&nbsp;').join(' ')
+      .split('&amp;').join('&')
+      .split('&quot;').join('"')
+      .split('&#39;').join("'")
+      .trim()
+  }
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html')
+  return (parsed.body.textContent || '').trim()
+}
+
+const sanitizeForEmail = (html: string): string => {
+  if (typeof DOMParser === 'undefined') {
+    return htmlToPlainText(html)
   }
 
   const blockedTags = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'meta', 'link', 'base'])
@@ -74,9 +88,24 @@ const sanitizeForEmail = (html: string): string => {
 
     Array.from(node.attributes).forEach((attr) => {
       const name = attr.name.toLowerCase()
-      const value = attr.value.trim().toLowerCase()
-      if (name.startsWith('on') || value.startsWith('javascript:') || value.startsWith('data:') || value.startsWith('vbscript:')) {
+      const rawValue = attr.value.trim()
+      const lowerValue = rawValue.toLowerCase()
+
+      if (name.startsWith('on') || lowerValue.startsWith('javascript:') || lowerValue.startsWith('data:') || lowerValue.startsWith('vbscript:')) {
         node.removeAttribute(attr.name)
+        return
+      }
+
+      if (name === 'href' || name === 'src') {
+        try {
+          const resolved = new URL(rawValue, 'https://example.invalid')
+          const protocol = resolved.protocol.toLowerCase()
+          if (protocol === 'javascript:' || protocol === 'data:' || protocol === 'vbscript:') {
+            node.removeAttribute(attr.name)
+          }
+        } catch {
+          node.removeAttribute(attr.name)
+        }
       }
     })
   })
@@ -145,19 +174,7 @@ function gerarTextoRelatorio(
   }
 
   if (analiseIa) {
-    const iaTxt = analiseIa
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n\n')
-      .replace(/<strong>(.*?)<\/strong>/gi, '*$1*')
-      .replace(/<b>(.*?)<\/b>/gi, '*$1*')
-      .replace(/<em>(.*?)<\/em>/gi, '_$1_')
-      .replace(/<i>(.*?)<\/i>/gi, '_$1_')
-      .replace(/<li>(.*?)<\/li>/gi, '• $1\n')
-      .replace(/<\/ul>/gi, '\n')
-      .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n*$1*\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
+    const iaTxt = htmlToPlainText(analiseIa)
 
     t += divider
     t += `*🧠 SÍNTESE DO MESTRE (IA)*\n\n` + iaTxt.replace(/\n{3,}/g, '\n\n').trim() + `\n`
@@ -328,7 +345,7 @@ export function generateAstrologicalReport(
   // Summary from AI or fallback
   let summary: string
   if (mapa.analise_ia) {
-    summary = mapa.analise_ia.replace(/<[^>]+>/g, '').split('.')[0].trim()
+    summary = htmlToPlainText(mapa.analise_ia).split('.')[0].trim()
   } else {
     summary = `Mapa astrológico de ${mapa.nome}`
   }
