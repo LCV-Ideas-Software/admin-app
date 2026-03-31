@@ -1,0 +1,85 @@
+name: Preview Auto PR
+
+on:
+  push:
+    branches:
+      - preview
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-auto-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  create-or-update-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create or reuse PR preview -> main
+        id: ensure_pr
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const base = 'main';
+            const head = 'preview';
+
+            const { data: existing } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              base,
+              head: `${owner}:${head}`,
+              per_page: 1,
+            });
+
+            let pr = existing[0];
+            if (!pr) {
+              const created = await github.rest.pulls.create({
+                owner,
+                repo,
+                title: 'chore(preview): promote preview to main',
+                head,
+                base,
+                body: 'PR criado automaticamente apos push em `preview`.',
+              });
+              pr = created.data;
+              core.info(`Created PR #${pr.number}`);
+            } else {
+              core.info(`Reusing PR #${pr.number}`);
+            }
+
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('pr_node_id', pr.node_id);
+
+      - name: Enable auto-merge (squash)
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pullRequestId = `${{ steps.ensure_pr.outputs.pr_node_id }}`;
+            try {
+              await github.graphql(
+                `mutation($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: SQUASH
+                  }) {
+                    pullRequest {
+                      number
+                    }
+                  }
+                }`,
+                { pullRequestId }
+              );
+              core.info(`Auto-merge enabled for PR #${{ steps.ensure_pr.outputs.pr_number }}`);
+            } catch (error) {
+              const msg = String(error && error.message ? error.message : error);
+              if (msg.includes('Auto merge is already enabled')) {
+                core.info('Auto-merge already enabled.');
+              } else {
+                core.warning(`Could not enable auto-merge: ${msg}`);
+              }
+            }
