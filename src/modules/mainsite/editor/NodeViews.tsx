@@ -12,33 +12,6 @@ import { clamp } from './utils'
 
 // ── Shared helpers ────────────────────────────────────────────
 
-export function migrateLegacyCaptions(html: string): string {
-  if (!html) return html
-
-  const normalizeCaption = (caption: string) =>
-    caption
-      .replace(/<[^>]+>/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-
-  const wrappedImagePattern = /<p[^>]*>\s*(<img\b[^>]*>)\s*<\/p>\s*<p[^>]*text-align\s*:\s*center[^>]*>\s*(?:<em>|<i>)\s*([\s\S]*?)\s*(?:<\/em>|<\/i>)\s*<\/p>/gi
-  const plainImagePattern = /(<img\b[^>]*>)\s*<p[^>]*text-align\s*:\s*center[^>]*>\s*(?:<em>|<i>)\s*([\s\S]*?)\s*(?:<\/em>|<\/i>)\s*<\/p>/gi
-
-  let migrated = html.replace(wrappedImagePattern, (_m, imgTag: string, captionRaw: string) => {
-    const caption = normalizeCaption(captionRaw)
-    if (!caption) return `<figure class="tiptap-figure">${imgTag}</figure>`
-    return `<figure class="tiptap-figure">${imgTag}<figcaption>${caption}</figcaption></figure>`
-  })
-
-  migrated = migrated.replace(plainImagePattern, (_m, imgTag: string, captionRaw: string) => {
-    const caption = normalizeCaption(captionRaw)
-    if (!caption) return `<figure class="tiptap-figure">${imgTag}</figure>`
-    return `<figure class="tiptap-figure">${imgTag}<figcaption>${caption}</figcaption></figure>`
-  })
-
-  return migrated
-}
-
 // ── Shared sub-components ─────────────────────────────────────
 
 export const ResizableMediaHandle = ({
@@ -74,7 +47,7 @@ export const SelectMediaButton = ({ onSelect }: { onSelect: () => void }) => (
   </button>
 )
 
-export const IMAGE_SNAPS = [
+const IMAGE_SNAPS = [
   { label: '25%', v: '25%' },
   { label: '50%', v: '50%' },
   { label: '75%', v: '75%' },
@@ -89,7 +62,7 @@ export const MediaSnapBar = ({ onSnap }: { onSnap: (v: string) => void }) => (
   </div>
 )
 
-export const VIDEO_SNAPS = [
+const VIDEO_SNAPS = [
   { label: '480p', w: 853, h: 480 },
   { label: '720p', w: 1280, h: 720 },
   { label: '840px', w: 840, h: 472 },
