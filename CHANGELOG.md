@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.74.19] - 2026-03-31
+### Corrigido
+- **PostEditor — Importar do Gemini com resiliência de rede**: endpoint `functions/api/mainsite/gemini-import.ts` reforçado para aceitar URLs `gemini.google.com/share/*` e `g.co/gemini/share/*`, normalizar links curtos e executar fallback de extração textual quando o fetch direto do Gemini for bloqueado (reduzindo falhas 502 em produção).
+- **PostEditor — Mensageria de erro contextual**: fluxo de importação agora diferencia erros de URL inválida, link privado/expirado/bloqueado, falha de leitura remota e retorno inválido, exibindo mensagens acionáveis ao operador.
+- **PostEditor — Indicadores visuais de progresso**: adicionada barra progressiva por etapas (validação, request, processamento, inserção, conclusão/erro) com feedback em tempo real e ações rápidas de retry/fechar no estado de erro.
+- **PostEditor Popup — crash `insertBefore` resolvido**: eliminado race condition de reconciliação React em janela popup ao remover portal do `PromptModal` e renderizar modal inline no subtree do editor; callback de submit mantido em microtask pós-unmount para estabilidade do DOM.
+
+### Controle de versão
+- `admin-app`: APP v01.74.18 → APP v01.74.19
+
 ## [v01.74.18] - 2026-03-31
 ### Corrigido
 - **Hotfix: Migração de Legados**: Corrigido um problema na rede de imports gerada na versão v01.74.17 que forçou a quebra do processo de *build* automatizado no Vite e `tsc`. A função de validação semântica de legendas HTML legadas (`migrateLegacyCaptions`) foi relocada do módulo `NodeViews.tsx` (que precisa ser livre de funções independentes para manter o `Fast Refresh` saudável do React) e implementada de volta como um export puro no módulo utilitário genérico `utils.ts`, re-sincronizada com eficácia no `PostEditor.tsx`.
