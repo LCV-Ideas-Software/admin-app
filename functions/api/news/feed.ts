@@ -142,7 +142,7 @@ function extractTag(block: string, tag: string): string {
  */
 function cleanHtml(text: string): string {
   return text
-    .replace(/<[^>]+>/g, '')
+    .replace(/<[^>]+>/g, ' ')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
