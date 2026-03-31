@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.74.10] — 2026-03-31
+### Corrigido
+- **PRs presos no GitHub por check obrigatório sem execução**: adicionado workflow `codeql.yml` no `admin-app` com job `Analyze (javascript-typescript)` para publicar o status check exigido pela branch protection em PRs para `main`, eliminando estado `pending` sem statuses (`total_count: 0`).
+
+### Controle de versão
+- `admin-app`: APP v01.74.09 → APP v01.74.10
+
 ## [v01.74.09] — 2026-03-31
 ### Corrigido
 - **GitHub Actions Deploy — falha em `npm ci` por peer dependency**: downgrade controlado de `eslint` para `^9.39.4` no `admin-app` para compatibilidade com `eslint-plugin-react-hooks@7.0.1`, eliminando erro `ERESOLVE` no workflow `Deploy` (branch `main`). `package-lock.json` regenerado para refletir a árvore válida.
