@@ -55,13 +55,34 @@ const formatPosicaoLabel = (pos: string): string => {
 }
 
 /** Sanitiza HTML para uso em e-mail (tags seguras apenas) */
-const sanitizeForEmail = (html: string): string =>
-  html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/on\w+="[^"]*"/gi, '')
-  .replace(/\s(href|src)\s*=\s*(['"])\s*(javascript|data|vbscript)\s*:[\s\S]*?\2/gi, '')
-  .replace(/javascript:/gi, '')
-  .replace(/data:/gi, '')
-  .replace(/vbscript:/gi, '')
+const sanitizeForEmail = (html: string): string => {
+  if (typeof DOMParser === 'undefined') {
+    return html
+  }
+
+  const blockedTags = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'meta', 'link', 'base'])
+  const parsed = new DOMParser().parseFromString(html, 'text/html')
+
+  const nodes = Array.from(parsed.body.querySelectorAll('*'))
+  nodes.forEach((node) => {
+    const tagName = node.tagName.toLowerCase()
+
+    if (blockedTags.has(tagName)) {
+      node.remove()
+      return
+    }
+
+    Array.from(node.attributes).forEach((attr) => {
+      const name = attr.name.toLowerCase()
+      const value = attr.value.trim().toLowerCase()
+      if (name.startsWith('on') || value.startsWith('javascript:') || value.startsWith('data:') || value.startsWith('vbscript:')) {
+        node.removeAttribute(attr.name)
+      }
+    })
+  })
+
+  return parsed.body.innerHTML
+}
 
 // ─── Text Report (WhatsApp-style) ────────────────────────────────
 
