@@ -142,15 +142,11 @@ function extractTag(block: string, tag: string): string {
  */
 function cleanHtml(text: string): string {
   return text
-<<<<<<< HEAD
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/<\s*script[\s\S]*?>[\s\S]*?<\s*\/\s*script\s*>/gi, ' ')
     .replace(/<\s*\/?\s*script\b[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, '')
-=======
-    .replace(/<[^>]+>/g, ' ')
->>>>>>> e87cf66706de3f09dd74053c1fd916c692039a30
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
