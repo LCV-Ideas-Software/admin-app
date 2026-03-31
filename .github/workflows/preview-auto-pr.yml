@@ -83,3 +83,36 @@ jobs:
                 core.warning(`Could not enable auto-merge: ${msg}`);
               }
             }
+
+      - name: Merge immediately when CLEAN
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = Number(`${{ steps.ensure_pr.outputs.pr_number }}`);
+
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
+            core.info(`PR #${pull_number} state=${pr.state} draft=${pr.draft} mergeable_state=${pr.mergeable_state}`);
+
+            if (pr.state !== 'open' || pr.draft) {
+              core.info('PR is not open/mergeable candidate now.');
+              return;
+            }
+
+            if (pr.mergeable_state === 'clean' || pr.mergeable_state === 'has_hooks') {
+              try {
+                await github.rest.pulls.merge({
+                  owner,
+                  repo,
+                  pull_number,
+                  merge_method: 'squash',
+                });
+                core.info(`Merged PR #${pull_number} immediately.`);
+              } catch (error) {
+                const msg = String(error && error.message ? error.message : error);
+                core.warning(`Immediate merge skipped: ${msg}`);
+              }
+            } else {
+              core.info('PR not CLEAN yet; auto-merge will handle when requirements pass.');
+            }
