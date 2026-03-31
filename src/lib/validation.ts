@@ -75,6 +75,7 @@ const normalizeSchemeInput = (value: string): string =>
   value
     .trim()
     .toLowerCase()
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f\s]+/g, '')
 
 /**
