@@ -65,11 +65,7 @@ export function validateAdminActor(actor: string): ValidationResult {
 
 const DOMAIN_REGEX = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i
 const MX_HOSTNAME_REGEX = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(\s+\d+)?$/i
-<<<<<<< HEAD
-const BLOCKED_URL_SCHEMES = ['javascript:', 'data:'] as const
-=======
 const BLOCKED_URL_SCHEMES = ['javascript:', 'data:', 'vbscript:'] as const
->>>>>>> 06a650100fb96aa9e77f965e12b15483f3954e99
 
 const normalizeSchemeInput = (value: string): string =>
   value

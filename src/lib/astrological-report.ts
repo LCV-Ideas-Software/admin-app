@@ -55,20 +55,7 @@ const formatPosicaoLabel = (pos: string): string => {
 }
 
 /** Sanitiza HTML para uso em e-mail (tags seguras apenas) */
-<<<<<<< HEAD
-<<<<<<< HEAD
-const sanitizeForEmail = (html: string): string =>
-  html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/on\w+="[^"]*"/gi, '')
-  .replace(/\s(href|src)\s*=\s*(['"])\s*(javascript|data|vbscript)\s*:[\s\S]*?\2/gi, '')
-  .replace(/javascript:/gi, '')
-  .replace(/data:/gi, '')
-  .replace(/vbscript:/gi, '')
-=======
-const sanitizeForEmail = (html: string): string => {
-=======
 const htmlToPlainText = (html: string): string => {
->>>>>>> 4ebcac4bec87b9fc61b8a74be04153662497f76e
   if (typeof DOMParser === 'undefined') {
     return html
       .split('&nbsp;').join(' ')
@@ -125,7 +112,6 @@ const sanitizeForEmail = (html: string): string => {
 
   return parsed.body.innerHTML
 }
->>>>>>> 06a650100fb96aa9e77f965e12b15483f3954e99
 
 // ─── Text Report (WhatsApp-style) ────────────────────────────────
 
