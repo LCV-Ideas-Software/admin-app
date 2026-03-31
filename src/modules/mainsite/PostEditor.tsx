@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import {

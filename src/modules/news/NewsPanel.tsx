@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Loader2, Newspaper, RefreshCw, Search } from 'lucide-react'
 import { loadNewsSettings, DEFAULT_NEWS_SETTINGS, type NewsSettings } from '../../lib/newsSettings'

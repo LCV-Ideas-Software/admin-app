@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 /**
  * useModuleConfig — Hook centralizado para persistência de configurações de módulo.
  * Lê/grava no D1 (BIGDATA_DB) via /api/config-store.

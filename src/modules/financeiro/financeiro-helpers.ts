@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 // admin-app/src/modules/financeiro/financeiro-helpers.ts
 // Tipos, constantes, status configs, payload parsers e utilitários do módulo financeiro.
 // Compliance: SumUp SDK v0.1.2+ / Mercado Pago REST API v1

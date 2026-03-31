@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Cloud, Loader2, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
