@@ -32,6 +32,20 @@ import {
 
 type SaveFeedback = { message: string; type: 'success' | 'error' } | null
 
+type GeminiImportProgress = {
+  active: boolean
+  stage: 'idle' | 'validating' | 'requesting' | 'processing' | 'inserting' | 'done' | 'error'
+  message: string
+  percent: number
+}
+
+const GEMINI_IMPORT_IDLE: GeminiImportProgress = {
+  active: false,
+  stage: 'idle',
+  message: '',
+  percent: 0,
+}
+
 export type PostEditorProps = {
   editingPostId: number | null
   initialTitle: string
@@ -59,6 +73,8 @@ export default function PostEditor({
   const [isUploading, setIsUploading] = useState(false)
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
   const [isImportingGemini, setIsImportingGemini] = useState(false)
+  const [geminiImportProgress, setGeminiImportProgress] = useState<GeminiImportProgress>(GEMINI_IMPORT_IDLE)
+  const [lastGeminiImportUrl, setLastGeminiImportUrl] = useState('')
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>(null)
   const saveFeedbackTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -500,23 +516,84 @@ export default function PostEditor({
 
   const handleGeminiImport = useCallback(async (url: string) => {
     if (!url || !editor) return
+
+    const normalizedUrl = url.trim()
+    const updateProgress = (next: Partial<GeminiImportProgress>) => {
+      setGeminiImportProgress((prev) => ({ ...prev, ...next, active: true }))
+    }
+
+    const resolveImportError = (status: number | null, backendMessage?: string): string => {
+      if (backendMessage) {
+        if (/privado|expirado|bloqueado/i.test(backendMessage)) {
+          return 'O link do Gemini parece privado, expirado ou bloqueado. Gere um novo link de compartilhamento publico e tente novamente.'
+        }
+        if (/nenhum conteudo extraido/i.test(backendMessage)) {
+          return 'Nao consegui extrair conteudo desse link. Abra o compartilhamento, confirme se o texto aparece publicamente e tente de novo.'
+        }
+      }
+      if (status === 422) {
+        return 'URL invalida. Use um link de compartilhamento do Gemini no formato https://gemini.google.com/share/....'
+      }
+      if (status === 502) {
+        return 'Falha ao ler o compartilhamento do Gemini no servidor. Tente novamente em instantes ou gere um novo link publico.'
+      }
+      if (status === 400) {
+        return 'A requisicao de importacao foi rejeitada. Verifique o link informado.'
+      }
+      return backendMessage || 'Erro ao importar do Gemini.'
+    }
+
+    updateProgress({ stage: 'validating', percent: 12, message: 'Validando link compartilhado do Gemini...' })
+
+    if (!/^https:\/\//i.test(normalizedUrl)) {
+      const message = 'URL invalida. O link precisa comecar com https://.'
+      updateProgress({ stage: 'error', percent: 100, message })
+      showNotification(message, 'error')
+      setTimeout(() => setGeminiImportProgress(GEMINI_IMPORT_IDLE), 2400)
+      return
+    }
+
+    setLastGeminiImportUrl(normalizedUrl)
+
     setIsImportingGemini(true)
+    updateProgress({ stage: 'requesting', percent: 36, message: 'Conectando ao endpoint de importacao...' })
     showNotification('Importando conteúdo do Gemini...', 'info')
+
     try {
       const res = await fetch('/api/mainsite/gemini-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: normalizedUrl }),
       })
-      const data = await res.json() as { html?: string; title?: string; error?: string }
-      if (!res.ok) throw new Error(data.error || 'Erro ao importar do Gemini.')
+
+      updateProgress({ stage: 'processing', percent: 70, message: 'Processando conteudo retornado...' })
+
+      let data: { html?: string; title?: string; error?: string } = {}
+      try {
+        data = await res.json() as { html?: string; title?: string; error?: string }
+      } catch {
+        data = {}
+      }
+
+      if (!res.ok) {
+        throw new Error(resolveImportError(res.status, data.error))
+      }
+
+      updateProgress({ stage: 'inserting', percent: 90, message: 'Inserindo conteudo no editor...' })
+
       if (data.html) {
         editor.chain().focus().insertContent(data.html).run()
         if (data.title && !postTitle.trim()) setPostTitle(data.title)
       }
+
+      updateProgress({ stage: 'done', percent: 100, message: 'Importacao concluida com sucesso.' })
       showNotification('Conteúdo importado com sucesso!', 'success')
+      setTimeout(() => setGeminiImportProgress(GEMINI_IMPORT_IDLE), 1400)
     } catch (err) {
-      showNotification(err instanceof Error ? err.message : 'Erro desconhecido.', 'error')
+      const message = err instanceof Error ? err.message : 'Erro desconhecido.'
+      updateProgress({ stage: 'error', percent: 100, message })
+      showNotification(message, 'error')
+      setTimeout(() => setGeminiImportProgress(GEMINI_IMPORT_IDLE), 2800)
     } finally {
       setIsImportingGemini(false)
     }
@@ -740,6 +817,42 @@ export default function PostEditor({
                 )
               })()}
             </div>
+          </div>
+        )}
+        {geminiImportProgress.active && (
+          <div
+            className={`gemini-import-progress gemini-import-progress--${geminiImportProgress.stage}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="gemini-import-progress__meta">
+              <span>Importacao Gemini</span>
+              <span>{geminiImportProgress.percent}%</span>
+            </div>
+            <div className="gemini-import-progress__track" aria-hidden="true">
+              <div className="gemini-import-progress__fill" style={{ width: `${geminiImportProgress.percent}%` }} />
+            </div>
+            <p className="gemini-import-progress__message">{geminiImportProgress.message}</p>
+            {geminiImportProgress.stage === 'error' && (
+              <div className="gemini-import-progress__actions">
+                <button
+                  type="button"
+                  className="gemini-import-progress__btn gemini-import-progress__btn--primary"
+                  onClick={() => handleGeminiImport(lastGeminiImportUrl)}
+                  disabled={!lastGeminiImportUrl || isImportingGemini}
+                >
+                  Tentar novamente
+                </button>
+                <button
+                  type="button"
+                  className="gemini-import-progress__btn gemini-import-progress__btn--ghost"
+                  onClick={() => setGeminiImportProgress(GEMINI_IMPORT_IDLE)}
+                  disabled={isImportingGemini}
+                >
+                  Fechar
+                </button>
+              </div>
+            )}
           </div>
         )}
         {editor && (

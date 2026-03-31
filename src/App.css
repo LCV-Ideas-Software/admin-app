@@ -5846,6 +5846,154 @@ input[type="color"]:focus-visible {
   outline: none;
 }
 
+.gemini-import-progress {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(154, 160, 166, 0.22);
+  background: rgba(26, 115, 232, 0.05);
+}
+
+.gemini-import-progress__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1a73e8;
+  margin-bottom: 6px;
+}
+
+.gemini-import-progress__track {
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(154, 160, 166, 0.26);
+  overflow: hidden;
+}
+
+.gemini-import-progress__fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1a73e8 0%, #34a853 100%);
+  transition: width 0.28s ease;
+}
+
+.gemini-import-progress__message {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #5f6368;
+  line-height: 1.45;
+}
+
+.gemini-import-progress__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.gemini-import-progress__btn {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gemini-import-progress__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gemini-import-progress__btn--primary {
+  background: #1a73e8;
+  color: #fff;
+}
+
+.gemini-import-progress__btn--primary:hover:not(:disabled) {
+  background: #185abc;
+}
+
+.gemini-import-progress__btn--ghost {
+  background: transparent;
+  color: #5f6368;
+  border-color: rgba(95, 99, 104, 0.3);
+}
+
+.gemini-import-progress__btn--ghost:hover:not(:disabled) {
+  background: rgba(95, 99, 104, 0.08);
+}
+
+.gemini-import-progress--done .gemini-import-progress__meta {
+  color: #137333;
+}
+
+.gemini-import-progress--done .gemini-import-progress__fill {
+  background: #34a853;
+}
+
+.gemini-import-progress--error {
+  background: rgba(234, 67, 53, 0.08);
+  border-bottom-color: rgba(234, 67, 53, 0.24);
+}
+
+.gemini-import-progress--error .gemini-import-progress__meta {
+  color: #c5221f;
+}
+
+.gemini-import-progress--error .gemini-import-progress__fill {
+  background: #ea4335;
+}
+
+[data-theme="dark"] .gemini-import-progress {
+  background: rgba(56, 189, 248, 0.09);
+  border-bottom-color: rgba(82, 82, 91, 0.55);
+}
+
+[data-theme="dark"] .gemini-import-progress__meta {
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .gemini-import-progress__track {
+  background: rgba(113, 113, 122, 0.45);
+}
+
+[data-theme="dark"] .gemini-import-progress__message {
+  color: #d4d4d8;
+}
+
+[data-theme="dark"] .gemini-import-progress__btn--primary {
+  background: #38bdf8;
+  color: #0a0a0a;
+}
+
+[data-theme="dark"] .gemini-import-progress__btn--primary:hover:not(:disabled) {
+  background: #7dd3fc;
+}
+
+[data-theme="dark"] .gemini-import-progress__btn--ghost {
+  color: #d4d4d8;
+  border-color: rgba(212, 212, 216, 0.28);
+}
+
+[data-theme="dark"] .gemini-import-progress__btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .gemini-import-progress--done .gemini-import-progress__meta {
+  color: #86efac;
+}
+
+[data-theme="dark"] .gemini-import-progress--error {
+  background: rgba(239, 68, 68, 0.12);
+  border-bottom-color: rgba(239, 68, 68, 0.32);
+}
+
+[data-theme="dark"] .gemini-import-progress--error .gemini-import-progress__meta {
+  color: #fca5a5;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    AI STATUS MODULE
    ═══════════════════════════════════════════════════════════════ */

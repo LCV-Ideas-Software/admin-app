@@ -48,7 +48,75 @@ const UI_NOISE = new Set([
   'Conversation with Gemini',   // mark: used as start anchor, skip itself
 ])
 
-const GEMINI_SHARE_RE = /^https:\/\/gemini\.google\.com\/share\/[a-zA-Z0-9_-]+\/?$/
+const GEMINI_SHARE_RE = /^https:\/\/(?:gemini\.google\.com|g\.co\/gemini)\/share\/[a-zA-Z0-9_-]+\/?(?:\?.*)?$/
+
+function normalizeGeminiShareUrl(rawUrl: string): string {
+  const parsed = new URL(rawUrl.trim())
+  if (parsed.hostname === 'g.co' && parsed.pathname.startsWith('/gemini/share/')) {
+    return `https://gemini.google.com${parsed.pathname}${parsed.search}`
+  }
+  if (parsed.hostname === 'gemini.google.com' && parsed.pathname.startsWith('/share/')) {
+    return parsed.toString()
+  }
+  return rawUrl.trim()
+}
+
+async function fetchGeminiShare(url: string): Promise<Response> {
+  return fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+    redirect: 'follow',
+  })
+}
+
+function buildJinaMirrorUrl(url: string): string {
+  return `https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`
+}
+
+function plainTextToParagraphHtml(text: string): string {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 2000)
+
+  return lines
+    .map((line) => `<p>${escapeHtmlAttrib(line)}</p>`)
+    .join('\n')
+}
+
+async function extractFromJinaMirror(url: string): Promise<{ chunks: string[]; title: string }> {
+  const mirrorResponse = await fetch(buildJinaMirrorUrl(url), {
+    headers: {
+      Accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+    },
+    redirect: 'follow',
+  })
+
+  if (!mirrorResponse.ok) {
+    throw new Error(`Falha no mirror com status ${mirrorResponse.status}`)
+  }
+
+  const text = (await mirrorResponse.text()).trim()
+  if (!text) {
+    throw new Error('Mirror retornou conteúdo vazio')
+  }
+
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 1)
+
+  const contentLines = lines.filter((line) => !UI_NOISE.has(line))
+  const title = contentLines[0]?.slice(0, 120) || ''
+  return { chunks: contentLines, title }
+}
 
 /**
  * Convert a subset of Markdown to HTML.
@@ -206,7 +274,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     })
   }
 
-  const { url } = body
+  const rawUrl = body.url || ''
+  const url = normalizeGeminiShareUrl(rawUrl)
 
   // Validate: only Gemini share links
   if (!url || !GEMINI_SHARE_RE.test(url)) {
@@ -217,31 +286,39 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   // Fetch the share page as a browser would
-  let fetchResponse: Response
+  let fetchResponse: Response | null = null
+  let chunks: string[] = []
+  let title = ''
   try {
-    fetchResponse = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-      },
-      redirect: 'follow',
-    })
+    fetchResponse = await fetchGeminiShare(url)
   } catch {
-    return new Response(
-      JSON.stringify({ error: 'Não foi possível acessar o link. Verifique se o compartilhamento é público.' }),
-      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    fetchResponse = null
   }
 
-  if (!fetchResponse.ok) {
-    return new Response(
-      JSON.stringify({ error: `Gemini retornou status ${fetchResponse.status}. O link pode ser privado ou expirado.` }),
-      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+  if (fetchResponse?.ok) {
+    const extracted = await extractConversationText(fetchResponse)
+    chunks = extracted.chunks
+    title = extracted.title
   }
 
-  const { chunks, title } = await extractConversationText(fetchResponse)
+  // Fallback: if direct fetch is blocked or yields no extractable content,
+  // use a plain-text mirror that renders dynamic pages server-side.
+  if (chunks.length === 0) {
+    try {
+      const mirror = await extractFromJinaMirror(url)
+      chunks = mirror.chunks
+      title = title || mirror.title
+    } catch {
+      const status = fetchResponse?.status
+      const message = status
+        ? `Gemini retornou status ${status}. O link pode estar privado, expirado ou bloqueado para leitura automática.`
+        : 'Não foi possível acessar o link. Verifique se o compartilhamento é público.'
+      return new Response(
+        JSON.stringify({ error: message }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+  }
 
   if (chunks.length === 0) {
     return new Response(
@@ -252,7 +329,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Convert extracted plain-text chunks to rich HTML
   const fullText = chunks.join('\n')
-  const html = markdownToHtml(fullText)
+  const html = fetchResponse?.ok ? markdownToHtml(fullText) : plainTextToParagraphHtml(fullText)
 
   // Clean up page title for use as post title
   const cleanTitle = title
