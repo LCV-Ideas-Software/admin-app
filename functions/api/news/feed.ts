@@ -142,8 +142,6 @@ function extractTag(block: string, tag: string): string {
  */
 function cleanHtml(text: string): string {
   return text
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
     .replace(/<\s*script[\s\S]*?>[\s\S]*?<\s*\/\s*script\s*>/gi, ' ')
     .replace(/<\s*\/?\s*script\b[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, '')
