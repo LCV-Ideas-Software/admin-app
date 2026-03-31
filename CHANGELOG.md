@@ -8,6 +8,9 @@
 - **Branch protection restaurada em todos os repos**: required status check `Analyze (javascript-typescript)` (CodeQL) habilitado no `main`. Resolve o gap de compatibilidade entre repository rulesets e o auto-merge nativo do GitHub (rulesets bloqueiam merge mas não fornecem sinal para auto-merge).
 - **CodeQL ruleset bypass**: `RepositoryRole:Admin` adicionado como bypass actor em todos os 7 repos.
 
+### CI/CD
+- **preview-auto-pr.yml — retry polling loop**: step "Merge immediately when CLEAN" substituído por retry polling (12×15s=3min) que aguarda CodeQL completar antes de mergear. Aplicado em todos os 7 repos.
+
 ### Controle de versão
 - `admin-app`: APP v01.74.04 → APP v01.74.05
 
