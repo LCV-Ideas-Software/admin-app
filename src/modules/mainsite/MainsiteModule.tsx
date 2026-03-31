@@ -592,7 +592,6 @@ export function MainsiteModule() {
             initialAuthor={editingPostId ? managedPosts.find(p => p.id === editingPostId)?.author ?? '' : ''}
             initialContent={editingPostContent}
             savingPost={savingPost}
-            adminActor={adminActor}
             showNotification={showNotification}
             onSave={(title, author, html) => handleSavePost(title, author, html)}
             onClose={resetPostEditor}

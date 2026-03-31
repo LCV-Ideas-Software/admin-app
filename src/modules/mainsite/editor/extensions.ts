@@ -39,6 +39,7 @@ import {
   ResizableYoutubeNodeView,
   FigureNodeView,
 } from './NodeViews'
+import { isYoutubeUrl } from './utils'
 
 export const lowlight = createLowlight(common)
 
@@ -142,9 +143,6 @@ export const createMentionSuggestion = (rawItems: string[]) => ({
     }
   },
 })
-
-export const isYoutubeUrl = (url: string): boolean =>
-  /(?:youtube\.com|youtu\.be)\//i.test(url)
 
 // ── Custom extensions ─────────────────────────────────────────
 

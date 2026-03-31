@@ -18,9 +18,8 @@ import { DragHandle } from '@tiptap/extension-drag-handle-react'
 import {
   buildTiptapExtensions,
   EDITORIAL_MENTION_BASE_ITEMS,
-  isYoutubeUrl,
 } from './editor/extensions'
-import { clamp, formatImageUrl } from './editor/utils'
+import { clamp, formatImageUrl, isYoutubeUrl } from './editor/utils'
 import { TIPTAP_SLASH_EVENTS } from './editor/SlashCommands'
 import { SearchReplacePanel } from './editor/SearchReplace'
 import { EditorBubbleMenu } from './editor/BubbleMenu'
@@ -40,7 +39,6 @@ export type PostEditorProps = {
   initialAuthor: string
   initialContent: string
   savingPost: boolean
-  adminActor: string
   showNotification: (msg: string, type: 'info' | 'success' | 'error') => void
   onSave: (title: string, author: string, htmlContent: string) => Promise<boolean>
   onClose: () => void

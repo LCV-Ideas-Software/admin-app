@@ -8,3 +8,6 @@ export const formatImageUrl = (url: string): string => {
   if (match && match[1]) return `https://drive.google.com/uc?export=view&id=${match[1]}`
   return url
 }
+
+export const isYoutubeUrl = (url: string): boolean =>
+  /(?:youtube\.com|youtu\.be)\//i.test(url)

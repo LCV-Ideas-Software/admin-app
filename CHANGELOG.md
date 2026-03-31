@@ -1,5 +1,17 @@
 # Changelog — Admin App
 
+## [v01.74.15] - 2026-03-31
+### Corrigido
+- **PostEditor — seleção robusta de mídia restaurada**: `ResizableImageNodeView` e `ResizableYoutubeNodeView` passaram a forçar `NodeSelection` no clique direto do wrapper e da própria mídia, fazendo voltar os controles de seleção, resize e snap bar em imagens e vídeos.
+- **PostEditor — drag handle oficial integrado**: adicionado `@tiptap/extension-drag-handle-react` com renderização real no orquestrador do editor, preservando a arquitetura modular e habilitando arraste visual de blocos.
+- **PostEditor — dark mode completo e limpeza final**: cobertura escura consolidada para toolbar, conteúdo, menus contextuais, search/replace, mentions, captions, highlights e drag handle. CSS legado duplicado de `pre/code/task-item` removido do final do `App.css`.
+
+### Alterado
+- **PostEditor — higiene de código v5**: `isYoutubeUrl` foi movido de `editor/extensions.ts` para `editor/utils.ts`, alinhando as funções puras utilitárias em um único módulo compartilhado. A prop morta `adminActor` foi removida do contrato do `PostEditor` e do call site em `MainsiteModule`.
+
+### Controle de versão
+- `admin-app`: APP v01.74.14 → APP v01.74.15
+
 ## [v01.74.14] - 2026-03-31
 ### Corrigido
 - **Compliance - docs legais locais em runtime**: o `LicencasModule` passou a carregar `LICENSE`, `NOTICE` e `THIRDPARTY` a partir de `public/legal/*` via `BASE_URL`, eliminando dependência de `raw.githubusercontent.com` no browser e removendo os 404 recorrentes em produção.
