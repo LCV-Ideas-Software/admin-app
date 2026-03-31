@@ -75,7 +75,6 @@ export default function PostEditor({
   const [isImportingGemini, setIsImportingGemini] = useState(false)
   const [geminiImportProgress, setGeminiImportProgress] = useState<GeminiImportProgress>(GEMINI_IMPORT_IDLE)
   const [lastGeminiImportUrl, setLastGeminiImportUrl] = useState('')
-  const [modalPortalTarget, setModalPortalTarget] = useState<HTMLElement | null>(null)
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>(null)
   const saveFeedbackTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -96,24 +95,6 @@ export default function PostEditor({
     extensions: tiptapExtensions,
     content: migratedInitialContent,
   })
-
-  useEffect(() => {
-    if (!editor) {
-      setModalPortalTarget(document.body)
-      return
-    }
-    try {
-      const nextTarget = editor.view?.dom?.ownerDocument?.body ?? document.body
-      setModalPortalTarget(nextTarget)
-    } catch {
-      // Keep previous target to avoid portal target flapping between documents.
-      setModalPortalTarget((prev) => prev ?? document.body)
-    }
-  }, [editor])
-
-  const getEditorPortalTarget = useCallback((): HTMLElement => {
-    return modalPortalTarget && modalPortalTarget.isConnected ? modalPortalTarget : document.body
-  }, [modalPortalTarget])
 
   // Force re-render on transaction AND selection change for Word-like dynamic button state
   const [, setTick] = useState(0)
@@ -676,7 +657,6 @@ export default function PostEditor({
             <EditorPromptModal
               modal={promptModal}
               setModal={setPromptModal}
-              portalTarget={getEditorPortalTarget()}
             />
 
             {/* AI Action Tool */}

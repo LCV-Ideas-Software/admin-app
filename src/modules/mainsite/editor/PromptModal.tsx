@@ -3,7 +3,6 @@
  * (link, image URL, YouTube, caption, Gemini import URL)
  * Extracted from PostEditor.tsx for structural decomposition.
  */
-import ReactDOM from 'react-dom'
 import { X, Link as LinkIcon, Image as ImageIcon, Type } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -59,10 +58,9 @@ export const PROMPT_MODAL_INITIAL: PromptModalState = {
 interface PromptModalProps {
   modal: PromptModalState
   setModal: (state: PromptModalState) => void
-  portalTarget?: Element
 }
 
-export function PromptModal({ modal, setModal, portalTarget }: PromptModalProps) {
+export function PromptModal({ modal, setModal }: PromptModalProps) {
   if (!modal.show) return null
 
   const close = () => setModal(PROMPT_MODAL_INITIAL)
@@ -81,9 +79,7 @@ export function PromptModal({ modal, setModal, portalTarget }: PromptModalProps)
     queueMicrotask(() => callback?.(payload))
   }
 
-  const target = portalTarget && portalTarget.isConnected ? portalTarget : document.body
-
-  return ReactDOM.createPortal(
+  return (
     <div className="admin-modal-overlay" role="dialog" aria-modal="true" aria-label="Entrada de dados">
       <div className="admin-modal-content">
         <button type="button" title="Fechar diálogo" className="admin-modal-close" onClick={close}>
@@ -150,7 +146,6 @@ export function PromptModal({ modal, setModal, portalTarget }: PromptModalProps)
           </div>
         </div>
       </div>
-    </div>,
-    target
+    </div>
   )
 }
