@@ -84,35 +84,39 @@ jobs:
               }
             }
 
-      - name: Merge immediately when CLEAN
+      - name: Wait for checks and merge
         uses: actions/github-script@v8
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pull_number = Number(`${{ steps.ensure_pr.outputs.pr_number }}`);
+            const maxAttempts = 12; // 12 x 15s = 3 minutes
+            const delayMs = 15000;
 
-            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
-            core.info(`PR #${pull_number} state=${pr.state} draft=${pr.draft} mergeable_state=${pr.mergeable_state}`);
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
+              core.info(`[${attempt}/${maxAttempts}] PR #${pull_number} state=${pr.state} mergeable_state=${pr.mergeable_state}`);
 
-            if (pr.state !== 'open' || pr.draft) {
-              core.info('PR is not open/mergeable candidate now.');
-              return;
-            }
-
-            if (pr.mergeable_state === 'clean' || pr.mergeable_state === 'has_hooks') {
-              try {
-                await github.rest.pulls.merge({
-                  owner,
-                  repo,
-                  pull_number,
-                  merge_method: 'squash',
-                });
-                core.info(`Merged PR #${pull_number} immediately.`);
-              } catch (error) {
-                const msg = String(error && error.message ? error.message : error);
-                core.warning(`Immediate merge skipped: ${msg}`);
+              if (pr.state !== 'open') {
+                core.info('PR is no longer open (already merged or closed).');
+                return;
               }
-            } else {
-              core.info('PR not CLEAN yet; auto-merge will handle when requirements pass.');
+
+              if (pr.mergeable_state === 'clean' || pr.mergeable_state === 'has_hooks') {
+                try {
+                  await github.rest.pulls.merge({ owner, repo, pull_number, merge_method: 'squash' });
+                  core.info(`Merged PR #${pull_number} on attempt ${attempt}.`);
+                  return;
+                } catch (error) {
+                  const msg = String(error && error.message ? error.message : error);
+                  core.warning(`Merge attempt ${attempt} failed: ${msg}`);
+                }
+              }
+
+              if (attempt < maxAttempts) {
+                core.info(`Waiting ${delayMs/1000}s before next attempt...`);
+                await new Promise(r => setTimeout(r, delayMs));
+              }
             }
+            core.info('Max attempts reached; GitHub native auto-merge will handle when ready.');
