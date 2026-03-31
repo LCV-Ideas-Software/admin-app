@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.74.04] — 2026-03-31
+### Alterado
+- **PostEditor — Links abrem em nova janela (auto `target="_blank"`)**: criada extensão `AutoTargetBlankLink` que estende `@tiptap/extension-link` com plugin ProseMirror de `appendTransaction`. Todos os links inseridos — via toolbar, autolink, paste ou edição manual — recebem automaticamente `target="_blank"` e `rel="noopener noreferrer"`, exceto links do YouTube (que são embeddados inline). O callback `addLink` também passou a enviar atributos explícitos no `setLink()`.
+
+### Controle de versão
+- `admin-app`: APP v01.74.03 → APP v01.74.04
+
 ## [v01.74.03] — 2026-03-31
 ### Corrigido
 - **News Feed — hardening de sanitização HTML para CodeQL**: `cleanHtml` em `functions/api/news/feed.ts` ajustado para remover tags sem regex específico de `<script>` e sem decodificar `&lt;`/`&gt;`, evitando reconstrução de delimitadores HTML e eliminando bloqueio de segurança no gate de PR.

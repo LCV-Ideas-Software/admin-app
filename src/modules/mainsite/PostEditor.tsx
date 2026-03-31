@@ -15,7 +15,7 @@ import {
 import { Extension } from '@tiptap/core'
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
-import { NodeSelection } from 'prosemirror-state'
+import { NodeSelection, Plugin, PluginKey } from 'prosemirror-state'
 import StarterKit from '@tiptap/starter-kit'
 // Underline is now included in StarterKit v3 — no explicit import needed
 import { Highlight } from '@tiptap/extension-highlight'
@@ -404,6 +404,55 @@ const TextIndent = Extension.create({
   },
 })
 
+// ── YouTube URL detection helper ─────────────────────────────
+const isYoutubeUrl = (url: string): boolean =>
+  /(?:youtube\.com|youtu\.be)\//i.test(url)
+
+// ── Link extension that enforces target="_blank" on non-YouTube links ──
+const autoTargetBlankPluginKey = new PluginKey('autoTargetBlank')
+
+const AutoTargetBlankLink = LinkExtension.extend({
+  addProseMirrorPlugins() {
+    const parentPlugins = this.parent?.() ?? []
+    return [
+      ...parentPlugins,
+      new Plugin({
+        key: autoTargetBlankPluginKey,
+        appendTransaction(_transactions, _oldState, newState) {
+          const { tr, doc, schema } = newState
+          const linkType = schema.marks.link
+          if (!linkType) return null
+
+          let modified = false
+          doc.descendants((node, pos) => {
+            if (!node.isText) return
+            node.marks.forEach((mark) => {
+              if (mark.type !== linkType) return
+              const href = mark.attrs.href || ''
+              // Skip YouTube links — they don't need target="_blank"
+              if (isYoutubeUrl(href)) return
+              // If target is already _blank, nothing to do
+              if (mark.attrs.target === '_blank') return
+
+              // Create a new mark with target="_blank" + secure rel
+              const newMark = linkType.create({
+                ...mark.attrs,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+              })
+              tr.removeMark(pos, pos + node.nodeSize, mark)
+              tr.addMark(pos, pos + node.nodeSize, newMark)
+              modified = true
+            })
+          })
+
+          return modified ? tr : null
+        },
+      }),
+    ]
+  },
+})
+
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({ dropcursor: false, link: false }),
   Markdown,
@@ -423,7 +472,7 @@ const TIPTAP_EXTENSIONS = [
   Dropcursor.configure({ color: '#4285f4', width: 2 }),
   CharacterCount,
   Placeholder.configure({ placeholder: 'Comece a escrever o conteúdo do post...' }),
-  LinkExtension.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
+  AutoTargetBlankLink.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
   CustomResizableImage.configure({ inline: false }),
   CustomResizableYoutube.configure({ inline: false, width: 840, height: 472, allowFullscreen: true, nocookie: true }),
 ]
@@ -666,10 +715,13 @@ export default function PostEditor({
       isLink: true,
       callback: (url, text) => {
         if (url === '') { editor.chain().focus().extendMarkRange('link').unsetLink().run(); return }
+        const linkAttrs = isYoutubeUrl(url)
+          ? { href: url }
+          : { href: url, target: '_blank' as const, rel: 'noopener noreferrer' }
         if (editor.state.selection.empty && text) {
-          editor.chain().focus().insertContent(`<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`).run()
+          editor.chain().focus().insertContent(`<a href="${url}"${isYoutubeUrl(url) ? '' : ' target="_blank" rel="noopener noreferrer"'}>${text}</a>`).run()
         } else {
-          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+          editor.chain().focus().extendMarkRange('link').setLink(linkAttrs).run()
         }
       },
     })
