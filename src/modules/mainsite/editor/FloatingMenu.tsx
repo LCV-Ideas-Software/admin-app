@@ -3,7 +3,7 @@
  * Extracted from PostEditor.tsx for structural decomposition.
  * Features: drag-and-drop, viewport clamping, shows on empty text blocks.
  */
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import {
   Heading1, Heading2, Heading3,
@@ -24,21 +24,21 @@ export function EditorFloatingMenu({ editor, onInsertTable }: EditorFloatingMenu
   const dragRef = useRef({ active: false, offsetX: 0, offsetY: 0 })
   const scrollRef = useRef(false)
 
-  const getPopupWindow = () => {
+  const getPopupWindow = useCallback(() => {
     try {
       return editor?.view?.dom?.ownerDocument?.defaultView || null
     } catch {
       return null
     }
-  }
+  }, [editor])
 
-  const getPortalTarget = () => {
+  const getPortalTarget = useCallback(() => {
     try {
       return editor?.view?.dom?.ownerDocument?.body || document.body
     } catch {
       return document.body
     }
-  }
+  }, [editor])
 
   useEffect(() => {
     if (!editor) return
@@ -78,7 +78,7 @@ export function EditorFloatingMenu({ editor, onInsertTable }: EditorFloatingMenu
       popupWin?.removeEventListener('scroll', handleScroll, true)
       popupWin?.removeEventListener('scrollend', handleScrollEnd, true)
     }
-  }, [editor])
+  }, [editor, getPopupWindow])
 
   const startDrag = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return

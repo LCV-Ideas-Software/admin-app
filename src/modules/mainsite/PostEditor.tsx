@@ -26,9 +26,11 @@ import { EditorBubbleMenu } from './editor/BubbleMenu'
 import { EditorFloatingMenu } from './editor/FloatingMenu'
 import {
   PromptModal as EditorPromptModal,
+} from './editor/PromptModal'
+import {
   type PromptModalState,
   PROMPT_MODAL_INITIAL,
-} from './editor/PromptModal'
+} from './editor/promptModalState'
 
 type SaveFeedback = { message: string; type: 'success' | 'error' } | null
 

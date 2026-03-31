@@ -4,134 +4,10 @@
  * ProseMirror Decoration-based highlighting (no external deps).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Extension } from '@tiptap/core'
-import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
-import { Decoration, DecorationSet } from 'prosemirror-view'
+import { TextSelection } from 'prosemirror-state'
 import { X, ChevronUp, ChevronDown } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
-import type { Node as ProseMirrorNode } from 'prosemirror-model'
-
-// -------------- ProseMirror plugin for search decorations ----------------
-
-interface DecorationPluginState {
-  decorations: DecorationSet
-  term: string
-  currentIndex: number
-}
-
-export const searchHighlightKey = new PluginKey<DecorationPluginState>('searchHighlight')
-
-interface SearchState {
-  term: string
-  currentIndex: number
-}
-
-let globalSearchState: SearchState = { term: '', currentIndex: 0 }
-
-function findAllMatches(doc: ProseMirrorNode, term: string): { from: number; to: number }[] {
-  if (!term) return []
-  const results: { from: number; to: number }[] = []
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(escaped, 'gi')
-  doc.descendants((node, pos) => {
-    if (!node.isText) return
-    const text = node.text!
-    let m: RegExpExecArray | null
-    while ((m = regex.exec(text)) !== null) {
-      results.push({ from: pos + m.index, to: pos + m.index + m[0].length })
-    }
-  })
-  return results
-}
-
-export const SearchHighlightPlugin = new Plugin({
-  key: searchHighlightKey,
-  state: {
-    init(_config, state) {
-      if (!globalSearchState.term) {
-        return { decorations: DecorationSet.empty, term: '', currentIndex: 0 }
-      }
-      const matches = findAllMatches(state.doc, globalSearchState.term)
-      const decos = matches.map((m, i) =>
-        Decoration.inline(m.from, m.to, {
-          class: i === globalSearchState.currentIndex
-            ? 'search-current-highlight'
-            : 'search-highlight',
-        })
-      )
-      return {
-        decorations: DecorationSet.create(state.doc, decos),
-        term: globalSearchState.term,
-        currentIndex: globalSearchState.currentIndex,
-      }
-    },
-    apply(tr, oldPluginState: DecorationPluginState, _oldState, newState) {
-      if (!globalSearchState.term) {
-        return { decorations: DecorationSet.empty, term: '', currentIndex: 0 }
-      }
-
-      if (!tr.docChanged && oldPluginState.term === globalSearchState.term && oldPluginState.currentIndex === globalSearchState.currentIndex) {
-        return oldPluginState
-      }
-
-      const matches = findAllMatches(newState.doc, globalSearchState.term)
-      const decos = matches.map((m, i) =>
-        Decoration.inline(m.from, m.to, {
-          class: i === globalSearchState.currentIndex
-            ? 'search-current-highlight'
-            : 'search-highlight',
-        })
-      )
-      return {
-        decorations: DecorationSet.create(newState.doc, decos),
-        term: globalSearchState.term,
-        currentIndex: globalSearchState.currentIndex,
-      }
-    },
-  },
-  props: {
-    decorations(state) {
-      const pluginState = this.getState(state)
-      return pluginState?.decorations ?? DecorationSet.empty
-    },
-  },
-})
-
-/**
- * SearchReplace TipTap Extension — registers highlight plugin and Find/Replace shortcuts.
- */
-export const SearchReplaceExtension = Extension.create({
-  name: 'searchReplace',
-
-  addProseMirrorPlugins() {
-    return [SearchHighlightPlugin]
-  },
-
-  addKeyboardShortcuts() {
-    const resolveOwnerDoc = () => {
-      try {
-        return this.editor.view.dom.ownerDocument
-      } catch {
-        return null
-      }
-    }
-
-    return {
-      'Mod-f': () => {
-        const ownerDoc = resolveOwnerDoc()
-        if (!ownerDoc) return false
-        ownerDoc.dispatchEvent(new CustomEvent('tiptap:search-toggle', { bubbles: true }))
-        return true
-      },
-      'Mod-h': () => {
-        const ownerDoc = resolveOwnerDoc()
-        if (!ownerDoc) return false
-        ownerDoc.dispatchEvent(new CustomEvent('tiptap:search-toggle', { bubbles: true }))
-        return true
-      },
-    }
-  },
-})
+import { findAllMatches, searchHighlightKey, setGlobalSearchState } from './searchReplaceCore'
 
 // -------------- React panel component ----------------
 
@@ -164,7 +40,7 @@ export function SearchReplacePanel({ editor }: SearchReplacePanelProps) {
         if (next) setTimeout(() => searchInputRef.current?.focus(), 50)
         else {
           // Clear search decorations when closing
-          globalSearchState = { term: '', currentIndex: 0 }
+          setGlobalSearchState({ term: '', currentIndex: 0 })
           editor?.view.dispatch(editor.state.tr)
         }
         return next
@@ -184,7 +60,7 @@ export function SearchReplacePanel({ editor }: SearchReplacePanelProps) {
   useEffect(() => {
     if (!editor) return
     const safeIndex = matches.length > 0 ? Math.min(currentIndex, matches.length - 1) : 0
-    globalSearchState = { term: searchTerm, currentIndex: safeIndex }
+    setGlobalSearchState({ term: searchTerm, currentIndex: safeIndex })
     editor.view.dispatch(editor.state.tr.setMeta(searchHighlightKey, {}))
   }, [searchTerm, currentIndex, matches.length, editor])
 
@@ -243,7 +119,7 @@ export function SearchReplacePanel({ editor }: SearchReplacePanelProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setVisible(false)
-      globalSearchState = { term: '', currentIndex: 0 }
+      setGlobalSearchState({ term: '', currentIndex: 0 })
       editor?.view.dispatch(editor.state.tr)
       editor?.commands.focus()
     } else if (e.key === 'Enter') {
@@ -269,7 +145,7 @@ export function SearchReplacePanel({ editor }: SearchReplacePanelProps) {
           className="search-replace-close"
           onClick={() => {
             setVisible(false)
-            globalSearchState = { term: '', currentIndex: 0 }
+            setGlobalSearchState({ term: '', currentIndex: 0 })
             editor?.view.dispatch(editor?.state.tr)
           }}
           title="Fechar (Esc)"

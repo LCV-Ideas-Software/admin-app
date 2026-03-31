@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.74.20] - 2026-03-31
+### Corrigido
+- **Gate de qualidade (lint) restaurado no editor MainSite**: extraída a infraestrutura de busca/substituição do `SearchReplace.tsx` para módulo core dedicado (`searchReplaceCore.ts`), removendo exports não-componentes do arquivo React e eliminando erros `react-refresh/only-export-components`.
+- **PromptModal — compliance Fast Refresh consolidada**: tipos/estado compartilhado migrados para `promptModalState.ts`, mantendo `PromptModal.tsx` focado em componente de UI e evitando regressões de lint em ciclos de desenvolvimento.
+- **FloatingMenu — warning de hooks removido**: funções de resolução de janela/portal passaram para `useCallback`, alinhando dependências de `useEffect` e removendo warning `react-hooks/exhaustive-deps`.
+
+### Controle de versão
+- `admin-app`: APP v01.74.19 → APP v01.74.20
+
 ## [v01.74.19] - 2026-03-31
 ### Corrigido
 - **PostEditor — Importar do Gemini com resiliência de rede**: endpoint `functions/api/mainsite/gemini-import.ts` reforçado para aceitar URLs `gemini.google.com/share/*` e `g.co/gemini/share/*`, normalizar links curtos e executar fallback de extração textual quando o fetch direto do Gemini for bloqueado (reduzindo falhas 502 em produção).

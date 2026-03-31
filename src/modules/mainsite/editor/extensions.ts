@@ -33,7 +33,7 @@ import { Markdown } from 'tiptap-markdown'
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 import { SlashCommands } from './SlashCommands'
-import { SearchReplaceExtension } from './SearchReplace'
+import { SearchReplaceExtension } from './searchReplaceCore'
 import {
   ResizableImageNodeView,
   ResizableYoutubeNodeView,
