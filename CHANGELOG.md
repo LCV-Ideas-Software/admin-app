@@ -1,5 +1,16 @@
 # Changelog — Admin App
 
+## [v01.74.05] — 2026-03-31
+### Corrigido
+- **PostEditor — sanitizador determinístico `target="_blank"` no save**: adicionada função `sanitizeLinksTargetBlank()` que usa `DOMParser` para forçar `target="_blank"` e `rel="noopener noreferrer"` em todos os links não-YouTube no momento do save, independente de transações do editor.
+
+### Governança
+- **Branch protection restaurada em todos os repos**: required status check `Analyze (javascript-typescript)` (CodeQL) habilitado no `main`. Resolve o gap de compatibilidade entre repository rulesets e o auto-merge nativo do GitHub (rulesets bloqueiam merge mas não fornecem sinal para auto-merge).
+- **CodeQL ruleset bypass**: `RepositoryRole:Admin` adicionado como bypass actor em todos os 7 repos.
+
+### Controle de versão
+- `admin-app`: APP v01.74.04 → APP v01.74.05
+
 ## [v01.74.04] — 2026-03-31
 ### Alterado
 - **PostEditor — Links abrem em nova janela (auto `target="_blank"`)**: criada extensão `AutoTargetBlankLink` que estende `@tiptap/extension-link` com plugin ProseMirror de `appendTransaction`. Todos os links inseridos — via toolbar, autolink, paste ou edição manual — recebem automaticamente `target="_blank"` e `rel="noopener noreferrer"`, exceto links do YouTube (que são embeddados inline). O callback `addLink` também passou a enviar atributos explícitos no `setLink()`.
