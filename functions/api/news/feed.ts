@@ -143,10 +143,10 @@ function extractTag(block: string, tag: string): string {
 function cleanHtml(text: string): string {
   return text
     .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    .replace(/[<>]/g, '')
     .trim()
 }
 
