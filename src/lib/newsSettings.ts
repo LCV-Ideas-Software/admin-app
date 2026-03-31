@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 /**
  * Configurações do painel de notícias — utilitário compartilhado.
  * Salva/lê do D1 (via /api/config-store) para uso em NewsPanel (leitura)

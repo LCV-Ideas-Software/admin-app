@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.74.06] — 2026-03-31
+### Governança
+- **Conformidade Híbrida Automática**: Injector de licenciamento (`apply-workspace-compliance.js`) parametrizado para gerar AGPLv3 `LICENSE`, `NOTICE` e `THIRDPARTY.md` na raiz física de todos os projetos, e estampar cabecalho SPDX (`SPDX-License-Identifier: AGPL-3.0-or-later`) em todos os sources `.js`/`.ts`/`.jsx`/`.tsx` do ecossistema.
+- **Transparência de Rede (SaaS Loophole)**: Componente global `ComplianceBanner` fixado ao rodapé do `admin-app`, oferecendo acesso nativo de 1 clique aos termos da licença e dependências diretamente no ambiente de operação.
+- **Módulo de Licenças (`LicencasModule`)**: Nova interface nativa que busca dinamicamente o source-of-truth dos manifestos (`LICENSE`, `NOTICE`, `THIRDPARTY.md`) servidos via raw.githubusercontent.com da branch principal em runtime, evitando caches stales durante rebuilds de assets Vite.
+
+### Controle de versão
+- `admin-app`: APP v01.74.05 → APP v01.74.06
+
 ## [v01.74.05] — 2026-03-31
 ### Corrigido
 - **PostEditor — sanitizador determinístico `target="_blank"` no save**: adicionada função `sanitizeLinksTargetBlank()` que usa `DOMParser` para forçar `target="_blank"` e `rel="noopener noreferrer"` em todos os links não-YouTube no momento do save, independente de transações do editor.

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AlertCircle, AlertTriangle, CheckCircle2, Info } from 'lucide-react'

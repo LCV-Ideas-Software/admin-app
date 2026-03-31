@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 import { Component, lazy, Suspense, useState, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import {
   BarChart3,
@@ -20,6 +24,7 @@ import {
 import './styles/variables.css'
 import './App.css'
 import { FloatingScrollButtons } from './components/FloatingScrollButtons'
+import { ComplianceBanner } from './components/ComplianceBanner'
 
 /* Lazy-loaded modules — cada módulo vira um chunk separado */
 const LAZY_IMPORT_RELOAD_KEY = 'admin-app:lazy-import-reload-once'
@@ -134,14 +139,15 @@ const CfPwModule = lazyWithAccessRecovery(() => import('./modules/cfpw/CfPwModul
 const OraculoModule = lazyWithAccessRecovery(() => import('./modules/oraculo/OraculoModule').then(m => ({ default: m.OraculoModule })))
 const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel').then(m => ({ default: m.NewsPanel })))
 const TlsrptModule = lazyWithAccessRecovery(() => import('./modules/tlsrpt/TlsrptModule').then(m => ({ default: m.TlsrptModule })))
+const LicencasModule = lazyWithAccessRecovery(() => import('./modules/compliance/LicencasModule').then(m => ({ default: m.LicencasModule })))
 
 const APP_VERSION = 'APP v01.74.05'
-type ModuleId = 'overview' | 'ai-status' | 'astrologo' | 'cardhub' | 'cfdns' | 'cfpw' | 'config' | 'financeiro' | 'oraculo' | 'itau' | 'mainsite' | 'mtasts' | 'telemetria' | 'tlsrpt'
+type ModuleId = 'overview' | 'ai-status' | 'astrologo' | 'cardhub' | 'cfdns' | 'cfpw' | 'config' | 'financeiro' | 'oraculo' | 'itau' | 'mainsite' | 'mtasts' | 'telemetria' | 'tlsrpt' | 'compliance'
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   'ai-status': 'AI Status', astrologo: 'Astrólogo', cardhub: 'Card Hub', cfdns: 'CF DNS', cfpw: 'CF P&W', financeiro: 'Financeiro', oraculo: 'Oráculo',
   itau: 'Itaú', mainsite: 'MainSite', mtasts: 'MTA-STS',
-  telemetria: 'Telemetria', config: 'Configurações', tlsrpt: 'TLS-RPT',
+  telemetria: 'Telemetria', config: 'Configurações', tlsrpt: 'TLS-RPT', compliance: 'Conformidade e Licenças',
 }
 
 // Regra do menu lateral: Visão Geral sempre primeiro, Configurações sempre último,
@@ -256,9 +262,12 @@ function App() {
             <TelemetriaModule />
           ) : activeModule === 'tlsrpt' ? (
             <TlsrptModule />
+          ) : activeModule === 'compliance' ? (
+            <LicencasModule />
           ) : null}
           </Suspense>
         </LazyModuleErrorBoundary>
+        <ComplianceBanner onViewLicenses={() => setActiveModule('compliance')} />
         <FloatingScrollButtons />
       </main>
     </div>

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 // Módulo: admin-app/src/modules/ai-status/AiStatusModule.tsx
 // Descrição: Dashboard AI Status — Tier A (Catálogo + Rate Limits) + Tier B (Usage) + Tier C (GCP Monitoring)
 

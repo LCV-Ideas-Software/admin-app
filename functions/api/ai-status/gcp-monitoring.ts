@@ -8,6 +8,16 @@ interface Env {
 }
 interface Ctx { env: Env }
 
+interface ServiceAccountKey {
+  type?: string
+  project_id?: string
+  private_key_id?: string
+  private_key: string
+  client_email: string
+  client_id?: string
+  token_uri?: string
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -15,21 +25,86 @@ function json(data: unknown, status = 200) {
   })
 }
 
-// Helper: gerar JWT para OAuth2 com service account
-async function getAccessToken(saKey: string): Promise<string> {
-  let sa: { client_email: string; private_key: string; token_uri: string }
+function toBase64UrlFromBytes(bytes: Uint8Array): string {
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function toBase64UrlFromString(value: string): string {
+  return toBase64UrlFromBytes(new TextEncoder().encode(value))
+}
+
+function tryDecodeBase64Utf8(value: string): string | null {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
   try {
-    sa = JSON.parse(saKey)
+    const binary = atob(padded)
+    return new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)))
   } catch {
-    const preview = saKey.substring(0, 40)
+    return null
+  }
+}
+
+function normalizePrivateKey(privateKey: string): string {
+  return privateKey
+    .replace(/\r\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .trim()
+}
+
+function parseServiceAccount(saKey: string): ServiceAccountKey {
+  const rawValue = saKey.trim()
+  const candidates = [rawValue]
+
+  const base64Decoded = tryDecodeBase64Utf8(rawValue)
+  if (base64Decoded) candidates.push(base64Decoded)
+
+  let parsed: unknown = null
+  let parseError: Error | null = null
+
+  for (const candidate of candidates) {
+    try {
+      parsed = JSON.parse(candidate)
+      break
+    } catch (error) {
+      parseError = error instanceof Error ? error : new Error('Falha ao interpretar JSON da service account.')
+    }
+  }
+
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed)
+    } catch (error) {
+      parseError = error instanceof Error ? error : new Error('Falha ao interpretar JSON da service account.')
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    const preview = rawValue.substring(0, 60)
+    const suffix = parseError ? ` Motivo: ${parseError.message}` : ''
     throw new Error(
-      `GCP_SA_KEY não é JSON válido. Preview: "${preview}...". ` +
-      `Cole o conteúdo completo do arquivo .json da Service Account no secret do Cloudflare.`
+      `GCP_SA_KEY não é um JSON de service account válido. Preview: "${preview}...".` +
+      ' Cole o conteúdo completo do arquivo .json da Service Account ou o JSON em Base64 no secret do Cloudflare.' +
+      suffix,
     )
   }
-  if (!sa.client_email || !sa.private_key) {
-    throw new Error('GCP_SA_KEY não contém client_email ou private_key. Verifique o JSON.')
+
+  const serviceAccount = parsed as Partial<ServiceAccountKey>
+  if (!serviceAccount.client_email || !serviceAccount.private_key) {
+    throw new Error('GCP_SA_KEY não contém client_email ou private_key. Verifique se o secret contém o JSON completo da service account.')
   }
+
+  return {
+    ...serviceAccount,
+    client_email: serviceAccount.client_email,
+    private_key: normalizePrivateKey(serviceAccount.private_key),
+  }
+}
+
+// Helper: gerar JWT para OAuth2 com service account
+async function getAccessToken(saKey: string): Promise<string> {
+  const sa = parseServiceAccount(saKey)
 
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'RS256', typ: 'JWT' }
@@ -42,25 +117,33 @@ async function getAccessToken(saKey: string): Promise<string> {
   }
 
   // Encode header e payload em base64url
-  const b64url = (obj: unknown) =>
-    btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-
-  const signingInput = `${b64url(header)}.${b64url(payload)}`
+  const signingInput = `${toBase64UrlFromString(JSON.stringify(header))}.${toBase64UrlFromString(JSON.stringify(payload))}`
 
   // Importar chave privada RSA (PKCS#8)
   const pemBody = sa.private_key
     .replace(/-----BEGIN PRIVATE KEY-----/, '')
     .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\n/g, '')
-  const keyBuffer = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+    .replace(/\s+/g, '')
 
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    keyBuffer.buffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
+  let keyBuffer: Uint8Array
+  try {
+    keyBuffer = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+  } catch {
+    throw new Error('A private_key do GCP_SA_KEY está malformada. Recrie a chave JSON da service account e atualize o secret no Cloudflare.')
+  }
+
+  let cryptoKey: CryptoKey
+  try {
+    cryptoKey = await crypto.subtle.importKey(
+      'pkcs8',
+      keyBuffer.buffer,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+  } catch {
+    throw new Error('Falha ao importar a private_key da service account. Verifique se o secret contém uma chave PKCS#8 válida e atualizada.')
+  }
 
   const signature = await crypto.subtle.sign(
     'RSASSA-PKCS1-v1_5',
@@ -68,8 +151,7 @@ async function getAccessToken(saKey: string): Promise<string> {
     new TextEncoder().encode(signingInput)
   )
 
-  const b64Sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const b64Sig = toBase64UrlFromBytes(new Uint8Array(signature))
 
   const jwt = `${signingInput}.${b64Sig}`
 
@@ -81,7 +163,17 @@ async function getAccessToken(saKey: string): Promise<string> {
   })
 
   if (!tokenRes.ok) {
-    throw new Error(`Token exchange failed: ${tokenRes.status} ${await tokenRes.text()}`)
+    const tokenError = await tokenRes.text()
+    if (tokenError.includes('invalid_grant') || tokenError.includes('Invalid JWT Signature')) {
+      throw new Error(
+        `Token exchange failed: ${tokenRes.status} ${tokenError}. ` +
+        `A assinatura JWT foi rejeitada pelo Google. Revise o secret GCP_SA_KEY após a rotação: ` +
+        `use o JSON completo da service account ativa, confirme que a chave privada atual corresponde ao private_key_id ` +
+        `${sa.private_key_id ? `(${sa.private_key_id.slice(0, 12)}...)` : 'esperado'} e redeploye o admin-app.`
+      )
+    }
+
+    throw new Error(`Token exchange failed: ${tokenRes.status} ${tokenError}`)
   }
 
   const tokenData = await tokenRes.json() as { access_token: string }

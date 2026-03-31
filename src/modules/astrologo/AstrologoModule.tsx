@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import type { FormEvent } from 'react'
 import { BrainCircuit, Loader2, Mail, Search, Send, Sparkles, Telescope, Trash2, X, RefreshCw } from 'lucide-react'

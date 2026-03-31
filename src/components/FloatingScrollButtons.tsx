@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 /**
  * FloatingScrollButtons — botões inteligentes de rolagem (paridade mainsite-frontend).
  * Mostra "Subir" quando rolado para baixo e "Descer" quando não está no final.

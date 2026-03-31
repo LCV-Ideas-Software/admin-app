@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 Leonardo Cardozo Vargas
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowDown, ArrowUp, GripVertical, Loader2, Plus, RefreshCw, Save, Trash2, Wand2 } from 'lucide-react'
