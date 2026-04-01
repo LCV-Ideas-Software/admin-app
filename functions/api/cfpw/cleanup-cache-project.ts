@@ -60,10 +60,12 @@ export async function onRequestPost(context: Context) {
     const zones = await listCloudflareZones(context.env)
     
     // 3. Mapear domínios para seus respectivos Zone IDs
-    const matchedZoneIds = new Set<string>()
+    const zoneToDomains = new Map<string, string[]>()
     const matchedDomains: string[] = []
 
     for (const domain of customDomains) {
+      if (!domain || typeof domain !== 'string') continue
+
       let bestZoneId: string | null = null
       let longestMatchLength = -1
 
@@ -82,14 +84,17 @@ export async function onRequestPost(context: Context) {
       }
 
       if (bestZoneId) {
-        matchedZoneIds.add(bestZoneId)
+        if (!zoneToDomains.has(bestZoneId)) {
+          zoneToDomains.set(bestZoneId, [])
+        }
+        zoneToDomains.get(bestZoneId)!.push(domain)
         matchedDomains.push(domain)
       }
     }
 
-    // 4. Executar limpeza de cache apenas nas zonas únicas identificadas
-    const purgePromises = Array.from(matchedZoneIds).map(zoneId => 
-      purgeCloudflareZoneCache(context.env, zoneId, { purge_everything: true })
+    // 4. Executar limpeza de cache seletiva (smart host purge) apenas nas zonas e subdomínios corretos
+    const purgePromises = Array.from(zoneToDomains.entries()).map(([zoneId, hosts]) => 
+      purgeCloudflareZoneCache(context.env, zoneId, { hosts })
         .catch(err => {
           throw new Error(`Falha ao limpar Zona ${zoneId}: ` + (err instanceof Error ? err.message : String(err)))
         })
@@ -102,9 +107,9 @@ export async function onRequestPost(context: Context) {
     return jsonResponse({
       ok: true,
       projectName,
-      processedZones: matchedZoneIds.size,
+      processedZones: zoneToDomains.size,
       purgedDomains: matchedDomains,
-      message: `Cache expurgado com sucesso em ${matchedZoneIds.size} zona(s).`,
+      message: `Cache expurgado com sucesso em ${zoneToDomains.size} zona(s) (Hosts: ${matchedDomains.join(', ')}).`,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido ao limpar cache do projeto.'
