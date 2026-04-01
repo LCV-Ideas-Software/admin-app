@@ -145,8 +145,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   structuredLog('info', 'transform API call starting', { endpoint: 'transform' });
 
   try {
-    const body = await context.request.json() as { action: string, text: string };
-    const { action, text } = body;
+    const body = await context.request.json() as { action: string, text: string, instruction?: string };
+    const { action, text, instruction } = body;
     
     if (!text || !action) {
       return new Response(JSON.stringify({ error: "Ação ou texto não fornecido." }), { status: 400 });
@@ -158,6 +158,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       case "summarize": promptInfo = "Resuma o texto a seguir de forma clara e concisa. Retorne APENAS o resumo direto."; break;
       case "expand": promptInfo = "Expanda o texto a seguir adicionando detalhes e contexto, mantendo o tom original. Retorne APENAS o texto expandido."; break;
       case "formal": promptInfo = "Reescreva o texto a seguir adotando um tom formal e profissional. Retorne APENAS o texto reescrito."; break;
+      case "freeform": 
+        if (!instruction) return new Response(JSON.stringify({ error: "Instrução não fornecida para formatação livre." }), { status: 400 });
+        promptInfo = `Aja como um assistente de edição de texto para publicação. Aplique estritamente a seguinte instrução do usuário no texto abaixo: "${instruction}". Retorne APENAS o resultado final editado, sem introduções ou comentários adicionais.`; 
+        break;
       default: return new Response(JSON.stringify({ error: "Ação de IA desconhecida." }), { status: 400 });
     }
 

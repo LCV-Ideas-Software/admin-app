@@ -1,5 +1,20 @@
 # Changelog — Admin App
 
+## [v01.75.00] - 2026-03-31
+### Alterado
+- **PostEditor — Pipeline Padrão-Ouro de Extração Gemini (Tabelas e Imagens)**: Refatorado totalmente o backend `gemini-import.ts`. O crawler rústico baseado em texto plano (`HTMLRewriter`) e expressões regulares limitadas foi descartado. A API agora processa links compartilhados utilizando primeiramente o espelho oficial de documentação (`r.jina.ai`) para resgatar o conteúdo integral em Markdown Perfeito gerado pelo Gemini e, a seguir, realiza um parse transcompilador completo utilizando a biblioteca `marked`. Isso confere ao editor a capacidade nativa de importar e projetar perfeitamente `<Table>`s, células complexas e tags `<img>` (bem como formatadores e hierarquias) que antes se perdiam.
+- **IA: Transformação de Texto (Freeform) Restaurada**: Corrigido um bug na API de transformação do editor (`/api/mainsite/ai/transform`) em que comandos usando a "Vinha mágica (Freeform)" resultavam em `HTTP 400` por conta da tipagem do body perder o mapeamento do switch/case da ação "freeform" com sua respectiva "instruction". O fluxo de prompt dinâmico foi inserido, permitindo edição generativa contextual da seleção de volta.
+
+### Controle de versão
+- `admin-app`: APP v01.74.21 → APP v01.75.00 (package.json v1.62.0)
+
+## [v01.74.21] - 2026-03-31
+### Corrigido
+- **PostEditor — Remoção definitiva do crash `insertBefore` na importação Gemini**: O alerta de erro fatal ao usar Importar do Gemini não era causado pele renderização em Portal do Modal (como tentativamente alterado na v01.74.19). A real responsabilidade do crash pertencia à barra de **progresso visual** que tentava montar-se na árvore React imediatamente ANTES do elemento `<DragHandle>` do Tiptap. Como o core do Tiptap arranca dinamicamente o `DragHandle` do container para flutuar entre parágrafos (reparenting), quando o React rodava `insertBefore(novaBarraProgresso, dragHandleNode)`, o navegador disparava o erro `NotFoundError`. A solução consolidada foi isolar o status block em um `wrapper` div semântico (estático e persistente), permitindo que o append de conteúdo ocorra isolado em escopo limpo sem depender de vizinhos transitórios do Tiptap.
+
+### Controle de versão
+- `admin-app`: APP v01.74.20 → APP v01.74.21 (package.json v1.61.1)
+
 ## [v01.74.20] - 2026-03-31
 ### Corrigido
 - **Gate de qualidade (lint) restaurado no editor MainSite**: extraída a infraestrutura de busca/substituição do `SearchReplace.tsx` para módulo core dedicado (`searchReplaceCore.ts`), removendo exports não-componentes do arquivo React e eliminando erros `react-refresh/only-export-components`.
