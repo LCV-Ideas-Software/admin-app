@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.02] - 2026-04-01
+### Corrigido
+- Evoluída a resolução de Token na API de cache do Cloudflare Pages implementada. Agora o backend aplica iteração seqüencial (fallback robusto via loop `for`) cruzando `CLOUDFLARE_DNS`, `CLOUDFLARE_API_TOKEN`, `CF_API_TOKEN` e `CLOUDFLARE_PW` até transpor qualquer erro explícito `403 (Authentication error)` e isolar o token funcional com a devida permissão `Zone.CachePurge` autorizada nativamente à operação em andamento, impedindo hard 500 crashes se chaves mestre/específicas estiverem misturadas ou com escopo restrito.
+
+### Controle de versão
+- `admin-app`: APP v01.77.01 → APP v01.77.02
+
 ## [v01.77.01] - 2026-04-01
 ### Corrigido
 - Resolvido um edge-case em que o Cache Purge API do Cloudflare Pages falharia em invocações locais ou de produção se o Token Base não possuísse as permissões explícitas de Zona para purgação e não falhasse adequadamente para um Token de resolução DNS que possuía. A API do `cfpw` agora delega para o Token DNS nativamente se configurado para bypass de permissão restrita da conta.

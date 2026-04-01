@@ -2,6 +2,12 @@
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
+## 2026-04-01 — Admin-App v01.77.02 — Cloudflare Purge Cache
+### Corrigido
+- Evoluída a resolução de Token na API de cache do Cloudflare Pages implementada. Agora o backend aplica iteração seqüencial (fallback robusto via loop `for`) cruzando múltiplos tokens possíveis, mitigando o erro 403 (Authentication error) em contextos restritos.
+### Controle de versão
+- `admin-app`: APP v01.77.01 → APP v01.77.02
+
 ## 2026-04-01 — Admin-App v01.77.01 — Cloudflare Purge Cache
 ### Corrigido
 - Resolvido um edge-case em que o Cache Purge API do Cloudflare Pages falharia em invocações locais ou de produção se o Token Base não possuísse as permissões explícitas de Zona para purgação e não fizesse fallback adequadamente para um Token de resolução DNS que possuía. A API do `cfpw` agora delega para o Token DNS nativamente se configurado para bypass de permissão restrita da conta.

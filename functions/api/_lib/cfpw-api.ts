@@ -909,35 +909,46 @@ export type CfpwZone = {
   status?: string
 }
 
-const resolveZoneToken = (env: EnvWithCloudflarePwToken) => {
-  const byDnsToken = env.CLOUDFLARE_DNS?.trim()
-  if (byDnsToken) {
-    return byDnsToken
-  }
 
-  // Se não tem CLOUDFLARE_DNS explícito, buscamos os globais ignorando o CLOUDFLARE_PW (que não tem permissão de zona)
-  const byApiToken = env.CLOUDFLARE_API_TOKEN?.trim()
-  if (byApiToken) {
-    return byApiToken
-  }
-
-  const byCfToken = env.CF_API_TOKEN?.trim()
-  if (byCfToken) {
-    return byCfToken
-  }
-
-  // Fallback extremo
-  return resolveToken(env)
-}
 
 export const listCloudflareZones = async (env: EnvWithCloudflarePwToken) => {
-  const zones = await cloudflareRequest<CfpwZone[]>(
-    env,
-    '/zones?per_page=500',
-    'Falha ao carregar zonas da Cloudflare',
-    undefined,
-    resolveZoneToken(env),
-  )
+  const tokens = [
+    env.CLOUDFLARE_DNS?.trim(),
+    env.CLOUDFLARE_API_TOKEN?.trim(),
+    env.CF_API_TOKEN?.trim(),
+    env.CLOUDFLARE_PW?.trim()
+  ].filter(Boolean) as string[]
+
+  if (tokens.length === 0) {
+    throw new Error('Nenhum token Cloudflare configurado no ambiente.')
+  }
+
+  let lastError: Error | null = null
+  let zones: CfpwZone[] | null = null
+
+  for (const token of tokens) {
+    try {
+      zones = await cloudflareRequest<CfpwZone[]>(
+        env,
+        '/zones?per_page=500',
+        'Falha ao carregar zonas da Cloudflare',
+        undefined,
+        token,
+      )
+      break
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      const msg = lastError.message.toLowerCase()
+      if (msg.includes('authentication error') || msg.includes('authorization') || msg.includes('403') || msg.includes('401')) {
+        continue
+      }
+      throw lastError
+    }
+  }
+
+  if (!zones && lastError) {
+    throw lastError
+  }
 
   return Array.isArray(zones) ? zones : []
 }
@@ -967,14 +978,46 @@ export const purgeCloudflareZoneCache = async (
     payload.purge_everything = true
   }
 
-  return cloudflareRequest<Record<string, unknown>>(
-    env,
-    `/zones/${encodeURIComponent(normalizedZoneId)}/purge_cache`,
-    `Falha ao executar purge_cache na zona ${normalizedZoneId}`,
-    {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    },
-    resolveZoneToken(env),
-  )
+  const tokens = [
+    env.CLOUDFLARE_DNS?.trim(),
+    env.CLOUDFLARE_API_TOKEN?.trim(),
+    env.CF_API_TOKEN?.trim(),
+    env.CLOUDFLARE_PW?.trim()
+  ].filter(Boolean) as string[]
+
+  if (tokens.length === 0) {
+    throw new Error('Nenhum token Cloudflare configurado no ambiente para purge_cache.')
+  }
+
+  let lastError: Error | null = null
+  let result: Record<string, unknown> | null = null
+
+  for (const token of tokens) {
+    try {
+      result = await cloudflareRequest<Record<string, unknown>>(
+        env,
+        `/zones/${encodeURIComponent(normalizedZoneId)}/purge_cache`,
+        `Falha ao executar purge_cache na zona ${normalizedZoneId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+        token,
+      )
+      break
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      const msg = lastError.message.toLowerCase()
+      if (msg.includes('authentication error') || msg.includes('authorization') || msg.includes('403') || msg.includes('401')) {
+        continue
+      }
+      throw lastError
+    }
+  }
+
+  if (!result && lastError) {
+    throw lastError
+  }
+
+  return result
 }
