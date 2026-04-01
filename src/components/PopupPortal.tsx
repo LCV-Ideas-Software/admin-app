@@ -50,13 +50,13 @@ export function PopupPortal({ isOpen, onClose, title = 'LCV Admin', children }: 
       ? document.activeElement
       : null
 
-    // Calculate smart dimensions (~90% of screen, capped)
+    // Calculate dimensions to fill the screen (maximized)
     const screenW = window.screen.availWidth || 1920
     const screenH = window.screen.availHeight || 1080
-    const popupW = Math.min(Math.round(screenW * 0.9), 1600)
-    const popupH = Math.min(Math.round(screenH * 0.9), 1000)
-    const left = Math.round((screenW - popupW) / 2)
-    const top = Math.round((screenH - popupH) / 2)
+    const popupW = screenW
+    const popupH = screenH
+    const left = 0
+    const top = 0
 
     const features = [
       `width=${popupW}`,

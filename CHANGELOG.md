@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.76.01] - 2026-04-01
+### Adicionado
+- **PostEditor Fullscreen Popup**: O componente global `PopupPortal` passou a abrir nativamente maximizado e cobrindo toda a área disponível (`100vw`/`100vh`) em vez dos antigos limites hard-coded de `90%` com margens centralizadas. Essa adequação melhora a imersão na edição de publicações e remove o atrito de ter que maximizar manualmente a janela independente do _PostEditor_ na criação de postagens no MainSite.
+
+### Controle de versão
+- `admin-app`: APP v01.76.00 → APP v01.76.01
+
 ## [v01.76.00] - 2026-04-01
 ### Alterado
 - **Padronização Global de Modais e Toasts (Portals)**: Todos os modais de confirmação, diálogos de entrada, e overlays de notificação em todos os módulos (MainSite, Astrólogo, Oráculo, Telemetria, CF DNS, CF P&W, etc) foram migrados de posicionamento embutido (inline rendering) para o padrão `React.createPortal()` na raiz do `document.body`. Isso resolve definitivamente qualquer bug e regressão de rolagem onde caixas de diálogo e toasts ficavam travados em topos virtuais de contextos de CSS (como o `content-visibility: auto` dos painéis modulares), sempre garantindo centralização exata na viewport nativa do usuário.
