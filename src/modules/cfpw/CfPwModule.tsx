@@ -108,10 +108,8 @@ type OpsActionField =
   | 'secretValue'
   | 'usageModel'
   | 'schedules'
-  | 'templateCode'
   | 'projectBranch'
   | 'pageSettingsJson'
-  | 'versionId'
   | 'zoneId'
   | 'routeId'
   | 'routePattern'
@@ -128,13 +126,6 @@ type OpsActionDefinition = {
 }
 
 const WORKER_OPS: OpsActionDefinition[] = [
-  {
-    value: 'create-worker-from-template',
-    label: 'Criar Worker com template base',
-    description: 'Publica um Worker inicial com um codigo JS simples e usage model definido no painel.',
-    fields: ['scriptName', 'usageModel', 'templateCode'],
-    outcomeLabel: 'Resumo do Worker criado',
-  },
   {
     value: 'get-worker-schedules',
     label: 'Ler cron triggers do Worker',
@@ -190,13 +181,6 @@ const WORKER_OPS: OpsActionDefinition[] = [
     description: 'Consulta as versoes publicadas para apoiar rollback e promote controlado.',
     fields: ['scriptName'],
     outcomeLabel: 'Versoes retornadas',
-  },
-  {
-    value: 'deploy-worker-version',
-    label: 'Promover versao do Worker',
-    description: 'Move uma versao especifica para 100% do trafego do Worker.',
-    fields: ['scriptName', 'versionId'],
-    outcomeLabel: 'Resultado da promocao de versao',
   },
   {
     value: 'list-worker-routes',
@@ -383,10 +367,8 @@ export function CfPwModule() {
   const [opsSecretValue, setOpsSecretValue] = useState('')
   const [opsUsageModel, setOpsUsageModel] = useState('standard')
   const [opsSchedulesRaw, setOpsSchedulesRaw] = useState('0 5 * * *')
-  const [opsTemplateCode, setOpsTemplateCode] = useState('')
   const [opsProjectBranch, setOpsProjectBranch] = useState('main')
   const [opsPageSettingsJson, setOpsPageSettingsJson] = useState('')
-  const [opsVersionId, setOpsVersionId] = useState('')
   const [opsZoneId, setOpsZoneId] = useState('')
   const [opsRouteId, setOpsRouteId] = useState('')
   const [opsRoutePattern, setOpsRoutePattern] = useState('')
@@ -656,10 +638,8 @@ export function CfPwModule() {
           secretValue: opsSecretValue,
           usageModel: opsUsageModel,
           schedules,
-          templateCode: opsTemplateCode,
           projectBranch: opsProjectBranch,
           pageSettingsJson: opsPageSettingsJson,
-          versionId: opsVersionId,
           zoneId: opsZoneId,
           routeId: opsRouteId,
           routePattern: opsRoutePattern,
@@ -699,9 +679,7 @@ export function CfPwModule() {
     opsScriptName,
     opsSecretName,
     opsSecretValue,
-    opsTemplateCode,
     opsUsageModel,
-    opsVersionId,
     opsZoneId,
     showNotification,
   ])
@@ -1154,13 +1132,6 @@ export function CfPwModule() {
                 </div>
               ) : null}
 
-              {visibleOpsFields.has('versionId') ? (
-                <div className="field-group">
-                  <label htmlFor="cfpw-ops-version-id">Version ID</label>
-                  <input id="cfpw-ops-version-id" name="cfpw-ops-version-id" value={opsVersionId} onChange={(event) => setOpsVersionId(event.target.value)} placeholder="Cole a versao retornada pela listagem" disabled={opsLoading} />
-                </div>
-              ) : null}
-
               {visibleOpsFields.has('zoneId') ? (
                 <div className="field-group">
                   <label htmlFor="cfpw-ops-zone-id">Zone ID</label>
@@ -1196,22 +1167,6 @@ export function CfPwModule() {
                   disabled={opsLoading}
                 />
                 <p className="field-hint">Exemplo: 0 5 * * * para executar diariamente as 05:00 UTC.</p>
-              </div>
-            ) : null}
-
-            {visibleOpsFields.has('templateCode') ? (
-              <div className="field-group">
-                <label htmlFor="cfpw-ops-template-code">Codigo inicial do Worker</label>
-                <textarea
-                  id="cfpw-ops-template-code"
-                  name="cfpw-ops-template-code"
-                  className="json-textarea"
-                  rows={6}
-                  value={opsTemplateCode}
-                  onChange={(event) => setOpsTemplateCode(event.target.value)}
-                  disabled={opsLoading}
-                />
-                <p className="field-hint">Se deixar em branco, o painel publica um template basico de resposta texto.</p>
               </div>
             ) : null}
 

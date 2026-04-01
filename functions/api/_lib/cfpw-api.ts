@@ -59,9 +59,13 @@ export type CfpwPageDeployment = {
   environment?: string
   url?: string
   deployment_trigger?: {
+    type?: string
     metadata?: {
       branch?: string
       commit_ref?: string
+      commit_hash?: string
+      commit_message?: string
+      commit_dirty?: boolean
     }
   }
   latest_stage?: {
@@ -588,6 +592,31 @@ export const deleteCloudflarePagesDomain = async (env: EnvWithCloudflarePwToken,
   )
 }
 
+export const getCloudflarePagesDeployment = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  projectName: string,
+  deploymentId: string,
+) => {
+  const normalizedAccountId = accountId.trim()
+  const normalizedProject = projectName.trim()
+  const normalizedDeploymentId = deploymentId.trim()
+  if (!normalizedAccountId || !normalizedProject || !normalizedDeploymentId) {
+    throw new Error('Account ID, projectName e deploymentId são obrigatórios para ler deployment de Pages.')
+  }
+
+  return cloudflareRequest<CfpwPageDeployment>(
+    env,
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/pages/projects/${encodeURIComponent(normalizedProject)}/deployments/${encodeURIComponent(normalizedDeploymentId)}`,
+    `Falha ao ler deployment ${normalizedDeploymentId}`,
+  )
+}
+
+const isDirectUploadLikeTrigger = (triggerType: string) => {
+  const normalized = triggerType.trim().toLowerCase()
+  return normalized === 'ad_hoc' || normalized === 'direct_upload'
+}
+
 export const retryCloudflarePagesDeployment = async (
   env: EnvWithCloudflarePwToken,
   accountId: string,
@@ -599,6 +628,14 @@ export const retryCloudflarePagesDeployment = async (
   const normalizedDeploymentId = deploymentId.trim()
   if (!normalizedAccountId || !normalizedProject || !normalizedDeploymentId) {
     throw new Error('Account ID, projectName e deploymentId são obrigatórios para retry de deployment.')
+  }
+
+  const deployment = await getCloudflarePagesDeployment(env, normalizedAccountId, normalizedProject, normalizedDeploymentId)
+  const triggerType = String(deployment.deployment_trigger?.type ?? '').trim()
+  if (isDirectUploadLikeTrigger(triggerType)) {
+    throw new Error(
+      `Retry indisponível para deployment ${normalizedDeploymentId}: deployment do tipo ${triggerType || 'direct_upload'} não suporta retry (somente builds).`,
+    )
   }
 
   return cloudflareRequest<Record<string, unknown>>(

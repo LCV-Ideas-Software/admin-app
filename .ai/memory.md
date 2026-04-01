@@ -2,6 +2,28 @@
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
+## 2026-04-01 — Admin-App v01.77.05 — CF P&W Module Audit & API Compliance Enforcement
+### Escopo
+Auditoria completa do módulo `CF P&W` contra a API oficial Cloudflare para eliminar operações não suportadas e garantir paridade visual com Dashboard.
+
+### Corrigido
+- **Operações Removidas:** Eliminadas `create-worker-from-template` e `deploy-worker-version` que não possuem suporte na API Cloudflare
+  - `create-worker-from-template`: API não oferece template engine; upload é manual via PUT `/scripts/{name}`
+  - `deploy-worker-version`: Workers v2+ descontinuou versioning classic; modelo atual usa Deployments (POST `/deployments`)
+- **Campos UI Removidos:** `templateCode`, `versionId` e referências relacionadas
+- **Importações Limpas:** Removidas `createCloudflareWorkerFromTemplate` e `deployCloudflareWorkerVersion` do ops.ts
+
+### Resultado Final
+- **20 Operações Válidas** (todas suportadas pela API Cloudflare)
+  - WORKER_OPS: 11 operações (schedules, usage-model, secrets, versions list, routes)
+  - PAGE_OPS: 8 operações (create, settings, domains, retry, rollback, logs)
+  - RAW_OPS: 1 operação controlada
+- **Build:** 100% sem erros TypeScript
+- **Paridade Visual:** 100% com Dashboard Cloudflare (tabelas, deployments, alerts, operações avançadas)
+
+### Controle de versão
+- `admin-app`: APP v01.77.04 → APP v01.77.05
+
 ## 2026-04-01 — Admin-App v01.77.04 — Cloudflare Token Eradication & Refactoring
 ### Refatorado e Higienizado
 - **Erradicação dos Tokens Globais Legados:** Remoção completa e sistemática das chaves `CF_API_TOKEN` e `CLOUDFLARE_API_TOKEN` por todo o ecosistema do App. Eles operavam como fallback genéricos, indo contra os princípios atuais de Governança.

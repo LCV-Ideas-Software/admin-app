@@ -6,11 +6,9 @@ import {
   addCloudflareWorkerRoute,
   addCloudflareWorkerSecret,
   createCloudflarePagesProject,
-  createCloudflareWorkerFromTemplate,
   deleteCloudflarePagesDomain,
   deleteCloudflareWorkerRoute,
   deleteCloudflareWorkerSecret,
-  deployCloudflareWorkerVersion,
   getCloudflarePagesDeploymentLogs,
   getCloudflareWorkerSchedules,
   getCloudflareWorkerUsageModel,
@@ -46,10 +44,8 @@ type OpsPayload = {
   secretValue?: unknown
   usageModel?: unknown
   schedules?: unknown
-  templateCode?: unknown
   projectBranch?: unknown
   pageSettingsJson?: unknown
-  versionId?: unknown
   zoneId?: unknown
   routeId?: unknown
   routePattern?: unknown
@@ -84,6 +80,28 @@ const normalizeSchedules = (value: unknown) => {
     .filter((item) => item.cron.length > 0)
 }
 
+const resolveOpsErrorStatus = (message: string) => {
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes('token cloudflare ausente')) {
+    return 503
+  }
+
+  if (normalized.includes('invalid access token') || normalized.includes('authentication error')) {
+    return 401
+  }
+
+  if (normalized.includes('retry indisponível para deployment') || normalized.includes('cannot retry a direct upload deployment')) {
+    return 409
+  }
+
+  if (normalized.includes('rollback') && normalized.includes('only') && normalized.includes('production')) {
+    return 409
+  }
+
+  return 502
+}
+
 export async function onRequestPost(context: Context) {
   const trace = createResponseTrace(context.request)
 
@@ -107,10 +125,8 @@ export async function onRequestPost(context: Context) {
   const secretValue = String(payload.secretValue ?? '')
   const usageModel = toText(payload.usageModel)
   const schedules = normalizeSchedules(payload.schedules)
-  const templateCode = String(payload.templateCode ?? '')
   const projectBranch = toText(payload.projectBranch)
   const pageSettingsJson = String(payload.pageSettingsJson ?? '')
-  const versionId = toText(payload.versionId)
   const zoneId = toText(payload.zoneId)
   const routeId = toText(payload.routeId)
   const routePattern = toText(payload.routePattern)
@@ -124,14 +140,6 @@ export async function onRequestPost(context: Context) {
     let result: unknown = null
 
     switch (action) {
-      case 'create-worker-from-template': {
-        if (!scriptName) {
-          return toError('scriptName é obrigatório para create-worker-from-template.', trace, 400)
-        }
-        result = await createCloudflareWorkerFromTemplate(context.env, accountInfo.accountId, scriptName, templateCode, usageModel)
-        break
-      }
-
       case 'get-worker-schedules': {
         if (!scriptName) {
           return toError('scriptName é obrigatório para get-worker-schedules.', trace, 400)
@@ -270,14 +278,6 @@ export async function onRequestPost(context: Context) {
         break
       }
 
-      case 'deploy-worker-version': {
-        if (!scriptName || !versionId) {
-          return toError('scriptName e versionId são obrigatórios para deploy-worker-version.', trace, 400)
-        }
-        result = await deployCloudflareWorkerVersion(context.env, accountInfo.accountId, scriptName, versionId)
-        break
-      }
-
       case 'list-worker-routes': {
         if (!zoneId) {
           return toError('zoneId é obrigatório para list-worker-routes.', trace, 400)
@@ -370,6 +370,6 @@ export async function onRequestPost(context: Context) {
       }
     }
 
-    return toError(message, trace, 502)
+    return toError(message, trace, resolveOpsErrorStatus(message))
   }
 }

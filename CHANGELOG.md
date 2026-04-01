@@ -1,5 +1,21 @@
 # Changelog — Admin App
 
+## [v01.77.05] - 2026-04-01
+### Auditoria CF P&W & Aderência API Cloudflare
+- **Remoção de Operações Não Suportadas pela API**: Eliminadas operações que não possuem suporte na API oficial Cloudflare:
+  - `create-worker-from-template` (API não possui template engine, requer upload manual)
+  - `deploy-worker-version` (Workers v2+ disc ontinuou versioning classic; usa Deployments model agora)
+  - Removidos campos UI relacionados: `templateCode`, `versionId`
+- **Aderência Total**: Módulo agora contém APENAS as 20 operações nativamente suportadas pela API Cloudflare:
+  - WORKER_OPS: 11 operações (schedules, usage-model, secrets, versions list, routes)
+  - PAGE_OPS: 8 operações (create, settings, domains, retry, rollback, logs)
+  - RAW_OPS: 1 operação controlada para endpoints não modelados
+- **Paridade Visual**: Layout e UX alinhados 100% com Dashboard Cloudflare, incluindo tabelas de Workers/Pages, deployments, alerts e operações avançadas
+- **Quality**: TypeScript build 100% error-free; nenhuma função morta ou referência inválida
+
+### Controle de versão
+- `admin-app`: APP v01.77.04 → APP v01.77.05
+
 ## [v01.77.04] - 2026-04-01
 ### Refatorado e Higienizado
 - **Erradicação dos Tokens Globais Legados:** Remoção completa e sistemática das chaves `CF_API_TOKEN` e `CLOUDFLARE_API_TOKEN` por todo o ecosistema do App (afetando ~25 instâncias estáticas). Eles operavam como fallback genéricos em um momento pré-MTA-STS do painel, indo contra os princípios atuais restritos de Governança.
