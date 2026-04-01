@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.75.02] - 2026-04-01
+### Corrigido
+- **DeploymentCleanupPanel — Fix na Posição do Modal**: A confirmação de exclusão (Purge de Deployments) voltou a ser centralizada no viewport do usuário. Devido à presença de `content-visibility: auto` no componente pai que cria um novo contexto de isolamento no CSS, modals que usavam `position: fixed` ficavam ancorados no topo da página interna rolável. O problema foi sanado utilizando um React `createPortal` para montar o modal/overlay de exclusão diretamente pro lado de fora, no escopo raiz do `document.body`.
+
+### Controle de versão
+- `admin-app`: APP v01.75.01 → APP v01.75.02
+
 ## [v01.75.01] - 2026-03-31
 ### Corrigido
 - **Gerador Automático de Resumos IA**: A função de gerar o resumo via IA (SEO e Compartilhamento Social) estava inoperante desde a adoção da nova interface do editor, exigindo acionamento manual em massa da lista. A rotina de salvamento (`handleSavePost`) foi corrigida para realizar o disparo automático (Fire-and-Forget) da API de resumos (`/api/mainsite/post-summaries`) assim que a gravação do Post (criação ou edição) for concluída pelo servidor principal.

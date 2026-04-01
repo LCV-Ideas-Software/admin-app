@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, Cloud, Loader2, Play, RotateCcw, Search, Trash2 } from 'lucide-react'
 import { useNotification } from './Notification'
 import './DeploymentCleanupPanel.css'
@@ -452,7 +453,7 @@ export function DeploymentCleanupPanel() {
       </div>
 
       {/* ── Confirm Modal (substitui window.confirm) ── */}
-      {pendingConfirm && (
+      {pendingConfirm && createPortal(
         <div className="deploy-cleanup__confirm-overlay" onClick={() => setPendingConfirm(false)}>
           <div className="deploy-cleanup__confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="deploy-cleanup__confirm-icon">
@@ -483,7 +484,8 @@ export function DeploymentCleanupPanel() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
