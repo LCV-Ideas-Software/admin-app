@@ -391,7 +391,7 @@ export function MainsiteModule() {
         }),
       })
 
-      const nextPayload = await response.json() as { ok: boolean; error?: string; request_id?: string }
+      const nextPayload = await response.json() as { ok: boolean; error?: string; request_id?: string; post?: { id: number } }
 
       if (!response.ok || !nextPayload.ok) {
         throw new Error(nextPayload.error ?? 'Falha ao salvar o post do MainSite.')
@@ -399,6 +399,17 @@ export function MainsiteModule() {
 
       await loadManagedPosts()
       showNotification(withTrace(isEditing ? 'Post do MainSite atualizado com sucesso.' : 'Post do MainSite criado com sucesso.', nextPayload), 'success')
+      
+      // Auto-trigger SEO summary generation using Fire and Forget
+      const targetPostId = isEditing ? editingPostId : nextPayload.post?.id
+      if (targetPostId) {
+        fetch('/api/mainsite/post-summaries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'regenerate', postId: targetPostId, model: msConfig.summaryModeloIA || undefined }),
+        }).then(() => loadSummaries()).catch(console.error)
+      }
+
       return true
     } catch {
       showNotification('Não foi possível salvar o post do MainSite.', 'error')

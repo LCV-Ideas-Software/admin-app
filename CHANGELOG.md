@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.75.01] - 2026-03-31
+### Corrigido
+- **Gerador Automático de Resumos IA**: A função de gerar o resumo via IA (SEO e Compartilhamento Social) estava inoperante desde a adoção da nova interface do editor, exigindo acionamento manual em massa da lista. A rotina de salvamento (`handleSavePost`) foi corrigida para realizar o disparo automático (Fire-and-Forget) da API de resumos (`/api/mainsite/post-summaries`) assim que a gravação do Post (criação ou edição) for concluída pelo servidor principal.
+
+### Controle de versão
+- `admin-app`: APP v01.75.00 → APP v01.75.01 (package.json v1.62.1)
+
 ## [v01.75.00] - 2026-03-31
 ### Alterado
 - **PostEditor — Pipeline Padrão-Ouro de Extração Gemini (Tabelas e Imagens)**: Refatorado totalmente o backend `gemini-import.ts`. O crawler rústico baseado em texto plano (`HTMLRewriter`) e expressões regulares limitadas foi descartado. A API agora processa links compartilhados utilizando primeiramente o espelho oficial de documentação (`r.jina.ai`) para resgatar o conteúdo integral em Markdown Perfeito gerado pelo Gemini e, a seguir, realiza um parse transcompilador completo utilizando a biblioteca `marked`. Isso confere ao editor a capacidade nativa de importar e projetar perfeitamente `<Table>`s, células complexas e tags `<img>` (bem como formatadores e hierarquias) que antes se perdiam.
