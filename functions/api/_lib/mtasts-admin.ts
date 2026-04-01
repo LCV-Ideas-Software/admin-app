@@ -51,7 +51,7 @@ const buildErrorMessage = async (response: Response, fallback: string) => {
 
   const looksLikeHtml = rawText.startsWith('<!DOCTYPE') || rawText.startsWith('<html')
   if (looksLikeHtml) {
-    return `${fallback}: resposta HTML inesperada do legado (HTTP ${response.status}). Verifique Cloudflare Access/challenge e CF_API_TOKEN no mtasts-admin.`
+    return `${fallback}: resposta HTML inesperada do legado (HTTP ${response.status}). Verifique Cloudflare Access/challenge.`
   }
 
   try {
@@ -74,7 +74,7 @@ const parseJsonOrThrow = <T>(rawText: string, fallback: string, response: Respon
 
   const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')
   if (looksLikeHtml) {
-    throw new Error(`${fallback}: resposta HTML inesperada do legado (HTTP ${response.status}). Verifique Cloudflare Access/challenge e CF_API_TOKEN no mtasts-admin.`)
+    throw new Error(`${fallback}: resposta HTML inesperada do legado (HTTP ${response.status}). Verifique Cloudflare Access/challenge.`)
   }
 
   try {

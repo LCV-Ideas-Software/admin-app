@@ -8,8 +8,6 @@ type Context = {
   env: {
     BIGDATA_DB?: D1Database
     CLOUDFLARE_PW?: string
-    CLOUDFLARE_API_TOKEN?: string
-    CF_API_TOKEN?: string
     CF_ACCOUNT_ID?: string
   }
 }

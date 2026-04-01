@@ -4,10 +4,8 @@ import { getCloudflareDnsSnapshot, listCloudflareZones } from '../_lib/cloudflar
 
 type Env = {
   BIGDATA_DB?: D1Database
-  CF_API_TOKEN?: string
   CLOUDFLARE_DNS?: string
-  CLOUDFLARE_API_TOKEN?: string
-}
+  }
 
 type Context = {
   request: Request

@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.77.04] - 2026-04-01
+### Refatorado e Higienizado
+- **Erradicação dos Tokens Globais Legados:** Remoção completa e sistemática das chaves `CF_API_TOKEN` e `CLOUDFLARE_API_TOKEN` por todo o ecosistema do App (afetando ~25 instâncias estáticas). Eles operavam como fallback genéricos em um momento pré-MTA-STS do painel, indo contra os princípios atuais restritos de Governança.
+- Consolidado a padronização e obrigatoriedade exclusiva do princípio de Defense in Depth para Tokens da Cloudflare (`CLOUDFLARE_PW`, `CLOUDFLARE_DNS` e renomeado `CLOUDFLARE_CACHE_TOKEN` puramente para `CLOUDFLARE_CACHE` harmonizando o visual).
+- **Oráculo Financeiro:** Adaptado o CRON Sync de Workes de fallback token genérico (sujeito a 403 eventual) explicitamente para a requisição modular de controle `CLOUDFLARE_PW` provida no `admin-app`.
+- **MTA-STS Admin:** Sanitizados os throw catchs legados que recomendavam inspecionar o saudoso e inoperante token global.
+
+### Controle de versão
+- `admin-app`: APP v01.77.03 → APP v01.77.04
+
 ## [v01.77.03] - 2026-04-01
 ### Corrigido e Otimizado
 - **Segregação de Tokens Cloudflare**: O erro `403 (Authentication error)` no endpoint `/client/v4/zones/:id/purge_cache` persistia devido à restrição estrita das chaves preexistentes (`CLOUDFLARE_DNS`, `CLOUDFLARE_PW`) que não possuíam, por design de segurança (Governance/Defence in Depth), os privilégios híbridos necessários para purgar cache.

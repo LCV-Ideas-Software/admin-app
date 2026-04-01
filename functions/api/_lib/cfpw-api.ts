@@ -89,27 +89,15 @@ export type CfpwPageDomain = {
 
 type EnvWithCloudflarePwToken = {
   CLOUDFLARE_PW?: string
-  CLOUDFLARE_API_TOKEN?: string
-  CF_API_TOKEN?: string
   CF_ACCOUNT_ID?: string
   CLOUDFLARE_DNS?: string
-  CLOUDFLARE_CACHE_TOKEN?: string
+  CLOUDFLARE_CACHE?: string
 }
 
 const resolveToken = (env: EnvWithCloudflarePwToken) => {
   const byPwToken = env.CLOUDFLARE_PW?.trim()
   if (byPwToken) {
     return byPwToken
-  }
-
-  const byApiToken = env.CLOUDFLARE_API_TOKEN?.trim()
-  if (byApiToken) {
-    return byApiToken
-  }
-
-  const byCfToken = env.CF_API_TOKEN?.trim()
-  if (byCfToken) {
-    return byCfToken
   }
 
   return ''
@@ -149,7 +137,7 @@ const cloudflareRequest = async <T>(
 ) => {
   const token = overrideToken || resolveToken(env)
   if (!token) {
-    throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_PW, CLOUDFLARE_API_TOKEN, CF_API_TOKEN ou use token override).')
+    throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_PW ou use token override).')
   }
 
   const hasContentTypeHeader = Boolean(
@@ -913,7 +901,7 @@ export type CfpwZone = {
 
 
 export const listCloudflareZones = async (env: EnvWithCloudflarePwToken) => {
-  const token = env.CLOUDFLARE_CACHE_TOKEN?.trim()
+  const token = env.CLOUDFLARE_CACHE?.trim()
 
   if (!token) {
     throw new Error('Nenhum token Cloudflare configurado no ambiente para ler zonas.')
@@ -963,10 +951,10 @@ export const purgeCloudflareZoneCache = async (
     payload.purge_everything = true
   }
 
-  const token = env.CLOUDFLARE_CACHE_TOKEN?.trim()
+  const token = env.CLOUDFLARE_CACHE?.trim()
 
   if (!token) {
-    throw new Error('Token global ausente no runtime para Zone.CachePurge (configure CLOUDFLARE_CACHE_TOKEN).')
+    throw new Error('Token global ausente no runtime para Zone.CachePurge (configure CLOUDFLARE_CACHE).')
   }
 
   let lastError: Error | null = null

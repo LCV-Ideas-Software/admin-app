@@ -9,7 +9,7 @@ type Context = {
   request: Request
   env: {
     CLOUDFLARE_PW?: string
-    CLOUDFLARE_CACHE_TOKEN?: string
+  CLOUDFLARE_CACHE?: string
     CF_ACCOUNT_ID?: string
   }
 }

@@ -1,7 +1,7 @@
 // Módulo: admin-app/functions/api/oraculo/cron.ts
 // Descrição: Atualiza o cron schedule do worker cron-taxa-ipca via Cloudflare API.
 
-interface Env { CF_API_TOKEN?: string; CLOUDFLARE_API_TOKEN?: string; CF_ACCOUNT_ID?: string }
+interface Env { CLOUDFLARE_PW?: string; CF_ACCOUNT_ID?: string }
 interface Ctx { env: Env; request: Request }
 
 function json(data: unknown, status = 200) {
@@ -13,7 +13,7 @@ function json(data: unknown, status = 200) {
 
 /** Resolve o token da Cloudflare API entre as variáveis disponíveis */
 function resolveToken(env: Env): string {
-  return env.CF_API_TOKEN?.trim() || env.CLOUDFLARE_API_TOKEN?.trim() || ''
+  return env.CLOUDFLARE_PW?.trim() || ''
 }
 
 // ─── GET: Lê o cron schedule atual do worker ─────────────────────────────────
@@ -24,8 +24,8 @@ export const onRequestGet = async ({ env }: Ctx) => {
   const accountId = env.CF_ACCOUNT_ID?.trim()
 
   if (!token || !accountId) {
-    console.error('[oraculo/cron] GET — CF_API_TOKEN ou CF_ACCOUNT_ID ausente')
-    return json({ ok: false, error: 'CF_API_TOKEN ou CF_ACCOUNT_ID ausente.' }, 503)
+    console.error('[oraculo/cron] GET — CLOUDFLARE_PW ou CF_ACCOUNT_ID ausente')
+    return json({ ok: false, error: 'CLOUDFLARE_PW ou CF_ACCOUNT_ID ausente.' }, 503)
   }
 
   try {
@@ -55,7 +55,7 @@ export const onRequestPut = async ({ env, request }: Ctx) => {
   const accountId = env.CF_ACCOUNT_ID?.trim()
 
   if (!token || !accountId) {
-    return json({ ok: false, error: 'CF_API_TOKEN ou CF_ACCOUNT_ID ausente.' }, 503)
+    return json({ ok: false, error: 'CLOUDFLARE_PW ou CF_ACCOUNT_ID ausente.' }, 503)
   }
 
   let body: { cron?: string }
