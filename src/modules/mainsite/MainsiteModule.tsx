@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Suspense, lazy } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  AlertTriangle, BrainCircuit, DollarSign,
+  AlertTriangle, DollarSign,
   FilePlus2, Globe, GripVertical,
   Loader2, Pencil, Pin, RefreshCw,
   Save, Sparkles, Trash2, X,
@@ -782,50 +782,6 @@ export function MainsiteModule() {
           </button>
         </div>
       </form>
-
-      {/* ── Modelos de IA (Gemini) — paridade com Calculadora/Oráculo/Astrólogo ── */}
-      <div className="form-card" style={{ marginTop: '24px' }}>
-        <div className="result-toolbar">
-          <div>
-            <h4><BrainCircuit size={16} /> Modelos de IA (Gemini)</h4>
-            <p className="field-hint">
-              Selecione o motor utilizado pelo chatbot e funcionalidades de IA deste módulo.{' '}
-              {!modelsLoading && geminiModels.length > 0 && <>· {geminiModels.length} modelos disponíveis</>}
-            </p>
-          </div>
-        </div>
-
-        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
-          <div className="field-group">
-            <label htmlFor="mainsite-modelo-ia">Modelo de Processamento</label>
-            <div className="select-wrapper">
-              <select
-                id="mainsite-modelo-ia"
-                name="mainsiteModeloIa"
-                value={msConfig.modeloIA || ''}
-                onChange={e => saveMsConfig({ modeloIA: e.target.value })}
-              >
-                {modelsLoading ? (
-                  <option value={msConfig.modeloIA || ''}>Carregando modelos do Cloudflare...</option>
-                ) : (
-                  <>
-                    <option value="">Automático (Padrão)</option>
-                    {geminiModels.length === 0 && msConfig.modeloIA && <option value={msConfig.modeloIA}>{msConfig.modeloIA}</option>}
-                    {geminiModels.map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-            <p className="field-hint" style={{ marginTop: '8px' }}>
-              Esta alteração é persistida localmente (no seu navegador) e aplicada instantaneamente sem recarregar a página.
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* ── Taxas dos Gateways de Pagamento ── */}
       <div className="form-card" style={{ marginTop: '24px' }}>

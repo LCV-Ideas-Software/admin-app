@@ -24,6 +24,7 @@ export type MainsitePublicSettings = {
   appearance: Record<string, unknown>
   rotation: Record<string, unknown>
   disclaimers: Record<string, unknown>
+  aiModels: Record<string, unknown>
 }
 
 // ATENÇÃO: código legado sem chamadores ativos. Se reativado, configurar MAINSITE_WORKER_API_BASE_URL via env.
@@ -169,16 +170,18 @@ export const deletePostFromBigdata = async (db: D1Database, id: number) => {
 }
 
 export const readLegacyPublicSettings = async (env: Env): Promise<MainsitePublicSettings> => {
-  const [appearance, rotation, disclaimers] = await Promise.all([
+  const [appearance, rotation, disclaimers, aiModels] = await Promise.all([
     fetchLegacyJson<Record<string, unknown>>(env, '/api/settings', 'Falha ao ler appearance do MainSite legado'),
     fetchLegacyJson<Record<string, unknown>>(env, '/api/settings/rotation', 'Falha ao ler rotation do MainSite legado'),
     fetchLegacyJson<Record<string, unknown>>(env, '/api/settings/disclaimers', 'Falha ao ler disclaimers do MainSite legado'),
+    fetchLegacyJson<Record<string, unknown>>(env, '/api/settings/ai_models', 'Falha ao ler ai_models do MainSite legado'),
   ])
 
   return {
     appearance,
     rotation,
     disclaimers,
+    aiModels,
   }
 }
 
@@ -187,6 +190,7 @@ export const upsertPublicSettingsIntoBigdata = async (db: D1Database, settings: 
     ['mainsite/appearance', JSON.stringify(settings.appearance)],
     ['mainsite/rotation', JSON.stringify(settings.rotation)],
     ['mainsite/disclaimers', JSON.stringify(settings.disclaimers)],
+    ['mainsite/ai_models', JSON.stringify(settings.aiModels)],
   ] as const
 
   for (const [id, payload] of rows) {

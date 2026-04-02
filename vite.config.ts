@@ -34,4 +34,8 @@ export default defineConfig({
       polyfill: false,
     },
   },
+  // Desabilita lightningcss para resolver problema em Windows
+  optimizeDeps: {
+    exclude: ['lightningcss']
+  }
 })

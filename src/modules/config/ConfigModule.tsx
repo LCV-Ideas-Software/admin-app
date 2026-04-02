@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Rocket, Save, Search, Settings2, ShieldCheck, Trash2, Zap, Upload } from 'lucide-react'
+import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Rocket, Save, Search, Settings2, ShieldCheck, Trash2, Zap, Upload, BrainCircuit } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import { RateLimitPanel } from '../../components/RateLimitPanel'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
@@ -14,6 +14,21 @@ import {
   loadNewsSettings, saveNewsSettings, dispatchNewsSettingsChange,
   slugify, DEFAULT_NEWS_SETTINGS, type NewsSettings, type NewsSource
 } from '../../lib/newsSettings'
+
+export type AIModelRegistry = {
+  id: string
+  version: string
+  displayName: string
+  description: string
+  inputTokenLimit: number
+  outputTokenLimit: number
+  supportedGenerationMethods: string[]
+  temperature?: number
+  topP?: number
+  topK?: number
+  vision?: boolean
+  api: 'gemini'
+}
 
 type AdminRuntimeConfig = {
   defaultAdminActor: string
@@ -82,9 +97,35 @@ export function ConfigModule() {
   // ── MainSite settings (appearance + rotation) state ──
   const [msAppearance, setMsAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE)
   const [msRotation, setMsRotation] = useState<RotationSettings>(DEFAULT_ROTATION)
+  const [msAiModels, setMsAiModels] = useState<{ chat: string; summary: string }>({ chat: '', summary: '' })
   const [msSettingsLoading, setMsSettingsLoading] = useState(false)
   const [msSavingSettings, setMsSavingSettings] = useState(false)
   const [adminActor] = useState('admin@app.lcv')
+  
+  // ── Gemini Models Loader ──
+  const [geminiModels, setGeminiModels] = useState<AIModelRegistry[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  
+  const loadModels = useCallback(async () => {
+    setModelsLoading(true)
+    try {
+      const res = await fetch('/api/mainsite/modelos', {
+        headers: { 'X-Admin-Actor': adminActor },
+      })
+      const payload = await res.json() as { ok: boolean; models: AIModelRegistry[] }
+      if (payload.ok && payload.models) {
+        setGeminiModels(payload.models)
+      }
+    } catch {
+      // Falha silenciosa pra não poluir.
+    } finally {
+      setModelsLoading(false)
+    }
+  }, [adminActor])
+
+  useEffect(() => {
+    void loadModels()
+  }, [loadModels])
 
   // ── Upload state (R2 Backgrounds) ──
   const [isUploadingBg, setIsUploadingBg] = useState(false)
@@ -327,6 +368,7 @@ export function ConfigModule() {
 
       setMsAppearance(payload.settings.appearance as AppearanceSettings ?? DEFAULT_APPEARANCE)
       setMsRotation(payload.settings.rotation as RotationSettings ?? DEFAULT_ROTATION)
+      setMsAiModels((payload.settings.aiModels as { chat: string; summary: string }) ?? { chat: '', summary: '' })
 
       if (shouldNotify) {
         showNotification('Ajustes do MainSite recarregados com sucesso.', 'success')
@@ -363,6 +405,7 @@ export function ConfigModule() {
           appearance: msAppearance,
           rotation: msRotation,
           disclaimers: currentDisclaimers,
+          aiModels: msAiModels,
           adminActor,
         }),
       })
@@ -732,6 +775,68 @@ export function ConfigModule() {
               >
                 {isUploadingBg && uploadTarget === 'light' ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
               </button>
+            </div>
+          </div>
+        </fieldset>
+        
+        {/* Modelos de IA (Gemini) */}
+        <fieldset className="settings-fieldset" style={{ marginTop: '24px' }}>
+          <legend><BrainCircuit size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} /> Modelos de IA (Gemini)</legend>
+          <p className="field-hint" style={{ marginBottom: '16px' }}>
+            Selecione de forma unificada os modelos que governarão o chatbot e a sumarização do MainSite.
+            {!modelsLoading && geminiModels.length > 0 && <>· {geminiModels.length} modelos disponíveis</>}
+          </p>
+          <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+            <div className="field-group">
+              <label htmlFor="cfg-mainsite-ai-chat">Modelo de Chatbot (Interação Típica)</label>
+              <div className="select-wrapper">
+                <select
+                  id="cfg-mainsite-ai-chat"
+                  name="cfgMainsiteAiChat"
+                  value={msAiModels.chat}
+                  onChange={e => setMsAiModels({ ...msAiModels, chat: e.target.value })}
+                >
+                  {modelsLoading ? (
+                    <option value={msAiModels.chat || ''}>Carregando modelos do Cloudflare...</option>
+                  ) : (
+                    <>
+                      <option value="">Automático (Padrão: gemini-1.5-flash-latest)</option>
+                      {geminiModels.length === 0 && msAiModels.chat && <option value={msAiModels.chat}>{msAiModels.chat}</option>}
+                      {geminiModels.map(m => (
+                        <option key={`chat-${m.id}`} value={m.id}>
+                          {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfg-mainsite-ai-summary">Modelo de Sumarização e Extração (SEO/LD)</label>
+              <div className="select-wrapper">
+                <select
+                  id="cfg-mainsite-ai-summary"
+                  name="cfgMainsiteAiSummary"
+                  value={msAiModels.summary}
+                  onChange={e => setMsAiModels({ ...msAiModels, summary: e.target.value })}
+                >
+                  {modelsLoading ? (
+                    <option value={msAiModels.summary || ''}>Carregando modelos do Cloudflare...</option>
+                  ) : (
+                    <>
+                      <option value="">Automático (Padrão: gemini-1.5-flash-latest)</option>
+                      {geminiModels.length === 0 && msAiModels.summary && <option value={msAiModels.summary}>{msAiModels.summary}</option>}
+                      {geminiModels.map(m => (
+                        <option key={`sum-${m.id}`} value={m.id}>
+                          {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              </div>
             </div>
           </div>
         </fieldset>

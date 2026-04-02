@@ -58,16 +58,21 @@ const safeParseObject = (rawPayload: string | undefined, fallback: Record<string
 }
 
 const readPublicSettings = async (db: D1Database): Promise<MainsitePublicSettings> => {
-  const [appearanceRow, rotationRow, disclaimersRow] = await Promise.all([
+  const [appearanceRow, rotationRow, disclaimersRow, aiModelsRow] = await Promise.all([
     db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/appearance').first<SettingRow>(),
     db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/rotation').first<SettingRow>(),
     db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/disclaimers').first<SettingRow>(),
+    db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/ai_models').first<SettingRow>(),
   ])
 
   return {
     appearance: safeParseObject(appearanceRow?.payload, {}),
     rotation: safeParseObject(rotationRow?.payload, {}),
     disclaimers: safeParseObject(disclaimersRow?.payload, {}),
+    aiModels: safeParseObject(aiModelsRow?.payload, {
+      chat: 'gemini-1.5-flash-latest',
+      summary: 'gemini-1.5-flash-latest',
+    }),
   }
 }
 
@@ -129,20 +134,22 @@ export async function onRequestPut(context: MainsiteContext) {
     const body = await context.request.json() as Partial<MainsitePublicSettings>
     const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>)
 
-    if (!isRecord(body.appearance) || !isRecord(body.rotation) || !isRecord(body.disclaimers)) {
-      return buildErrorResponse('Appearance, rotation e disclaimers precisam ser objetos JSON válidos.', trace, 400)
+    if (!isRecord(body.appearance) || !isRecord(body.rotation) || !isRecord(body.disclaimers) || (body.aiModels && !isRecord(body.aiModels))) {
+      return buildErrorResponse('Appearance, rotation, disclaimers e aiModels precisam ser objetos JSON válidos.', trace, 400)
     }
 
     const settings: MainsitePublicSettings = {
       appearance: body.appearance,
       rotation: body.rotation,
       disclaimers: body.disclaimers,
+      aiModels: body.aiModels ?? {},
     }
 
     await Promise.all([
       upsertSetting(db, 'mainsite/appearance', settings.appearance),
       upsertSetting(db, 'mainsite/rotation', settings.rotation),
       upsertSetting(db, 'mainsite/disclaimers', settings.disclaimers),
+      upsertSetting(db, 'mainsite/ai_models', settings.aiModels),
     ])
 
     try {
@@ -154,7 +161,7 @@ export async function onRequestPut(context: MainsiteContext) {
         metadata: {
           action: 'save-public-settings',
           adminActor,
-          settingsUpserted: 3,
+          settingsUpserted: 4,
         },
       })
     } catch {
@@ -163,7 +170,7 @@ export async function onRequestPut(context: MainsiteContext) {
 
     return new Response(JSON.stringify({
       ok: true,
-      settingsUpserted: 3,
+      settingsUpserted: 4,
       admin_actor: adminActor,
       ...trace,
     }), {

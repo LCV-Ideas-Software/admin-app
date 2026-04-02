@@ -2,6 +2,13 @@
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
+## 2026-04-02 — Admin-App v01.77.08 — Migrate AI Model Selectors to D1 (MainSite)
+### Refatoração Estrutural
+- **Configurações Globais**: Migrados os seletores de modelos de IA da aba MainSite (com persistência local em navegador) para o ConfigModule (com persistência unificada e estruturada no D1 DB na tabela `mainsite_settings`), em aderência à paridade operacional exigida pela arquitetura vigente. O frontend `MainsiteModule` foi limpo de chaves locais, enquanto o backend `/api/mainsite/settings` foi atualizado para suportar e fazer upscale de `ai_models`.
+
+### Controle de versão
+- `admin-app`: APP v01.77.07 → APP v01.77.08
+
 ## 2026-04-01 — Admin-App v01.77.05 — CF P&W Module Audit & API Compliance Enforcement
 ### Escopo
 Auditoria completa do módulo `CF P&W` contra a API oficial Cloudflare para eliminar operações não suportadas e garantir paridade visual com Dashboard.

@@ -1,5 +1,20 @@
 # Changelog — Admin App
 
+## [v01.77.08] - 2026-04-02
+### Refatoração Estrutural
+- **Configurações Globais**: Migrados os seletores de modelos de IA da aba MainSite (com persistência local em navegador) para o ConfigModule (com persistência unificada e estruturada no D1 DB na tabela `mainsite_settings`), em aderência à paridade operacional exigida pela arquitetura vigente.
+
+### Controle de versão
+- `admin-app`: APP v01.77.07 → APP v01.77.08
+
+## [v01.77.07] - 2026-04-02
+### Atualizações Tecnológicas (P4)
+- **Vitest**: Configurada a infraestrutura de testes unitários com o framework `vitest`.
+- **Workaround LightningCSS**: Inserido `optimizeDeps.exclude: ['lightningcss']` no `vite.config.ts` para resolver problemas de compatibilidade de *pre-bundling* no Windows, uniformizando o comportamento com o frontend.
+
+### Controle de versão
+- `admin-app`: APP v01.77.06 → APP v01.77.07
+
 ## [v01.77.06] - 2026-04-01
 ### Features
 - **Gerenciador Visual de Segredos:** Integrada interface rica via componente \`SecretsManager\` diretamente na aba Ajustes do CF P&W.
