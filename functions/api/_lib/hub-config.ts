@@ -1,4 +1,4 @@
-import { logModuleOperationalEvent, type D1Database } from './operational'
+﻿import { logModuleOperationalEvent, type D1Database } from './operational'
 
 export type HubModule = 'apphub' | 'adminhub'
 
@@ -36,7 +36,7 @@ const HUB_CARDS_LIMITS = {
 
 const APPHUB_DEFAULT_CARDS: HubCard[] = [
   {
-    name: 'Divagações Filosóficas',
+    name: 'Reflexos da Alma',
     description: 'Publicações sobre temas científico-religio-filosóficos',
     url: 'https://www.lcv.rio.br',
     icon: '🧠',
