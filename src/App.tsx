@@ -141,7 +141,7 @@ const NewsPanel = lazyWithAccessRecovery(() => import('./modules/news/NewsPanel'
 const TlsrptModule = lazyWithAccessRecovery(() => import('./modules/tlsrpt/TlsrptModule').then(m => ({ default: m.TlsrptModule })))
 const LicencasModule = lazyWithAccessRecovery(() => import('./modules/compliance/LicencasModule').then(m => ({ default: m.LicencasModule })))
 
-const APP_VERSION = 'APP v01.77.09'
+const APP_VERSION = 'APP v01.77.10'
 type ModuleId = 'overview' | 'ai-status' | 'astrologo' | 'cardhub' | 'cfdns' | 'cfpw' | 'config' | 'financeiro' | 'oraculo' | 'calculadora' | 'mainsite' | 'mtasts' | 'telemetria' | 'tlsrpt' | 'compliance'
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {

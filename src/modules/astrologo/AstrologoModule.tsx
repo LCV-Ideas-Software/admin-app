@@ -285,7 +285,19 @@ export function AstrologoModule() {
 
   const renderModelSelect = (label: string, id: string, value: string | undefined, onChange: (v: string) => void) => (
     <div className="field-group">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {label}
+        <button 
+          type="button" 
+          className="ghost-button" 
+          onClick={() => void carregarModelos()} 
+          disabled={modelsLoading} 
+          style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
+        >
+          {modelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+          Atualizar
+        </button>
+      </label>
       <select id={id} value={value || ''} onChange={e => onChange(e.target.value)}>
         {!value && <option value="">(Padrão do Sistema)</option>}
         {geminiModels.map(m => (

@@ -4,9 +4,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Rocket, Save, Search, Settings2, ShieldCheck, Trash2, Zap, Upload, BrainCircuit } from 'lucide-react'
+import { Database, Globe, Loader2, Newspaper, Plus, RefreshCw, Rocket, Save, Search, Settings2, Trash2, Zap, Upload, BrainCircuit } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
-import { RateLimitPanel } from '../../components/RateLimitPanel'
 import { SyncStatusCard } from '../../components/SyncStatusCard'
 import { DeploymentCleanupPanel } from '../../components/DeploymentCleanupPanel'
 import { useModuleConfig } from '../../lib/useModuleConfig'
@@ -91,7 +90,6 @@ export function ConfigModule() {
   const [runtimeConfig, saveRuntimeConfig] = useModuleConfig<AdminRuntimeConfig>(STORAGE_KEY, DEFAULT_CONFIG)
   const [config, setConfig] = useState<AdminRuntimeConfig>(DEFAULT_CONFIG)
   const [baselineConfig, setBaselineConfig] = useState<AdminRuntimeConfig>(DEFAULT_CONFIG)
-  const [selectedRateModule, setSelectedRateModule] = useState('')
   const [selectedSyncModule, setSelectedSyncModule] = useState('')
 
   // ── MainSite settings (appearance + rotation) state ──
@@ -788,7 +786,19 @@ export function ConfigModule() {
           </p>
           <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
             <div className="field-group">
-              <label htmlFor="cfg-mainsite-ai-chat">Modelo de Chatbot (Interação Típica)</label>
+              <label htmlFor="cfg-mainsite-ai-chat" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Modelo de Chatbot (Interação Típica)
+                <button 
+                  type="button" 
+                  className="ghost-button" 
+                  onClick={() => void carregarModelos()} 
+                  disabled={modelsLoading} 
+                  style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
+                >
+                  {modelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+                  Atualizar
+                </button>
+              </label>
               <div className="select-wrapper">
                 <select
                   id="cfg-mainsite-ai-chat"
@@ -814,7 +824,19 @@ export function ConfigModule() {
             </div>
 
             <div className="field-group">
-              <label htmlFor="cfg-mainsite-ai-summary">Modelo de Sumarização e Extração (SEO/LD)</label>
+              <label htmlFor="cfg-mainsite-ai-summary" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Modelo de Sumarização e Extração (SEO/LD)
+                <button 
+                  type="button" 
+                  className="ghost-button" 
+                  onClick={() => void carregarModelos()} 
+                  disabled={modelsLoading} 
+                  style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
+                >
+                  {modelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+                  Atualizar
+                </button>
+              </label>
               <div className="select-wrapper">
                 <select
                   id="cfg-mainsite-ai-summary"
@@ -842,39 +864,7 @@ export function ConfigModule() {
         </fieldset>
       </form>
 
-      <article className="result-card">
-        <header className="result-header">
-          <h4><ShieldCheck size={16} /> Rate Limit — Controles por módulo</h4>
-        </header>
-        <div className="field-group">
-          <label htmlFor="config-ratelimit-module">Selecione o módulo</label>
-          <select
-            id="config-ratelimit-module"
-            name="configRateLimitModule"
-            value={selectedRateModule}
-            onChange={(e) => setSelectedRateModule(e.target.value)}
-          >
-            <option value="">— Escolha um módulo —</option>
-            <option value="astrologo">Astrólogo</option>
-            <option value="calculadora">Calculadora</option>
-            <option value="mainsite">MainSite</option>
-            <option value="oraculo">Oráculo</option>
-          </select>
-        </div>
-      </article>
 
-      {selectedRateModule === 'astrologo' && (
-        <RateLimitPanel moduleLabel="Astrólogo" endpoint="/api/astrologo/rate-limit" idPrefix="config-ast" />
-      )}
-      {selectedRateModule === 'calculadora' && (
-        <RateLimitPanel moduleLabel="Calculadora" endpoint="/api/calculadora/rate-limit" idPrefix="config-calculadora" />
-      )}
-      {selectedRateModule === 'mainsite' && (
-        <RateLimitPanel moduleLabel="MainSite" endpoint="/api/mainsite/rate-limit" idPrefix="config-mainsite" />
-      )}
-      {selectedRateModule === 'oraculo' && (
-        <RateLimitPanel moduleLabel="Oráculo" endpoint="/api/oraculo/rate-limit" idPrefix="config-oraculo" />
-      )}
 
       <article className="result-card">
         <header className="result-header">

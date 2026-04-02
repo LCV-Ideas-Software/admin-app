@@ -224,7 +224,19 @@ export function CalculadoraModule() {
 
         <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
           <div className="field-group">
-            <label htmlFor="calculadora-modelo-ia">Modelo de Processamento</label>
+            <label htmlFor="calculadora-modelo-ia" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Modelo de Processamento
+              <button 
+                type="button" 
+                className="ghost-button" 
+                onClick={() => void carregarModelos()} 
+                disabled={modelsLoading} 
+                style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
+              >
+                {modelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+                Atualizar
+              </button>
+            </label>
             <div className="select-wrapper">
               <select 
                 id="calculadora-modelo-ia" 
