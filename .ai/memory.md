@@ -3,6 +3,16 @@
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
 
+## 2026-04-02 - Admin-App v01.77.16 - Fix Definitivo: Auto-Save de Modelos de IA no ConfigModule
+### Corrigido
+- **Verdadeira causa raiz**: Os seletores de modelo no `ConfigModule` usavam `setMsAiModels()` (state local React), que nunca persistia automaticamente no D1. O `AstrologoModule` e `CalculadoraModule` usam `useModuleConfig` com auto-save imediato via `/api/config-store` — por isso funcionavam. A diferença de arquitetura era a causa real.
+- **Fix**: Implementada `saveAiModelsImmediately()` + `handleAiModelChange(field, value)` no `ConfigModule`. Ao trocar o select, o handler: (1) atualiza state local, (2) lê settings atuais do D1, (3) faz PUT com todos os campos preservados + novo `aiModels`.
+- **Regra estabelecida**: Todo seletor de modelo de IA DEVE persistir imediatamente ao onChange, nunca depender de submit manual de formulário.
+- **Nota sobre patches anteriores**: v01.77.14 (backend condicional) e v01.77.15 (paridade visual) continuam válidos como defense-in-depth, mas não eram a causa do bug principal.
+
+### Controle de versão
+- admin-app: APP v01.77.15 -> APP v01.77.16
+
 ## 2026-04-02 - Admin-App v01.77.15 - Paridade Visual de Seletores de IA
 ### Alterado
 - **Padrão de referência estabelecido**: O `AstrologoModule.renderModelSelect` é o design pattern canônico para seletores de modelos de IA. Características: botão "Atualizar" inline no `<label>` (11px, compacto), `<select>` direto (sem wrapper div), default "(Padrão do Sistema)", formato de option `{displayName} ({api}) {vision}`.

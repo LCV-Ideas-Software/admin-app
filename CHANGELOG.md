@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.16] - 2026-04-02
+### Corrigido
+- **Bug Definitivo: Persistência de Modelos de IA no ConfigModule**: Identificada e corrigida a verdadeira causa raiz — os seletores de modelo no `ConfigModule` usavam `setMsAiModels()` (React state local), que **nunca persistia no D1** até o usuário clicar "Salvar ajustes". Diferente do `AstrologoModule` e `CalculadoraModule`, que usam `useModuleConfig` com auto-save imediato via `/api/config-store`, o `ConfigModule` dependia de submit manual do form. Implementada função `saveAiModelsImmediately` com handler `handleAiModelChange` que persiste no D1 instantaneamente ao trocar o select, em paridade total com os demais módulos.
+
+### Controle de versão
+- `admin-app`: APP v01.77.15 -> APP v01.77.16
+
 ## [v01.77.15] - 2026-04-02
 ### Alterado
 - **Paridade Visual de Seletores de IA**: Unificado o padrão visual dos seletores de modelos de IA em todos os módulos (`AstrologoModule`, `CalculadoraModule`, `ConfigModule`) usando o formato compacto do Astrólogo como referência. Removido botão duplicado "Recarregar Modelos" (toolbar) do `AstrologoModule` — o botão inline "Atualizar" (11px, dentro do label) é o único controle. Removido wrapper `div.select-wrapper`, opção de loading intermediária ("Carregando modelos do Cloudflare..."), hints redundantes e normalizado texto padrão para "(Padrão do Sistema)" e ordem de exibição `{displayName} ({api}) {vision}`.

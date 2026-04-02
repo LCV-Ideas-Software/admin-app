@@ -427,6 +427,47 @@ export function ConfigModule() {
     }
   }
 
+  // ── AI Models: auto-save on select change (paridade com Astrólogo/Calculadora) ──
+  const saveAiModelsImmediately = useCallback(async (nextModels: { chat: string; summary: string }) => {
+    try {
+      // 1. Fetch current full settings to preserve everything else
+      const currentRes = await fetch('/api/mainsite/settings', {
+        headers: { 'X-Admin-Actor': adminActor },
+      })
+      const currentPayload = await currentRes.json() as { ok: boolean; settings?: Record<string, unknown> }
+
+      // 2. PUT only aiModels (backend conditional upsert handles the rest)
+      const response = await fetch('/api/mainsite/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+        body: JSON.stringify({
+          appearance: currentPayload.settings?.appearance ?? {},
+          rotation: currentPayload.settings?.rotation ?? {},
+          disclaimers: currentPayload.settings?.disclaimers ?? { enabled: true, items: [] },
+          aiModels: nextModels,
+          adminActor,
+        }),
+      })
+
+      const result = await response.json() as { ok: boolean; error?: string }
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error ?? 'Falha ao salvar modelo de IA.')
+      }
+
+      showNotification('Modelo de IA salvo.', 'success')
+    } catch {
+      showNotification('Não foi possível salvar o modelo de IA.', 'error')
+    }
+  }, [adminActor, showNotification])
+
+  const handleAiModelChange = useCallback((field: 'chat' | 'summary', value: string) => {
+    setMsAiModels(prev => {
+      const next = { ...prev, [field]: value }
+      void saveAiModelsImmediately(next)
+      return next
+    })
+  }, [saveAiModelsImmediately])
+
   const saveConfig = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSaving(true)
@@ -808,7 +849,7 @@ export function ConfigModule() {
                 id="cfg-mainsite-ai-chat"
                 name="cfgMainsiteAiChat"
                 value={msAiModels.chat}
-                onChange={e => setMsAiModels({ ...msAiModels, chat: e.target.value })}
+                onChange={e => handleAiModelChange('chat', e.target.value)}
               >
                 {!msAiModels.chat && <option value="">(Padrão do Sistema)</option>}
                 {msAiModels.chat && !geminiModels.some(m => m.id === msAiModels.chat) && (
@@ -838,7 +879,7 @@ export function ConfigModule() {
                 id="cfg-mainsite-ai-summary"
                 name="cfgMainsiteAiSummary"
                 value={msAiModels.summary}
-                onChange={e => setMsAiModels({ ...msAiModels, summary: e.target.value })}
+                onChange={e => handleAiModelChange('summary', e.target.value)}
               >
                 {!msAiModels.summary && <option value="">(Padrão do Sistema)</option>}
                 {msAiModels.summary && !geminiModels.some(m => m.id === msAiModels.summary) && (
