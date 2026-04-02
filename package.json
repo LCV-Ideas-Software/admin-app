@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.48.0",
     "@sumup/sdk": "^0.1.4",
     "@tiptap/extension-bubble-menu": "^3.21.0",
     "@tiptap/extension-character-count": "^3.21.0",

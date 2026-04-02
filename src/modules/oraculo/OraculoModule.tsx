@@ -50,8 +50,8 @@ interface OracleConfig {
 
 const DEFAULT_CONFIG: OracleConfig = {
   csvUrl: 'https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv',
-  modeloVision: 'gemini-2.5-pro-preview-05-06',
-  modeloAnalise: 'gemini-2.5-pro-preview-05-06',
+  modeloVision: 'gemini-2.5-flash',
+  modeloAnalise: 'gemini-2.5-flash',
 }
 
 /** Converte hora BRT para UTC (BRT = UTC-3) */
@@ -320,7 +320,19 @@ export function OraculoModule() {
 
   const renderModelSelect = (label: string, id: string, value: string, onChange: (v: string) => void) => (
     <div className="field-group">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {label}
+        <button 
+          type="button" 
+          className="ghost-button" 
+          onClick={() => void carregarModelos()} 
+          disabled={modelsLoading} 
+          style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
+        >
+          {modelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+          Atualizar
+        </button>
+      </label>
       {geminiModels.length > 0 ? (
         <select id={id} value={value} onChange={e => onChange(e.target.value)}>
           {!geminiModels.find(m => m.id === value) && <option value={value}>{value} (manual)</option>}

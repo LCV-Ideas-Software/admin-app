@@ -22,6 +22,16 @@
       "service": "tlsrpt-motor"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "GLOBAL_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true

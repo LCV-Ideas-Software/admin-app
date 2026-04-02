@@ -925,7 +925,19 @@ export function MainsiteModule() {
         {/* Modelo IA para geração de resumos */}
         <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr)', marginBottom: '16px' }}>
           <div className="field-group">
-            <label htmlFor="summary-modelo-ia">Modelo de Geração de Resumos</label>
+            <label htmlFor="summary-modelo-ia" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Modelo de Geração de Resumos
+              <button 
+                type="button" 
+                className="ghost-button" 
+                onClick={() => void carregarModelos()} 
+                disabled={modelsLoading || bulkGenerating} 
+                style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
+              >
+                {modelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+                Atualizar
+              </button>
+            </label>
             <div className="select-wrapper">
               <select
                 id="summary-modelo-ia"

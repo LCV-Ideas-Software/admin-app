@@ -73,15 +73,8 @@ const SUMMARY_SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
 ]
 
-// ── v1beta: Thinking Model Support — filtra thought blocks ──
-function extractTextFromParts(parts: Array<{ text?: string; thought?: boolean }> | undefined): string {
-  return (parts || [])
-    .filter(p => p.text && !p.thought)
-    .map(p => p.text)
-    .join('')
-}
+import { GoogleGenAI } from '@google/genai'
 
-// ── v1beta: Robust JSON extraction (fences, texto extra) ──
 function extractJsonFromText(rawText: string): string {
   let str = rawText.trim()
   // Remover markdown ```json ... ``` fences
@@ -119,49 +112,33 @@ REGRAS:
 TÍTULO: ${title}
 CONTEÚDO: ${cleanContent}`
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`
   const MAX_RETRIES = 2
   const RETRY_DELAY = 800
+  const ai = new GoogleGenAI({ apiKey })
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const payload: Record<string, unknown> = {
-        contents: [{ parts: [{ text: prompt }] }],
-        safetySettings: SUMMARY_SAFETY_SETTINGS,
-        generationConfig: {
-          temperature: 0.3,
-          topP: 0.8,
-          maxOutputTokens: 1024,
-          responseMimeType: 'application/json',
-          // v1beta: Thinking Model Support
-          ...(attempt === 0 ? { thinkingConfig: { thinkingLevel: 'LOW' } } : {}),
-        },
+      const config = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        safetySettings: SUMMARY_SAFETY_SETTINGS as any,
+        temperature: 0.3,
+        topP: 0.8,
+        maxOutputTokens: 1024,
+        responseMimeType: 'application/json',
+        // v1beta: Thinking Model Support
+        ...(attempt === 0 ? { thinkingConfig: { thinkingLevel: 'LOW' } } : {}),
       }
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const response = await ai.models.generateContent({
+        model: resolvedModel,
+        contents: prompt,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        config: config as any
       })
 
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => '(no body)')
-        // Se 400/404, pode ser incompatibilidade de thinkingConfig — tentar sem
-        if (attempt === 0 && (res.status === 400 || res.status === 404)) {
-          await new Promise(r => setTimeout(r, RETRY_DELAY))
-          continue
-        }
-        return { error: `Gemini API ${res.status} (attempt ${attempt + 1}): ${errBody.substring(0, 200)}` }
-      }
-
-      const data = await res.json() as Record<string, unknown>
-      const candidates = data.candidates as Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }> | undefined
-
-      // v1beta: extrair texto filtrando thought blocks
-      const rawText = extractTextFromParts(candidates?.[0]?.content?.parts)
+      const rawText = response.text
       if (!rawText) {
-        const preview = JSON.stringify(data).substring(0, 300)
-        return { error: `Gemini sem texto útil (attempt ${attempt + 1}). Modelo: ${resolvedModel}. Resposta: ${preview}` }
+        return { error: `Gemini sem texto útil (attempt ${attempt + 1}). Modelo: ${resolvedModel}.` }
       }
 
       // Parsing JSON robusto
@@ -176,7 +153,7 @@ CONTEÚDO: ${cleanContent}`
         summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
       }
     } catch (err) {
-      // Retry: primeira falha pode ser thinkingConfig incompatível
+      // Retry: primeira falha pode ser thinkingConfig incompatível ou outro 400
       if (attempt === 0) {
         await new Promise(r => setTimeout(r, RETRY_DELAY))
         continue

@@ -1,29 +1,10 @@
 // Módulo: admin-app/functions/api/ai-status/models.ts
 // Descrição: Catálogo completo de modelos Gemini com metadados (token limits, thinking, etc).
 
+import { GoogleGenAI } from '@google/genai';
+
 interface Env { GEMINI_API_KEY: string }
 interface Ctx { env: Env }
-
-interface GeminiModelRaw {
-  name: string
-  baseModelId?: string
-  version?: string
-  displayName: string
-  description?: string
-  inputTokenLimit?: number
-  outputTokenLimit?: number
-  supportedGenerationMethods?: string[]
-  thinking?: boolean
-  temperature?: number
-  maxTemperature?: number
-  topP?: number
-  topK?: number
-}
-
-interface ModelsResponse {
-  models?: GeminiModelRaw[]
-  nextPageToken?: string
-}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -37,9 +18,9 @@ export const onRequestGet = async ({ env }: Ctx) => {
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 503)
 
   try {
+    const ai = new GoogleGenAI({ apiKey });
     const start = Date.now()
 
-    // Consultar v1beta para lista mais completa (inclui preview/experimental)
     const allModels = new Map<string, {
       id: string
       displayName: string
@@ -55,57 +36,47 @@ export const onRequestGet = async ({ env }: Ctx) => {
       tier: string
     }>()
 
-    // Paginar para não perder modelos
-    for (const apiVersion of ['v1', 'v1beta']) {
-      let pageToken: string | undefined
-      do {
-        const url = new URL(`https://generativelanguage.googleapis.com/${apiVersion}/models`)
-        url.searchParams.set('key', apiKey)
-        url.searchParams.set('pageSize', '100')
-        if (pageToken) url.searchParams.set('pageToken', pageToken)
+    // A SDK @google/genai chama nativamente a versão correta da API.
+    // Usamos list() que nos dá um iterador automático.
+    const response = await ai.models.list();
+    
+    for await (const m of response) {
+      if (!m.name) continue;
+      
+      const rawModel = m as Record<string, unknown>;
+      const supportedMethods = (rawModel.supportedGenerationMethods as string[]) || [];
 
-        const res = await fetch(url.toString())
-        if (!res.ok) break
-        const data = await res.json() as ModelsResponse
-        pageToken = data.nextPageToken
+      const id = m.name.replace('models/', '');
+      const lower = id.toLowerCase();
+      // Filtrar só Gemini com generateContent
+      if (!lower.startsWith('gemini')) continue;
+      if (!supportedMethods.includes('generateContent')) continue;
 
-        for (const m of data.models || []) {
-          const id = m.name.replace('models/', '')
-          const lower = id.toLowerCase()
-          // Filtrar só Gemini com generateContent
-          if (!lower.startsWith('gemini')) continue
-          if (!m.supportedGenerationMethods?.includes('generateContent')) continue
+      // Determinar família
+      let family = 'other';
+      if (lower.includes('flash-lite')) family = 'flash-lite';
+      else if (lower.includes('flash')) family = 'flash';
+      else if (lower.includes('pro')) family = 'pro';
 
-          // Determinar família
-          let family = 'other'
-          if (lower.includes('flash-lite')) family = 'flash-lite'
-          else if (lower.includes('flash')) family = 'flash'
-          else if (lower.includes('pro')) family = 'pro'
+      // Determinar tier (stable vs preview vs experimental)
+      let tier = 'stable';
+      if (lower.includes('preview')) tier = 'preview';
+      else if (lower.includes('exp')) tier = 'experimental';
 
-          // Determinar tier (stable vs preview vs experimental)
-          let tier = 'stable'
-          if (lower.includes('preview')) tier = 'preview'
-          else if (lower.includes('exp')) tier = 'experimental'
-
-          // Preferir v1beta (dados mais completos) sobre v1
-          if (!allModels.has(id) || apiVersion === 'v1beta') {
-            allModels.set(id, {
-              id,
-              displayName: m.displayName || id,
-              description: m.description || '',
-              api: apiVersion,
-              inputTokenLimit: m.inputTokenLimit || 0,
-              outputTokenLimit: m.outputTokenLimit || 0,
-              thinking: m.thinking || false,
-              temperature: m.temperature ?? null,
-              maxTemperature: m.maxTemperature ?? null,
-              methods: m.supportedGenerationMethods || [],
-              family,
-              tier,
-            })
-          }
-        }
-      } while (pageToken)
+      allModels.set(id, {
+        id,
+        displayName: m.displayName || id,
+        description: m.description || '',
+        api: 'sdk',
+        inputTokenLimit: (rawModel.inputTokenLimit as number) || 0,
+        outputTokenLimit: (rawModel.outputTokenLimit as number) || 0,
+        thinking: (rawModel.thinking as boolean) || false,
+        temperature: (rawModel.temperature as number) ?? null,
+        maxTemperature: (rawModel.maxTemperature as number) ?? null,
+        methods: supportedMethods,
+        family,
+        tier,
+      });
     }
 
     const latencyMs = Date.now() - start

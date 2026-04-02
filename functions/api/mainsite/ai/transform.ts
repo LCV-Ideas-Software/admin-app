@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { GoogleGenAI } from '@google/genai';
+
 /**
  * @typedef {Object} GeminiConfig
  * @property {string} model - Modelo Gemini (ex: 'gemini-pro-latest')
@@ -18,24 +20,8 @@ interface D1Database {
   prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown> } }
 }
 
-interface GeminiResponse {
-  usageMetadata?: {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-    cachedContentTokenCount?: number;
-  };
-  candidates?: {
-    content?: {
-      parts?: {
-        text?: string;
-        thought?: boolean;
-      }[];
-    };
-  }[];
-}
-
 const GEMINI_CONFIG = {
-  model: 'gemini-pro-latest',
+  model: 'gemini-2.5-flash',
   version: 'v1beta',
   maxTokensInput: 120000,
   maxRetries: 2,
@@ -76,20 +62,12 @@ function structuredLog(level: 'info' | 'warn' | 'error', message: string, contex
  */
 async function estimateTokenCount(text: string, apiKey: string): Promise<number> {
   try {
-    const url = `https://generativelanguage.googleapis.com/${GEMINI_CONFIG.version}/models/${GEMINI_CONFIG.model}:countTokens?key=${apiKey}`;
-    const payload = { contents: [{ parts: [{ text }] }] };
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.countTokens({
+      model: GEMINI_CONFIG.model,
+      contents: text
     });
-
-    if (response.ok) {
-      const data = await response.json() as { totalTokens?: number };
-      return data.totalTokens || 0;
-    }
-    return 0;
+    return response.totalTokens || 0;
   } catch (error) {
     structuredLog('warn', 'Failed to count tokens', { error: (error as Error).message });
     return 0;
@@ -109,30 +87,6 @@ function validateInputTokens(tokenCount: number) {
     };
   }
   return { shouldReject: false };
-}
-
-/**
- * Extrai usageMetadata do payload de resposta
- * @param {Object} responseData 
- */
-function extractUsageMetadata(responseData: GeminiResponse) {
-  if (!responseData?.usageMetadata) return { promptTokens: 0, outputTokens: 0, cachedTokens: 0 };
-  return {
-    promptTokens: responseData.usageMetadata.promptTokenCount || 0,
-    outputTokens: responseData.usageMetadata.candidatesTokenCount || 0,
-    cachedTokens: responseData.usageMetadata.cachedContentTokenCount || 0
-  };
-}
-
-/**
- * Extrai apenas o texto válido ignorando o thinking block
- * @param {Array} parts 
- */
-function extractTextFromParts(parts: { text?: string; thought?: boolean }[] | undefined) {
-  return (parts || [])
-    .filter(p => p.text && !p.thought)
-    .map(p => p.text)
-    .join('');
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -183,23 +137,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" }
     ];
 
-    const generateUrl = `https://generativelanguage.googleapis.com/${GEMINI_CONFIG.version}/models/${GEMINI_CONFIG.model}:generateContent?key=${context.env.GEMINI_API_KEY}`;
+    const ai = new GoogleGenAI({ apiKey: context.env.GEMINI_API_KEY });
+    let finalResponseText = '';
+    let usageMetadata = { promptTokens: 0, outputTokens: 0, cachedTokens: 0 };
     
-    const payload = {
-      contents: [{ parts: [{ text: fullPrompt }] }],
-      safetySettings,
-      generationConfig: {
-        temperature: GEMINI_CONFIG.endpoints.transform.temperature,
-        topP: GEMINI_CONFIG.endpoints.transform.topP,
-        maxOutputTokens: GEMINI_CONFIG.endpoints.transform.maxOutputTokens, // 4. MaxOutputTokens Configurado
-        // 8. Thinking Model Support
-        thinkingConfig: GEMINI_CONFIG.defaultThinkingConfig
-      }
-    };
-
-    let lastStatus = 502;
-    let finalResponse: GeminiResponse | null = null;
-
     // 7. Detailed Retry Handling
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
       try {
@@ -207,61 +148,76 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           endpoint: 'transform', attempt: tentativa + 1
         });
         
-        const response = await fetch(generateUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+        // TypeScript workaround for strict SDK types missing some enums or experimental features
+        const config = {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          safetySettings: safetySettings as any,
+          temperature: GEMINI_CONFIG.endpoints.transform.temperature,
+          topP: GEMINI_CONFIG.endpoints.transform.topP,
+          maxOutputTokens: GEMINI_CONFIG.endpoints.transform.maxOutputTokens, // 4. MaxOutputTokens Configurado
+          // 8. Thinking Model Support
+          thinkingConfig: GEMINI_CONFIG.defaultThinkingConfig
+        };
+
+        const response = await ai.models.generateContent({
+          model: GEMINI_CONFIG.model,
+          contents: fullPrompt,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          config: config as any
         });
         
-        if (response.ok) {
-          const data = await response.json() as GeminiResponse;
+        if (response.text) {
           // 5. Usage Metadata Tracking
-          const usage = extractUsageMetadata(data);
+          usageMetadata = {
+            promptTokens: response.usageMetadata?.promptTokenCount || 0,
+            outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
+            cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,
+          };
+          
           structuredLog('info', 'Gemini request succeeded', {
-            endpoint: 'transform', attempt: tentativa + 1, status: response.status, usageMetadata: usage
+            endpoint: 'transform', attempt: tentativa + 1, status: 200, usageMetadata
           });
 
           // Telemetria → ai_usage_logs (fire-and-forget)
           logAiUsage(context.env.BIGDATA_DB, {
             module: 'mainsite',
             model: GEMINI_CONFIG.model,
-            input_tokens: usage.promptTokens,
-            output_tokens: usage.outputTokens,
+            input_tokens: usageMetadata.promptTokens,
+            output_tokens: usageMetadata.outputTokens,
             latency_ms: Date.now() - _telemetryStart,
             status: 'ok',
           });
           
-          finalResponse = data;
+          finalResponseText = response.text;
           break;
+        } else {
+          throw new Error('Sem texto retornado na resposta da IA');
         }
-        
-        lastStatus = response.status;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        const status = (err as { status?: number }).status || 500;
         structuredLog('warn', `Gemini request failed, will retry`, {
-          endpoint: 'transform', attempt: tentativa + 1, status: response.status
+          endpoint: 'transform', attempt: tentativa + 1, status, error: errorMsg
         });
+        
+        if (tentativa === GEMINI_CONFIG.maxRetries - 1) {
+           structuredLog('error', 'Gemini request error (final attempt)', {
+             endpoint: 'transform', attempt: tentativa + 1, error: errorMsg
+           });
+           throw err;
+        }
         
         if (tentativa === 0) {
           await new Promise(r => setTimeout(r, GEMINI_CONFIG.retryDelayMs));
         }
-      } catch (err) {
-        structuredLog('error', 'Gemini request error', {
-          endpoint: 'transform', attempt: tentativa + 1, error: (err as Error).message
-        });
       }
     }
 
-    if (!finalResponse) {
-      throw new Error(`Gemini API failed permanently. Last status: ${lastStatus}`);
+    if (!finalResponseText) {
+      throw new Error(`Gemini API failed permanently após ${GEMINI_CONFIG.maxRetries} tentativas.`);
     }
 
-    const parts = finalResponse.candidates?.[0]?.content?.parts;
-    const generatedText = extractTextFromParts(parts);
-    
-    if (!generatedText) {
-      throw new Error("Resposta vazia da IA ou bloqueada.");
-    }
-
-    return new Response(JSON.stringify({ text: generatedText.trim() }), {
+    return new Response(JSON.stringify({ text: finalResponseText.trim() }), {
       headers: { 'Content-Type': 'application/json; charset=utf-8' }
     });
 

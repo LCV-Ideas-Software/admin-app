@@ -1,11 +1,14 @@
 /// <reference types="@cloudflare/workers-types" />
+
+import { GoogleGenAI } from '@google/genai';
+
 /**
  * /api/news/discover — Pages Function
  *
  * Motor inteligente de descoberta de fontes RSS com 3 camadas:
  * 1. LOCAL: banco curado de ~150 feeds conhecidos (instantâneo)
  * 2. GOOGLE NEWS: geração de feed RSS via news.google.com/rss/search
- * 3. GEMINI AI: consulta ao gemini-2.5-flash-lite para descobrir feeds reais
+ * 3. GEMINI AI: consulta ao gemini-2.5-flash para descobrir feeds reais
  *
  * Parâmetros:
  * - q (string): Termo de busca
@@ -302,42 +305,25 @@ REGRAS:
 - Priorize fontes brasileiras quando o termo for em português.
 - Se não conhecer feeds para o termo, retorne um array vazio [].`
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
+    const ai = new GoogleGenAI({ apiKey });
+    
+    // As the GoogleGenAI SDK handles its reqs natively, we let the layer level Promise.race handle timeouts.
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 1024,
+        responseMimeType: 'application/json',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+    });
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 1024,
-            responseMimeType: 'application/json',
-          },
-        }),
-      }
-    )
+    const text = response.text;
+    if (!text) return [];
 
-    clearTimeout(timeout)
-
-    if (!response.ok) {
-      console.warn(`[discover] Gemini API returned HTTP ${response.status}`)
-      return []
-    }
-
-    const data = await response.json() as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-    }
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) return []
-
-    const parsed = JSON.parse(text) as Array<{ name?: string; url?: string; category?: string }>
-    if (!Array.isArray(parsed)) return []
+    const parsed = JSON.parse(text) as Array<{ name?: string; url?: string; category?: string }>;
+    if (!Array.isArray(parsed)) return [];
 
     const results = parsed
       .filter(item => item.name && item.url && item.category)
@@ -348,21 +334,29 @@ REGRAS:
         url: item.url!,
         category: item.category!,
         source: 'gemini-ai' as const,
-      }))
+      }));
 
     // Telemetria fire-and-forget
     if (db) {
+      const usage = response.usageMetadata;
       db.prepare(`
         INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).bind('news-discover', 'gemini-2.5-flash-lite', 0, 0, Date.now() - _telStart, 'ok'
+      `).bind('news-discover', 'gemini-2.5-flash', usage?.promptTokenCount || 0, usage?.candidatesTokenCount || 0, Date.now() - _telStart, 'ok'
       ).run().catch(() => {});
     }
 
     return results;
   } catch (error) {
-    console.warn('[discover] Gemini discovery failed:', error)
-    return []
+    console.warn('[discover] Gemini discovery failed:', error);
+    if (db) {
+      db.prepare(`
+        INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind('news-discover', 'gemini-2.5-flash', 0, 0, Date.now() - _telStart, 'error', error instanceof Error ? error.message : 'Unknown error'
+      ).run().catch(() => {});
+    }
+    return [];
   }
 }
 

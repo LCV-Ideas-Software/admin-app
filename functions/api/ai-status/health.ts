@@ -11,48 +11,49 @@ function json(data: unknown, status = 200) {
   })
 }
 
+import { GoogleGenAI } from '@google/genai';
+
 export const onRequestGet = async ({ env }: Ctx) => {
   const apiKey = env?.GEMINI_API_KEY
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.', keyConfigured: false }, 503)
 
   try {
+    const ai = new GoogleGenAI({ apiKey });
     const start = Date.now()
+    
     // Faz uma chamada leve ao endpoint de modelos para verificar saúde da API
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=1`
-    )
+    const model = await ai.models.get({ model: "gemini-2.5-flash" });
     const latencyMs = Date.now() - start
 
-    if (res.ok) {
+    if (model) {
       return json({
         ok: true,
         keyConfigured: true,
         apiReachable: true,
         latencyMs,
-        httpStatus: res.status,
+        httpStatus: 200,
         checkedAt: new Date().toISOString(),
       })
     }
 
-    // A API respondeu mas com erro (key inválida, quota, etc)
-    const errorBody = await res.text().catch(() => '')
     return json({
       ok: false,
       keyConfigured: true,
       apiReachable: true,
       latencyMs,
-      httpStatus: res.status,
-      errorDetail: errorBody.slice(0, 500),
+      httpStatus: 404,
+      errorDetail: "Modelo gemini-2.5-flash não encontrado pela API",
       checkedAt: new Date().toISOString(),
     })
   } catch (err) {
+    const errorBody = err instanceof Error ? err.message : String(err);
     return json({
       ok: false,
       keyConfigured: true,
       apiReachable: false,
       latencyMs: null,
       httpStatus: null,
-      error: err instanceof Error ? err.message : 'Network error',
+      error: errorBody.slice(0, 500),
       checkedAt: new Date().toISOString(),
     })
   }

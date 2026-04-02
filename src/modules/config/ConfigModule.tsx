@@ -800,7 +800,7 @@ export function ConfigModule() {
                     <option value={msAiModels.chat || ''}>Carregando modelos do Cloudflare...</option>
                   ) : (
                     <>
-                      <option value="">Automático (Padrão: gemini-1.5-flash-latest)</option>
+                      <option value="">Automático (Padrão: gemini-2.5-flash)</option>
                       {geminiModels.length === 0 && msAiModels.chat && <option value={msAiModels.chat}>{msAiModels.chat}</option>}
                       {geminiModels.map(m => (
                         <option key={`chat-${m.id}`} value={m.id}>
@@ -826,7 +826,7 @@ export function ConfigModule() {
                     <option value={msAiModels.summary || ''}>Carregando modelos do Cloudflare...</option>
                   ) : (
                     <>
-                      <option value="">Automático (Padrão: gemini-1.5-flash-latest)</option>
+                      <option value="">Automático (Padrão: gemini-2.5-flash)</option>
                       {geminiModels.length === 0 && msAiModels.summary && <option value={msAiModels.summary}>{msAiModels.summary}</option>}
                       {geminiModels.map(m => (
                         <option key={`sum-${m.id}`} value={m.id}>
