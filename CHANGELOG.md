@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.10] - 2026-04-02
+### Alterado
+- **Governança de IA no Frontend**: integrado o botão "Atualizar" genérico do seletor em praticamente todo lugar que usa dropdown de IA usando `@google/genai` com refresh explícito para garantir contorno total de cache (Módulo Calculadora, MainSite chatbot, MainSite summary, etc.). Removido `RateLimitPanel` do `ConfigModule` e limpados os wrappers de endpoint no subdiretório `api/*/rate-limit.ts` porque toda a funcionalidade manual inter-app agora foi completamente defenestrada em prol da governança unificada WAF nativa Cloudflare Access/Workers Limits.
+
+### Controle de versão
+- `admin-app`: APP v01.77.09 → APP v01.77.10
+
 ## [v01.77.08] - 2026-04-02
 ### Refatoração Estrutural
 - **Configurações Globais**: Migrados os seletores de modelos de IA da aba MainSite (com persistência local em navegador) para o ConfigModule (com persistência unificada e estruturada no D1 DB na tabela `mainsite_settings`), em aderência à paridade operacional exigida pela arquitetura vigente.
