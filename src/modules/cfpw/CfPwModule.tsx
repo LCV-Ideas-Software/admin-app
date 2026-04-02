@@ -311,30 +311,49 @@ const AmigavelViewer: React.FC<{ data: unknown }> = ({ data }) => {
   return <span>Desconhecido</span>
 }
 
-const SecretsManager: React.FC<{ scriptName: string, adminActor: string }> = ({ scriptName, adminActor }) => {
-  const [secrets, setSecrets] = useState<{ name: string; type: string }[]>([])
+const SecretsManager: React.FC<{ domainType: 'worker' | 'page', resourceId: string, adminActor: string }> = ({ domainType, resourceId, adminActor }) => {
+  const [secrets, setSecrets] = useState<{ name: string; type: string; value?: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [newName, setNewName] = useState('')
   const [newValue, setNewValue] = useState('')
+  const [newType, setNewType] = useState<'plain_text' | 'secret_text'>('secret_text')
+  const [isRotating, setIsRotating] = useState(false)
   const { showNotification } = useNotification()
 
   const loadSecrets = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/cfpw/ops', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
-        body: JSON.stringify({ action: 'list-worker-secrets', scriptName })
-      })
-      const payload = await res.json() as OpsResponsePayload
-      if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
-      setSecrets(Array.isArray(payload.result) ? payload.result as { name: string; type: string }[] : [])
+      if (domainType === 'worker') {
+        const res = await fetch('/api/cfpw/ops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+          body: JSON.stringify({ action: 'list-worker-secrets', scriptName: resourceId })
+        })
+        const payload = await res.json() as OpsResponsePayload
+        if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
+        setSecrets(Array.isArray(payload.result) ? payload.result as { name: string; type: string }[] : [])
+      } else {
+        const query = new URLSearchParams({ projectName: resourceId })
+        const res = await fetch(`/api/cfpw/page-details?${query.toString()}`, { headers: { 'X-Admin-Actor': adminActor } })
+        const payload = await res.json() as PageDetailsPayload
+        if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
+        const projectRecord = payload.project as Record<string, unknown> | undefined
+        const deploymentConfigs = projectRecord?.deployment_configs as Record<string, unknown> | undefined
+        const productionConfig = deploymentConfigs?.production as Record<string, unknown> | undefined
+        const envVars = (productionConfig?.env_vars as Record<string, { type: string; value?: string }>) || {}
+        const mapped = Object.keys(envVars).map(key => ({
+          name: key,
+          type: envVars[key].type,
+          value: envVars[key].value
+        }))
+        setSecrets(mapped)
+      }
     } catch (error) {
       showNotification(error instanceof Error ? error.message : 'Erro ao ler secrets', 'error')
     } finally {
       setLoading(false)
     }
-  }, [scriptName, adminActor, showNotification])
+  }, [domainType, resourceId, adminActor, showNotification])
 
   useEffect(() => {
     void loadSecrets()
@@ -343,14 +362,27 @@ const SecretsManager: React.FC<{ scriptName: string, adminActor: string }> = ({ 
   const handleDelete = async (secretName: string) => {
     setLoading(true)
     try {
-      const res = await fetch('/api/cfpw/ops', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
-        body: JSON.stringify({ action: 'delete-worker-secret', scriptName, secretName })
-      })
-      const payload = await res.json() as OpsResponsePayload
-      if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
-      showNotification('Secret removido.', 'success')
+      if (domainType === 'worker') {
+        const res = await fetch('/api/cfpw/ops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+          body: JSON.stringify({ action: 'delete-worker-secret', scriptName: resourceId, secretName })
+        })
+        const payload = await res.json() as OpsResponsePayload
+        if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
+      } else {
+        const settingsJson = JSON.stringify({
+          deployment_configs: { production: { env_vars: { [secretName]: null } } }
+        })
+        const res = await fetch('/api/cfpw/ops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+          body: JSON.stringify({ action: 'update-page-project-settings', projectName: resourceId, pageSettingsJson: settingsJson })
+        })
+        const payload = await res.json() as OpsResponsePayload
+        if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
+      }
+      showNotification('Removido.', 'success')
       await loadSecrets()
     } catch (error) {
       showNotification(error instanceof Error ? error.message : 'Erro', 'error')
@@ -364,16 +396,31 @@ const SecretsManager: React.FC<{ scriptName: string, adminActor: string }> = ({ 
     if (!newName.trim() || !newValue.trim()) return
     setLoading(true)
     try {
-      const res = await fetch('/api/cfpw/ops', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
-        body: JSON.stringify({ action: 'add-worker-secret', scriptName, secretName: newName.trim(), secretValue: newValue.trim() })
-      })
-      const payload = await res.json() as OpsResponsePayload
-      if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
-      showNotification('Secret adicionado.', 'success')
+      if (domainType === 'worker') {
+        const res = await fetch('/api/cfpw/ops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+          body: JSON.stringify({ action: 'add-worker-secret', scriptName: resourceId, secretName: newName.trim(), secretValue: newValue.trim() })
+        })
+        const payload = await res.json() as OpsResponsePayload
+        if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
+      } else {
+        const settingsJson = JSON.stringify({
+          deployment_configs: { production: { env_vars: { [newName.trim()]: { value: newValue.trim(), type: newType } } } }
+        })
+        const res = await fetch('/api/cfpw/ops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
+          body: JSON.stringify({ action: 'update-page-project-settings', projectName: resourceId, pageSettingsJson: settingsJson })
+        })
+        const payload = await res.json() as OpsResponsePayload
+        if (!res.ok || !payload.ok) throw new Error(payload.error ?? 'Falha.')
+      }
+      showNotification(isRotating ? 'Rotacionado com sucesso.' : 'Adicionado com sucesso.', 'success')
       setNewName('')
       setNewValue('')
+      setNewType('secret_text')
+      setIsRotating(false)
       await loadSecrets()
     } catch (error) {
       showNotification(error instanceof Error ? error.message : 'Erro', 'error')
@@ -381,15 +428,39 @@ const SecretsManager: React.FC<{ scriptName: string, adminActor: string }> = ({ 
       setLoading(false)
     }
   }
+  
+  const startRotate = (s: { name: string; type: string; value?: string }) => {
+    setNewName(s.name)
+    setNewValue(s.value || '')
+    setNewType((s.type as 'plain_text' | 'secret_text') || 'secret_text')
+    setIsRotating(true)
+    window.scrollTo({ top: document.getElementById('secrets-manager-form')?.offsetTop || 0, behavior: 'smooth' })
+  }
+
+  const cancelRotate = () => {
+    setNewName('')
+    setNewValue('')
+    setNewType('secret_text')
+    setIsRotating(false)
+  }
 
   return (
     <div style={{ background: '#fff', border: '1px solid #dadce0', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
        <h3 style={{ margin: '0 0 16px', fontSize: '1.2rem' }}>Gerenciador de Variáveis & Segredos</h3>
        
-       <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-         <input placeholder="KEY_NAME" value={newName} onChange={e => setNewName(e.target.value)} disabled={loading} style={{ flex: 1, minWidth: '150px' }} />
-         <input type="password" placeholder="Valor Secreto" value={newValue} onChange={e => setNewValue(e.target.value)} disabled={loading} style={{ flex: 2, minWidth: '200px' }} />
-         <button type="submit" className="primary-button" disabled={loading} style={{ padding: '8px 16px' }}>Adicionar</button>
+       <form id="secrets-manager-form" onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+         <input placeholder="KEY_NAME" value={newName} onChange={e => setNewName(e.target.value)} disabled={loading || isRotating} style={{ flex: 1, minWidth: '150px' }} />
+         <input type={newType === 'secret_text' ? "password" : "text"} placeholder={newType === 'secret_text' ? "Valor Secreto" : "Valor da Variável"} value={newValue} onChange={e => setNewValue(e.target.value)} disabled={loading} style={{ flex: 2, minWidth: '200px' }} />
+         
+         {domainType === 'page' && (
+           <select value={newType} onChange={e => setNewType(e.target.value as 'plain_text' | 'secret_text')} disabled={loading || isRotating} style={{ padding: '8px', border: '1px solid #dadce0', borderRadius: '6px' }}>
+             <option value="secret_text">Segredo Oculto</option>
+             <option value="plain_text">Variável de Texto</option>
+           </select>
+         )}
+
+         <button type="submit" className="primary-button" disabled={loading} style={{ padding: '8px 16px' }}>{isRotating ? 'Salvar Rotação' : 'Adicionar'}</button>
+         {isRotating && <button type="button" className="ghost-button" onClick={cancelRotate} disabled={loading} style={{ padding: '8px' }}>Cancelar</button>}
        </form>
 
        <div>
@@ -405,8 +476,12 @@ const SecretsManager: React.FC<{ scriptName: string, adminActor: string }> = ({ 
                    <ShieldCheck size={16} color="#1a73e8" />
                    <strong>{s.name}</strong>
                    <span style={{ fontSize: '0.8rem', background: '#e8eaed', padding: '2px 6px', borderRadius: '4px' }}>{s.type}</span>
+                   {s.type === 'plain_text' && s.value && <span style={{ fontSize: '0.8rem', color: '#5f6368', background: '#fff', border: '1px solid #dadce0', padding: '2px 6px', borderRadius: '4px' }}>{s.value}</span>}
                  </div>
-                 <button type="button" className="ghost-button" style={{ color: '#d93025', padding: '4px' }} onClick={() => handleDelete(s.name)} disabled={loading} title="Remover"><Trash2 size={16} /></button>
+                 <div style={{ display: 'flex', gap: '8px' }}>
+                   <button type="button" className="ghost-button" style={{ padding: '4px 12px', fontSize: '0.85rem' }} onClick={() => startRotate(s)} disabled={loading} title="Alterar valor">Rotacionar</button>
+                   <button type="button" className="ghost-button" style={{ color: '#d93025', padding: '4px' }} onClick={() => handleDelete(s.name)} disabled={loading} title="Remover"><Trash2 size={16} /></button>
+                 </div>
                </div>
              ))}
            </div>
@@ -802,7 +877,7 @@ export function CfPwModule() {
 
             {activeTab === 'settings' && (
               <div className="cfpw-detail-section">
-                 {details.type === 'worker' && <SecretsManager scriptName={details.id} adminActor={adminActor} />}
+                 <SecretsManager domainType={details.type} resourceId={details.id} adminActor={adminActor} />
                  <h3>Ações de Gerenciamento</h3>
                  <div className="cfpw-action-list">
                     {(details.type === 'worker' ? WORKER_OPS : PAGE_OPS).map(action => (
@@ -828,11 +903,11 @@ export function CfPwModule() {
                   <>
                   <div className="cfpw-detail-kpi">
                      <span>Domínios Vinculados</span>
-                     <strong>{(details.payload as any)?.project?.domains?.length || 0}</strong>
+                     <strong>{((details.payload as PageDetailsPayload).project?.domains as unknown[])?.length || 0}</strong>
                   </div>
                   <div className="cfpw-detail-kpi" style={{ marginTop: '12px' }}>
                      <span>Branch de Produção</span>
-                     <strong>{(details.payload as any)?.project?.production_branch || 'N/A'}</strong>
+                     <strong>{String((details.payload as PageDetailsPayload).project?.production_branch || 'N/A')}</strong>
                   </div>
                   </>
                 )}
@@ -840,11 +915,11 @@ export function CfPwModule() {
                   <>
                   <div className="cfpw-detail-kpi">
                      <span>Usage Model</span>
-                     <strong>{(details.payload as any)?.worker?.usage_model || 'N/A'}</strong>
+                     <strong>{String((details.payload as WorkerDetailsPayload).worker?.usage_model || 'N/A')}</strong>
                   </div>
                   <div className="cfpw-detail-kpi" style={{ marginTop: '12px' }}>
                      <span>Compatibility Date</span>
-                     <strong>{(details.payload as any)?.worker?.compatibility_date || 'N/A'}</strong>
+                     <strong>{String((details.payload as WorkerDetailsPayload).worker?.compatibility_date || 'N/A')}</strong>
                   </div>
                   </>
                 )}
