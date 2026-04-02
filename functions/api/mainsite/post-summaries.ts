@@ -8,6 +8,7 @@
 import { toHeaders } from '../_lib/mainsite-admin'
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { createResponseTrace } from '../_lib/request-trace'
+import { GoogleGenAI } from '@google/genai'
 
 interface D1PreparedStatement {
   bind: (...values: Array<string | number | null>) => D1PreparedStatement
@@ -73,7 +74,8 @@ const SUMMARY_SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
 ]
 
-import { GoogleGenAI } from '@google/genai'
+// Removemos o import inline para evitar erros de inicialização de worker na ponta
+// import { GoogleGenAI } from '@google/genai'
 
 function extractJsonFromText(rawText: string): string {
   let str = rawText.trim()
@@ -125,8 +127,6 @@ CONTEÚDO: ${cleanContent}`
         topP: 0.8,
         maxOutputTokens: 1024,
         responseMimeType: 'application/json',
-        // v1beta: Thinking Model Support
-        ...(attempt === 0 ? { thinkingConfig: { thinkingLevel: 'LOW' } } : {}),
       }
 
       const response = await ai.models.generateContent({

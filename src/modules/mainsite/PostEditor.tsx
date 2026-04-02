@@ -659,6 +659,7 @@ export default function PostEditor({
             <EditorPromptModal
               modal={promptModal}
               setModal={setPromptModal}
+              targetNode={editor?.view?.dom?.ownerDocument?.body || document.body}
             />
 
             {/* AI Action Tool */}

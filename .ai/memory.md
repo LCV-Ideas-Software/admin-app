@@ -3,6 +3,16 @@
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
 
+## 2026-04-02 - Admin-App v01.77.17 - Fix PostEditor AI Tools (Gemini Import & Summaries)
+### Corrigido
+- **Regressão Gemini Import (PostEditor)**: A interface `PromptModal` (usada no Gemini Import progress) estava injetando seu Portal no root `document.body` e não no content Window do popup do Tiptap. Resolvido passando `editor.view.dom.ownerDocument.body` via nova prop `targetNode`.
+- **Erro 502 nas API Cloudflare Functions**: 
+  1. `/api/mainsite/post-summaries`: Removida restrição do `thinkingConfig` com tipo `application/json` que falhava em chamadas à versão atual da SDK, gerando erro na origem. O import de `@google/genai` retornou localmente com export ao global scope.
+  2. `/api/mainsite/gemini-import`: Alteração de response no bloco catch da extração do espelho Jina.ai, devolvendo JSON HTTP 400 amigável que interliga perfeitamente à UX do frontend sem disparar log avermelhado de infra-crash.
+  
+### Controle de versão
+- admin-app: APP v01.77.16 -> APP v01.77.17
+
 ## 2026-04-02 - Admin-App v01.77.16 - Fix Definitivo: Auto-Save de Modelos de IA no ConfigModule
 ### Corrigido
 - **Verdadeira causa raiz**: Os seletores de modelo no `ConfigModule` usavam `setMsAiModels()` (state local React), que nunca persistia automaticamente no D1. O `AstrologoModule` e `CalculadoraModule` usam `useModuleConfig` com auto-save imediato via `/api/config-store` — por isso funcionavam. A diferença de arquitetura era a causa real.

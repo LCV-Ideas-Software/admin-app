@@ -155,8 +155,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Timeout ou bloqueio remoto'
     return new Response(
-      JSON.stringify({ error: `Não foi possível acessar a publicação no momento (${message}). Verifique se o link ainda está compartilhável ao público e ativo.` }),
-      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: `O proxy de leitura (Jina) recusou o link ou foi bloqueado pelo Google (${message}). Tente gerar um novo link público ou aguarde.` }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 

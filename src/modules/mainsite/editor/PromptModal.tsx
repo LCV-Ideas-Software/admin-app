@@ -18,9 +18,10 @@ import {
 interface PromptModalProps {
   modal: PromptModalState
   setModal: (state: PromptModalState) => void
+  targetNode?: HTMLElement | null
 }
 
-export function PromptModal({ modal, setModal }: PromptModalProps) {
+export function PromptModal({ modal, setModal, targetNode }: PromptModalProps) {
   if (!modal.show) return null
 
   const close = () => setModal(PROMPT_MODAL_INITIAL)
@@ -107,6 +108,6 @@ export function PromptModal({ modal, setModal }: PromptModalProps) {
         </div>
       </div>
     </div>,
-    document.body
+    targetNode || document.body
   )
 }

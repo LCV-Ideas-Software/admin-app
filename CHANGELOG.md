@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.77.17] - 2026-04-02
+### Corrigido
+- **Regressão Gemini Import (PostEditor)**: Corrigido bug onde o popup (WindowPortal) renderizava componentes como o `PromptModal` no `document.body` da aba principal. O modal agora injeta dinamicamente o Portal no `ownerDocument.body` da própria view do popup.
+- **Erro 502 em AI Tools**: Corrigido crash nos endpoints `/api/mainsite/gemini-import` e `/api/mainsite/post-summaries`. No caso do `post-summaries`, a configuração `thinkingConfig` (incompatível com resposta JSON) foi removida; já o `gemini-import` agora levanta código HTTP 400 (em vez de 502) quando a Jina falha, permitindo que o frontend exiba feedback amigável.
+- **Top-level Import**: Corrigida instabilidade na execução via API passando dependência do SDK `GoogleGenAI` para o topo da função `post-summaries.ts`.
+
+### Controle de versão
+- `admin-app`: APP v01.77.16 -> APP v01.77.17
+
 ## [v01.77.16] - 2026-04-02
 ### Corrigido
 - **Bug Definitivo: Persistência de Modelos de IA no ConfigModule**: Identificada e corrigida a verdadeira causa raiz — os seletores de modelo no `ConfigModule` usavam `setMsAiModels()` (React state local), que **nunca persistia no D1** até o usuário clicar "Salvar ajustes". Diferente do `AstrologoModule` e `CalculadoraModule`, que usam `useModuleConfig` com auto-save imediato via `/api/config-store`, o `ConfigModule` dependia de submit manual do form. Implementada função `saveAiModelsImmediately` com handler `handleAiModelChange` que persiste no D1 instantaneamente ao trocar o select, em paridade total com os demais módulos.
