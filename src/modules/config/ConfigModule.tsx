@@ -811,7 +811,9 @@ export function ConfigModule() {
                   ) : (
                     <>
                       <option value="">Automático (Padrão: gemini-2.5-flash)</option>
-                      {geminiModels.length === 0 && msAiModels.chat && <option value={msAiModels.chat}>{msAiModels.chat}</option>}
+                      {msAiModels.chat && !geminiModels.some(m => m.id === msAiModels.chat) && (
+                        <option value={msAiModels.chat}>{msAiModels.chat} (Personalizado)</option>
+                      )}
                       {geminiModels.map(m => (
                         <option key={`chat-${m.id}`} value={m.id}>
                           {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
@@ -849,7 +851,9 @@ export function ConfigModule() {
                   ) : (
                     <>
                       <option value="">Automático (Padrão: gemini-2.5-flash)</option>
-                      {geminiModels.length === 0 && msAiModels.summary && <option value={msAiModels.summary}>{msAiModels.summary}</option>}
+                      {msAiModels.summary && !geminiModels.some(m => m.id === msAiModels.summary) && (
+                        <option value={msAiModels.summary}>{msAiModels.summary} (Personalizado)</option>
+                      )}
                       {geminiModels.map(m => (
                         <option key={`sum-${m.id}`} value={m.id}>
                           {m.displayName} {m.vision ? '👁️' : ''} ({m.api})

@@ -248,7 +248,9 @@ export function CalculadoraModule() {
                 ) : (
                   <>
                     <option value="">Automático (Padrão)</option>
-                    {geminiModels.length === 0 && config.modeloIA && <option value={config.modeloIA}>{config.modeloIA}</option>}
+                    {config.modeloIA && !geminiModels.some(m => m.id === config.modeloIA) && (
+                      <option value={config.modeloIA}>{config.modeloIA} (Personalizado)</option>
+                    )}
                     {geminiModels.map(m => (
                       <option key={m.id} value={m.id}>
                         {m.displayName} {m.vision ? '👁️' : ''} ({m.api})

@@ -3,6 +3,13 @@
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
 
+## 2026-04-02 - Admin-App v01.77.13 - Prevenção Múltipla de Resets e Auto-reload
+### Corrigido e Estruturado
+- Removido o falso "reset de dados local via Cloudflare" engatilhado em reboots/deploys devido à falha de renderização React em listas de preenchimento de modelos customizados. `Mainsite, Calculadora e Config` receberam a injeção do check customizado para exibirem `[Modelo] (Personalizado)` sempre que a API do Google (Cloudflare Provider) censurar/modificar/remover a nomenclatura oficial antiga de suas instâncias, mantendo em D1 o cache intocado.
+
+### Controle de versão
+- admin-app: APP v01.77.12 -> APP v01.77.13
+
 ## 2026-04-02 - Admin-App v01.77.11 - Correção no Parser de UI de IA
 ### Corrigido
 - Restaurada na interface gráfica a lista e submissão correta (fallback name + api route) dos seletores dinâmicos de Inteligência Artificial usando propriedades m.displayName formatadas no backend no lugar da dupla declaração de variável acidental que quebrava o parser TSX (AstrologoModule).

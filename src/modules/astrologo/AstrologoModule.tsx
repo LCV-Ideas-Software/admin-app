@@ -300,10 +300,12 @@ export function AstrologoModule() {
       </label>
       <select id={id} value={value || ''} onChange={e => onChange(e.target.value)}>
         {!value && <option value="">(Padrão do Sistema)</option>}
+        {value && !geminiModels.some(m => m.id === value) && (
+          <option value={value}>{value} (Personalizado)</option>
+        )}
         {geminiModels.map(m => (
           <option key={m.id} value={m.id}>{m.displayName} ({m.api}) {m.vision ? '👁️' : ''}</option>
         ))}
-        {geminiModels.length === 0 && value && <option value={value}>{value}</option>}
       </select>
     </div>
   )
