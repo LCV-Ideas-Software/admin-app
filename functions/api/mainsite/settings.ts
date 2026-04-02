@@ -145,12 +145,10 @@ export async function onRequestPut(context: MainsiteContext) {
       aiModels: body.aiModels ?? {},
     }
 
-    await Promise.all([
-      upsertSetting(db, 'mainsite/appearance', settings.appearance),
-      upsertSetting(db, 'mainsite/rotation', settings.rotation),
-      upsertSetting(db, 'mainsite/disclaimers', settings.disclaimers),
-      upsertSetting(db, 'mainsite/ai_models', settings.aiModels),
-    ])
+    await upsertSetting(db, 'mainsite/appearance', settings.appearance)
+    await upsertSetting(db, 'mainsite/rotation', settings.rotation)
+    await upsertSetting(db, 'mainsite/disclaimers', settings.disclaimers)
+    await upsertSetting(db, 'mainsite/ai_models', settings.aiModels)
 
     try {
       await logModuleOperationalEvent(db, {
