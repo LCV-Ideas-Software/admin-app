@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.15] - 2026-04-02
+### Alterado
+- **Paridade Visual de Seletores de IA**: Unificado o padrão visual dos seletores de modelos de IA em todos os módulos (`AstrologoModule`, `CalculadoraModule`, `ConfigModule`) usando o formato compacto do Astrólogo como referência. Removido botão duplicado "Recarregar Modelos" (toolbar) do `AstrologoModule` — o botão inline "Atualizar" (11px, dentro do label) é o único controle. Removido wrapper `div.select-wrapper`, opção de loading intermediária ("Carregando modelos do Cloudflare..."), hints redundantes e normalizado texto padrão para "(Padrão do Sistema)" e ordem de exibição `{displayName} ({api}) {vision}`.
+
+### Controle de versão
+- `admin-app`: APP v01.77.14 -> APP v01.77.15
+
 ## [v01.77.14] - 2026-04-02
 ### Corrigido
 - **Bug Crítico: Persistência de Modelos de IA**: Corrigido bug de overwrite cross-módulo que apagava silenciosamente as seleções de modelos de IA (Chatbot e Sumarização) do `ConfigModule` toda vez que o `MainsiteModule` salvava disclaimers. O `MainsiteModule` omitia o campo `aiModels` no PUT para `/api/mainsite/settings`, e o backend presumia `{}` como fallback, sobrescrevendo o valor real no D1. Fix aplicado em duas camadas (defense-in-depth): (1) backend agora só grava `mainsite/ai_models` se o campo foi explicitamente incluído no body; (2) frontend `MainsiteModule` agora lê e preserva `aiModels` ao salvar disclaimers.

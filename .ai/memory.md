@@ -3,6 +3,15 @@
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
 
+## 2026-04-02 - Admin-App v01.77.15 - Paridade Visual de Seletores de IA
+### Alterado
+- **Padrão de referência estabelecido**: O `AstrologoModule.renderModelSelect` é o design pattern canônico para seletores de modelos de IA. Características: botão "Atualizar" inline no `<label>` (11px, compacto), `<select>` direto (sem wrapper div), default "(Padrão do Sistema)", formato de option `{displayName} ({api}) {vision}`.
+- **Módulos alinhados**: `CalculadoraModule` e `ConfigModule` (chat + summary) foram normalizados para seguir exatamente o padrão do Astrólogo. Removidos: `div.select-wrapper`, opção "Carregando modelos do Cloudflare...", hint "persistida no banco de dados", botão duplicado "Recarregar Modelos" (toolbar).
+- **Regra**: todo novo seletor de modelo de IA DEVE seguir este padrão visual.
+
+### Controle de versão
+- admin-app: APP v01.77.14 -> APP v01.77.15
+
 ## 2026-04-02 - Admin-App v01.77.14 - Fix Crítico: Persistência de Modelos de IA (Cross-Module Overwrite)
 ### Corrigido
 - **Root Cause**: O `MainsiteModule` ao salvar disclaimers via PUT `/api/mainsite/settings` omitia o campo `aiModels` do body. O backend (settings.ts) aplicava fallback `body.aiModels ?? {}`, escrevendo um objeto vazio no D1 e apagando as seleções feitas no `ConfigModule`.
