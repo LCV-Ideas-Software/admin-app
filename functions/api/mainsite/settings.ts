@@ -142,17 +142,15 @@ export async function onRequestPut(context: MainsiteContext) {
       return buildErrorResponse('Appearance, rotation, disclaimers e aiModels precisam ser objetos JSON válidos.', trace, 400)
     }
 
-    const settings: MainsitePublicSettings = {
-      appearance: body.appearance,
-      rotation: body.rotation,
-      disclaimers: body.disclaimers,
-      aiModels: body.aiModels ?? {},
-    }
+    await upsertSetting(db, 'mainsite/appearance', body.appearance as Record<string, unknown>)
+    await upsertSetting(db, 'mainsite/rotation', body.rotation as Record<string, unknown>)
+    await upsertSetting(db, 'mainsite/disclaimers', body.disclaimers as Record<string, unknown>)
 
-    await upsertSetting(db, 'mainsite/appearance', settings.appearance)
-    await upsertSetting(db, 'mainsite/rotation', settings.rotation)
-    await upsertSetting(db, 'mainsite/disclaimers', settings.disclaimers)
-    await upsertSetting(db, 'mainsite/ai_models', settings.aiModels)
+    let settingsUpserted = 3
+    if (body.aiModels !== undefined) {
+      await upsertSetting(db, 'mainsite/ai_models', body.aiModels as Record<string, unknown>)
+      settingsUpserted = 4
+    }
 
     try {
       await logModuleOperationalEvent(db, {
@@ -163,7 +161,7 @@ export async function onRequestPut(context: MainsiteContext) {
         metadata: {
           action: 'save-public-settings',
           adminActor,
-          settingsUpserted: 4,
+          settingsUpserted,
         },
       })
     } catch {

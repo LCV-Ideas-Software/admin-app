@@ -500,8 +500,9 @@ export function MainsiteModule() {
       const currentPayload = await currentRes.json() as { ok: boolean; settings?: Record<string, unknown> }
       const currentAppearance = currentPayload.settings?.appearance ?? {}
       const currentRotation = currentPayload.settings?.rotation ?? {}
+      const currentAiModels = currentPayload.settings?.aiModels ?? {}
 
-      // 2. Merge: preserve appearance + rotation, update disclaimers
+      // 2. Merge: preserve appearance + rotation + aiModels, update disclaimers
       const response = await fetch('/api/mainsite/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },
@@ -509,6 +510,7 @@ export function MainsiteModule() {
           appearance: currentAppearance,
           rotation: currentRotation,
           disclaimers,
+          aiModels: currentAiModels,
           adminActor,
         }),
       })

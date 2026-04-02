@@ -3,6 +3,16 @@
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
 
+## 2026-04-02 - Admin-App v01.77.14 - Fix Crítico: Persistência de Modelos de IA (Cross-Module Overwrite)
+### Corrigido
+- **Root Cause**: O `MainsiteModule` ao salvar disclaimers via PUT `/api/mainsite/settings` omitia o campo `aiModels` do body. O backend (settings.ts) aplicava fallback `body.aiModels ?? {}`, escrevendo um objeto vazio no D1 e apagando as seleções feitas no `ConfigModule`.
+- **Fix Backend (defense-in-depth)**: `settings.ts` agora só executa `upsertSetting(db, 'mainsite/ai_models', ...)` se `body.aiModels !== undefined`. Callers que não enviam o campo não afetam a linha no D1.
+- **Fix Frontend**: `MainsiteModule.tsx` agora lê e preserva `aiModels` do GET antes de enviar o PUT ao salvar disclaimers.
+- **Padrão estabelecido**: Qualquer módulo que chame PUT em `/api/mainsite/settings` DEVE incluir `aiModels` no body ou contar com a proteção backend que ignora campos ausentes.
+
+### Controle de versão
+- admin-app: APP v01.77.13 -> APP v01.77.14
+
 ## 2026-04-02 - Admin-App v01.77.13 - Prevenção Múltipla de Resets e Auto-reload
 ### Corrigido e Estruturado
 - Removido o falso "reset de dados local via Cloudflare" engatilhado em reboots/deploys devido à falha de renderização React em listas de preenchimento de modelos customizados. `Mainsite, Calculadora e Config` receberam a injeção do check customizado para exibirem `[Modelo] (Personalizado)` sempre que a API do Google (Cloudflare Provider) censurar/modificar/remover a nomenclatura oficial antiga de suas instâncias, mantendo em D1 o cache intocado.

@@ -756,13 +756,9 @@ export function AstrologoModule() {
                 <BrainCircuit size={16} />
                 <h4 style={{ margin: 0 }}>Modelos de IA (Gemini)</h4>
               </div>
-              <p className="field-hint" style={{ margin: '4px 0 0' }}>Modelo de rede neural ativo na síntese astrológica.</p>
-            </div>
-            <div className="inline-actions">
-              <button type="button" className="ghost-button" onClick={() => void carregarModelos()} disabled={modelsLoading}>
-                {modelsLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />} 
-                Recarregar Modelos
-              </button>
+              <p className="field-hint" style={{ margin: '4px 0 0' }}>Modelo de rede neural ativo na síntese astrológica.
+                {!modelsLoading && geminiModels.length > 0 && <> · {geminiModels.length} modelos disponíveis</>}
+              </p>
             </div>
           </div>
           <fieldset className="settings-fieldset" style={{ marginTop: '1rem' }}>

@@ -804,30 +804,20 @@ export function ConfigModule() {
                   Atualizar
                 </button>
               </label>
-              <div className="select-wrapper">
-                <select
-                  id="cfg-mainsite-ai-chat"
-                  name="cfgMainsiteAiChat"
-                  value={msAiModels.chat}
-                  onChange={e => setMsAiModels({ ...msAiModels, chat: e.target.value })}
-                >
-                  {modelsLoading ? (
-                    <option value={msAiModels.chat || ''}>Carregando modelos do Cloudflare...</option>
-                  ) : (
-                    <>
-                      <option value="">Automático (Padrão: gemini-2.5-flash)</option>
-                      {msAiModels.chat && !geminiModels.some(m => m.id === msAiModels.chat) && (
-                        <option value={msAiModels.chat}>{msAiModels.chat} (Personalizado)</option>
-                      )}
-                      {geminiModels.map(m => (
-                        <option key={`chat-${m.id}`} value={m.id}>
-                          {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
-                        </option>
-                      ))}
-                    </>
-                  )}
-                </select>
-              </div>
+              <select
+                id="cfg-mainsite-ai-chat"
+                name="cfgMainsiteAiChat"
+                value={msAiModels.chat}
+                onChange={e => setMsAiModels({ ...msAiModels, chat: e.target.value })}
+              >
+                {!msAiModels.chat && <option value="">(Padrão do Sistema)</option>}
+                {msAiModels.chat && !geminiModels.some(m => m.id === msAiModels.chat) && (
+                  <option value={msAiModels.chat}>{msAiModels.chat} (Personalizado)</option>
+                )}
+                {geminiModels.map(m => (
+                  <option key={`chat-${m.id}`} value={m.id}>{m.displayName} ({m.api}) {m.vision ? '👁️' : ''}</option>
+                ))}
+              </select>
             </div>
 
             <div className="field-group">
@@ -844,30 +834,20 @@ export function ConfigModule() {
                   Atualizar
                 </button>
               </label>
-              <div className="select-wrapper">
-                <select
-                  id="cfg-mainsite-ai-summary"
-                  name="cfgMainsiteAiSummary"
-                  value={msAiModels.summary}
-                  onChange={e => setMsAiModels({ ...msAiModels, summary: e.target.value })}
-                >
-                  {modelsLoading ? (
-                    <option value={msAiModels.summary || ''}>Carregando modelos do Cloudflare...</option>
-                  ) : (
-                    <>
-                      <option value="">Automático (Padrão: gemini-2.5-flash)</option>
-                      {msAiModels.summary && !geminiModels.some(m => m.id === msAiModels.summary) && (
-                        <option value={msAiModels.summary}>{msAiModels.summary} (Personalizado)</option>
-                      )}
-                      {geminiModels.map(m => (
-                        <option key={`sum-${m.id}`} value={m.id}>
-                          {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
-                        </option>
-                      ))}
-                    </>
-                  )}
-                </select>
-              </div>
+              <select
+                id="cfg-mainsite-ai-summary"
+                name="cfgMainsiteAiSummary"
+                value={msAiModels.summary}
+                onChange={e => setMsAiModels({ ...msAiModels, summary: e.target.value })}
+              >
+                {!msAiModels.summary && <option value="">(Padrão do Sistema)</option>}
+                {msAiModels.summary && !geminiModels.some(m => m.id === msAiModels.summary) && (
+                  <option value={msAiModels.summary}>{msAiModels.summary} (Personalizado)</option>
+                )}
+                {geminiModels.map(m => (
+                  <option key={`sum-${m.id}`} value={m.id}>{m.displayName} ({m.api}) {m.vision ? '👁️' : ''}</option>
+                ))}
+              </select>
             </div>
           </div>
         </fieldset>

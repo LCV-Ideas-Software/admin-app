@@ -237,32 +237,19 @@ export function CalculadoraModule() {
                 Atualizar
               </button>
             </label>
-            <div className="select-wrapper">
-              <select 
-                id="calculadora-modelo-ia" 
-                value={config.modeloIA || ''} 
-                onChange={e => saveConfig({ modeloIA: e.target.value })}
-              >
-                {modelsLoading ? (
-                  <option value={config.modeloIA || ''}>Carregando modelos do Cloudflare...</option>
-                ) : (
-                  <>
-                    <option value="">Automático (Padrão)</option>
-                    {config.modeloIA && !geminiModels.some(m => m.id === config.modeloIA) && (
-                      <option value={config.modeloIA}>{config.modeloIA} (Personalizado)</option>
-                    )}
-                    {geminiModels.map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.displayName} {m.vision ? '👁️' : ''} ({m.api})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-            <p className="field-hint" style={{ marginTop: '8px' }}>
-              Esta alteração é persistida no banco de dados e sincronizada entre dispositivos.
-            </p>
+            <select 
+              id="calculadora-modelo-ia" 
+              value={config.modeloIA || ''} 
+              onChange={e => saveConfig({ modeloIA: e.target.value })}
+            >
+              {!config.modeloIA && <option value="">(Padrão do Sistema)</option>}
+              {config.modeloIA && !geminiModels.some(m => m.id === config.modeloIA) && (
+                <option value={config.modeloIA}>{config.modeloIA} (Personalizado)</option>
+              )}
+              {geminiModels.map(m => (
+                <option key={m.id} value={m.id}>{m.displayName} ({m.api}) {m.vision ? '👁️' : ''}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

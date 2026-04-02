@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.14] - 2026-04-02
+### Corrigido
+- **Bug Crítico: Persistência de Modelos de IA**: Corrigido bug de overwrite cross-módulo que apagava silenciosamente as seleções de modelos de IA (Chatbot e Sumarização) do `ConfigModule` toda vez que o `MainsiteModule` salvava disclaimers. O `MainsiteModule` omitia o campo `aiModels` no PUT para `/api/mainsite/settings`, e o backend presumia `{}` como fallback, sobrescrevendo o valor real no D1. Fix aplicado em duas camadas (defense-in-depth): (1) backend agora só grava `mainsite/ai_models` se o campo foi explicitamente incluído no body; (2) frontend `MainsiteModule` agora lê e preserva `aiModels` ao salvar disclaimers.
+
+### Controle de versão
+- `admin-app`: APP v01.77.13 -> APP v01.77.14
+
 ## [v01.77.13] - 2026-04-02
 ### Corrigido
 - **Interface Módulos de IA**: Fixado um comportamento nocivo nas telas de Configuração e nos selects do `AstrologoModule`, `CalculadoraModule` e `ConfigModule`, originado pelo ecossistema React. Os modelos eram resetados sem intenção quando eles possuíam customizações antigas ou exclusivas não declaradas nas respostas oficiais do provedor AI da Cloudflare, pois a renderização da lista vazia esmagava o cache `D1`. Implementado render condicional que sinaliza "(Personalizado)" e preserva as strings originais nestes eventos, blindando o recarregamento durante novos deploys.
