@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.18] - 2026-04-02
+### Corrigido e Adicionado
+- **Alta Fidelidade na Extração de Conversas (Gemini Import)**: Aprimorado agressivamente o systemPrompt de inicialização do SDK nativo do Gemini no handler `/api/mainsite/gemini-import`. A formatação original do chat exportado via Share URL, que antes perdia \`<svg>\`s e formatações exatas, agora possui constraints estritos no zero-shot prompt. A instrução proíbe resumos e impõe cópia sintática perfeitamente idêntica usando markdown (com preservação de tabelas e injeções precisas de \`![alt](src)\` advindas das tags de imagem listadas no snapshot HTML).
+
+### Controle de versão
+- `admin-app`: APP v01.77.17 -> APP v01.77.18
+
 ## [v01.77.17] - 2026-04-02
 ### Corrigido
 - **Regressão Gemini Import (PostEditor)**: Corrigido bug onde o popup (WindowPortal) renderizava componentes como o `PromptModal` no `document.body` da aba principal. O modal agora injeta dinamicamente o Portal no `ownerDocument.body` da própria view do popup.
