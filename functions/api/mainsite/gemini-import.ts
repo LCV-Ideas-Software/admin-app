@@ -131,6 +131,26 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     'Access-Control-Allow-Headers': 'Content-Type',
   }
 
+  // Outer bulletproof catch — NEVER let an unhandled exception escape
+  // (CF Pages returns its own 502 HTML page if the Worker crashes without a Response)
+  try {
+    return await handleGeminiImport(context, corsHeaders);
+  } catch (outerErr) {
+    const detail = outerErr instanceof Error ? outerErr.message : String(outerErr);
+    const stack = outerErr instanceof Error ? outerErr.stack : undefined;
+    structuredLog('error', 'Uncaught fatal error in gemini-import', { detail, stack });
+    return new Response(
+      JSON.stringify({ error: `Erro fatal no servidor. Detalhe: ${detail}` }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+async function handleGeminiImport(
+  context: Parameters<PagesFunction<Env>>[0],
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+
   const contentType = context.request.headers.get('content-type') || ''
   if (!contentType.includes('application/json')) {
     return new Response(JSON.stringify({ error: 'Content-Type must be application/json' }), {
@@ -252,11 +272,11 @@ Regras:
     });
     structuredLog('error', 'Falha no import nativo do Gemini', { error: err instanceof Error ? err.message : 'Unknown' });
 
-    const message = err instanceof Error ? err.message : 'Erro na leitura do HTML';
-    const statusCode = message.includes('status 4') ? 422 : 502;
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    // NEVER return 502 — Cloudflare proxy intercepts it and replaces body with HTML error page
     return new Response(
       JSON.stringify({ error: `Falha na importação Gemini. Detalhe: ${message}` }),
-      { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 
