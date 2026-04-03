@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.77.32] - 2026-04-03
+### Alterado
+- **Migração Cloudflare AI Gateway**: As rotas de listagem de modelos (`/api/mainsite/modelos` e `/api/oraculo/modelos`) e o endpoint de importação (`/api/mainsite/gemini-import`) foram inteiramente refatorados para utilizar a bind `CF_AI_GATEWAY`, evitando o erro 502 de proxying do Cloudflare. 
+- **Modelos Resilientes**: O status HTTP dos erros nestas rotas foi convertido de 502 para 500 para garantir emissões de payload em JSON.
+- **Remoção de Hardcoding**: A rotina de importação e os seletores do `OraculoModule` agora carregam dinamicamente a string do modelo ativo no banco D1 (`mainsite_settings`), abolindo definições fixas no código (ex: `gemini-pro-latest` e `gemini-1.5-flash`).
+
+### Controle de versão
+- `admin-app`: APP v01.77.31 -> APP v01.77.32
+
 ## [v01.77.31] - 2026-04-03
 ### Adicionado
 - **Integração Word (mammoth.js)**: Adicionada a capacidade de importação e decodificação client-side de arquivos `.docx` do MS Word para HTML rico e limpo dentro do Tiptap `PostEditor`. Integrado o botão de FileUpload mapeando estilos nativos do editor, com parser customizado para Títulos e Parágrafos nativos.

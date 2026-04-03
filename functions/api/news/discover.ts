@@ -19,10 +19,30 @@
 interface Env {
   BIGDATA_DB: D1Database
   GEMINI_API_KEY?: string
+  CF_AI_GATEWAY?: string
 }
 
 interface D1Binding {
-  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown> } }
+  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown>, first<T>(): Promise<T|null> } }
+}
+
+const DEFAULT_MODEL = '';
+
+async function resolveModel(db?: D1Binding): Promise<string> {
+  if (!db) return DEFAULT_MODEL;
+  try {
+    const row = await db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/ai_models').first<{ payload?: string }>();
+    if (row?.payload) {
+      const parsed = JSON.parse(row.payload) as Record<string, unknown>;
+      // Para descobertas e buscas, o modelo de chat é o mais adequado
+      if (typeof parsed.chat === 'string' && parsed.chat) {
+        return parsed.chat;
+      }
+    }
+  } catch {
+    //
+  }
+  return DEFAULT_MODEL;
 }
 
 interface RssSuggestion {
@@ -287,8 +307,9 @@ function buildGoogleNewsSuggestion(query: string): RssSuggestion | null {
 // Layer 3: Gemini AI — descoberta inteligente de feeds
 // ══════════════════════════════════════════════════════════
 
-async function discoverWithGemini(query: string, apiKey: string, db?: D1Binding): Promise<RssSuggestion[]> {
+async function discoverWithGemini(query: string, apiKey: string, baseUrl: string, db?: D1Binding): Promise<RssSuggestion[]> {
   const _telStart = Date.now();
+  const activeModel = await resolveModel(db);
   try {
     const prompt = `Você é um especialista em feeds RSS de notícias.
 O usuário está buscando fontes de notícias para o termo: "${query}"
@@ -304,7 +325,7 @@ REGRAS:
 - Priorize fontes brasileiras quando o termo for em português.
 - Se não conhecer feeds para o termo, retorne um array vazio [].`
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch(`${baseUrl}/v1beta/models/${activeModel}:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -321,7 +342,7 @@ REGRAS:
       throw new Error(`Gemini API Error: ${res.status}`);
     }
 
-    const data = await res.json() as any;
+    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>, usageMetadata?: { promptTokenCount?: number, candidatesTokenCount?: number } };
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) return [];
 
@@ -344,7 +365,7 @@ REGRAS:
       db.prepare(`
         INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).bind('news-discover', 'gemini-2.5-flash', usage?.promptTokenCount || 0, usage?.candidatesTokenCount || 0, Date.now() - _telStart, 'ok'
+      `).bind('news-discover', activeModel, usage?.promptTokenCount || 0, usage?.candidatesTokenCount || 0, Date.now() - _telStart, 'ok'
       ).run().catch(() => {});
     }
 
@@ -355,7 +376,7 @@ REGRAS:
       db.prepare(`
         INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).bind('news-discover', 'gemini-2.5-flash', 0, 0, Date.now() - _telStart, 'error', error instanceof Error ? error.message : 'Unknown error'
+      `).bind('news-discover', activeModel, 0, 0, Date.now() - _telStart, 'error', error instanceof Error ? error.message : 'Unknown error'
       ).run().catch(() => {});
     }
     return [];
@@ -501,10 +522,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   // Layer 3: Gemini AI (se API key disponível e query ≥3 chars)
   const apiKey = context.env.GEMINI_API_KEY
+  const baseUrl = context.env.CF_AI_GATEWAY || 'https://generativelanguage.googleapis.com';
   if (apiKey && query.length >= 3) {
     try {
       const geminiResults = await Promise.race([
-        discoverWithGemini(query, apiKey, context.env.BIGDATA_DB as unknown as D1Binding),
+        discoverWithGemini(query, apiKey, baseUrl, context.env.BIGDATA_DB as unknown as D1Binding),
         new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), 6000)),
       ])
       addUnique(geminiResults)

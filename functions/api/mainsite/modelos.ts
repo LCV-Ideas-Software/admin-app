@@ -2,7 +2,10 @@
 // Descrição: Lista modelos Gemini (Flash + Pro) disponíveis via SDK para uso no chatbot do MainSite.
 
 
-interface Env { GEMINI_API_KEY: string }
+interface Env { 
+  GEMINI_API_KEY: string
+  CF_AI_GATEWAY?: string 
+}
 interface Ctx { env: Env }
 
 function json(data: unknown, status = 200) {
@@ -25,12 +28,13 @@ function formatModelName(id: string): string {
 
 export const onRequestGet = async ({ env }: Ctx) => {
   const apiKey = env?.GEMINI_API_KEY
-  if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 503)
+  if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 500)
 
   try {
     const allModels = new Map<string, { id: string; displayName: string; api: string; vision: boolean }>()
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const baseUrl = env.CF_AI_GATEWAY || 'https://generativelanguage.googleapis.com'
+    const res = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`);
     if (!res.ok) throw new Error(`API Error: ${res.status}`);
     
     interface ModelOutput { name: string; displayName: string; supportedGenerationMethods: string[] }

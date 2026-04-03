@@ -74,8 +74,8 @@ const readPublicSettings = async (db: D1Database): Promise<MainsitePublicSetting
     rotation: safeParseObject(rotationRow?.payload, {}),
     disclaimers: safeParseObject(disclaimersRow?.payload, {}),
     aiModels: safeParseObject(aiModelsRow?.payload, {
-      chat: 'gemini-2.5-flash',
-      summary: 'gemini-2.5-flash',
+      chat: '',
+      summary: '',
     }),
   }
 }

@@ -8,10 +8,16 @@ interface Env {
   GEMINI_API_KEY: string
   JINA_API_KEY?: string
   BIGDATA_DB?: D1Database
+  CF_AI_GATEWAY?: string
 }
 
 interface D1Database {
-  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown> } }
+  prepare(query: string): { 
+    bind(...values: unknown[]): { 
+      run(): Promise<unknown>,
+      all<T = unknown>(): Promise<{ results: T[] }>
+    } 
+  }
 }
 
 interface PagesContext<E = Env> {
@@ -26,11 +32,25 @@ interface ImportRequest {
 }
 
 const GEMINI_CONFIG = {
-  model: 'gemini-pro-latest',
   temperature: 0.1,
   maxRetries: 1,
   retryDelayMs: 1000
 };
+
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+
+async function resolveModel(db: D1Database | undefined): Promise<string> {
+  if (!db) return DEFAULT_MODEL;
+  try {
+    const res = await db.prepare('SELECT dados_json FROM mainsite_settings WHERE id = ?')
+      .bind('ai_models').all<{ dados_json: string }>();
+    if (res.results && res.results.length > 0) {
+      const parsed = JSON.parse(res.results[0].dados_json) as { chat?: string };
+      if (parsed.chat) return parsed.chat;
+    }
+  } catch { /* fallback silently */ }
+  return DEFAULT_MODEL;
+}
 
 // Jina.ai Reader API — fetches page content as clean markdown
 // (direct fetch from Cloudflare Worker IPs ALWAYS triggers Google CAPTCHA)
@@ -213,6 +233,8 @@ async function handleGeminiImport(
     )
   }
 
+  const activeModel = await resolveModel(context.env.BIGDATA_DB);
+
   const _telemetryStart = Date.now();
   let finalMarkdown = '';
   let finalTitle = '';
@@ -250,7 +272,9 @@ Regras:
           }
         };
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:generateContent?key=${context.env.GEMINI_API_KEY}`, {
+        const baseUrl = context.env.CF_AI_GATEWAY || 'https://generativelanguage.googleapis.com'
+        const url = `${baseUrl}/v1beta/models/${activeModel}:generateContent?key=${context.env.GEMINI_API_KEY}`
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -272,7 +296,7 @@ Regras:
 
           logAiUsage(context.env.BIGDATA_DB, {
             module: 'mainsite_gemini_import',
-            model: GEMINI_CONFIG.model,
+            model: activeModel,
             input_tokens: usageMetadata.promptTokens,
             output_tokens: usageMetadata.outputTokens,
             latency_ms: Date.now() - _telemetryStart,
@@ -297,7 +321,7 @@ Regras:
     // Telemetria de erro
     logAiUsage(context.env.BIGDATA_DB, {
       module: 'mainsite_gemini_import',
-      model: GEMINI_CONFIG.model,
+      model: activeModel,
       input_tokens: 0,
       output_tokens: 0,
       latency_ms: Date.now() - _telemetryStart,

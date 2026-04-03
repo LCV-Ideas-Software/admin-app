@@ -23,6 +23,7 @@ interface D1Database {
 interface SummaryEnv {
   BIGDATA_DB?: D1Database
   GEMINI_API_KEY?: string
+  CF_AI_GATEWAY?: string
 }
 
 interface SummaryContext {
@@ -63,7 +64,7 @@ async function hashContent(text: string): Promise<string> {
     .join('')
 }
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+const DEFAULT_GEMINI_MODEL = ''
 
 // ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
 const SUMMARY_SAFETY_SETTINGS = [
@@ -92,6 +93,7 @@ async function generateShareSummary(
   title: string,
   htmlContent: string,
   apiKey: string,
+  baseUrl?: string,
   model?: string,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const resolvedModel = model || DEFAULT_GEMINI_MODEL
@@ -128,7 +130,8 @@ CONTEÚDO: ${cleanContent}`
         }
       }
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`, {
+      const base = baseUrl || 'https://generativelanguage.googleapis.com'
+      const res = await fetch(`${base}/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -138,7 +141,7 @@ CONTEÚDO: ${cleanContent}`
         throw new Error(`Gemini API Error: ${res.status} ${res.statusText}`)
       }
 
-      const data = await res.json() as any
+      const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text
 
       if (!rawText) {
@@ -325,7 +328,7 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, apiKey, resolvedModel)
+          const result = await generateShareSummary(post.title, post.content, apiKey, context.env.CF_AI_GATEWAY, resolvedModel)
           if ('error' in result) {
             failed++
             details.push({ postId: post.id, title: post.title, status: result.error })
@@ -378,7 +381,7 @@ export async function onRequestPost(context: SummaryContext) {
 
       const resolvedModel = await resolveSummaryModel(db, body.model)
 
-      const result = await generateShareSummary(post.title, post.content, apiKey, resolvedModel)
+      const result = await generateShareSummary(post.title, post.content, apiKey, context.env.CF_AI_GATEWAY, resolvedModel)
       if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 502)
 
       const contentHash = await hashContent(stripHtml(post.content))

@@ -1,7 +1,32 @@
+
+
+## 📋 DIRETIVAS DO PROJETO E REGRAS DE CÓDIGO
+# Regras
+- Use princípios de Clean Code.
+- Comente lógicas complexas.
+
+
+## 🧠 MEMÓRIA DE CONTEXTO ISOLADO (ADMIN-APP)
 # AI Memory Log — Admin-App
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
+## 2026-04-03 — Cloudflare Paid Scale Integration
+### Escopo
+Migração arquitetural unificada para aproveitamento da infraestrutura Cloudflare Paid. Implementação de **Smart Placement** transversal para redução de latência via proximidade física com o banco de dados (BIGDATA_DB). Adoção da diretiva `usage_model: unbound` para mitigar o `Error 1102` (CPU limit excess). Embutimento global do proxy **Cloudflare AI Gateway** sobrepondo o SDK nativo (`@google/genai`) e habilitando Caching, Rate limiting Nativo e Observabilidade Unificada, mantendo operação híbrida com os LLMs da rede.
+
+### Diretivas Respeitadas
+- Conformidade 100% com `wrangler.json`.
+- `tlsrpt-motor` e `cron-taxa-ipca` revalidados em infraestrutura moderna sem timeout.
+
+## 2026-04-03 — Admin-App v01.77.30 — Editor Spacing Custom Extension
+### Contexto
+- A formatação via Gemini ou recortes textuais frequentemente possuía distâncias incômodas gerando quebra do ritmo de leitura (espaçamentos erráticos de parágrafos/listas ou entrelinhas insatisfatórias). O usuário exigia aderência à familiaridade Microsoft Word.
+### Adicionado
+- Extensão Tiptap `EditorSpacing`: Criação do Custom Node global manipulando dinamicamente e via *inline-css* atributos Tiptap nativos. Suporte estrito `CommandProps` implementado na raiz da extensão satisfazendo as exigências rigorosas (`any` removido completamente para compilador do TypeScript).
+- UI `PostEditor.tsx`: `<select>` iconizado por `ArrowUpDown` posicionado logicamente para fácil visualização na Toolbar, integrando 6 escalas modulares de tamanho e um despachante de Margem rápida "Adicionar/Remover" em `<p>` tags.
+### Controle de versão
+- `admin-app`: APP v01.77.20 → APP v01.77.30
 ## 2026-04-03 — Admin-App v01.77.19 — Fix Crítico: Gemini Import 502 Bad Gateway Fantasma
 ### Corrigido
 - **Root Cause**: O error handler de `gemini-import.ts` retornava HTTP `502` como status code em caso de erro. O Cloudflare proxy intercepta qualquer resposta 502 de Pages Functions e **substitui o body JSON** pela sua própria página HTML de "Bad Gateway", ocultando completamente a mensagem de erro real. Diagnóstico via TTFB: 352ms prova crash imediato, não timeout.
@@ -14,6 +39,66 @@
 - **NUNCA** retornar HTTP 502 de dentro de um Cloudflare Worker/Pages Function — o proxy trata 502 como "origin failure" e substitui o response body.
 ### Controle de versão
 - `admin-app`: APP v01.77.18 → APP v01.77.19
+
+## 2026-04-02 - Admin-App v01.77.17 - Fix PostEditor AI Tools (Gemini Import & Summaries)
+### Corrigido
+- **Regressão Gemini Import (PostEditor)**: A interface `PromptModal` (usada no Gemini Import progress) estava injetando seu Portal no root `document.body` e não no content Window do popup do Tiptap. Resolvido passando `editor.view.dom.ownerDocument.body` via nova prop `targetNode`.
+- **Erro 502 nas API Cloudflare Functions**: 
+  1. `/api/mainsite/post-summaries`: Removida restrição do `thinkingConfig` com tipo `application/json` que falhava em chamadas à versão atual da SDK, gerando erro na origem. O import de `@google/genai` retornou localmente com export ao global scope.
+  2. `/api/mainsite/gemini-import`: Alteração de response no bloco catch da extração do espelho Jina.ai, devolvendo JSON HTTP 400 amigável que interliga perfeitamente à UX do frontend sem disparar log avermelhado de infra-crash.
+  
+### Controle de versão
+- admin-app: APP v01.77.16 -> APP v01.77.17
+
+## 2026-04-02 - Admin-App v01.77.16 - Fix Definitivo: Auto-Save de Modelos de IA no ConfigModule
+### Corrigido
+- **Verdadeira causa raiz**: Os seletores de modelo no `ConfigModule` usavam `setMsAiModels()` (state local React), que nunca persistia automaticamente no D1. O `AstrologoModule` e `CalculadoraModule` usam `useModuleConfig` com auto-save imediato via `/api/config-store` — por isso funcionavam. A diferença de arquitetura era a causa real.
+- **Fix**: Implementada `saveAiModelsImmediately()` + `handleAiModelChange(field, value)` no `ConfigModule`. Ao trocar o select, o handler: (1) atualiza state local, (2) lê settings atuais do D1, (3) faz PUT com todos os campos preservados + novo `aiModels`.
+- **Regra estabelecida**: Todo seletor de modelo de IA DEVE persistir imediatamente ao onChange, nunca depender de submit manual de formulário.
+- **Nota sobre patches anteriores**: v01.77.14 (backend condicional) e v01.77.15 (paridade visual) continuam válidos como defense-in-depth, mas não eram a causa do bug principal.
+
+### Controle de versão
+- admin-app: APP v01.77.15 -> APP v01.77.16
+
+## 2026-04-02 - Admin-App v01.77.15 - Paridade Visual de Seletores de IA
+### Alterado
+- **Padrão de referência estabelecido**: O `AstrologoModule.renderModelSelect` é o design pattern canônico para seletores de modelos de IA. Características: botão "Atualizar" inline no `<label>` (11px, compacto), `<select>` direto (sem wrapper div), default "(Padrão do Sistema)", formato de option `{displayName} ({api}) {vision}`.
+- **Módulos alinhados**: `CalculadoraModule` e `ConfigModule` (chat + summary) foram normalizados para seguir exatamente o padrão do Astrólogo. Removidos: `div.select-wrapper`, opção "Carregando modelos do Cloudflare...", hint "persistida no banco de dados", botão duplicado "Recarregar Modelos" (toolbar).
+- **Regra**: todo novo seletor de modelo de IA DEVE seguir este padrão visual.
+
+### Controle de versão
+- admin-app: APP v01.77.14 -> APP v01.77.15
+
+## 2026-04-02 - Admin-App v01.77.14 - Fix Crítico: Persistência de Modelos de IA (Cross-Module Overwrite)
+### Corrigido
+- **Root Cause**: O `MainsiteModule` ao salvar disclaimers via PUT `/api/mainsite/settings` omitia o campo `aiModels` do body. O backend (settings.ts) aplicava fallback `body.aiModels ?? {}`, escrevendo um objeto vazio no D1 e apagando as seleções feitas no `ConfigModule`.
+- **Fix Backend (defense-in-depth)**: `settings.ts` agora só executa `upsertSetting(db, 'mainsite/ai_models', ...)` se `body.aiModels !== undefined`. Callers que não enviam o campo não afetam a linha no D1.
+- **Fix Frontend**: `MainsiteModule.tsx` agora lê e preserva `aiModels` do GET antes de enviar o PUT ao salvar disclaimers.
+- **Padrão estabelecido**: Qualquer módulo que chame PUT em `/api/mainsite/settings` DEVE incluir `aiModels` no body ou contar com a proteção backend que ignora campos ausentes.
+
+### Controle de versão
+- admin-app: APP v01.77.13 -> APP v01.77.14
+
+## 2026-04-02 - Admin-App v01.77.13 - Prevenção Múltipla de Resets e Auto-reload
+### Corrigido e Estruturado
+- Removido o falso "reset de dados local via Cloudflare" engatilhado em reboots/deploys devido à falha de renderização React em listas de preenchimento de modelos customizados. `Mainsite, Calculadora e Config` receberam a injeção do check customizado para exibirem `[Modelo] (Personalizado)` sempre que a API do Google (Cloudflare Provider) censurar/modificar/remover a nomenclatura oficial antiga de suas instâncias, mantendo em D1 o cache intocado.
+
+### Controle de versão
+- admin-app: APP v01.77.12 -> APP v01.77.13
+
+## 2026-04-02 - Admin-App v01.77.11 - Correção no Parser de UI de IA
+### Corrigido
+- Restaurada na interface gráfica a lista e submissão correta (fallback name + api route) dos seletores dinâmicos de Inteligência Artificial usando propriedades m.displayName formatadas no backend no lugar da dupla declaração de variável acidental que quebrava o parser TSX (AstrologoModule).
+- Atualizados e verificados os deploys falhos devido a dependência de tipagens erradas. Removidos limites baseados em JS do Painel Admin CF P&W, delegados ao WAF nativo.
+
+### Controle de versão
+- admin-app: APP v01.77.10 -> APP v01.77.11
+## 2026-04-02 — Admin-App v01.77.08 — Migrate AI Model Selectors to D1 (MainSite)
+### Refatoração Estrutural
+- **Configurações Globais**: Migrados os seletores de modelos de IA da aba MainSite (com persistência local em navegador) para o ConfigModule (com persistência unificada e estruturada no D1 DB na tabela `mainsite_settings`), em aderência à paridade operacional exigida pela arquitetura vigente. O frontend `MainsiteModule` foi limpo de chaves locais, enquanto o backend `/api/mainsite/settings` foi atualizado para suportar e fazer upscale de `ai_models`.
+
+### Controle de versão
+- `admin-app`: APP v01.77.07 → APP v01.77.08
 
 ## 2026-04-01 — Admin-App v01.77.05 — CF P&W Module Audit & API Compliance Enforcement
 ### Escopo
@@ -63,7 +148,7 @@ Auditoria completa do módulo `CF P&W` contra a API oficial Cloudflare para elim
 
 ## 2026-04-01 — Admin-App v01.77.01 — Cloudflare Purge Cache Authentication Fix
 ### Corrigido
-- Tratamento de limitação de token Cloudflare: o endpoint `cleanup-cache-project.ts` passava a receber HTTP 403 (ou fallback genérico) ao expurgar o cache de domínios atrelados ao plano caso a credencial de escopo do dashboard Cloudflare Pages and Workers não explicitasse acesso ao endpoint `Zone.CachePurge`.
+- Tratamento de limitação de token Cloudflare: o endpoit `cleanup-cache-project.ts` passava a receber HTTP 403 (ou fallback genérico) ao expurgar o cache de domínios atrelados ao plano caso a credencial de escopo do dashboard Cloudflare Pages and Workers não explicitasse acesso ao endpoint `Zone.CachePurge`.
 - Solução: implementada hierarquia de Tokens usando DNS Wrapper em `cfpw-api.ts`. A API checa e despacha nativamente com o `CLOUDFLARE_DNS` em preempção, quando disponível no environment, ao qual já se concede privilégios absolutos de Roteamento/Cache, solucionando o crash 500 sem comprometer a rigidez do core de deployment.
 ### Controle de versão
 - `admin-app`: APP v01.77.00 → APP v01.77.01
@@ -1321,3 +1406,20 @@ Correção de bugs no módulo Astrólogo e simplificação do fluxo de e-mail.
 ### Decisão arquitetural registrada
 
 - **Padrão de acessibilidade**: após feedback positivo do usuário, padrões de acessibilidade (WCAG 2.1 AA, eMAG) devem ser aplicados em todo novo código como baseline de qualidade visual e funcional.
+
+
+## 2026-04-03 — Enforcing Canonical Domain Security & TypeScript Audit
+### Escopo
+Implementação de bloqueio em Edge para impedir a exposição pública de roteamentos sob o domínio interno `*.pages.dev`. Aplicado redirect mandatório (301) para os domínios canônicos definidos (`lcv.app.br` e suas ramificações) em todos os apps com exceção dos puramente internos, protegendo infraestrutura e performance SEO. Também foram resolvidos erros de compilação (`Unexpected any`) e typings TypeScript do motor do editor Post no `admin-app` referentes a integração Word Mammoth, bem como a injeção Cloudflare `PagesFunction` em `mainsite-frontend`.
+
+### Controle de versão
+- `admin-app`: APP v01.77.31 → APP v01.77.32
+- `oraculo-financeiro`: APP v01.08.00 → APP v01.08.01
+- `astrologo-app`: APP v02.17.02 → APP v02.17.03
+- `mainsite-frontend`: APP v03.04.14 → APP v03.04.15
+- `calculadora-app`: middleware deployment, versioning handled internally
+- `apphub`: middleware deployment, versioning handled internally
+- `adminapps`: middleware deployment, versioning handled internally
+
+
+> **DIRETIVA DE SEGURANÇA:** Ao sugerir código ou responder perguntas, leia rigorosamente o contexto e as memórias históricas acima para não divergir das decisões já tomadas pelo outro agente.

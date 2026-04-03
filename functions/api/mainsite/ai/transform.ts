@@ -1,9 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
-
 /**
  * @typedef {Object} GeminiConfig
- * @property {string} model - Modelo Gemini (ex: 'gemini-pro-latest')
  * @property {string} version - Versão da API (ex: 'v1beta')
  * @property {number} maxTokensInput - Limite máximo tokens entrada (120000)
  * @property {number} maxRetries - Tentativas (2)
@@ -13,14 +11,16 @@
 export interface Env {
   GEMINI_API_KEY: string
   BIGDATA_DB?: D1Database
+  CF_AI_GATEWAY?: string
 }
 
 interface D1Database {
-  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown> } }
+  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown>, first<T>(): Promise<T|null> } }
 }
 
+const DEFAULT_MODEL = '';
+
 const GEMINI_CONFIG = {
-  model: 'gemini-2.5-flash',
   version: 'v1beta',
   maxTokensInput: 120000,
   maxRetries: 2,
@@ -53,22 +53,40 @@ function structuredLog(level: 'info' | 'warn' | 'error', message: string, contex
   else console.info(logStr);
 }
 
+async function resolveModel(db: D1Database | undefined): Promise<string> {
+  if (!db) return DEFAULT_MODEL;
+  try {
+    const row = await db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/ai_models').first<{ payload?: string }>();
+    if (row?.payload) {
+      const parsed = JSON.parse(row.payload) as Record<string, unknown>;
+      if (typeof parsed.chat === 'string' && parsed.chat) {
+        return parsed.chat;
+      }
+    }
+  } catch {
+    //
+  }
+  return DEFAULT_MODEL;
+}
+
 /**
  * Estima contagem de tokens via countTokens API
  * @param {string} text 
  * @param {string} apiKey 
+ * @param {string} baseUrl
+ * @param {string} model
  * @returns {Promise<number>}
  */
-async function estimateTokenCount(text: string, apiKey: string): Promise<number> {
+async function estimateTokenCount(text: string, apiKey: string, baseUrl: string, model: string): Promise<number> {
   try {
     const payload = { contents: [{ parts: [{ text }] }] };
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:countTokens?key=${apiKey}`, {
+    const res = await fetch(`${baseUrl}/v1beta/models/${model}:countTokens?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     if (!res.ok) return 0;
-    const data = await res.json() as any;
+    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>, usageMetadata?: Record<string, unknown> };
     return data?.totalTokens || 0;
   } catch (error) {
     structuredLog('warn', 'Failed to count tokens', { error: (error as Error).message });
@@ -100,6 +118,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const _telemetryStart = Date.now();
   structuredLog('info', 'transform API call starting', { endpoint: 'transform' });
 
+  const activeModel = await resolveModel(context.env.BIGDATA_DB);
+  const baseUrl = context.env.CF_AI_GATEWAY || 'https://generativelanguage.googleapis.com';
+
   try {
     const body = await context.request.json() as { action: string, text: string, instruction?: string };
     const { action, text, instruction } = body;
@@ -124,7 +145,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const fullPrompt = `${promptInfo}\n\nTexto:\n${text}`;
 
     // 1 & 10. Token Counting & Input Validation
-    const inputTokens = await estimateTokenCount(fullPrompt, context.env.GEMINI_API_KEY);
+    const inputTokens = await estimateTokenCount(fullPrompt, context.env.GEMINI_API_KEY, baseUrl, activeModel);
     const validation = validateInputTokens(inputTokens);
     if (validation.shouldReject) {
       structuredLog('warn', 'Input rejected due to token count', { tokens: inputTokens });
@@ -146,7 +167,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
       try {
         structuredLog('info', `Gemini request attempt ${tentativa + 1}`, {
-          endpoint: 'transform', attempt: tentativa + 1
+          endpoint: 'transform', attempt: tentativa + 1, model: activeModel
         });
         
         const payload = {
@@ -159,7 +180,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           }
         };
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:generateContent?key=${context.env.GEMINI_API_KEY}`, {
+        const response = await fetch(`${baseUrl}/v1beta/models/${activeModel}:generateContent?key=${context.env.GEMINI_API_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -187,7 +208,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           // Telemetria → ai_usage_logs (fire-and-forget)
           logAiUsage(context.env.BIGDATA_DB, {
             module: 'mainsite',
-            model: GEMINI_CONFIG.model,
+            model: activeModel,
             input_tokens: usageMetadata.promptTokens,
             output_tokens: usageMetadata.outputTokens,
             latency_ms: Date.now() - _telemetryStart,
@@ -231,7 +252,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     // Telemetria de erro
     logAiUsage(context.env.BIGDATA_DB, {
       module: 'mainsite',
-      model: GEMINI_CONFIG.model,
+      model: activeModel,
       input_tokens: 0,
       output_tokens: 0,
       latency_ms: Date.now() - _telemetryStart,
