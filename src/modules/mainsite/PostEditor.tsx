@@ -10,7 +10,7 @@ import {
   Subscript as SubIcon, Superscript as SuperIcon,
   Table as TableIcon,
   Upload, Image as ImageIcon, ZoomIn, ZoomOut, MessageSquare,
-  Sparkles, Wand2, Send, Download,
+  Sparkles, Wand2, Send, Download, FileUp,
   Undo2, Redo2, GripVertical, ArrowUpDown
 } from 'lucide-react'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -80,6 +80,8 @@ export default function PostEditor({
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>(null)
   const saveFeedbackTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const wordInputRef = useRef<HTMLInputElement>(null)
+  const [isProcessingWord, setIsProcessingWord] = useState(false)
   const [aiChatOpen, setAiChatOpen] = useState(false)
   const [aiChatInput, setAiChatInput] = useState('')
   const aiChatBtnRef = useRef<HTMLButtonElement>(null)
@@ -243,6 +245,42 @@ export default function PostEditor({
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [editor, showNotification, insertCaptionBlock, openPromptModal])
+
+  const handleWordUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editor) return
+    const file = event.target.files?.[0]
+    if (!file) return
+    setIsProcessingWord(true)
+    showNotification('Processando documento do MS Word...', 'info')
+    
+    try {
+      const mammothModule = await import('mammoth')
+      const mammoth = mammothModule.default || mammothModule
+      const arrayBuffer = await file.arrayBuffer()
+      
+      const htmlResult = await mammoth.convertToHtml({
+        arrayBuffer,
+        styleMap: [
+          "p[style-name='Normal'] => p:fresh",
+          "p[style-name='Heading 1'] => h1:fresh",
+          "p[style-name='Heading 2'] => h2:fresh",
+          "p[style-name='Heading 3'] => h3:fresh",
+          "p[style-name='Heading 4'] => h4:fresh",
+          "p[style-name='Heading 5'] => h5:fresh",
+          "p[style-name='Heading 6'] => h6:fresh"
+        ]
+      })
+      
+      const html = htmlResult.value
+      editor.chain().focus().insertContent(html).run()
+      showNotification('Documento do Word importado com sucesso.', 'success')
+    } catch (err) {
+      showNotification(err instanceof Error ? err.message : 'Erro ao importar documento do Word.', 'error')
+    } finally {
+      setIsProcessingWord(false)
+      if (wordInputRef.current) wordInputRef.current.value = ''
+    }
+  }, [editor, showNotification])
 
   const addImageUrl = useCallback(() => {
     if (!editor) return
@@ -726,6 +764,8 @@ export default function PostEditor({
             {/* ── Media toolbar ── */}
             <input id="tiptap-file-upload" ref={fileInputRef} name="tiptapFileUpload" type="file" accept="image/*" title="Upload de imagem" className="tiptap-hidden-input" onChange={handleImageUpload} />
             <button type="button" title="Upload de imagem (R2)" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>{isUploading ? <Loader2 size={15} className="spin" /> : <Upload size={15} />}</button>
+            <input id="tiptap-word-upload" ref={wordInputRef} name="tiptapWordUpload" type="file" accept=".docx" title="Importar do Microsoft Word" className="tiptap-hidden-input" onChange={handleWordUpload} />
+            <button type="button" title="Decodificar / Importar do Microsoft Word (.docx)" onClick={() => wordInputRef.current?.click()} disabled={isProcessingWord}>{isProcessingWord ? <Loader2 size={15} className="spin" /> : <FileUp size={15} />}</button>
             <button type="button" title="Imagem por URL / Google Drive" onClick={addImageUrl}><ImageIcon size={15} /></button>
             <button type="button" title="Vídeo do YouTube" onClick={addYoutube}><span>YT</span></button>
             <button type="button" title="Reduzir mídia" onClick={() => adjustSelectedMediaSize(-1)} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><ZoomOut size={15} /></button>

@@ -466,6 +466,43 @@ export const EditorSpacing = Extension.create({
   },
 })
 
+// ── WordPasteHandler — Higienização do Copy-Paste do Microsoft Word ─────────
+export const WordPasteHandler = Extension.create({
+  name: 'wordPasteHandler',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('wordPasteHandler'),
+        props: {
+          transformPastedHTML(html) {
+            // Verifica se a marca d'água do Word ou do Office está presente no HTML gerado
+            if (!/class="?Mso|xmlns:w="urn:schemas-microsoft-com:office:word"/i.test(html)) {
+              return html
+            }
+            
+            let clean = html
+            // 1. Remove os blocos XML ocultos do VML/Office (bloatware cego gerado pelo Word)
+            clean = clean.replace(/<!--[\s\S]*?-->/g, '')
+            clean = clean.replace(/<o:p>\s*<\/o:p>/gi, '')
+            clean = clean.replace(/<o:p>.*?<\/o:p>/gi, '')
+
+            // 2. Transforma as declarações do Word de text-align que o Tiptap não assimila inicialmente
+            clean = clean.replace(/text-align:\s*start/gi, 'text-align: left')
+
+            // 3. Remove âncoras (bookmarks) fantasmas vazias (<a name="OLE_LINK1"></a>)
+            clean = clean.replace(/<a name="[^"]*"><\/a>/gi, '')
+
+            // IMPORTANTE: Deixamos TODOS os spans, text-indent e color passarem integralmente
+            // porque eles serão interceptados e digeridos pelas extensões FontFamily, FontSize, Color e EditorSpacing.
+            
+            return clean
+          }
+        }
+      })
+    ]
+  }
+})
+
 // ── buildTiptapExtensions — full extension list ───────────────
 
 export const buildTiptapExtensions = (mentionItems: string[]) => [
@@ -508,4 +545,5 @@ export const buildTiptapExtensions = (mentionItems: string[]) => [
   SlashCommands,
   SearchReplaceExtension,
   EditorSpacing,
+  WordPasteHandler,
 ]

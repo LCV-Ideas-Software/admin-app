@@ -1,5 +1,16 @@
 # Changelog — Admin App
 
+## [v01.77.31] - 2026-04-03
+### Adicionado
+- **Integração Word (mammoth.js)**: Adicionada a capacidade de importação e decodificação client-side de arquivos `.docx` do MS Word para HTML rico e limpo dentro do Tiptap `PostEditor`. Integrado o botão de FileUpload mapeando estilos nativos do editor, com parser customizado para Títulos e Parágrafos nativos.
+- **Word Paste Handler**: Inserida extensão nativa Tiptap em `extensions.ts` para capturar a Área de Transferência (Clipboard `transformPastedHTML`), removendo sucatas XML (`<o:p>`, diretivas VML MSO) de arquivos copiados do Word nativamente para o navegador, mas preservando o alinhamento de espaçamentos e atributos formatados suportados.
+
+### Alterado
+- **Renderização Pública**: O componente de leitura do frontend (`PostReader.tsx`) teve a diretriz do `DOMPurify` afrouxada em `ADD_ATTR: ['style']` estritamente controlada pelas extensões de inline-styles do Tiptap original, garantindo extrema fidelidade para renderização dos textos formatados transferidos via Microsoft Word para a Cloudflare de forma legível.
+
+### Controle de versão
+- `admin-app`: APP v01.77.30 -> APP v01.77.31
+
 ## [v01.77.30] - 2026-04-03
 ### Adicionado
 - **Espaçamento de Tiptap Editor**: Implementado suporte avançado de controle para espaçamento entre linhas e margens de parágrafos via Tiptap. 
