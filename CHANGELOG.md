@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.77.30] - 2026-04-03
+### Adicionado
+- **Espaçamento de Tiptap Editor**: Implementado suporte avançado de controle para espaçamento entre linhas e margens de parágrafos via Tiptap. 
+  - Extensão customizada `EditorSpacing` registrada nativamente como atributos de `lineHeight`, `marginTop` e `marginBottom` (escrevendo CSS inline style formatters no HTML da página final).
+  - Controle nativo visual no PostEditor sob um dropdown acessível com o novo ícone `ArrowUpDown`.
+  - Soluciona a necessidade de remover ou adicionar distâncias excessivas entre referências bibliográficas do editor rico.
+
+### Controle de versão
+- `admin-app`: APP v01.77.20 -> APP v01.77.30
+
 ## [v01.77.20] - 2026-04-03
 ### Corrigido
 - **Formatação de Importação Gemini**: Implementada normalização inteligente de parágrafos vazios. O pipeline de importação nativo agora remove parágrafos em branco preexistentes inseridos pelo modelo ou pelo conversor Markdown, garantindo espaçamento consistente e uniforme através da inserção controlada de `<br>` do Tiptap.

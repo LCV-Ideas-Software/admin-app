@@ -1,7 +1,14 @@
 # AI Memory Log — Admin-App
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
-
+## 2026-04-03 — Admin-App v01.77.30 — Editor Spacing Custom Extension
+### Contexto
+- A formatação via Gemini ou recortes textuais frequentemente possuía distâncias incômodas gerando quebra do ritmo de leitura (espaçamentos erráticos de parágrafos/listas ou entrelinhas insatisfatórias). O usuário exigia aderência à familiaridade Microsoft Word.
+### Adicionado
+- Extensão Tiptap `EditorSpacing`: Criação do Custom Node global manipulando dinamicamente e via *inline-css* atributos Tiptap nativos. Suporte estrito `CommandProps` implementado na raiz da extensão satisfazendo as exigências rigorosas (`any` removido completamente para compilador do TypeScript).
+- UI `PostEditor.tsx`: `<select>` iconizado por `ArrowUpDown` posicionado logicamente para fácil visualização na Toolbar, integrando 6 escalas modulares de tamanho e um despachante de Margem rápida "Adicionar/Remover" em `<p>` tags.
+### Controle de versão
+- `admin-app`: APP v01.77.20 → APP v01.77.30
 ## 2026-04-03 — Admin-App v01.77.19 — Fix Crítico: Gemini Import 502 Bad Gateway Fantasma
 ### Corrigido
 - **Root Cause**: O error handler de `gemini-import.ts` retornava HTTP `502` como status code em caso de erro. O Cloudflare proxy intercepta qualquer resposta 502 de Pages Functions e **substitui o body JSON** pela sua própria página HTML de "Bad Gateway", ocultando completamente a mensagem de erro real. Diagnóstico via TTFB: 352ms prova crash imediato, não timeout.

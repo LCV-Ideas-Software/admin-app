@@ -4,6 +4,7 @@
  * Also includes: FigureImageNode (semantic figure/figcaption block).
  */
 import { Extension, Node as TiptapNode, mergeAttributes } from '@tiptap/core'
+import type { CommandProps } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { Plugin, PluginKey } from 'prosemirror-state'
 import StarterKit from '@tiptap/starter-kit'
@@ -384,6 +385,87 @@ export const FigureImageNode = TiptapNode.create({
   },
 })
 
+// ── EditorSpacing — Espaçamento de linhas e parágrafos ─────────
+export const EditorSpacing = Extension.create({
+  name: 'editorSpacing',
+  addOptions() {
+    return { types: ['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'] }
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          lineHeight: {
+            default: null,
+            parseHTML: element => element.style.lineHeight || null,
+            renderHTML: attributes => {
+              if (!attributes.lineHeight) return {}
+              return { style: `line-height: ${attributes.lineHeight}` }
+            },
+          },
+          marginTop: {
+            default: null,
+            parseHTML: element => element.style.marginTop || null,
+            renderHTML: attributes => {
+              if (!attributes.marginTop) return {}
+              return { style: `margin-top: ${attributes.marginTop}` }
+            },
+          },
+          marginBottom: {
+            default: null,
+            parseHTML: element => element.style.marginBottom || null,
+            renderHTML: attributes => {
+              if (!attributes.marginBottom) return {}
+              return { style: `margin-bottom: ${attributes.marginBottom}` }
+            },
+          },
+        },
+      },
+    ]
+  },
+  addCommands() {
+    return {
+      setLineHeight: (lineHeight: string) => ({ tr, state, dispatch }: CommandProps) => {
+        const { selection } = state
+        state.doc.nodesBetween(selection.from, selection.to, (node: { type: { name: string }; attrs: Record<string, unknown> }, pos: number) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) tr.setNodeMarkup(pos, undefined, { ...node.attrs, lineHeight })
+          }
+        })
+        return true
+      },
+      unsetLineHeight: () => ({ tr, state, dispatch }: CommandProps) => {
+        const { selection } = state
+        state.doc.nodesBetween(selection.from, selection.to, (node: { type: { name: string }; attrs: Record<string, unknown> }, pos: number) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) tr.setNodeMarkup(pos, undefined, { ...node.attrs, lineHeight: null })
+          }
+        })
+        return true
+      },
+      setMarginTop: (marginTop: string) => ({ tr, state, dispatch }: CommandProps) => {
+        const { selection } = state
+        state.doc.nodesBetween(selection.from, selection.to, (node: { type: { name: string }; attrs: Record<string, unknown> }, pos: number) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) tr.setNodeMarkup(pos, undefined, { ...node.attrs, marginTop })
+          }
+        })
+        return true
+      },
+      setMarginBottom: (marginBottom: string) => ({ tr, state, dispatch }: CommandProps) => {
+        const { selection } = state
+        state.doc.nodesBetween(selection.from, selection.to, (node: { type: { name: string }; attrs: Record<string, unknown> }, pos: number) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) tr.setNodeMarkup(pos, undefined, { ...node.attrs, marginBottom })
+          }
+        })
+        return true
+      },
+    }
+  },
+})
+
 // ── buildTiptapExtensions — full extension list ───────────────
 
 export const buildTiptapExtensions = (mentionItems: string[]) => [
@@ -425,4 +507,5 @@ export const buildTiptapExtensions = (mentionItems: string[]) => [
   FigureImageNode,
   SlashCommands,
   SearchReplaceExtension,
+  EditorSpacing,
 ]

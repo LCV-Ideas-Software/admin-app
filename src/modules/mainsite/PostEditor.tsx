@@ -11,7 +11,7 @@ import {
   Table as TableIcon,
   Upload, Image as ImageIcon, ZoomIn, ZoomOut, MessageSquare,
   Sparkles, Wand2, Send, Download,
-  Undo2, Redo2, GripVertical
+  Undo2, Redo2, GripVertical, ArrowUpDown
 } from 'lucide-react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { DragHandle } from '@tiptap/extension-drag-handle-react'
@@ -765,6 +765,42 @@ export default function PostEditor({
                 <option value="20px">20px</option>
                 <option value="24px">24px</option>
                 <option value="30px">30px</option>
+              </select>
+            </div>
+            <div className="tiptap-select-group">
+              <ArrowUpDown size={14} />
+              <select id="tiptap-line-spacing" name="tiptapLineSpacing" title="Espaçamento de linha e parágrafo" onChange={(e) => {
+                const val = e.target.value;
+                /* eslint-disable @typescript-eslint/no-explicit-any */
+                if (val.startsWith('lh-')) {
+                  const lh = val.replace('lh-', '');
+                  if (lh === 'normal') (editor.chain().focus() as any).unsetLineHeight().run();
+                  else (editor.chain().focus() as any).setLineHeight(lh).run();
+                } else if (val === 'mar-add-top') {
+                   (editor.chain().focus() as any).setMarginTop('1.5em').run();
+                } else if (val === 'mar-rem-top') {
+                   (editor.chain().focus() as any).setMarginTop('0px').run();
+                } else if (val === 'mar-add-bot') {
+                   (editor.chain().focus() as any).setMarginBottom('1.5em').run();
+                } else if (val === 'mar-rem-bot') {
+                   (editor.chain().focus() as any).setMarginBottom('0px').run();
+                }
+                /* eslint-enable @typescript-eslint/no-explicit-any */
+                e.target.value = '';
+              }} value="">
+                <option value="">Espaçamento...</option>
+                <option value="lh-1">Linhas: 1.0</option>
+                <option value="lh-1.15">Linhas: 1.15</option>
+                <option value="lh-1.5">Linhas: 1.5</option>
+                <option value="lh-2">Linhas: 2.0</option>
+                <option value="lh-2.5">Linhas: 2.5</option>
+                <option value="lh-3">Linhas: 3.0</option>
+                <option value="lh-normal">Linhas: Padrão</option>
+                <option disabled>──────────</option>
+                <option value="mar-add-top">Adicionar antes do parágrafo</option>
+                <option value="mar-rem-top">Remover antes do parágrafo</option>
+                <option value="mar-add-bot">Adicionar depois do parágrafo</option>
+                <option value="mar-rem-bot">Remover depois do parágrafo</option>
               </select>
             </div>
 
