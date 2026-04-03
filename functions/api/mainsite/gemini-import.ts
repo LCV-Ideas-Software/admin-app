@@ -1,7 +1,4 @@
-import { marked } from 'marked'
-import { GoogleGenAI } from '@google/genai'
-
-/**
+import { marked } from 'marked'/**
  * gemini-import.ts — Cloudflare Pages Function
  * POST /api/mainsite/gemini-import
  * Fetches a Gemini share URL directly and utilizes Gemini SDK to cleanly parse its conversation.
@@ -229,37 +226,45 @@ Regras:
 3. LIMPEZA: Descarte elementos de UI (Sign in, Settings, botões de menu).
 4. TÍTULO: Infira o título principal da conversa.`;
 
-    const config = {
-      systemInstruction: systemInstructionConfig,
-      temperature: GEMINI_CONFIG.temperature,
-      responseMimeType: "application/json",
-      responseJsonSchema: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "Título da conversa" },
-          markdown: { type: "string", description: "Conteúdo em Markdown" }
-        },
-        required: ["title", "markdown"],
-      }
-    };
-
-    const ai = new GoogleGenAI({ apiKey: context.env.GEMINI_API_KEY });
     let usageMetadata = { promptTokens: 0, outputTokens: 0, cachedTokens: 0 };
 
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
       try {
-        const response = await ai.models.generateContent({
-          model: GEMINI_CONFIG.model,
-          contents: `Extraia a conversa do conteúdo abaixo:\n\n${pageContent}`,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          config: config as any
+        const payload = {
+          contents: [{ parts: [{ text: `Extraia a conversa do conteúdo abaixo:\n\n${pageContent}` }] }],
+          systemInstruction: { parts: [{ text: systemInstructionConfig }] },
+          generationConfig: {
+            temperature: GEMINI_CONFIG.temperature,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Título da conversa" },
+                markdown: { type: "string", description: "Conteúdo em Markdown" }
+              },
+              required: ["title", "markdown"],
+            }
+          }
+        };
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:generateContent?key=${context.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
 
-        if (response.text) {
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json() as any;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (text) {
           usageMetadata = {
-            promptTokens: response.usageMetadata?.promptTokenCount || 0,
-            outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
-            cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,
+            promptTokens: data.usageMetadata?.promptTokenCount || 0,
+            outputTokens: data.usageMetadata?.candidatesTokenCount || 0,
+            cachedTokens: data.usageMetadata?.cachedContentTokenCount || 0,
           };
 
           logAiUsage(context.env.BIGDATA_DB, {
@@ -272,7 +277,7 @@ Regras:
           });
 
           // Parse JSON safely
-          const result = JSON.parse(response.text) as { title: string, markdown: string };
+          const result = JSON.parse(text) as { title: string, markdown: string };
           finalTitle = result.title;
           finalMarkdown = result.markdown;
           break;
