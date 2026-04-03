@@ -125,23 +125,29 @@ function normalizeGeminiShareUrl(rawUrl: string): string {
 }
 
 function preprocessMarkdown(md: string): string {
-  // Ajusta títulos para H3
-  let processed = md.replace(/^(#{1,6})\s/gm, '### ')
-  // Preserva imagens não estruturadas com um aviso formatado
-  processed = processed.replace(/!\[([^\]]*)\]\([^)]+\)/g, '\n🖼️ *[Imagem não importada: $1]*\n')
-  return processed
+  let processed = md;
+  // 1. Ajusta títulos (de # até ######) para virarem no máximo H3 (###)
+  processed = processed.replace(/^(#{1,6})\s/gm, '### ');
+  // 2. Preserva imagens não estruturadas com um aviso formatado
+  processed = processed.replace(/!\[([^\]]*)\]\([^)]+\)/g, '\n🖼️ *[Imagem não importada: $1]*\n');
+  return processed;
 }
 
 function postprocessHtml(html: string): string {
-  // Configura justificação global nos parágrafos
-  let processed = html.replace(/<p>/g, '<p style="text-align: justify">')
-  // Aplica o recuo de primeira linha (simulado com espaço especial \u2003)
-  processed = processed.replace(/<p style="text-align: justify">/g, '<p style="text-align: justify">\u2003')
-  // Corrige parágrafos que iniciam com a flag de imagem (removemos o recuo indesejado nelas)
-  processed = processed.replace(/\u2003🖼️/g, '🖼️')
-  // Insere um espaçamento vertical explícito (linha vazia) entre blocos de parágrafos
-  processed = processed.replace(/<\/p>\n*<p/g, '</p>\n<p><br></p>\n<p')
-  return processed
+  let processed = html;
+  
+  // 1. Configura justificação global e recuo de primeira linha (1.5rem) nos parágrafos normais
+  // O TipTap lida com isso através da extensão TextIndent configurada em extensions.ts
+  processed = processed.replace(/<p>/g, '<p style="text-align: justify; text-indent: 1.5rem">');
+  
+  // 2. Corrige parágrafos de placeholder de imagem marcados (removemos o recuo indesejado nelas)
+  processed = processed.replace(/<p style="text-align: justify; text-indent: 1.5rem">(\s*)🖼️/g, '<p style="text-align: justify">$1🖼️');
+  
+  // 3. Insere um espaçamento vertical explícito (linha vazia) entre blocos de parágrafos
+  // <br> é reconhecido garantidamente pelo Tiptap como quebra de linha rígida
+  processed = processed.replace(/<\/p>\s*<p/g, '</p>\n<p><br></p>\n<p');
+  
+  return processed;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
