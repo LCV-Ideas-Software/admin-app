@@ -29,7 +29,7 @@ interface ImportRequest {
 }
 
 const GEMINI_CONFIG = {
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.1-pro-preview',
   temperature: 0.1,
   maxRetries: 1,
   retryDelayMs: 1000
@@ -122,6 +122,26 @@ function normalizeGeminiShareUrl(rawUrl: string): string {
     return parsed.toString()
   }
   return rawUrl.trim()
+}
+
+function preprocessMarkdown(md: string): string {
+  // Ajusta títulos para H3
+  let processed = md.replace(/^(#{1,6})\s/gm, '### ')
+  // Preserva imagens não estruturadas com um aviso formatado
+  processed = processed.replace(/!\[([^\]]*)\]\([^)]+\)/g, '\n🖼️ *[Imagem não importada: $1]*\n')
+  return processed
+}
+
+function postprocessHtml(html: string): string {
+  // Configura justificação global nos parágrafos
+  let processed = html.replace(/<p>/g, '<p style="text-align: justify">')
+  // Aplica o recuo de primeira linha (simulado com espaço especial \u2003)
+  processed = processed.replace(/<p style="text-align: justify">/g, '<p style="text-align: justify">\u2003')
+  // Corrige parágrafos que iniciam com a flag de imagem (removemos o recuo indesejado nelas)
+  processed = processed.replace(/\u2003🖼️/g, '🖼️')
+  // Insere um espaçamento vertical explícito (linha vazia) entre blocos de parágrafos
+  processed = processed.replace(/<\/p>\n*<p/g, '</p>\n<p><br></p>\n<p')
+  return processed
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -287,8 +307,14 @@ Regras:
     )
   }
 
+  // Aplica pre-processamento (títulos e imagens)
+  const preparedMarkdown = preprocessMarkdown(finalMarkdown)
+
   // Promise wrap is safe for future marked extensions compatibility
-  const html = await marked.parse(finalMarkdown)
+  let html = await marked.parse(preparedMarkdown)
+  
+  // Aplica pos-processamento (identação, justificação, espaçamento)
+  html = postprocessHtml(html)
 
   return new Response(
     JSON.stringify({ html, title: finalTitle || undefined }),
