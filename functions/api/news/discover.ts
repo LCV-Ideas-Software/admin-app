@@ -7,7 +7,7 @@
  * Motor inteligente de descoberta de fontes RSS com 3 camadas:
  * 1. LOCAL: banco curado de ~150 feeds conhecidos (instantâneo)
  * 2. GOOGLE NEWS: geração de feed RSS via news.google.com/rss/search
- * 3. GEMINI AI: consulta ao gemini-2.5-flash para descobrir feeds reais
+ * 3. GEMINI AI: consulta à LLM (modelo configurado ou fallback) para descobrir feeds reais
  *
  * Parâmetros:
  * - q (string): Termo de busca
@@ -26,10 +26,10 @@ interface D1Binding {
   prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown>, first<T>(): Promise<T|null> } }
 }
 
-const DEFAULT_MODEL = '';
+const FALLBACK_MODEL = 'gemini-2.5-flash';
 
 async function resolveModel(db?: D1Binding): Promise<string> {
-  if (!db) return DEFAULT_MODEL;
+  if (!db) return FALLBACK_MODEL;
   try {
     const row = await db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/ai_models').first<{ payload?: string }>();
     if (row?.payload) {
@@ -42,7 +42,7 @@ async function resolveModel(db?: D1Binding): Promise<string> {
   } catch {
     //
   }
-  return DEFAULT_MODEL;
+  return FALLBACK_MODEL;
 }
 
 interface RssSuggestion {

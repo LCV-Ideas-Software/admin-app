@@ -37,19 +37,19 @@ const GEMINI_CONFIG = {
   retryDelayMs: 1000
 };
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const FALLBACK_MODEL = 'gemini-2.5-flash';
 
 async function resolveModel(db: D1Database | undefined): Promise<string> {
-  if (!db) return DEFAULT_MODEL;
+  if (!db) return FALLBACK_MODEL;
   try {
-    const res = await db.prepare('SELECT dados_json FROM mainsite_settings WHERE id = ?')
-      .bind('ai_models').all<{ dados_json: string }>();
-    if (res.results && res.results.length > 0) {
-      const parsed = JSON.parse(res.results[0].dados_json) as { chat?: string };
+    const res = await db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1')
+      .bind('mainsite/ai_models').all<{ payload: string }>();
+    if (res.results && res.results.length > 0 && res.results[0].payload) {
+      const parsed = JSON.parse(res.results[0].payload) as { chat?: string };
       if (parsed.chat) return parsed.chat;
     }
   } catch { /* fallback silently */ }
-  return DEFAULT_MODEL;
+  return FALLBACK_MODEL;
 }
 
 // Jina.ai Reader API — fetches page content as clean markdown
@@ -284,7 +284,10 @@ Regras:
           throw new Error(`API Error: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as { 
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>, 
+          usageMetadata?: { promptTokenCount?: number, candidatesTokenCount?: number, cachedContentTokenCount?: number } 
+        };
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (text) {

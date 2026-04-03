@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.77.33] - 2026-04-03
+### Corrigido
+- `functions/api/mainsite/gemini-import.ts`: Erradicado bypass do modelo que forçava uso do `gemini-2.5-flash` devido a query SQL antiga usando a coluna `dados_json`. Ajustado para consumir dinamicamente a coluna `payload` com a chave correta `mainsite/ai_models`. Adicionado tipagem stricta corrigindo falha de "Unexpected any".
+- `functions/api/news/discover.ts`: O fallback default da AI foi consertado de default estático vazio (que gerava URL quebrada e silent errors) para constante estruturada `FALLBACK_MODEL`, espelhando a correção principal.
+
+### Alterado
+- AI Parity Sync (`C:\Scripts\ai-parity-sync.js`): Atualizado para motor multi-repo descentralizado `v2`, injetando paridade (`copilot-instructions.md`, `GEMINI.md`) em cada subrepositório ativo com proteção single-instance (PID).
+- Reversão de constantes arbitrárias e falsos-positivos na malha do AI Gateway.
+
 ## [v01.77.32] - 2026-04-03
 ### Alterado
 - **Migração Cloudflare AI Gateway**: As rotas de listagem de modelos (`/api/mainsite/modelos` e `/api/oraculo/modelos`) e o endpoint de importação (`/api/mainsite/gemini-import`) foram inteiramente refatorados para utilizar a bind `CF_AI_GATEWAY`, evitando o erro 502 de proxying do Cloudflare. 

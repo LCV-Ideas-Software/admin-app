@@ -1411,3 +1411,16 @@ Implementação de bloqueio em Edge para impedir a exposição pública de rotea
 - `calculadora-app`: middleware deployment, versioning handled internally
 - `apphub`: middleware deployment, versioning handled internally
 - `adminapps`: middleware deployment, versioning handled internally
+
+## 2026-04-03 — AI Models Selection Parity & Hardcoding Eradication
+### Escopo
+Auditoria e resolução do problema de regressão nos seletores de modelo AI do admin-app. O sistema não estava respeitando o `mainsite/ai_models` gravado no D1 por causa de um backend (gemini-import.ts) que continuava tentando ler a coluna legacy `dados_json` para a key `ai_models`.
+
+### Corrigido
+- `admin-app/functions/api/mainsite/gemini-import.ts`: a consulta SQL ao D1 (`BIGDATA_DB`) foi atualizada para recuperar a coluna correta `payload` na chave correta `mainsite/ai_models`, reativando a paridade de estado com a interface do admin-app. O erro de `Unexpected any` no parse da response do Gemini foi resolvido de forma estrita.
+- `admin-app/functions/api/news/discover.ts` & `gemini-import.ts`: strings de hardcoding imperativas eliminadas. Criado fluxo unificado onde a configuração de banco injeta o user-choice, e uma constante local `FALLBACK_MODEL` protege o uptime apenas caso o BD esteja offline/vazio (eliminando silent crashes causados por string vazia).
+- Paridade Universal: O script `C:\Scripts\ai-parity-sync.js` foi reescrito (v2) para varredura multi-repo dinâmica, injetando memórias cross-workspace via múltiplos listeners `fs.watch` e controlando a unicidade da instância do daemon Node.
+
+### Controle de versão
+- `admin-app`: APP v01.77.32 → APP v01.77.33
+
