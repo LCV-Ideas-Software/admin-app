@@ -22,11 +22,16 @@
       "service": "tlsrpt-motor"
     }
   ],
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "ai": {
     "binding": "AI"
   },
   "observability": {
     "enabled": true
+  },
+  "placement": {
+    "mode": "smart"
   }
 }

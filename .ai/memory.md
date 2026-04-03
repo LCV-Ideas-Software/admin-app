@@ -1,6 +1,15 @@
 # AI Memory Log — Admin-App
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
+
+## 2026-04-03 — Cloudflare Paid Scale Integration
+### Escopo
+Migração arquitetural unificada para aproveitamento da infraestrutura Cloudflare Paid. Implementação de **Smart Placement** transversal para redução de latência via proximidade física com o banco de dados (BIGDATA_DB). Adoção da diretiva `usage_model: unbound` para mitigar o `Error 1102` (CPU limit excess). Embutimento global do proxy **Cloudflare AI Gateway** sobrepondo o SDK nativo (`@google/genai`) e habilitando Caching, Rate limiting Nativo e Observabilidade Unificada, mantendo operação híbrida com os LLMs da rede.
+
+### Diretivas Respeitadas
+- Conformidade 100% com `wrangler.json`.
+- `tlsrpt-motor` e `cron-taxa-ipca` revalidados em infraestrutura moderna sem timeout.
+
 ## 2026-04-03 — Admin-App v01.77.30 — Editor Spacing Custom Extension
 ### Contexto
 - A formatação via Gemini ou recortes textuais frequentemente possuía distâncias incômodas gerando quebra do ritmo de leitura (espaçamentos erráticos de parágrafos/listas ou entrelinhas insatisfatórias). O usuário exigia aderência à familiaridade Microsoft Word.
