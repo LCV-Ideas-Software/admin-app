@@ -1,6 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { GoogleGenAI } from '@google/genai';
 
 /**
  * /api/news/discover — Pages Function
@@ -305,21 +304,25 @@ REGRAS:
 - Priorize fontes brasileiras quando o termo for em português.
 - Se não conhecer feeds para o termo, retorne um array vazio [].`
 
-    const ai = new GoogleGenAI({ apiKey });
-    
-    // As the GoogleGenAI SDK handles its reqs natively, we let the layer level Promise.race handle timeouts.
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.2,
-        maxOutputTokens: 1024,
-        responseMimeType: 'application/json',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1024,
+          responseMimeType: "application/json"
+        }
+      })
     });
+    
+    if (!res.ok) {
+      throw new Error(`Gemini API Error: ${res.status}`);
+    }
 
-    const text = response.text;
+    const data = await res.json() as any;
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) return [];
 
     const parsed = JSON.parse(text) as Array<{ name?: string; url?: string; category?: string }>;
@@ -335,10 +338,9 @@ REGRAS:
         category: item.category!,
         source: 'gemini-ai' as const,
       }));
-
     // Telemetria fire-and-forget
     if (db) {
-      const usage = response.usageMetadata;
+      const usage = data?.usageMetadata || {};
       db.prepare(`
         INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status)
         VALUES (?, ?, ?, ?, ?, ?)

@@ -31,7 +31,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // ../node_modules/retry/lib/retry_operation.js
 var require_retry_operation = __commonJS({
   "../node_modules/retry/lib/retry_operation.js"(exports, module) {
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     function RetryOperation(timeouts, options) {
       if (typeof options === "boolean") {
         options = { forever: options };
@@ -168,7 +168,7 @@ var require_retry_operation = __commonJS({
 // ../node_modules/retry/lib/retry.js
 var require_retry = __commonJS({
   "../node_modules/retry/lib/retry.js"(exports) {
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var RetryOperation = require_retry_operation();
     exports.operation = function(options) {
       var timeouts = exports.timeouts(options);
@@ -255,7 +255,7 @@ var require_retry = __commonJS({
 // ../node_modules/retry/index.js
 var require_retry2 = __commonJS({
   "../node_modules/retry/index.js"(exports, module) {
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     module.exports = require_retry();
   }
 });
@@ -264,7 +264,7 @@ var require_retry2 = __commonJS({
 var require_p_retry = __commonJS({
   "../node_modules/p-retry/index.js"(exports, module) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var retry = require_retry2();
     var networkErrorMsgs = [
       "Failed to fetch",
@@ -10973,7 +10973,7 @@ function sleep(ms) {
 var import_p_retry, _defaultBaseGeminiUrl, _defaultBaseVertexUrl, BaseModule, Language, Outcome, FunctionResponseScheduling, Type, Environment, AuthType, HttpElementLocation, ApiSpec, PhishBlockThreshold, Behavior, DynamicRetrievalConfigMode, FunctionCallingConfigMode, ThinkingLevel, PersonGeneration, ProminentPeople, HarmCategory, HarmBlockMethod, HarmBlockThreshold, FinishReason, HarmProbability, HarmSeverity, UrlRetrievalStatus, BlockedReason, TrafficType, Modality, ModelStage, MediaResolution, TuningMode, AdapterSize, JobState, TuningJobState, AggregationMetric, PairwiseChoice, TuningTask, DocumentState, PartMediaResolutionLevel, ToolType, ResourceScope, ServiceTier, FeatureSelectionPreference, EmbeddingApiType, SafetyFilterLevel, ImagePromptLanguage, MaskReferenceMode, ControlReferenceType, SubjectReferenceType, EditMode, SegmentMode, VideoGenerationReferenceType, VideoGenerationMaskMode, VideoCompressionQuality, TuningMethod, FileState, FileSource, TurnCompleteReason, MediaModality, VadSignalType, VoiceActivityType, StartSensitivity, EndSensitivity, ActivityHandling, TurnCoverage, Scale, MusicGenerationMode, LiveMusicPlaybackControl, HttpResponse, GenerateContentResponse, EmbedContentResponse, GenerateImagesResponse, EditImageResponse, UpscaleImageResponse, RecontextImageResponse, SegmentImageResponse, ListModelsResponse, DeleteModelResponse, CountTokensResponse, ComputeTokensResponse, GenerateVideosOperation, ListTuningJobsResponse, CancelTuningJobResponse, DeleteCachedContentResponse, ListCachedContentsResponse, ListDocumentsResponse, ListFileSearchStoresResponse, UploadToFileSearchStoreResumableResponse, ImportFileOperation, ListFilesResponse, CreateFileResponse, DeleteFileResponse, RegisterFilesResponse, ListBatchJobsResponse, LiveServerMessage, LiveMusicServerMessage, UploadToFileSearchStoreOperation, PagedItem, Pager, Batches, Caches, Chats, Chat, ApiError, Files, CONTENT_TYPE_HEADER, SERVER_TIMEOUT_HEADER, USER_AGENT_HEADER, GOOGLE_API_CLIENT_HEADER, SDK_VERSION, LIBRARY_LABEL, VERTEX_AI_API_DEFAULT_VERSION, GOOGLE_AI_API_DEFAULT_VERSION, DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_HTTP_STATUS_CODES, ApiClient, MCP_LABEL, hasMcpToolUsageFromMcpToTool, McpCallableTool, LiveMusic, LiveMusicSession, FUNCTION_RESPONSE_REQUIRES_ID, Live, defaultLiveSendClientContentParamerters, Session, DEFAULT_MAX_REMOTE_CALLS, Models, Operations, Tokens, Documents, FileSearchStores, uuid4Internal, uuid4, castToError, GeminiNextGenAPIClientError, APIError, APIUserAbortError, APIConnectionError, APIConnectionTimeoutError, BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError, ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError, startsWithSchemeRegexp, isAbsoluteURL, isArrayInternal, isArray, isReadonlyArrayInternal, isReadonlyArray, validatePositiveInteger, safeJSON, sleep$1, FallbackEncoder, VERSION, checkFileSupport, isAsyncIterable, isBlobLike, isFileLike, isResponseLike, APIResource, EMPTY, createPathTagFunction, path, BaseInteractions, Interactions, encodeUTF8_, decodeUTF8_, LineDecoder, levelNumbers, parseLogLevel, noopLogger, cachedLoggers, formatRequestDetails, Stream, SSEDecoder, APIPromise, brand_privateNullableHeaders, buildHeaders, readEnv, _a, BaseGeminiNextGenAPIClient, GeminiNextGenAPIClient, Tunings, BrowserDownloader, MAX_CHUNK_SIZE, MAX_RETRY_COUNT, INITIAL_RETRY_DELAY_MS, DELAY_MULTIPLIER, X_GOOG_UPLOAD_STATUS_HEADER_FIELD, BrowserUploader, BrowserWebSocketFactory, BrowserWebSocket, GOOGLE_API_KEY_HEADER, WebAuth, LANGUAGE_LABEL_PREFIX, GoogleGenAI;
 var init_web = __esm({
   "../node_modules/@google/genai/dist/web/index.mjs"() {
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     import_p_retry = __toESM(require_p_retry(), 1);
     _defaultBaseGeminiUrl = void 0;
     _defaultBaseVertexUrl = void 0;
@@ -18550,7 +18550,7 @@ var GEMINI_CONFIG, onRequestPost;
 var init_transform = __esm({
   "api/mainsite/ai/transform.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     GEMINI_CONFIG = {
       model: "gemini-2.5-flash",
@@ -18721,7 +18721,7 @@ var onRequestGet;
 var init_filename = __esm({
   "api/mainsite/media/[filename].ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     onRequestGet = /* @__PURE__ */ __name(async (context) => {
       const filename = context.params.filename;
       if (!filename) {
@@ -18748,7 +18748,7 @@ var DEFAULT_ADMIN_ACTOR, normalizeAdminActor, resolveAdminActorFromRequest;
 var init_admin_actor = __esm({
   "api/_lib/admin-actor.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     DEFAULT_ADMIN_ACTOR = "admin-app";
     normalizeAdminActor = /* @__PURE__ */ __name((value) => {
       const actor = String(value ?? "").trim();
@@ -18859,7 +18859,7 @@ async function finishSyncRun(db, run) {
 var init_operational = __esm({
   "api/_lib/operational.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(ensureOperationalTables, "ensureOperationalTables");
     __name(logModuleOperationalEvent, "logModuleOperationalEvent");
     __name(startSyncRun, "startSyncRun");
@@ -18872,7 +18872,7 @@ var HUB_CARDS_LIMITS, APPHUB_DEFAULT_CARDS, ADMINHUB_DEFAULT_CARDS, toHubHeaders
 var init_hub_config = __esm({
   "api/_lib/hub-config.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     HUB_CARDS_LIMITS = {
       maxCards: 100,
@@ -19139,7 +19139,7 @@ var toRequestId, createResponseTrace;
 var init_request_trace = __esm({
   "api/_lib/request-trace.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     toRequestId = /* @__PURE__ */ __name((request) => {
       const byHeader = request.headers.get("X-Request-Id")?.trim();
       if (byHeader) {
@@ -19201,7 +19201,7 @@ function unauthorizedResponse(message, headers2) {
 var init_auth = __esm({
   "api/_lib/auth.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(validatePutAuth, "validatePutAuth");
     __name(unauthorizedResponse, "unauthorizedResponse");
   }
@@ -19296,7 +19296,7 @@ var buildErrorResponse;
 var init_config = __esm({
   "api/adminhub/config.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_admin_actor();
     init_hub_config();
     init_request_trace();
@@ -19440,7 +19440,7 @@ var onRequestGet3;
 var init_gcp_monitoring = __esm({
   "api/ai-status/gcp-monitoring.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(json, "json");
     __name(toBase64UrlFromBytes, "toBase64UrlFromBytes");
     __name(toBase64UrlFromString, "toBase64UrlFromString");
@@ -19536,7 +19536,7 @@ var onRequestGet4;
 var init_health = __esm({
   "api/ai-status/health.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     __name(json2, "json");
     onRequestGet4 = /* @__PURE__ */ __name(async ({ env }) => {
@@ -19597,7 +19597,7 @@ var onRequestGet5;
 var init_models = __esm({
   "api/ai-status/models.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     __name(json3, "json");
     __name(formatModelName, "formatModelName");
@@ -19682,7 +19682,7 @@ var onRequestGet6, onRequestPost2;
 var init_usage = __esm({
   "api/ai-status/usage.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(json4, "json");
     __name(ensureTable, "ensureTable");
     onRequestGet6 = /* @__PURE__ */ __name(async ({ env }) => {
@@ -19870,7 +19870,7 @@ var buildErrorResponse2;
 var init_config2 = __esm({
   "api/apphub/config.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_admin_actor();
     init_hub_config();
     init_request_trace();
@@ -19893,7 +19893,7 @@ var toHeaders;
 var init_astrologo_admin = __esm({
   "api/_lib/astrologo-admin.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     toHeaders = /* @__PURE__ */ __name(() => ({
       "Content-Type": "application/json",
       "Cache-Control": "no-store"
@@ -20005,7 +20005,7 @@ var json5, isValidEmail;
 var init_enviar_email = __esm({
   "api/astrologo/enviar-email.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_astrologo_admin();
     init_admin_actor();
@@ -20074,7 +20074,7 @@ var json6, resolveDb, resolveOperationalSource;
 var init_excluir = __esm({
   "api/astrologo/excluir.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_astrologo_admin();
     init_admin_actor();
@@ -20167,7 +20167,7 @@ var json7, resolveDb2, resolveOperationalSource2;
 var init_ler = __esm({
   "api/astrologo/ler.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_astrologo_admin();
     init_admin_actor();
@@ -20239,7 +20239,7 @@ var toResponseHeaders, toItem, queryBigdataItems;
 var init_listar = __esm({
   "api/astrologo/listar.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     toResponseHeaders = /* @__PURE__ */ __name(() => ({
@@ -20314,7 +20314,7 @@ var onRequestGet9;
 var init_modelos = __esm({
   "api/astrologo/modelos.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     __name(json8, "json");
     __name(formatModelName2, "formatModelName");
@@ -20462,7 +20462,7 @@ var parseLimit, toHeaders2, toSyncRow;
 var init_sync = __esm({
   "api/astrologo/sync.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     parseLimit = /* @__PURE__ */ __name((rawValue) => {
       const parsed = Number.parseInt(rawValue ?? "300", 10);
@@ -20503,7 +20503,7 @@ var onRequestGet10, onRequestDelete;
 var init_userdata = __esm({
   "api/astrologo/userdata.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(jsonResponse, "jsonResponse");
     onRequestGet10 = /* @__PURE__ */ __name(async ({ env, request }) => {
       const db = env?.BIGDATA_DB;
@@ -20611,7 +20611,7 @@ var resolveToken, parseJsonOrThrow, toFirstError, cloudflareRequest, cloudflareR
 var init_cloudflare_api = __esm({
   "api/_lib/cloudflare-api.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     resolveToken = /* @__PURE__ */ __name((env) => {
       const byDnsToken = env.CLOUDFLARE_DNS?.trim();
       if (byDnsToken) {
@@ -21001,7 +21001,7 @@ var toHeaders3, toError;
 var init_delete = __esm({
   "api/cfdns/delete.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_admin_actor();
     init_request_trace();
@@ -21094,7 +21094,7 @@ var toHeaders4, toError2, toPositiveInt;
 var init_records = __esm({
   "api/cfdns/records.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cloudflare_api();
@@ -21191,7 +21191,7 @@ var toHeaders5, toError3, normalizeRecord;
 var init_upsert = __esm({
   "api/cfdns/upsert.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_admin_actor();
     init_request_trace();
@@ -21277,7 +21277,7 @@ var toHeaders6, toError4;
 var init_zones = __esm({
   "api/cfdns/zones.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cloudflare_api();
@@ -21302,7 +21302,7 @@ var resolveToken2, parseJsonOrThrow2, toFirstError2, cloudflareRequest2, validat
 var init_cfpw_api = __esm({
   "api/_lib/cfpw-api.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     resolveToken2 = /* @__PURE__ */ __name((env) => {
       const byPwToken = env.CLOUDFLARE_PW?.trim();
       if (byPwToken) {
@@ -22010,7 +22010,7 @@ var jsonResponse2;
 var init_cleanup_cache_project = __esm({
   "api/cfpw/cleanup-cache-project.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_cfpw_api();
     jsonResponse2 = /* @__PURE__ */ __name((body, status = 200) => new Response(JSON.stringify(body), {
       status,
@@ -22164,7 +22164,7 @@ var jsonResponse3, isActiveStageStatus, TARGET_BRANCHES, getDeploymentBranch, is
 var init_cleanup_deployments = __esm({
   "api/cfpw/cleanup-deployments.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_cfpw_api();
     jsonResponse3 = /* @__PURE__ */ __name((body, status = 200) => new Response(JSON.stringify(body), {
       status,
@@ -22301,7 +22301,7 @@ var toHeaders7, toError5, toText;
 var init_delete_page = __esm({
   "api/cfpw/delete-page.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cfpw_api();
@@ -22392,7 +22392,7 @@ var toHeaders8, toError6, toText2;
 var init_delete_worker = __esm({
   "api/cfpw/delete-worker.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cfpw_api();
@@ -22655,7 +22655,7 @@ var toHeaders9, toError7, toText3, normalizeSchedules, resolveOpsErrorStatus;
 var init_ops = __esm({
   "api/cfpw/ops.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cfpw_api();
@@ -22770,7 +22770,7 @@ var toHeaders10, toError8, mapWorker, mapProject;
 var init_overview = __esm({
   "api/cfpw/overview.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cfpw_api();
@@ -22902,7 +22902,7 @@ var toHeaders11, toError9, toProjectName;
 var init_page_details = __esm({
   "api/cfpw/page-details.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cfpw_api();
@@ -23008,7 +23008,7 @@ var toHeaders12, toError10, toScriptName;
 var init_worker_details = __esm({
   "api/cfpw/worker-details.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cfpw_api();
@@ -23165,7 +23165,7 @@ function withTimeoutSignal(signal, timeout) {
 var _computedKey, APIResource2, SumUpError, APIError2, APIPromise2, UNKNOWN, normalizeArch, cachedRuntimeInfo, HTTPClient, Checkouts, Customers, Members, Memberships, Merchants, Payouts, Readers, Receipts, Roles, Subaccounts, Transactions, SumUp, src, dist_default;
 var init_dist = __esm({
   "../node_modules/@sumup/sdk/dist/index.js"() {
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     APIResource2 = class {
       static {
         __name(this, "APIResource");
@@ -23735,7 +23735,7 @@ var FINANCIAL_CUTOFF_BRT, FINANCIAL_CUTOFF_DATE, FINANCIAL_CUTOFF_UTC, FINANCIAL
 var init_insights = __esm({
   "api/financeiro/insights.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_dist();
     FINANCIAL_CUTOFF_BRT = "2026-03-01T00:00:00-03:00";
     FINANCIAL_CUTOFF_DATE = "2026-03-01";
@@ -24026,7 +24026,7 @@ var FINANCIAL_CUTOFF, onRequestGet18;
 var init_mp_balance = __esm({
   "api/financeiro/mp-balance.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     FINANCIAL_CUTOFF = "2026-03-01";
     onRequestGet18 = /* @__PURE__ */ __name(async (context) => {
       const token = context.env.MP_ACCESS_TOKEN;
@@ -24066,7 +24066,7 @@ var init_mp_balance = __esm({
 var require_mercadoPagoConfig = __commonJS({
   "../node_modules/mercadopago/dist/mercadoPagoConfig.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.MercadoPagoConfig = void 0;
     var MercadoPagoConfig3 = class {
@@ -24086,7 +24086,7 @@ var require_mercadoPagoConfig = __commonJS({
 var require_browser = __commonJS({
   "../node_modules/node-fetch/browser.js"(exports, module) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var getGlobal = /* @__PURE__ */ __name(function() {
       if (typeof self !== "undefined") {
         return self;
@@ -24114,7 +24114,7 @@ var require_browser = __commonJS({
 var require_config = __commonJS({
   "../node_modules/mercadopago/dist/utils/config/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.AppConfig = void 0;
     var AppConfig = class {
@@ -24166,7 +24166,7 @@ var require_config = __commonJS({
 var require_rng = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/rng.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24190,7 +24190,7 @@ var require_rng = __commonJS({
 var require_regex = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/regex.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24204,7 +24204,7 @@ var require_regex = __commonJS({
 var require_validate = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/validate.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24227,7 +24227,7 @@ var require_validate = __commonJS({
 var require_stringify = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/stringify.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24263,7 +24263,7 @@ var require_stringify = __commonJS({
 var require_v1 = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/v1.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24336,7 +24336,7 @@ var require_v1 = __commonJS({
 var require_parse = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/parse.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24380,7 +24380,7 @@ var require_parse = __commonJS({
 var require_v35 = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/v35.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24449,7 +24449,7 @@ var require_v35 = __commonJS({
 var require_md5 = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/md5.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24616,7 +24616,7 @@ var require_md5 = __commonJS({
 var require_v3 = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/v3.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24637,7 +24637,7 @@ var require_v3 = __commonJS({
 var require_native = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/native.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24654,7 +24654,7 @@ var require_native = __commonJS({
 var require_v4 = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/v4.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24693,7 +24693,7 @@ var require_v4 = __commonJS({
 var require_sha1 = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/sha1.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24781,7 +24781,7 @@ var require_sha1 = __commonJS({
 var require_v5 = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/v5.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24802,7 +24802,7 @@ var require_v5 = __commonJS({
 var require_nil = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/nil.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24816,7 +24816,7 @@ var require_nil = __commonJS({
 var require_version = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/version.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24842,7 +24842,7 @@ var require_version = __commonJS({
 var require_commonjs_browser = __commonJS({
   "../node_modules/uuid/dist/commonjs-browser/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", {
       value: true
     });
@@ -24920,7 +24920,7 @@ var require_commonjs_browser = __commonJS({
 var require_restClient = __commonJS({
   "../node_modules/mercadopago/dist/utils/restClient/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __rest2 = exports && exports.__rest || function(s, e) {
       var t = {};
       for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
@@ -25020,7 +25020,7 @@ var require_restClient = __commonJS({
 var require_create = __commonJS({
   "../node_modules/mercadopago/dist/clients/cardToken/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -25037,7 +25037,7 @@ var require_create = __commonJS({
 var require_cardToken = __commonJS({
   "../node_modules/mercadopago/dist/clients/cardToken/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25069,7 +25069,7 @@ var require_cardToken = __commonJS({
 var require_get = __commonJS({
   "../node_modules/mercadopago/dist/clients/customerCard/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -25086,7 +25086,7 @@ var require_get = __commonJS({
 var require_create2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/customerCard/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -25103,7 +25103,7 @@ var require_create2 = __commonJS({
 var require_remove = __commonJS({
   "../node_modules/mercadopago/dist/clients/customerCard/remove/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = remove;
     var restClient_1 = require_restClient();
@@ -25120,7 +25120,7 @@ var require_remove = __commonJS({
 var require_update = __commonJS({
   "../node_modules/mercadopago/dist/clients/customerCard/update/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = update;
     var restClient_1 = require_restClient();
@@ -25137,7 +25137,7 @@ var require_update = __commonJS({
 var require_list = __commonJS({
   "../node_modules/mercadopago/dist/clients/customerCard/list/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = list;
     var restClient_1 = require_restClient();
@@ -25154,7 +25154,7 @@ var require_list = __commonJS({
 var require_customerCard = __commonJS({
   "../node_modules/mercadopago/dist/clients/customerCard/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25226,7 +25226,7 @@ var require_customerCard = __commonJS({
 var require_get2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/customer/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -25243,7 +25243,7 @@ var require_get2 = __commonJS({
 var require_create3 = __commonJS({
   "../node_modules/mercadopago/dist/clients/customer/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -25260,7 +25260,7 @@ var require_create3 = __commonJS({
 var require_remove2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/customer/remove/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = remove;
     var restClient_1 = require_restClient();
@@ -25277,7 +25277,7 @@ var require_remove2 = __commonJS({
 var require_update2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/customer/update/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = update;
     var restClient_1 = require_restClient();
@@ -25294,7 +25294,7 @@ var require_update2 = __commonJS({
 var require_search = __commonJS({
   "../node_modules/mercadopago/dist/clients/customer/search/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = search;
     var restClient_1 = require_restClient();
@@ -25311,7 +25311,7 @@ var require_search = __commonJS({
 var require_customer = __commonJS({
   "../node_modules/mercadopago/dist/clients/customer/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25422,7 +25422,7 @@ var require_customer = __commonJS({
 var require_get3 = __commonJS({
   "../node_modules/mercadopago/dist/clients/invoice/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -25439,7 +25439,7 @@ var require_get3 = __commonJS({
 var require_search2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/invoice/search/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = search;
     var restClient_1 = require_restClient();
@@ -25456,7 +25456,7 @@ var require_search2 = __commonJS({
 var require_invoice = __commonJS({
   "../node_modules/mercadopago/dist/clients/invoice/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25499,7 +25499,7 @@ var require_invoice = __commonJS({
 var require_list2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/identificationType/list/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = list;
     var restClient_1 = require_restClient();
@@ -25516,7 +25516,7 @@ var require_list2 = __commonJS({
 var require_identificationType = __commonJS({
   "../node_modules/mercadopago/dist/clients/identificationType/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25549,7 +25549,7 @@ var require_identificationType = __commonJS({
 var require_get4 = __commonJS({
   "../node_modules/mercadopago/dist/clients/paymentRefund/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -25566,7 +25566,7 @@ var require_get4 = __commonJS({
 var require_create4 = __commonJS({
   "../node_modules/mercadopago/dist/clients/paymentRefund/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -25583,7 +25583,7 @@ var require_create4 = __commonJS({
 var require_list3 = __commonJS({
   "../node_modules/mercadopago/dist/clients/paymentRefund/list/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = list;
     var restClient_1 = require_restClient();
@@ -25600,7 +25600,7 @@ var require_list3 = __commonJS({
 var require_total = __commonJS({
   "../node_modules/mercadopago/dist/clients/paymentRefund/total/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = total;
     var restClient_1 = require_restClient();
@@ -25617,7 +25617,7 @@ var require_total = __commonJS({
 var require_paymentRefund = __commonJS({
   "../node_modules/mercadopago/dist/clients/paymentRefund/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25679,7 +25679,7 @@ var require_paymentRefund = __commonJS({
 var require_get5 = __commonJS({
   "../node_modules/mercadopago/dist/clients/paymentMethod/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -25696,7 +25696,7 @@ var require_get5 = __commonJS({
 var require_paymentMethod = __commonJS({
   "../node_modules/mercadopago/dist/clients/paymentMethod/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25729,7 +25729,7 @@ var require_paymentMethod = __commonJS({
 var require_capture = __commonJS({
   "../node_modules/mercadopago/dist/clients/payment/capture/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = capture;
     var restClient_1 = require_restClient();
@@ -25750,7 +25750,7 @@ var require_capture = __commonJS({
 var require_search3 = __commonJS({
   "../node_modules/mercadopago/dist/clients/payment/search/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = search;
     var restClient_1 = require_restClient();
@@ -25767,7 +25767,7 @@ var require_search3 = __commonJS({
 var require_cancel = __commonJS({
   "../node_modules/mercadopago/dist/clients/payment/cancel/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = cancel;
     var restClient_1 = require_restClient();
@@ -25787,7 +25787,7 @@ var require_cancel = __commonJS({
 var require_create5 = __commonJS({
   "../node_modules/mercadopago/dist/clients/payment/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -25804,7 +25804,7 @@ var require_create5 = __commonJS({
 var require_get6 = __commonJS({
   "../node_modules/mercadopago/dist/clients/payment/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -25821,7 +25821,7 @@ var require_get6 = __commonJS({
 var require_payment = __commonJS({
   "../node_modules/mercadopago/dist/clients/payment/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -25894,7 +25894,7 @@ var require_payment = __commonJS({
 var require_create6 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApproval/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -25911,7 +25911,7 @@ var require_create6 = __commonJS({
 var require_get7 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApproval/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -25928,7 +25928,7 @@ var require_get7 = __commonJS({
 var require_search4 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApproval/search/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = search;
     var restClient_1 = require_restClient();
@@ -25945,7 +25945,7 @@ var require_search4 = __commonJS({
 var require_update3 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApproval/update/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = update;
     var restClient_1 = require_restClient();
@@ -25962,7 +25962,7 @@ var require_update3 = __commonJS({
 var require_preApproval = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApproval/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -26025,7 +26025,7 @@ var require_preApproval = __commonJS({
 var require_get8 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApprovalPlan/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -26042,7 +26042,7 @@ var require_get8 = __commonJS({
 var require_create7 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApprovalPlan/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -26059,7 +26059,7 @@ var require_create7 = __commonJS({
 var require_update4 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApprovalPlan/update/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = update;
     var restClient_1 = require_restClient();
@@ -26076,7 +26076,7 @@ var require_update4 = __commonJS({
 var require_search5 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApprovalPlan/search/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = search;
     var restClient_1 = require_restClient();
@@ -26093,7 +26093,7 @@ var require_search5 = __commonJS({
 var require_preApprovalPlan = __commonJS({
   "../node_modules/mercadopago/dist/clients/preApprovalPlan/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -26156,7 +26156,7 @@ var require_preApprovalPlan = __commonJS({
 var require_cancelPaymentIntent = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/cancelPaymentIntent/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = cancelPaymentIntent;
     var restClient_1 = require_restClient();
@@ -26173,7 +26173,7 @@ var require_cancelPaymentIntent = __commonJS({
 var require_changeDeviceOperatingMode = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/changeDeviceOperatingMode/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = changeDeviceOperatingMode;
     var restClient_1 = require_restClient();
@@ -26190,7 +26190,7 @@ var require_changeDeviceOperatingMode = __commonJS({
 var require_createPaymentIntent = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/createPaymentIntent/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = createPaymentIntent;
     var restClient_1 = require_restClient();
@@ -26207,7 +26207,7 @@ var require_createPaymentIntent = __commonJS({
 var require_getDevices = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/getDevices/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = getDevices;
     var restClient_1 = require_restClient();
@@ -26224,7 +26224,7 @@ var require_getDevices = __commonJS({
 var require_getPaymentIntentList = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/getPaymentIntentList/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = getPaymentIntentList;
     var restClient_1 = require_restClient();
@@ -26241,7 +26241,7 @@ var require_getPaymentIntentList = __commonJS({
 var require_getPaymentIntentStatus = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/getPaymentIntentStatus/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = getPaymentIntentStatus;
     var restClient_1 = require_restClient();
@@ -26258,7 +26258,7 @@ var require_getPaymentIntentStatus = __commonJS({
 var require_searchPaymentIntent = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/searchPaymentIntent/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = searchPaymentIntent;
     var restClient_1 = require_restClient();
@@ -26275,7 +26275,7 @@ var require_searchPaymentIntent = __commonJS({
 var require_point = __commonJS({
   "../node_modules/mercadopago/dist/clients/point/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -26368,7 +26368,7 @@ var require_point = __commonJS({
 var require_get9 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preference/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -26385,7 +26385,7 @@ var require_get9 = __commonJS({
 var require_create8 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preference/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -26402,7 +26402,7 @@ var require_create8 = __commonJS({
 var require_update5 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preference/update/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = update;
     var restClient_1 = require_restClient();
@@ -26419,7 +26419,7 @@ var require_update5 = __commonJS({
 var require_search6 = __commonJS({
   "../node_modules/mercadopago/dist/clients/preference/search/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = search;
     var restClient_1 = require_restClient();
@@ -26436,7 +26436,7 @@ var require_search6 = __commonJS({
 var require_preference = __commonJS({
   "../node_modules/mercadopago/dist/clients/preference/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -26499,7 +26499,7 @@ var require_preference = __commonJS({
 var require_create9 = __commonJS({
   "../node_modules/mercadopago/dist/clients/oAuth/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -26517,7 +26517,7 @@ var require_create9 = __commonJS({
 var require_refresh = __commonJS({
   "../node_modules/mercadopago/dist/clients/oAuth/refresh/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = refresh;
     var restClient_1 = require_restClient();
@@ -26535,7 +26535,7 @@ var require_refresh = __commonJS({
 var require_getAuthorizationURL = __commonJS({
   "../node_modules/mercadopago/dist/clients/oAuth/getAuthorizationURL/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = getAuthorizationURL;
     var restClient_1 = require_restClient();
@@ -26552,7 +26552,7 @@ var require_getAuthorizationURL = __commonJS({
 var require_oAuth = __commonJS({
   "../node_modules/mercadopago/dist/clients/oAuth/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -26603,7 +26603,7 @@ var require_oAuth = __commonJS({
 var require_create10 = __commonJS({
   "../node_modules/mercadopago/dist/clients/merchantOrder/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -26620,7 +26620,7 @@ var require_create10 = __commonJS({
 var require_get10 = __commonJS({
   "../node_modules/mercadopago/dist/clients/merchantOrder/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -26637,7 +26637,7 @@ var require_get10 = __commonJS({
 var require_update6 = __commonJS({
   "../node_modules/mercadopago/dist/clients/merchantOrder/update/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = update;
     var restClient_1 = require_restClient();
@@ -26654,7 +26654,7 @@ var require_update6 = __commonJS({
 var require_search7 = __commonJS({
   "../node_modules/mercadopago/dist/clients/merchantOrder/search/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = search;
     var restClient_1 = require_restClient();
@@ -26671,7 +26671,7 @@ var require_search7 = __commonJS({
 var require_merchantOrder = __commonJS({
   "../node_modules/mercadopago/dist/clients/merchantOrder/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -26734,7 +26734,7 @@ var require_merchantOrder = __commonJS({
 var require_get11 = __commonJS({
   "../node_modules/mercadopago/dist/clients/user/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -26751,7 +26751,7 @@ var require_get11 = __commonJS({
 var require_user = __commonJS({
   "../node_modules/mercadopago/dist/clients/user/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -26784,7 +26784,7 @@ var require_user = __commonJS({
 var require_create11 = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = create;
     var restClient_1 = require_restClient();
@@ -26801,7 +26801,7 @@ var require_create11 = __commonJS({
 var require_get12 = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/get/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = get;
     var restClient_1 = require_restClient();
@@ -26818,7 +26818,7 @@ var require_get12 = __commonJS({
 var require_process = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/process/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = process2;
     var restClient_1 = require_restClient();
@@ -26835,7 +26835,7 @@ var require_process = __commonJS({
 var require_capture2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/capture/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = capture;
     var restClient_1 = require_restClient();
@@ -26852,7 +26852,7 @@ var require_capture2 = __commonJS({
 var require_cancel2 = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/cancel/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = cancel;
     var restClient_1 = require_restClient();
@@ -26869,7 +26869,7 @@ var require_cancel2 = __commonJS({
 var require_refund = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/refund/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = refund;
     var restClient_1 = require_restClient();
@@ -26886,7 +26886,7 @@ var require_refund = __commonJS({
 var require_create12 = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/transaction/create/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = createTransaction;
     var restClient_1 = require_restClient();
@@ -26903,7 +26903,7 @@ var require_create12 = __commonJS({
 var require_update7 = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/transaction/update/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = updateTransaction;
     var restClient_1 = require_restClient();
@@ -26920,7 +26920,7 @@ var require_update7 = __commonJS({
 var require_delete = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/transaction/delete/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = deleteTransaction;
     var restClient_1 = require_restClient();
@@ -26937,7 +26937,7 @@ var require_delete = __commonJS({
 var require_order = __commonJS({
   "../node_modules/mercadopago/dist/clients/order/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     var __importDefault = exports && exports.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -27050,7 +27050,7 @@ var require_order = __commonJS({
 var require_dist = __commonJS({
   "../node_modules/mercadopago/dist/index.js"(exports) {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Order = exports.User = exports.MerchantOrder = exports.OAuth = exports.Preference = exports.Point = exports.PreApprovalPlan = exports.PreApproval = exports.Payment = exports.PaymentMethod = exports.PaymentRefund = exports.IdentificationType = exports.Invoice = exports.Customer = exports.CustomerCard = exports.CardToken = exports.MercadoPagoConfig = void 0;
     var mercadoPagoConfig_1 = require_mercadoPagoConfig();
@@ -27130,7 +27130,7 @@ var import_mercadopago, onRequestPost13;
 var init_mp_cancel = __esm({
   "api/financeiro/mp-cancel.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     import_mercadopago = __toESM(require_dist(), 1);
     onRequestPost13 = /* @__PURE__ */ __name(async (context) => {
       const url = new URL(context.request.url);
@@ -27155,7 +27155,7 @@ var import_mercadopago2, onRequestPost14;
 var init_mp_refund = __esm({
   "api/financeiro/mp-refund.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     import_mercadopago2 = __toESM(require_dist(), 1);
     onRequestPost14 = /* @__PURE__ */ __name(async (context) => {
       const url = new URL(context.request.url);
@@ -27187,7 +27187,7 @@ var FINANCIAL_CUTOFF2, onRequestGet19;
 var init_sumup_balance = __esm({
   "api/financeiro/sumup-balance.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_dist();
     FINANCIAL_CUTOFF2 = "2026-03-01";
     onRequestGet19 = /* @__PURE__ */ __name(async (context) => {
@@ -27230,7 +27230,7 @@ var onRequestPost15;
 var init_sumup_cancel = __esm({
   "api/financeiro/sumup-cancel.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_dist();
     onRequestPost15 = /* @__PURE__ */ __name(async (context) => {
       const url = new URL(context.request.url);
@@ -27298,7 +27298,7 @@ var onRequestPost16;
 var init_sumup_refund = __esm({
   "api/financeiro/sumup-refund.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_dist();
     onRequestPost16 = /* @__PURE__ */ __name(async (context) => {
       const url = new URL(context.request.url);
@@ -27371,7 +27371,7 @@ var onRequestGet20;
 var init_modelos2 = __esm({
   "api/calculadora/modelos.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     __name(json9, "json");
     __name(formatModelName3, "formatModelName");
@@ -27477,7 +27477,7 @@ var toResponseHeaders2, normalizeMoeda, parseDias, queryBigdataOverview;
 var init_overview2 = __esm({
   "api/calculadora/overview.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     toResponseHeaders2 = /* @__PURE__ */ __name(() => ({
@@ -27547,7 +27547,7 @@ var DEFAULT_PARAMS, SUPPORTED_ROUTES, toHeaders13, toRate, validateRate, ensureP
 var init_calculadora_admin = __esm({
   "api/_lib/calculadora-admin.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     DEFAULT_PARAMS = {
       iof_cartao: 0.035,
       iof_global: 0.035,
@@ -27791,7 +27791,7 @@ var json10, resolveParametrosDb, resolveOperationalSource3;
 var init_parametros = __esm({
   "api/calculadora/parametros.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_calculadora_admin();
     init_admin_actor();
@@ -27981,7 +27981,7 @@ var parseLimit2, toHeaders14, parseObservabilidadeRows, parseRateLimitPolicies, 
 var init_sync2 = __esm({
   "api/calculadora/sync.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     parseLimit2 = /* @__PURE__ */ __name((rawValue) => {
       const parsed = Number.parseInt(rawValue ?? "300", 10);
@@ -28062,7 +28062,7 @@ var toHeaders15;
 var init_mainsite_admin = __esm({
   "api/_lib/mainsite-admin.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     toHeaders15 = /* @__PURE__ */ __name(() => ({
       "Content-Type": "application/json",
       "Cache-Control": "no-store"
@@ -28138,7 +28138,7 @@ var DEFAULT_FEES, FEES_KEY;
 var init_fees = __esm({
   "api/mainsite/fees.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_mainsite_admin();
     init_request_trace();
@@ -28246,7 +28246,7 @@ function g(u3, e) {
 var T, _, be, m, Re, Te, Oe, C, we, Q, se, ie, ye, j, Pe, F, Se, $e, v, U, _e, oe, Le, K, ne, Me, ze, Ee, Ie, ae, Ae, z, H, W, Ce, le, Be, De, qe, ue, ve, He, pe, Ze, Ge, Ne, Qe, je, Fe, Ue, Ke, We, Xe, q, Je, ce, he, Ve, re, X, Ye, N, et, B, E, tt, ke, w, x, y, $, b, P, D, L, Qt, jt, Ft, Ut, Kt, Xt, Jt;
 var init_marked_esm = __esm({
   "../node_modules/marked/lib/marked.esm.js"() {
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(M, "M");
     T = M();
     __name(G, "G");
@@ -29524,36 +29524,42 @@ Regras:
 2. PRESERVA\xC7\xC3O: Mantenha imagens (![alt](url)), tabelas, e blocos de c\xF3digo com linguagem correta.
 3. LIMPEZA: Descarte elementos de UI (Sign in, Settings, bot\xF5es de menu).
 4. T\xCDTULO: Infira o t\xEDtulo principal da conversa.`;
-    const config = {
-      systemInstruction: systemInstructionConfig,
-      temperature: GEMINI_CONFIG2.temperature,
-      responseMimeType: "application/json",
-      responseJsonSchema: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "T\xEDtulo da conversa" },
-          markdown: { type: "string", description: "Conte\xFAdo em Markdown" }
-        },
-        required: ["title", "markdown"]
-      }
-    };
-    const ai = new GoogleGenAI({ apiKey: context.env.GEMINI_API_KEY });
     let usageMetadata = { promptTokens: 0, outputTokens: 0, cachedTokens: 0 };
     for (let tentativa = 0; tentativa < GEMINI_CONFIG2.maxRetries; tentativa++) {
       try {
-        const response = await ai.models.generateContent({
-          model: GEMINI_CONFIG2.model,
-          contents: `Extraia a conversa do conte\xFAdo abaixo:
+        const payload = {
+          contents: [{ parts: [{ text: `Extraia a conversa do conte\xFAdo abaixo:
 
-${pageContent}`,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          config
+${pageContent}` }] }],
+          systemInstruction: { parts: [{ text: systemInstructionConfig }] },
+          generationConfig: {
+            temperature: GEMINI_CONFIG2.temperature,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "T\xEDtulo da conversa" },
+                markdown: { type: "string", description: "Conte\xFAdo em Markdown" }
+              },
+              required: ["title", "markdown"]
+            }
+          }
+        };
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG2.model}:generateContent?key=${context.env.GEMINI_API_KEY}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
-        if (response.text) {
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
           usageMetadata = {
-            promptTokens: response.usageMetadata?.promptTokenCount || 0,
-            outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
-            cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0
+            promptTokens: data.usageMetadata?.promptTokenCount || 0,
+            outputTokens: data.usageMetadata?.candidatesTokenCount || 0,
+            cachedTokens: data.usageMetadata?.cachedContentTokenCount || 0
           };
           logAiUsage2(context.env.BIGDATA_DB, {
             module: "mainsite_gemini_import",
@@ -29563,7 +29569,7 @@ ${pageContent}`,
             latency_ms: Date.now() - _telemetryStart,
             status: "ok"
           });
-          const result = JSON.parse(response.text);
+          const result = JSON.parse(text);
           finalTitle = result.title;
           finalMarkdown = result.markdown;
           break;
@@ -29610,9 +29616,8 @@ var GEMINI_CONFIG2, JINA_READER_PREFIX, JINA_TIMEOUT_MS, GEMINI_SHARE_RE, onRequ
 var init_gemini_import = __esm({
   "api/mainsite/gemini-import.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_marked_esm();
-    init_web();
     GEMINI_CONFIG2 = {
       model: "gemini-3.1-pro-preview",
       temperature: 0.1,
@@ -29665,7 +29670,7 @@ var EXTERNAL_MEDIA_PATTERN, INTERNAL_MEDIA_PREFIX, onRequestPost21;
 var init_migrate_media_urls = __esm({
   "api/mainsite/migrate-media-urls.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     EXTERNAL_MEDIA_PATTERN = /https:\/\/mainsite-app\.lcv\.rio\.br\/api\/uploads\//g;
     INTERNAL_MEDIA_PREFIX = "/api/mainsite/media/";
     onRequestPost21 = /* @__PURE__ */ __name(async (context) => {
@@ -29725,7 +29730,7 @@ var onRequestGet24;
 var init_modelos3 = __esm({
   "api/mainsite/modelos.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     __name(json11, "json");
     __name(formatModelName4, "formatModelName");
@@ -29850,7 +29855,7 @@ var toResponseHeaders3, parseLimit3, mapPost, queryBigdata;
 var init_overview3 = __esm({
   "api/mainsite/overview.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     toResponseHeaders3 = /* @__PURE__ */ __name(() => ({
@@ -30193,7 +30198,7 @@ var DEFAULT_GEMINI_MODEL, SUMMARY_SAFETY_SETTINGS, json12;
 var init_post_summaries = __esm({
   "api/mainsite/post-summaries.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_mainsite_admin();
     init_operational();
     init_request_trace();
@@ -30463,7 +30468,7 @@ var parseId, parseText, DEFAULT_AUTHOR, mapPostRow, buildErrorResponse3, require
 var init_posts = __esm({
   "api/mainsite/posts.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_mainsite_admin();
     init_admin_actor();
@@ -30593,7 +30598,7 @@ var parseId2, buildErrorResponse4, requireDb2;
 var init_posts_pin = __esm({
   "api/mainsite/posts-pin.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_mainsite_admin();
     init_admin_actor();
@@ -30678,7 +30683,7 @@ var buildErrorResponse5;
 var init_posts_reorder = __esm({
   "api/mainsite/posts-reorder.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_mainsite_admin();
     init_admin_actor();
@@ -30791,7 +30796,7 @@ var isRecord, buildErrorResponse6, requireDb3, safeParseObject, readPublicSettin
 var init_settings = __esm({
   "api/mainsite/settings.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_mainsite_admin();
     init_admin_actor();
@@ -30983,7 +30988,7 @@ var toHeaders16, DEFAULT_SETTINGS, isValidJson;
 var init_sync3 = __esm({
   "api/mainsite/sync.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     toHeaders16 = /* @__PURE__ */ __name(() => ({
       "Content-Type": "application/json",
@@ -31038,7 +31043,7 @@ var onRequestPost27;
 var init_upload = __esm({
   "api/mainsite/upload.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     onRequestPost27 = /* @__PURE__ */ __name(async (context) => {
       try {
         const formData = await context.request.formData();
@@ -31165,7 +31170,7 @@ var toHeaders17, normalizeDomain, generateMtastsId, toError11, normalizePolicyTe
 var init_orchestrate = __esm({
   "api/mtasts/orchestrate.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_admin_actor();
     init_request_trace();
@@ -31274,7 +31279,7 @@ var toResponseHeaders4, parseLimit4, normalizeDomain2, mapHistoryRow, mapPolicyR
 var init_overview4 = __esm({
   "api/mtasts/overview.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     toResponseHeaders4 = /* @__PURE__ */ __name(() => ({
@@ -31408,7 +31413,7 @@ var normalizeDomain3, toHeaders18, toError12;
 var init_policy = __esm({
   "api/mtasts/policy.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cloudflare_api();
@@ -31579,7 +31584,7 @@ var toHeaders19;
 var init_sync4 = __esm({
   "api/mtasts/sync.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_cloudflare_api();
     toHeaders19 = /* @__PURE__ */ __name(() => ({
@@ -31644,7 +31649,7 @@ var toHeaders20, toError13;
 var init_zones2 = __esm({
   "api/mtasts/zones.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     init_cloudflare_api();
@@ -31868,7 +31873,7 @@ var DIRECTORY, onRequestGet32;
 var init_discover = __esm({
   "api/news/discover.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     DIRECTORY = [
       // Brasil — Geral
@@ -32221,7 +32226,7 @@ var RSS_SOURCES, DEFAULT_MAX_ITEMS, CACHE_TTL_SECONDS, onRequestGet33;
 var init_feed = __esm({
   "api/news/feed.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     RSS_SOURCES = [
       { id: "g1", name: "G1", url: "https://g1.globo.com/rss/g1/", category: "brasil" },
       { id: "folha", name: "Folha", url: "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml", category: "brasil" },
@@ -32308,7 +32313,7 @@ var onRequestGet34, onRequestPut5;
 var init_cron = __esm({
   "api/oraculo/cron.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(json13, "json");
     __name(resolveToken3, "resolveToken");
     onRequestGet34 = /* @__PURE__ */ __name(async ({ env }) => {
@@ -32394,7 +32399,7 @@ var onRequestPost30;
 var init_excluir2 = __esm({
   "api/oraculo/excluir.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     onRequestPost30 = /* @__PURE__ */ __name(async ({ env, request }) => {
       const adminActor = request.headers.get("X-Admin-Actor");
       if (!adminActor) {
@@ -32477,7 +32482,7 @@ var onRequestGet35;
 var init_listar2 = __esm({
   "api/oraculo/listar.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     onRequestGet35 = /* @__PURE__ */ __name(async ({ env, request }) => {
       const url = new URL(request.url);
       const tipo = url.searchParams.get("tipo") ?? "tesouro-ipca";
@@ -32561,7 +32566,7 @@ var onRequestGet36;
 var init_modelos4 = __esm({
   "api/oraculo/modelos.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_web();
     __name(json14, "json");
     __name(formatModelName5, "formatModelName");
@@ -32665,7 +32670,7 @@ var onRequestGet37;
 var init_taxacache = __esm({
   "api/oraculo/taxacache.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(json15, "json");
     __name(parseCSV, "parseCSV");
     onRequestGet37 = /* @__PURE__ */ __name(async ({ env, request }) => {
@@ -32759,7 +32764,7 @@ var onRequestGet38, onRequestDelete4;
 var init_userdata2 = __esm({
   "api/oraculo/userdata.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(jsonResponse4, "jsonResponse");
     onRequestGet38 = /* @__PURE__ */ __name(async ({ env, request }) => {
       const db = env?.BIGDATA_DB;
@@ -32960,7 +32965,7 @@ var toResponseHeaders5;
 var init_operational2 = __esm({
   "api/overview/operational.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     toResponseHeaders5 = /* @__PURE__ */ __name(() => ({
@@ -33000,7 +33005,7 @@ var ALLOWED_TABLES;
 var init_delete2 = __esm({
   "api/telemetry/delete.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_request_trace();
     ALLOWED_TABLES = [
       "mainsite_contact_logs",
@@ -33083,7 +33088,7 @@ var headers;
 var init_telemetry = __esm({
   "api/telemetry/telemetry.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_operational();
     init_request_trace();
     headers = /* @__PURE__ */ __name(() => ({ "Content-Type": "application/json", "Cache-Control": "no-store" }), "headers");
@@ -33096,7 +33101,7 @@ var onRequest;
 var init_path = __esm({
   "api/tlsrpt/[[path]].ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     onRequest = /* @__PURE__ */ __name(async (context) => {
       const url = new URL(context.request.url);
       const backendPath = url.pathname.replace("/api/tlsrpt", "") || "/";
@@ -33175,7 +33180,7 @@ var TABLE;
 var init_config_store = __esm({
   "api/config-store.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     TABLE = "admin_module_configs";
     __name(ensureTable3, "ensureTable");
     __name(onRequestGet41, "onRequestGet");
@@ -33201,7 +33206,7 @@ async function onRequestGet42() {
 var init_health2 = __esm({
   "api/health.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     __name(onRequestGet42, "onRequestGet");
   }
 });
@@ -33242,7 +33247,7 @@ var STANDARD_JSON_HEADERS, SECURE_HEADERS, CACHEABLE_HEADERS;
 var init_http_common = __esm({
   "api/_lib/http-common.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     STANDARD_JSON_HEADERS = {
       "Content-Type": "application/json; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
@@ -33373,7 +33378,7 @@ var DEFAULT_CONFIG;
 var init_config3 = __esm({
   "api/config.ts"() {
     "use strict";
-    init_functionsRoutes_0_054338953599802675();
+    init_functionsRoutes_0_9642314473491627();
     init_http_common();
     DEFAULT_CONFIG = {
       theme: {
@@ -33421,10 +33426,10 @@ var init_config3 = __esm({
   }
 });
 
-// ../.wrangler/tmp/pages-n6m6q2/functionsRoutes-0.054338953599802675.mjs
+// ../.wrangler/tmp/pages-7E3ulI/functionsRoutes-0.9642314473491627.mjs
 var routes;
-var init_functionsRoutes_0_054338953599802675 = __esm({
-  "../.wrangler/tmp/pages-n6m6q2/functionsRoutes-0.054338953599802675.mjs"() {
+var init_functionsRoutes_0_9642314473491627 = __esm({
+  "../.wrangler/tmp/pages-7E3ulI/functionsRoutes-0.9642314473491627.mjs"() {
     "use strict";
     init_transform();
     init_filename();
@@ -34120,10 +34125,10 @@ var init_functionsRoutes_0_054338953599802675 = __esm({
 });
 
 // ../node_modules/wrangler/templates/pages-template-worker.ts
-init_functionsRoutes_0_054338953599802675();
+init_functionsRoutes_0_9642314473491627();
 
 // ../node_modules/path-to-regexp/dist.es2015/index.js
-init_functionsRoutes_0_054338953599802675();
+init_functionsRoutes_0_9642314473491627();
 function lexer(str) {
   var tokens = [];
   var i = 0;

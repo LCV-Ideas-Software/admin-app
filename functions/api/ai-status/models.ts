@@ -1,7 +1,6 @@
 // Módulo: admin-app/functions/api/ai-status/models.ts
 // Descrição: Catálogo completo de modelos Gemini com metadados (token limits, thinking, etc).
 
-import { GoogleGenAI } from '@google/genai';
 
 interface Env { GEMINI_API_KEY: string }
 interface Ctx { env: Env }
@@ -29,7 +28,6 @@ export const onRequestGet = async ({ env }: Ctx) => {
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 503)
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const start = Date.now()
 
     const allModels = new Map<string, {
@@ -47,10 +45,13 @@ export const onRequestGet = async ({ env }: Ctx) => {
       tier: string
     }>()
 
-    // Usamos list() que nos dá um iterador automático.
-    const response = await ai.models.list();
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) throw new Error(`API Error: ${res.status}`);
     
-    for await (const m of response) {
+    interface ModelOutput { name: string; displayName: string; description: string; inputTokenLimit: number; outputTokenLimit: number; supportedGenerationMethods: string[]; temperature?: number; topP?: number; maxTemperature?: number }
+    const data = await res.json() as { models: ModelOutput[] };
+
+    for (const m of data.models || []) {
       if (!m.name) continue;
       
       const id = m.name.replace('models/', '');

@@ -11,18 +11,17 @@ function json(data: unknown, status = 200) {
   })
 }
 
-import { GoogleGenAI } from '@google/genai';
 
 export const onRequestGet = async ({ env }: Ctx) => {
   const apiKey = env?.GEMINI_API_KEY
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.', keyConfigured: false }, 503)
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const start = Date.now()
     
     // Faz uma chamada leve ao endpoint de modelos para verificar saúde da API
-    const model = await ai.models.get({ model: "gemini-2.5-flash" });
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${apiKey}`);
+    const model = res.ok;
     const latencyMs = Date.now() - start
 
     if (model) {

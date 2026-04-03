@@ -1,7 +1,6 @@
 // Módulo: admin-app/functions/api/oraculo/gemini-models.ts
 // Descrição: Lista modelos Gemini (Flash + Pro) disponíveis via SDK.
 
-import { GoogleGenAI } from '@google/genai';
 
 interface Env { GEMINI_API_KEY: string }
 interface Ctx { env: Env }
@@ -29,12 +28,15 @@ export const onRequestGet = async ({ env }: Ctx) => {
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 503)
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const allModels = new Map<string, { id: string; displayName: string; api: string; vision: boolean }>()
 
-    const response = await ai.models.list();
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+    
+    interface ModelOutput { name: string; displayName: string; supportedGenerationMethods: string[] }
+    const data = await res.json() as { models: ModelOutput[] };
 
-    for await (const m of response) {
+    for (const m of data.models || []) {
       if (!m.name) continue;
 
       const id = m.name.replace('models/', '')

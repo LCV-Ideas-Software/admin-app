@@ -8,7 +8,6 @@
 import { toHeaders } from '../_lib/mainsite-admin'
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { createResponseTrace } from '../_lib/request-trace'
-import { GoogleGenAI } from '@google/genai'
 
 interface D1PreparedStatement {
   bind: (...values: Array<string | number | null>) => D1PreparedStatement
@@ -74,8 +73,7 @@ const SUMMARY_SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
 ]
 
-// Removemos o import inline para evitar erros de inicialização de worker na ponta
-// import { GoogleGenAI } from '@google/genai'
+// Módulo SDK do Gemini removido. Usando Fetch Edge-Native.
 
 function extractJsonFromText(rawText: string): string {
   let str = rawText.trim()
@@ -116,27 +114,33 @@ CONTEÚDO: ${cleanContent}`
 
   const MAX_RETRIES = 2
   const RETRY_DELAY = 800
-  const ai = new GoogleGenAI({ apiKey })
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const config = {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        safetySettings: SUMMARY_SAFETY_SETTINGS as any,
-        temperature: 0.3,
-        topP: 0.8,
-        maxOutputTokens: 1024,
-        responseMimeType: 'application/json',
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        safetySettings: SUMMARY_SAFETY_SETTINGS,
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.8,
+          maxOutputTokens: 1024,
+          responseMimeType: 'application/json',
+        }
       }
 
-      const response = await ai.models.generateContent({
-        model: resolvedModel,
-        contents: prompt,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        config: config as any
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       })
 
-      const rawText = response.text
+      if (!res.ok) {
+        throw new Error(`Gemini API Error: ${res.status} ${res.statusText}`)
+      }
+
+      const data = await res.json() as any
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text
+
       if (!rawText) {
         return { error: `Gemini sem texto útil (attempt ${attempt + 1}). Modelo: ${resolvedModel}.` }
       }

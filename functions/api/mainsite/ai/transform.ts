@@ -1,6 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { GoogleGenAI } from '@google/genai';
 
 /**
  * @typedef {Object} GeminiConfig
@@ -62,12 +61,15 @@ function structuredLog(level: 'info' | 'warn' | 'error', message: string, contex
  */
 async function estimateTokenCount(text: string, apiKey: string): Promise<number> {
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.countTokens({
-      model: GEMINI_CONFIG.model,
-      contents: text
+    const payload = { contents: [{ parts: [{ text }] }] };
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:countTokens?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-    return response.totalTokens || 0;
+    if (!res.ok) return 0;
+    const data = await res.json() as any;
+    return data?.totalTokens || 0;
   } catch (error) {
     structuredLog('warn', 'Failed to count tokens', { error: (error as Error).message });
     return 0;
@@ -137,7 +139,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" }
     ];
 
-    const ai = new GoogleGenAI({ apiKey: context.env.GEMINI_API_KEY });
     let finalResponseText = '';
     let usageMetadata = { promptTokens: 0, outputTokens: 0, cachedTokens: 0 };
     
@@ -148,30 +149,35 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           endpoint: 'transform', attempt: tentativa + 1
         });
         
-        // TypeScript workaround for strict SDK types missing some enums or experimental features
-        const config = {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          safetySettings: safetySettings as any,
-          temperature: GEMINI_CONFIG.endpoints.transform.temperature,
-          topP: GEMINI_CONFIG.endpoints.transform.topP,
-          maxOutputTokens: GEMINI_CONFIG.endpoints.transform.maxOutputTokens, // 4. MaxOutputTokens Configurado
-          // 8. Thinking Model Support
-          thinkingConfig: GEMINI_CONFIG.defaultThinkingConfig
+        const payload = {
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          safetySettings,
+          generationConfig: {
+            temperature: GEMINI_CONFIG.endpoints.transform.temperature,
+            topP: GEMINI_CONFIG.endpoints.transform.topP,
+            maxOutputTokens: GEMINI_CONFIG.endpoints.transform.maxOutputTokens
+          }
         };
 
-        const response = await ai.models.generateContent({
-          model: GEMINI_CONFIG.model,
-          contents: fullPrompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          config: config as any
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:generateContent?key=${context.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json() as any;
+        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         
-        if (response.text) {
+        if (responseText) {
           // 5. Usage Metadata Tracking
           usageMetadata = {
-            promptTokens: response.usageMetadata?.promptTokenCount || 0,
-            outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
-            cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,
+            promptTokens: data.usageMetadata?.promptTokenCount || 0,
+            outputTokens: data.usageMetadata?.candidatesTokenCount || 0,
+            cachedTokens: data.usageMetadata?.cachedContentTokenCount || 0,
           };
           
           structuredLog('info', 'Gemini request succeeded', {
@@ -188,7 +194,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             status: 'ok',
           });
           
-          finalResponseText = response.text;
+          finalResponseText = responseText;
           break;
         } else {
           throw new Error('Sem texto retornado na resposta da IA');
