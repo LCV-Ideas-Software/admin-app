@@ -28,7 +28,7 @@ interface ImportRequest {
 }
 
 const GEMINI_CONFIG = {
-  model: 'gemini-2.5-pro',
+  model: 'gemini-2.0-flash',
   temperature: 0.1,
   topP: 0.8,
   maxRetries: 2,
@@ -156,17 +156,10 @@ Atue como um conversor de alta fidelidade para Markdown garantindo:
 3. LIMPEZA DE RUÍDO: Descarte inteiramente as partes que são puramente interface de usuário ('Sign in', 'Settings', botões de rodapé/menu), retendo exclusivamente o fluxo de conversa.
 4. TÍTULO: Infira ou deduz o cabeçalho original ou título principal da conversa.`;
 
-    const safetySettings = [
-      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
-    ];
+    // Defaults for safety will be used
 
     const config = {
       systemInstruction: systemInstructionConfig,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      safetySettings: safetySettings as any,
       temperature: GEMINI_CONFIG.temperature,
       topP: GEMINI_CONFIG.topP,
       responseMimeType: "application/json",
