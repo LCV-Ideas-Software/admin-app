@@ -2,6 +2,19 @@
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
+## 2026-04-03 — Admin-App v01.77.19 — Fix Crítico: Gemini Import 502 Bad Gateway Fantasma
+### Corrigido
+- **Root Cause**: O error handler de `gemini-import.ts` retornava HTTP `502` como status code em caso de erro. O Cloudflare proxy intercepta qualquer resposta 502 de Pages Functions e **substitui o body JSON** pela sua própria página HTML de "Bad Gateway", ocultando completamente a mensagem de erro real. Diagnóstico via TTFB: 352ms prova crash imediato, não timeout.
+- **Fix aplicado**:
+  1. Status `502` → `500` (Cloudflare não intercepta 500).
+  2. Outer bulletproof try/catch envolvendo `handleGeminiImport()`.
+  3. Tipo `Parameters<PagesFunction<Env>>[0]` para context tipado sem imports extras.
+- **Pipeline otimizado**: Jina Reader autenticado (`JINA_API_KEY`), modelo `gemini-2.5-flash`, AbortController 15s, prompt simplificado.
+### Lição operacional
+- **NUNCA** retornar HTTP 502 de dentro de um Cloudflare Worker/Pages Function — o proxy trata 502 como "origin failure" e substitui o response body.
+### Controle de versão
+- `admin-app`: APP v01.77.18 → APP v01.77.19
+
 ## 2026-04-01 — Admin-App v01.77.05 — CF P&W Module Audit & API Compliance Enforcement
 ### Escopo
 Auditoria completa do módulo `CF P&W` contra a API oficial Cloudflare para eliminar operações não suportadas e garantir paridade visual com Dashboard.

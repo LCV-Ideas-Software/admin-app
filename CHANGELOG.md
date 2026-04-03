@@ -1,5 +1,21 @@
 # Changelog — Admin App
 
+## [v01.77.19] - 2026-04-03
+### Corrigido
+- **Fix Crítico: Gemini Import 502 Bad Gateway Fantasma**: Root cause identificada via análise de network (352ms TTFB prova crash imediato, não timeout). O error handler retornava HTTP `502` como status code — porém o **Cloudflare proxy intercepta respostas 502** de Pages Functions e substitui o body JSON pela sua própria página HTML de "Bad Gateway", ocultando completamente a mensagem de erro real. Fix:
+  1. **Status 502 → 500**: O Cloudflare não intercepta respostas 500, permitindo que o JSON de erro chegue ao frontend.
+  2. **Outer bulletproof try/catch**: Handler principal (`onRequestPost`) agora delega para `handleGeminiImport()` envolvida em catch externo inquebrável, garantindo que qualquer exceção não prevista retorne JSON legível em vez de crashar o Worker.
+  3. **Tipo `Parameters<PagesFunction<Env>>[0]`**: Usado para tipar o context da função extraída sem necessidade de importar `EventContext`.
+- **Pipeline Gemini Import otimizado** (sessão completa):
+  - Fetch via Jina Reader autenticado (`JINA_API_KEY`) em formato markdown (payload ~20-50KB vs ~580KB HTML).
+  - Modelo migrado para `gemini-2.5-flash` (3-5x mais rápido que `gemini-2.5-pro`).
+  - `AbortController` com timeout de 15s no fetch do Jina.
+  - Prompt simplificado para extração eficiente.
+- **Lição operacional**: NUNCA retornar HTTP 502 de dentro de um Cloudflare Worker/Pages Function — o proxy Cloudflare trata 502 como "origin failure" e substitui o response body.
+
+### Controle de versão
+- `admin-app`: APP v01.77.18 -> APP v01.77.19
+
 ## [v01.77.18] - 2026-04-02
 ### Corrigido e Adicionado
 - **Alta Fidelidade na Extração de Conversas (Gemini Import)**: Aprimorado agressivamente o systemPrompt de inicialização do SDK nativo do Gemini no handler `/api/mainsite/gemini-import`. A formatação original do chat exportado via Share URL, que antes perdia \`<svg>\`s e formatações exatas, agora possui constraints estritos no zero-shot prompt. A instrução proíbe resumos e impõe cópia sintática perfeitamente idêntica usando markdown (com preservação de tabelas e injeções precisas de \`![alt](src)\` advindas das tags de imagem listadas no snapshot HTML).
