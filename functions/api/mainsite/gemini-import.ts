@@ -28,13 +28,11 @@ interface ImportRequest {
 }
 
 const GEMINI_CONFIG = {
-  model: 'gemini-2.5-pro',
-  maxOutputTokens: 8192,
+  model: 'gemini-pro-latest',
   temperature: 0.1,
   topP: 0.8,
   maxRetries: 2,
-  retryDelayMs: 1000,
-  defaultThinkingConfig: { thinkingLevel: 'HIGH' }
+  retryDelayMs: 1000
 };
 
 // Log estruturado
@@ -151,16 +149,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 
     // 3. Prompt native Gemini SDK to act as an extractor, returning JSON mode
-    const systemPrompt = `Você é um sistema de extração inteligente super avançado encarregado de parsear links de compartilhamento do Gemini.
-Análise detalhadamente o código HTML da página do Gemini Share abaixo e atue como um conversor de alta fidelidade para Markdown.
-Regras fundamentais:
+    const systemInstructionConfig = `Você é um sistema de extração inteligente super avançado encarregado de parsear links de compartilhamento do Gemini.
+Atue como um conversor de alta fidelidade para Markdown garantindo:
 1. FIDELIDADE ABSOLUTA: Recupere todo o conteúdo da conversa (perguntas do usuário e respostas da IA) de forma idêntica ao original. Não resuma, não omita.
 2. PRESERVAÇÃO DE ATIVOS: Você DEVE preservar TODAS as imagens (usando a sintaxe ![alt](url) do markdown extraindo os links 'src' verdadeiros das tags <img> do HTML do artigo), bem como quaisquer tabelas (formatadas precisamente como tabelas Markdown) e blocos de código (com as especificações de linguagem corretas).
 3. LIMPEZA DE RUÍDO: Descarte inteiramente as partes que são puramente interface de usuário ('Sign in', 'Settings', botões de rodapé/menu), retendo exclusivamente o fluxo de conversa.
-4. TÍTULO: Infira ou deduz o cabeçalho original ou título principal da conversa.
-
-HTML:
-${cleanedHtml}`;
+4. TÍTULO: Infira ou deduz o cabeçalho original ou título principal da conversa.`;
 
     const safetySettings = [
       { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
@@ -170,12 +164,11 @@ ${cleanedHtml}`;
     ];
 
     const config = {
+      systemInstruction: systemInstructionConfig,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       safetySettings: safetySettings as any,
       temperature: GEMINI_CONFIG.temperature,
       topP: GEMINI_CONFIG.topP,
-      maxOutputTokens: GEMINI_CONFIG.maxOutputTokens, // 8K for huge conversational outputs
-      thinkingConfig: GEMINI_CONFIG.defaultThinkingConfig,
       responseMimeType: "application/json",
       responseSchema: {
         type: "OBJECT",
@@ -200,7 +193,7 @@ ${cleanedHtml}`;
       try {
         const response = await ai.models.generateContent({
           model: GEMINI_CONFIG.model,
-          contents: systemPrompt,
+          contents: `Análise detalhadamente o código HTML da página do Gemini Share abaixo e extraia a conversa:\n\nHTML:\n${cleanedHtml}`,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           config: config as any
         });
