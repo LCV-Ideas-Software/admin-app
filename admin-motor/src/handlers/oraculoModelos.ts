@@ -1,6 +1,5 @@
 type Env = {
   GEMINI_API_KEY?: string;
-  CF_AI_GATEWAY?: string;
 };
 
 type Context = {
@@ -34,15 +33,9 @@ export const handleOraculoModelosGet = async (context: Context) => {
   try {
     const allModels = new Map<string, { id: string; displayName: string; api: string; vision: boolean }>();
 
-    const gatewayUrl = 'https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio';
-    const baseUrl = env.CF_AI_GATEWAY ? gatewayUrl : 'https://generativelanguage.googleapis.com';
+    const baseUrl = 'https://generativelanguage.googleapis.com';
 
-    const requestHeaders: Record<string, string> = {};
-    if (env.CF_AI_GATEWAY) {
-      requestHeaders['cf-aig-authorization'] = `Bearer ${env.CF_AI_GATEWAY}`;
-    }
-
-    const res = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`, { headers: requestHeaders });
+    const res = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`);
     if (!res.ok) throw new Error(`API Error: ${res.status}`);
 
     interface ModelOutput {

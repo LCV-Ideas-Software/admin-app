@@ -11,7 +11,6 @@
 export interface Env {
   GEMINI_API_KEY: string
   BIGDATA_DB?: D1Database
-  CF_AI_GATEWAY?: string
 }
 
 interface D1Database {
@@ -130,7 +129,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     structuredLog('error', 'transform: no model resolved');
     return new Response(JSON.stringify({ error: 'Modelo de IA não configurado. Configure em Configurações > Modelos de IA.' }), { status: 500 });
   }
-  const baseUrl: string = (resolvedEnv.CF_AI_GATEWAY as string | undefined) || 'https://generativelanguage.googleapis.com';
+  const baseUrl: string = 'https://generativelanguage.googleapis.com';
 
   try {
     const body = await context.request.json() as { action: string, text: string, instruction?: string };

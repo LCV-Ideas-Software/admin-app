@@ -19,7 +19,6 @@
 interface Env {
   BIGDATA_DB: D1Database
   GEMINI_API_KEY?: string
-  CF_AI_GATEWAY?: string
 }
 
 interface D1Binding {
@@ -522,7 +521,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   // Layer 3: Gemini AI (se API key disponível e query ≥3 chars)
   const apiKey = ((context as any).data?.env || context.env).GEMINI_API_KEY
-  const baseUrl = ((context as any).data?.env || context.env).CF_AI_GATEWAY || 'https://generativelanguage.googleapis.com';
+  const baseUrl = 'https://generativelanguage.googleapis.com';
   if (apiKey && query.length >= 3) {
     try {
       const geminiResults = await Promise.race([

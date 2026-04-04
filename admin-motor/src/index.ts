@@ -68,10 +68,8 @@ type AdminMotorEnv = {
   BIGDATA_DB?: D1Like;
   AI?: unknown;
   GEMINI_API_KEY?: unknown;
-  CF_AI_GATEWAY?: unknown;
   CLOUDFLARE_PW?: unknown;
   CF_ACCOUNT_ID?: unknown;
-  CF_AI_TOKEN?: unknown;
   SUMUP_API_KEY_PRIVATE?: unknown;
   SUMUP_MERCHANT_CODE?: unknown;
   MP_ACCESS_TOKEN?: unknown;
@@ -89,10 +87,8 @@ type ResolvedAdminMotorEnv = {
   BIGDATA_DB?: D1Like;
   AI?: unknown;
   GEMINI_API_KEY?: string;
-  CF_AI_GATEWAY?: string;
   CLOUDFLARE_PW?: string;
   CF_ACCOUNT_ID?: string;
-  CF_AI_TOKEN?: string;
   SUMUP_API_KEY_PRIVATE?: string;
   SUMUP_MERCHANT_CODE?: string;
   MP_ACCESS_TOKEN?: string;
@@ -123,8 +119,6 @@ type ModelOption = {
   vision: boolean;
 };
 
-const SEO_READER_SCOPE = 'seo-reader';
-const DEFAULT_CF_ACCOUNT_ID = 'd65b76a0e64c3791e932edd9163b1c71';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -181,10 +175,8 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   BIGDATA_DB: env.BIGDATA_DB,
   AI: env.AI,
   GEMINI_API_KEY: await readSecretString(env.GEMINI_API_KEY),
-  CF_AI_GATEWAY: await readSecretString(env.CF_AI_GATEWAY),
   CLOUDFLARE_PW: await readSecretString(env.CLOUDFLARE_PW),
   CF_ACCOUNT_ID: await readSecretString(env.CF_ACCOUNT_ID),
-  CF_AI_TOKEN: await readSecretString(env.CF_AI_TOKEN),
   SUMUP_API_KEY_PRIVATE: await readSecretString(env.SUMUP_API_KEY_PRIVATE),
   SUMUP_MERCHANT_CODE: await readSecretString(env.SUMUP_MERCHANT_CODE),
   MP_ACCESS_TOKEN: await readSecretString(env.MP_ACCESS_TOKEN),
@@ -290,14 +282,9 @@ const fetchMainsiteGeminiModels = async (
   }
 
   const allModels = new Map<string, ModelOption>();
-  const gatewayUrl =
-    'https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio';
-  const baseUrl = env.CF_AI_GATEWAY ? gatewayUrl : 'https://generativelanguage.googleapis.com';
+  const baseUrl = 'https://generativelanguage.googleapis.com';
 
   const requestHeaders: Record<string, string> = {};
-  if (env.CF_AI_GATEWAY) {
-    requestHeaders['cf-aig-authorization'] = `Bearer ${env.CF_AI_GATEWAY}`;
-  }
 
   interface ModelOutput {
     name: string;
@@ -314,7 +301,6 @@ const fetchMainsiteGeminiModels = async (
     const upstreamBody = await res.text().catch(() => '');
     console.error('[mainsite/modelos] upstream:error', {
       status: res.status,
-      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
       bodyPreview: upstreamBody.slice(0, 300),
     });
     throw new Error(`API Error: ${res.status}`);
@@ -353,109 +339,18 @@ const fetchMainsiteGeminiModels = async (
   });
 };
 
-const fetchWorkersAiModels = async (env: ResolvedAdminMotorEnv): Promise<ModelOption[]> => {
-  const accountId = env.CF_ACCOUNT_ID || DEFAULT_CF_ACCOUNT_ID;
-  // Token dedicado para listagem de modelos AI — CLOUDFLARE_PW é exclusivo do módulo CF P&W
-  const token = env.CF_AI_TOKEN;
-
-  if (!token) {
-    throw new Error('CF_AI_TOKEN não configurado. Verifique o binding no wrangler.json e o secret na Secrets Store.');
-  }
-
-  // Tipo real da API: task é um objeto { name, description }, não uma string
-  type WorkersAiModel = {
-    id?: string;
-    name?: string;       // Ex: "@cf/meta/llama-3.1-8b-instruct" (usado pelo AI.run())
-    description?: string;
-    task?: { name?: string; description?: string } | string;
-    properties?: unknown[];
-  };
-
-  // Busca modelos de Text Generation via filtro server-side
-  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?per_page=100&hide_experimental=true&task=${encodeURIComponent('Text Generation')}`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Cloudflare AI models search falhou (${res.status}): ${body.slice(0, 300)}`);
-  }
-
-  const payload = (await res.json()) as { result?: WorkersAiModel[] };
-  const allModels = payload.result || [];
-
-  // Extrai o nome da task de forma segura (API retorna objeto ou string)
-  const getTaskName = (task: WorkersAiModel['task']): string => {
-    if (!task) return '';
-    if (typeof task === 'string') return task.toLowerCase();
-    return (task.name || '').toLowerCase();
-  };
-
-  // Filtra descartando deprecated e garantindo text generation
-  const filtered = allModels.filter((item) => {
-    const taskName = getTaskName(item.task);
-    const isTextGen = taskName.includes('text generation') || taskName.includes('chat');
-    const desc = (item.description || '').toLowerCase();
-    const isDeprecated = desc.includes('deprecated');
-    return isTextGen && !isDeprecated && Boolean(item.name);
-  });
-
-  // Deduplica por name (campo usado pelo AI.run())
-  const seen = new Set<string>();
-  const mapped: ModelOption[] = [];
-
-  for (const item of filtered) {
-    const modelId = String(item.name || item.id);
-    if (seen.has(modelId)) continue;
-    seen.add(modelId);
-
-    const lower = modelId.toLowerCase();
-    const shortName = modelId.startsWith('@cf/')
-      ? modelId.replace(/^@cf\/[^/]+\//, '')
-      : modelId;
-
-    mapped.push({
-      id: modelId,
-      displayName: shortName,
-      api: 'workers-ai',
-      vision: lower.includes('vision') || lower.includes('vl') || lower.includes('llava') || lower.includes('pixtral') || lower.includes('scout'),
-    } satisfies ModelOption);
-  }
-
-  return mapped.sort((a, b) => a.displayName.localeCompare(b.displayName));
-};
-
 const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEnv): Promise<Response> => {
-  const url = new URL(request.url);
-  const scope = url.searchParams.get('scope');
-
-  if (scope === SEO_READER_SCOPE) {
-    const models = await fetchWorkersAiModels(env);
-    return json({
-      ok: true,
-      scope,
-      source: 'workers-ai',
-      models,
-      total: models.length,
-    });
-  }
-
   try {
     const models = await fetchMainsiteGeminiModels(request, env);
 
     console.info('[ai-status/models] request:ok', {
       total: models.length,
-      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      gatewayEnabled: false,
     });
     return json({ ok: true, models, total: models.length });
   } catch (err) {
     console.error('[ai-status/models] request:error', {
-      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      gatewayEnabled: false,
       error: err instanceof Error ? err.message : String(err),
     });
     return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos.' }, 500);

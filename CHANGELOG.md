@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.77.38] - 2026-04-04
+### Alterado
+- **Migração Concluída: Retorno ao SDK Gemini**: Finalizada com sucesso a desativação completa do Cloudflare AI Gateway e Workers AI. Os sistemas de inteligência artificial de leitura, sumarização e criação do repositório operam direta e estritamente sob a API Google, mitigando erros 524 de timeout na formatação/tradução induzidos pelo proxy Layer da Cloudflare.
+- As constantes, handlers e interceptadores que carregavam suporte nativo ao longo de todo o Workspace (em `gemini-import.ts`, `transform.ts`, `discover.ts` e `oraculoModelos.ts`) foram removidos estritamente, bem como purgados as referências ambientais nas injecões `ResolvedAdminMotorEnv`. As variáveis globais `CF_AI_GATEWAY` e `CF_AI_TOKEN` foram erradicadas.
+- **Frontend `ConfigModule.tsx`**: O painel teve os seletores de UI desvencilhados de Cloudflare Workers AI separando os blocos, operando de maneira genérica e padronizada apenas para listagens Gemini.
+- A auditoria confirma o expurgo finalizado das varíaveis também no backend e no cofre do Secrets Store.
+
+### Controle de versão
+- `admin-app`: APP v01.77.37 -> APP v01.77.38
+
 ## [v01.77.37] - 2026-04-04
 ### Corrigido
 - `src/modules/financeiro/FinanceiroModule.tsx`: Resolvido crash na renderização do modal de estorno (`TypeError: Cannot read properties of undefined (reading 'toLocaleString')`). O valor de `modal.tx.amount` agora é tratado de forma segura com fallback usando `Number(modal.tx.amount ?? 0)`.

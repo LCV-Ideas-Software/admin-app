@@ -1,5 +1,13 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-04 — Gemini Direct API Migration & Gateway Elimination
+### Scope
+Remoção integral do Cloudflare AI Gateway e do fallback estrito para Cloudflare Workers AI nas operações de geração e processamento de textos do MainSite e backends de edição (`post-summaries`, `transform.ts`, `gemini-import.ts`), prevenindo erros \`524 Timeout\` em operações pesadas no proxy do Cloudflare.
+### Resolved
+- **Expurgo Ambiental**: Excluídos do `admin-motor/index.ts` e do runtime resolver os tokens estritos como \`CF_AI_GATEWAY\` e \`CF_AI_TOKEN\`.
+- **Tipagens Corrigidas**: A supressão das env vars ausentes permitiram limpar problemas de linter com a `ResolvedAdminMotorEnv`.
+- **Frontend Unification**: \`ConfigModule.tsx\` desvinculou as listagens nativas da CF AI para exibir puramente a UI de \`geminiModels\`.
+
 ## 2026-04-04 — Admin-Motor Post Summaries AI Binding Issue
 ### Scope
 Resolução do erro `AI binding não configurado` que ocorria no disparo em background (via POST `/api/mainsite/post-summaries`) responsável pelas auto-summarizações (SEO e LD) dos artigos novos criados pelo LCV Admin. O Binding não fluía de forma propagada na topologia interna Worker->Service.
