@@ -3,6 +3,16 @@ import {
   handleCleanupDeploymentsPost,
 } from './handlers/cfpwCleanup';
 import { handleFinanceiroInsightsGet } from './handlers/financeiroInsights';
+import { handleAiStatusModelsGet } from './handlers/aiStatusModels';
+import { handleOraculoModelosGet } from './handlers/oraculoModelos';
+import { handleOraculoCronGet, handleOraculoCronPut } from './handlers/oraculoCron';
+import { handleAstrologoEnviarEmailPost } from './handlers/astrologoEmail';
+import {
+  handleSumupRefundPost,
+  handleSumupCancelPost,
+  handleMpRefundPost,
+  handleMpCancelPost,
+} from './handlers/financeiroActions';
 import { toHeaders } from '../../functions/api/_lib/mainsite-admin';
 
 type AdminMotorEnv = {
@@ -205,8 +215,25 @@ export default {
       return handleAiStatusHealth(request, env);
     }
 
+    if (method === 'GET' && pathname === '/api/ai-status/models') {
+      return handleAiStatusModelsGet({ request, env });
+    }
+
     if (method === 'GET' && pathname === '/api/mainsite/modelos') {
       return handleMainsiteModelos(request, env);
+    }
+
+    if (method === 'GET' && pathname === '/api/oraculo/modelos') {
+      return handleOraculoModelosGet({ request, env });
+    }
+
+    if (pathname === '/api/oraculo/cron') {
+      if (method === 'GET') return handleOraculoCronGet({ request, env });
+      if (method === 'PUT') return handleOraculoCronPut({ request, env });
+    }
+
+    if (method === 'POST' && pathname === '/api/astrologo/enviar-email') {
+      return handleAstrologoEnviarEmailPost({ request, env });
     }
 
     if (pathname === '/api/cfpw/cleanup-deployments') {
@@ -216,6 +243,22 @@ export default {
 
     if (method === 'GET' && pathname === '/api/financeiro/insights') {
       return handleFinanceiroInsightsGet({ request, env });
+    }
+
+    if (method === 'POST' && pathname === '/api/financeiro/sumup-refund') {
+      return handleSumupRefundPost({ request, env });
+    }
+
+    if (method === 'POST' && pathname === '/api/financeiro/sumup-cancel') {
+      return handleSumupCancelPost({ request, env });
+    }
+
+    if (method === 'POST' && pathname === '/api/financeiro/mp-refund') {
+      return handleMpRefundPost({ request, env });
+    }
+
+    if (method === 'POST' && pathname === '/api/financeiro/mp-cancel') {
+      return handleMpCancelPost({ request, env });
     }
 
     return notFound();
