@@ -43,6 +43,7 @@ export const onRequestGet = async (context: { env: Record<string, string>; data?
     // Fallback debug: se não vier entries (mesmo 200 OK), expõe o payload original e alerta
     if (!data.entries) {
       return new Response(JSON.stringify({ 
+        ok: true,
         entries: [], 
         debug_payload: data,
         message: "O Google Cloud Logging respondeu com sucesso, mas a chave 'entries' não estava presente ou o array é vazio. Validar payload de debug." 
@@ -51,7 +52,7 @@ export const onRequestGet = async (context: { env: Record<string, string>; data?
       })
     }
 
-    return new Response(JSON.stringify({ entries: data.entries }), {
+    return new Response(JSON.stringify({ ok: true, projectId, entries: data.entries }), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (err: unknown) {
