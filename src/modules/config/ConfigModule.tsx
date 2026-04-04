@@ -133,16 +133,21 @@ export function ConfigModule() {
       const res = await fetch('/api/mainsite/modelos?scope=seo-reader', {
         headers: { 'X-Admin-Actor': adminActor },
       })
-      const payload = await res.json() as { ok: boolean; models: AIModelRegistry[] }
+      const payload = await res.json() as { ok: boolean; models: AIModelRegistry[]; warning?: string; error?: string }
       if (payload.ok && payload.models) {
         setSeoReaderModels(payload.models)
+        if (payload.warning) {
+          showNotification(payload.warning, 'info')
+        }
+      } else if (!payload.ok && payload.error) {
+        showNotification(payload.error, 'error')
       }
     } catch {
-      // Falha silenciosa pra não poluir.
+      showNotification('Falha ao carregar modelos Cloudflare para SEO/Leitor.', 'error')
     } finally {
       setSeoReaderModelsLoading(false)
     }
-  }, [adminActor])
+  }, [adminActor, showNotification])
 
   useEffect(() => {
     void loadSeoReaderModels()

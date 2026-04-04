@@ -122,6 +122,7 @@ type ModelOption = {
 };
 
 const SEO_READER_SCOPE = 'seo-reader';
+const DEFAULT_CF_ACCOUNT_ID = 'd65b76a0e64c3791e932edd9163b1c71';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -350,11 +351,11 @@ const fetchMainsiteGeminiModels = async (
 };
 
 const fetchWorkersAiModels = async (env: ResolvedAdminMotorEnv): Promise<ModelOption[]> => {
-  const accountId = env.CF_ACCOUNT_ID;
+  const accountId = env.CF_ACCOUNT_ID || DEFAULT_CF_ACCOUNT_ID;
   const token = env.CLOUDFLARE_PW;
 
-  if (!accountId || !token) {
-    throw new Error('CF_ACCOUNT_ID/CLOUDFLARE_PW não configurados para listar modelos Cloudflare.');
+  if (!token) {
+    throw new Error('CLOUDFLARE_PW não configurado para listar modelos Cloudflare.');
   }
 
   const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?per_page=100&hide_experimental=true`, {
@@ -417,11 +418,29 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
         total: models.length,
       });
     } catch (err) {
+      const cfError = err instanceof Error ? err.message : String(err);
       console.error('[mainsite/modelos] cloudflare-api:error', {
         scope,
-        error: err instanceof Error ? err.message : String(err),
+        error: cfError,
       });
-      return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos Cloudflare.' }, 500);
+
+      try {
+        const fallbackModels = await fetchMainsiteGeminiModels(request, env);
+        return json({
+          ok: true,
+          scope,
+          source: 'fallback-gemini-via-gateway',
+          warning: `Cloudflare API indisponível para listagem (${cfError}). Ajuste token com permissão Workers AI - Read/Edit.`,
+          models: fallbackModels,
+          total: fallbackModels.length,
+        });
+      } catch (fallbackErr) {
+        return json({
+          ok: false,
+          error: fallbackErr instanceof Error ? fallbackErr.message : 'Falha ao listar modelos.',
+          details: cfError,
+        }, 500);
+      }
     }
   }
 
