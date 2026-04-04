@@ -331,7 +331,7 @@ REGRAS:
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 8192,
           responseMimeType: "application/json"
         }
       })
@@ -552,3 +552,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     },
   })
 }
+

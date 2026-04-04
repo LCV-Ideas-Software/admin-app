@@ -71,7 +71,7 @@ function structuredLog(level: 'INFO' | 'WARN' | 'ERROR', message: string, contex
 const GEMINI_CONFIG = {
   model: 'gemini-2.5-flash',
   apiVersion: 'v1beta',
-  maxOutputTokens: 4096,
+  maxOutputTokens: 8192,
   temperature: 0.3
 }
 
@@ -510,3 +510,4 @@ export async function onRequestPost(context: SummaryContext) {
     return json({ ok: false, error: error instanceof Error ? error.message : 'Erro no endpoint de resumos.', ...trace }, 500)
   }
 }
+

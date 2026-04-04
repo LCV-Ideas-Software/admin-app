@@ -30,7 +30,7 @@ const GEMINI_CONFIG = {
     transform: {
       temperature: 0.3,
       topP: 0.8,
-      maxOutputTokens: 4096
+      maxOutputTokens: 8192
     }
   }
 };
@@ -300,3 +300,4 @@ function logAiUsage(db: D1Database | undefined, payload: TelemetryPayload) {
     payload.error_detail || null,
   ).run().catch(() => { /* telemetria não deve quebrar o fluxo */ });
 }
+
