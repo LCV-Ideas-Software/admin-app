@@ -22,6 +22,8 @@ interface D1Database {
 
 interface SummaryEnv {
   BIGDATA_DB?: D1Database
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  AI?: any
   GEMINI_API_KEY?: string
   CF_AI_GATEWAY?: string
 }
@@ -70,12 +72,7 @@ async function hashContent(text: string): Promise<string> {
 const DEFAULT_GEMINI_MODEL = ''
 
 // ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
-const SUMMARY_SAFETY_SETTINGS = [
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
-  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-]
+// Removed SUMMARY_SAFETY_SETTINGS as we now use Cloudflare AI
 
 // Módulo SDK do Gemini removido. Usando Fetch Edge-Native.
 
@@ -95,74 +92,45 @@ function extractJsonFromText(rawText: string): string {
 async function generateShareSummary(
   title: string,
   htmlContent: string,
-  apiKey: string,
-  baseUrl?: string,
-  model?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  aiBinding: any
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
-  const resolvedModel = model || DEFAULT_GEMINI_MODEL
   const cleanContent = stripHtml(htmlContent).substring(0, 3000)
 
-  const prompt = `Você é um editor especializado em SEO e compartilhamento social.
+  const messages = [
+    { 
+      role: 'system', 
+      content: `Você é um editor especializado em SEO e compartilhamento social.
 Dado o título e o conteúdo de um artigo/post, gere DOIS resumos em português brasileiro:
-
-1. **summary_og** (máx. 160 caracteres): descrição curta, factual e envolvente para Open Graph (og:description). Deve ser atrativa para clique em WhatsApp, Facebook, Twitter.
-2. **summary_ld** (máx. 300 caracteres): descrição mais completa para Schema.org/JSON-LD. Deve capturar o tema central e contexto do artigo.
+1. summary_og (máx. 160 caracteres): descrição curta, factual e envolvente para Open Graph (og:description).
+2. summary_ld (máx. 300 caracteres): descrição mais completa para Schema.org/JSON-LD.
 
 REGRAS:
-- Mantenha tom neutro/informativo, sem clickbait exagerado.
-- Não inclua o título no resumo — ele já aparece separadamente.
-- Retorne APENAS JSON válido no formato: {"summary_og": "...", "summary_ld": "..."}
-- Sem markdown, sem explicações, sem texto adicional.
-
-TÍTULO: ${title}
-CONTEÚDO: ${cleanContent}`
+- Retorne APENAS um objeto JSON válido no formato: {"summary_og": "...", "summary_ld": "..."}
+- Seja neutro e informativo.
+- SEM marcação markdown, SEM explicações. APENAS o JSON puro.` 
+    },
+    { role: 'user', content: `TÍTULO: ${title}\nCONTEÚDO: ${cleanContent}` }
+  ]
 
   const MAX_RETRIES = 2
-  const RETRY_DELAY = 800
-
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        safetySettings: SUMMARY_SAFETY_SETTINGS,
-        generationConfig: {
-          temperature: 0.3,
-          topP: 0.8,
-          maxOutputTokens: 1024,
-          responseMimeType: 'application/json',
-        }
-      }
-
-      let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (!aiBinding) throw new Error('AI binding não configurado.')
       
-      if (baseUrl) {
-        apiUrl = `https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
-        headers['cf-aig-authorization'] = `Bearer ${baseUrl}`;
-      }
-
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
+      const response = await aiBinding.run('@cf/meta/llama-3.1-8b-instruct', {
+        messages,
+        max_tokens: 500,
+        temperature: 0.3
       })
 
-      if (!res.ok) {
-        throw new Error(`Gemini API Error: ${res.status} ${res.statusText}`)
-      }
+      const rawText = response.response
+      if (!rawText) return { error: `AI sem texto útil.` }
 
-      const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text
-
-      if (!rawText) {
-        return { error: `Gemini sem texto útil (attempt ${attempt + 1}). Modelo: ${resolvedModel}.` }
-      }
-
-      // Parsing JSON robusto
       const jsonStr = extractJsonFromText(rawText)
       const parsed = JSON.parse(jsonStr) as { summary_og?: string; summary_ld?: string }
       if (!parsed.summary_og) {
-        return { error: `JSON sem summary_og. Raw: ${rawText.substring(0, 150)}` }
+        return { error: `JSON sem summary_og.` }
       }
 
       return {
@@ -170,16 +138,12 @@ CONTEÚDO: ${cleanContent}`
         summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
       }
     } catch (err) {
-      // Retry: primeira falha pode ser thinkingConfig incompatível ou outro 400
-      if (attempt === 0) {
-        await new Promise(r => setTimeout(r, RETRY_DELAY))
-        continue
-      }
-      return { error: `Exception (attempt ${attempt + 1}): ${err instanceof Error ? err.message : String(err)}` }
+      if (attempt === 0) continue
+      return { error: `Exception: ${err instanceof Error ? err.message : String(err)}` }
     }
   }
 
-  return { error: 'Gemini API falhou após todas as tentativas.' }
+  return { error: 'AI falhou após tentativas.' }
 }
 
 // ── Ensure table + self-healing migration for missing columns ──
@@ -283,11 +247,10 @@ export async function onRequestPost(context: SummaryContext) {
       model?: string // modelo Gemini selecionado pelo usuário
     }
 
-    const apiKey = (context.data?.env || context.env).GEMINI_API_KEY
+    // apiKey extracted for Gemini (removed)
 
     // ── Generate All ──
     if (body.action === 'generate-all') {
-      if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.', ...trace }, 503)
 
       const mode = body.mode || 'missing'
 
@@ -338,7 +301,7 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, apiKey, (context.data?.env || context.env).CF_AI_GATEWAY, resolvedModel)
+          const result = await generateShareSummary(post.title, post.content, (context.data?.env || context.env).AI)
           if ('error' in result) {
             failed++
             details.push({ postId: post.id, title: post.title, status: result.error })
@@ -380,7 +343,6 @@ export async function onRequestPost(context: SummaryContext) {
 
     // ── Regenerate single ──
     if (body.action === 'regenerate') {
-      if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.', ...trace }, 503)
       if (!body.postId) return json({ ok: false, error: 'postId é obrigatório.', ...trace }, 400)
 
       const post = await db.prepare(
@@ -391,7 +353,7 @@ export async function onRequestPost(context: SummaryContext) {
 
       const resolvedModel = await resolveSummaryModel(db, body.model)
 
-      const result = await generateShareSummary(post.title, post.content, apiKey, (context.data?.env || context.env).CF_AI_GATEWAY, resolvedModel)
+      const result = await generateShareSummary(post.title, post.content, (context.data?.env || context.env).AI)
       if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 502)
 
       const contentHash = await hashContent(stripHtml(post.content))
