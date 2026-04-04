@@ -71,6 +71,7 @@ type AdminMotorEnv = {
   CF_AI_GATEWAY?: unknown;
   CLOUDFLARE_PW?: unknown;
   CF_ACCOUNT_ID?: unknown;
+  CF_AI_TOKEN?: unknown;
   SUMUP_API_KEY_PRIVATE?: unknown;
   SUMUP_MERCHANT_CODE?: unknown;
   MP_ACCESS_TOKEN?: unknown;
@@ -91,6 +92,7 @@ type ResolvedAdminMotorEnv = {
   CF_AI_GATEWAY?: string;
   CLOUDFLARE_PW?: string;
   CF_ACCOUNT_ID?: string;
+  CF_AI_TOKEN?: string;
   SUMUP_API_KEY_PRIVATE?: string;
   SUMUP_MERCHANT_CODE?: string;
   MP_ACCESS_TOKEN?: string;
@@ -182,6 +184,7 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   CF_AI_GATEWAY: await readSecretString(env.CF_AI_GATEWAY),
   CLOUDFLARE_PW: await readSecretString(env.CLOUDFLARE_PW),
   CF_ACCOUNT_ID: await readSecretString(env.CF_ACCOUNT_ID),
+  CF_AI_TOKEN: await readSecretString(env.CF_AI_TOKEN),
   SUMUP_API_KEY_PRIVATE: await readSecretString(env.SUMUP_API_KEY_PRIVATE),
   SUMUP_MERCHANT_CODE: await readSecretString(env.SUMUP_MERCHANT_CODE),
   MP_ACCESS_TOKEN: await readSecretString(env.MP_ACCESS_TOKEN),
@@ -352,13 +355,25 @@ const fetchMainsiteGeminiModels = async (
 
 const fetchWorkersAiModels = async (env: ResolvedAdminMotorEnv): Promise<ModelOption[]> => {
   const accountId = env.CF_ACCOUNT_ID || DEFAULT_CF_ACCOUNT_ID;
-  const token = env.CLOUDFLARE_PW;
+  // Token dedicado para listagem de modelos AI — CLOUDFLARE_PW é exclusivo do módulo CF P&W
+  const token = env.CF_AI_TOKEN;
 
   if (!token) {
-    throw new Error('CLOUDFLARE_PW não configurado para listar modelos Cloudflare.');
+    throw new Error('CF_AI_TOKEN não configurado. Verifique o binding no wrangler.json e o secret na Secrets Store.');
   }
 
-  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?per_page=100&hide_experimental=true`, {
+  // Tipo real da API: task é um objeto { name, description }, não uma string
+  type WorkersAiModel = {
+    id?: string;
+    name?: string;       // Ex: "@cf/meta/llama-3.1-8b-instruct" (usado pelo AI.run())
+    description?: string;
+    task?: { name?: string; description?: string } | string;
+    properties?: unknown[];
+  };
+
+  // Busca modelos de Text Generation via filtro server-side
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?per_page=100&hide_experimental=true&task=${encodeURIComponent('Text Generation')}`;
+  const res = await fetch(url, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -368,36 +383,49 @@ const fetchWorkersAiModels = async (env: ResolvedAdminMotorEnv): Promise<ModelOp
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Cloudflare AI models search falhou (${res.status}): ${body.slice(0, 200)}`);
+    throw new Error(`Cloudflare AI models search falhou (${res.status}): ${body.slice(0, 300)}`);
   }
 
-  type WorkersAiModel = {
-    id?: string;
-    name?: string;
-    description?: string;
-    task?: string;
+  const payload = (await res.json()) as { result?: WorkersAiModel[] };
+  const allModels = payload.result || [];
+
+  // Extrai o nome da task de forma segura (API retorna objeto ou string)
+  const getTaskName = (task: WorkersAiModel['task']): string => {
+    if (!task) return '';
+    if (typeof task === 'string') return task.toLowerCase();
+    return (task.name || '').toLowerCase();
   };
 
-  const payload = (await res.json()) as { result?: WorkersAiModel[] };
-  const results = payload.result || [];
-
-  const filtered = results.filter((item) => {
-    const task = (item.task || '').toLowerCase();
-    return task.includes('text generation') || task.includes('chat');
+  // Filtra descartando deprecated e garantindo text generation
+  const filtered = allModels.filter((item) => {
+    const taskName = getTaskName(item.task);
+    const isTextGen = taskName.includes('text generation') || taskName.includes('chat');
+    const desc = (item.description || '').toLowerCase();
+    const isDeprecated = desc.includes('deprecated');
+    return isTextGen && !isDeprecated && Boolean(item.name);
   });
 
-  const mapped = (filtered.length > 0 ? filtered : results)
-    .filter((item) => Boolean(item.id))
-    .map((item) => {
-      const id = String(item.id);
-      const lower = id.toLowerCase();
-      return {
-        id,
-        displayName: item.name || id,
-        api: 'workers-ai',
-        vision: lower.includes('vision') || lower.includes('vl') || lower.includes('llava') || lower.includes('pixtral'),
-      } satisfies ModelOption;
-    });
+  // Deduplica por name (campo usado pelo AI.run())
+  const seen = new Set<string>();
+  const mapped: ModelOption[] = [];
+
+  for (const item of filtered) {
+    const modelId = String(item.name || item.id);
+    if (seen.has(modelId)) continue;
+    seen.add(modelId);
+
+    const lower = modelId.toLowerCase();
+    const shortName = modelId.startsWith('@cf/')
+      ? modelId.replace(/^@cf\/[^/]+\//, '')
+      : modelId;
+
+    mapped.push({
+      id: modelId,
+      displayName: shortName,
+      api: 'workers-ai',
+      vision: lower.includes('vision') || lower.includes('vl') || lower.includes('llava') || lower.includes('pixtral') || lower.includes('scout'),
+    } satisfies ModelOption);
+  }
 
   return mapped.sort((a, b) => a.displayName.localeCompare(b.displayName));
 };
@@ -407,41 +435,14 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
   const scope = url.searchParams.get('scope');
 
   if (scope === SEO_READER_SCOPE) {
-    try {
-      const models = await fetchWorkersAiModels(env);
-
-      return json({
-        ok: true,
-        scope,
-        source: 'cloudflare-api',
-        models,
-        total: models.length,
-      });
-    } catch (err) {
-      const cfError = err instanceof Error ? err.message : String(err);
-      console.error('[mainsite/modelos] cloudflare-api:error', {
-        scope,
-        error: cfError,
-      });
-
-      try {
-        const fallbackModels = await fetchMainsiteGeminiModels(request, env);
-        return json({
-          ok: true,
-          scope,
-          source: 'fallback-gemini-via-gateway',
-          warning: `Cloudflare API indisponível para listagem (${cfError}). Ajuste token com permissão Workers AI - Read/Edit.`,
-          models: fallbackModels,
-          total: fallbackModels.length,
-        });
-      } catch (fallbackErr) {
-        return json({
-          ok: false,
-          error: fallbackErr instanceof Error ? fallbackErr.message : 'Falha ao listar modelos.',
-          details: cfError,
-        }, 500);
-      }
-    }
+    const models = await fetchWorkersAiModels(env);
+    return json({
+      ok: true,
+      scope,
+      source: 'workers-ai',
+      models,
+      total: models.length,
+    });
   }
 
   try {

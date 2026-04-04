@@ -67,6 +67,11 @@
       "binding": "GCP_PROJECT_ID",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "gcp-project-id"
+    },
+    {
+      "binding": "CF_AI_TOKEN",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "cf-ai-token"
     }
   ],
   "d1_databases": [
