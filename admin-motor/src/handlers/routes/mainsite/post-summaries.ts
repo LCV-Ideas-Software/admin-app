@@ -10,9 +10,9 @@ import { logModuleOperationalEvent } from '../_lib/operational'
 import { createResponseTrace } from '../_lib/request-trace'
 
 interface D1PreparedStatement {
-  bind: (...values: Array<string | number | null>) => D1PreparedStatement
-  first: <T>() => Promise<T | null>
-  all: <T>() => Promise<{ results?: T[] }>
+  bind: (...values: Array<unknown>) => D1PreparedStatement
+  first: <T = unknown>() => Promise<T | null>
+  all: <T = unknown>() => Promise<{ results?: T[] }>
   run: () => Promise<unknown>
 }
 
@@ -29,6 +29,9 @@ interface SummaryEnv {
 interface SummaryContext {
   request: Request
   env: SummaryEnv
+  data?: {
+    env?: SummaryEnv
+  }
 }
 
 type SummaryRow = {
@@ -130,10 +133,17 @@ CONTEÚDO: ${cleanContent}`
         }
       }
 
-      const base = baseUrl || 'https://generativelanguage.googleapis.com'
-      const res = await fetch(`${base}/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`, {
+      let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      
+      if (baseUrl) {
+        apiUrl = `https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio/v1beta/models/${resolvedModel}:generateContent?key=${apiKey}`;
+        headers['cf-aig-authorization'] = `Bearer ${baseUrl}`;
+      }
+
+      const res = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload)
       })
 
@@ -207,7 +217,7 @@ const json = (data: unknown, status = 200) =>
 export async function onRequestGet(context: SummaryContext) {
   const trace = createResponseTrace(context.request)
   try {
-    const db = ((context as any).data?.env || context.env).BIGDATA_DB
+    const db = (context.data?.env || context.env).BIGDATA_DB
     if (!db) return json({ ok: false, error: 'BIGDATA_DB não configurado.', ...trace }, 500)
 
     await ensureTable(db)
@@ -259,7 +269,7 @@ async function resolveSummaryModel(db: D1Database, reqModel?: string): Promise<s
 export async function onRequestPost(context: SummaryContext) {
   const trace = createResponseTrace(context.request)
   try {
-    const db = ((context as any).data?.env || context.env).BIGDATA_DB
+    const db = (context.data?.env || context.env).BIGDATA_DB
     if (!db) return json({ ok: false, error: 'BIGDATA_DB não configurado.', ...trace }, 500)
 
     await ensureTable(db)
@@ -273,7 +283,7 @@ export async function onRequestPost(context: SummaryContext) {
       model?: string // modelo Gemini selecionado pelo usuário
     }
 
-    const apiKey = ((context as any).data?.env || context.env).GEMINI_API_KEY
+    const apiKey = (context.data?.env || context.env).GEMINI_API_KEY
 
     // ── Generate All ──
     if (body.action === 'generate-all') {
@@ -328,7 +338,7 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, apiKey, ((context as any).data?.env || context.env).CF_AI_GATEWAY, resolvedModel)
+          const result = await generateShareSummary(post.title, post.content, apiKey, (context.data?.env || context.env).CF_AI_GATEWAY, resolvedModel)
           if ('error' in result) {
             failed++
             details.push({ postId: post.id, title: post.title, status: result.error })
@@ -381,7 +391,7 @@ export async function onRequestPost(context: SummaryContext) {
 
       const resolvedModel = await resolveSummaryModel(db, body.model)
 
-      const result = await generateShareSummary(post.title, post.content, apiKey, ((context as any).data?.env || context.env).CF_AI_GATEWAY, resolvedModel)
+      const result = await generateShareSummary(post.title, post.content, apiKey, (context.data?.env || context.env).CF_AI_GATEWAY, resolvedModel)
       if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 502)
 
       const contentHash = await hashContent(stripHtml(post.content))

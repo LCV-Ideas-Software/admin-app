@@ -276,11 +276,17 @@ Regras:
           }
         };
 
-        const baseUrl = env?.CF_AI_GATEWAY || 'https://generativelanguage.googleapis.com'
-        const apiUrl = `${baseUrl}/v1beta/models/${activeModel}:generateContent?key=${env?.GEMINI_API_KEY}`
+        let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${env?.GEMINI_API_KEY}`;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        
+        if (env?.CF_AI_GATEWAY) {
+          apiUrl = `https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio/v1beta/models/${activeModel}:generateContent?key=${env?.GEMINI_API_KEY}`;
+          headers['cf-aig-authorization'] = `Bearer ${env.CF_AI_GATEWAY}`;
+        }
+
         const response = await fetch(apiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(payload)
         });
 
