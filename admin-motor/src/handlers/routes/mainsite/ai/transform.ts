@@ -18,7 +18,8 @@ interface D1Database {
   prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown>, first<T>(): Promise<T|null> } }
 }
 
-const DEFAULT_MODEL = '';
+/** Fallback usado quando BIGDATA_DB não retorna modelo configurado para 'chat'. */
+const FALLBACK_MODEL = 'gemini-2.5-pro';
 
 const GEMINI_CONFIG = {
   version: 'v1beta',
@@ -54,19 +55,24 @@ function structuredLog(level: 'info' | 'warn' | 'error', message: string, contex
 }
 
 async function resolveModel(db: D1Database | undefined): Promise<string> {
-  if (!db) return DEFAULT_MODEL;
+  if (!db) {
+    structuredLog('warn', 'resolveModel: BIGDATA_DB unavailable, using fallback', { fallback: FALLBACK_MODEL });
+    return FALLBACK_MODEL;
+  }
   try {
     const row = await db.prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1').bind('mainsite/ai_models').first<{ payload?: string }>();
     if (row?.payload) {
       const parsed = JSON.parse(row.payload) as Record<string, unknown>;
       if (typeof parsed.chat === 'string' && parsed.chat) {
+        structuredLog('info', 'resolveModel: model from DB', { model: parsed.chat });
         return parsed.chat;
       }
     }
-  } catch {
-    //
+  } catch (err) {
+    structuredLog('warn', 'resolveModel: DB lookup failed, using fallback', { error: (err as Error).message, fallback: FALLBACK_MODEL });
   }
-  return DEFAULT_MODEL;
+  structuredLog('info', 'resolveModel: no model in DB, using fallback', { fallback: FALLBACK_MODEL });
+  return FALLBACK_MODEL;
 }
 
 /**
@@ -86,7 +92,7 @@ async function estimateTokenCount(text: string, apiKey: string, baseUrl: string,
       body: JSON.stringify(payload)
     });
     if (!res.ok) return 0;
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>, usageMetadata?: Record<string, unknown> };
+    const data = await res.json() as { totalTokens?: number };
     return data?.totalTokens || 0;
   } catch (error) {
     structuredLog('warn', 'Failed to count tokens', { error: (error as Error).message });
@@ -110,16 +116,21 @@ function validateInputTokens(tokenCount: number) {
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
-  if (!((context as any).data?.env || context.env).GEMINI_API_KEY) {
+  const resolvedEnv = ((context as { data?: { env?: Env } }).data?.env ?? context.env) as Env;
+
+  if (!resolvedEnv.GEMINI_API_KEY) {
     structuredLog('error', 'GEMINI_API_KEY missing');
     return new Response(JSON.stringify({ error: "GEMINI_API_KEY não configurada." }), { status: 500 });
   }
 
   const _telemetryStart = Date.now();
   structuredLog('info', 'transform API call starting', { endpoint: 'transform' });
-
-  const activeModel = await resolveModel(((context as any).data?.env || context.env).BIGDATA_DB);
-  const baseUrl = ((context as any).data?.env || context.env).CF_AI_GATEWAY || 'https://generativelanguage.googleapis.com';
+  const activeModel = await resolveModel(resolvedEnv.BIGDATA_DB);
+  if (!activeModel) {
+    structuredLog('error', 'transform: no model resolved');
+    return new Response(JSON.stringify({ error: 'Modelo de IA não configurado. Configure em Configurações > Modelos de IA.' }), { status: 500 });
+  }
+  const baseUrl: string = (resolvedEnv.CF_AI_GATEWAY as string | undefined) || 'https://generativelanguage.googleapis.com';
 
   try {
     const body = await context.request.json() as { action: string, text: string, instruction?: string };
@@ -145,7 +156,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const fullPrompt = `${promptInfo}\n\nTexto:\n${text}`;
 
     // 1 & 10. Token Counting & Input Validation
-    const inputTokens = await estimateTokenCount(fullPrompt, ((context as any).data?.env || context.env).GEMINI_API_KEY, baseUrl, activeModel);
+    const inputTokens = await estimateTokenCount(fullPrompt, resolvedEnv.GEMINI_API_KEY as string, baseUrl, activeModel);
     const validation = validateInputTokens(inputTokens);
     if (validation.shouldReject) {
       structuredLog('warn', 'Input rejected due to token count', { tokens: inputTokens });
@@ -180,17 +191,24 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           }
         };
 
-        const response = await fetch(`${baseUrl}/v1beta/models/${activeModel}:generateContent?key=${((context as any).data?.env || context.env).GEMINI_API_KEY}`, {
+        const response = await fetch(`${baseUrl}/v1beta/models/${activeModel}:generateContent?key=${resolvedEnv.GEMINI_API_KEY as string}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
+          const errBody = await response.text().catch(() => '');
+          structuredLog('error', 'Gemini API error response', {
+            endpoint: 'transform', attempt: tentativa + 1,
+            status: response.status, statusText: response.statusText,
+            body: errBody.substring(0, 300),
+            model: activeModel,
+          });
           throw new Error(`API Error: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>, usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number } };
         const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (responseText) {
@@ -206,7 +224,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           });
 
           // Telemetria → ai_usage_logs (fire-and-forget)
-          logAiUsage(((context as any).data?.env || context.env).BIGDATA_DB, {
+          logAiUsage(resolvedEnv.BIGDATA_DB as D1Database | undefined, {
             module: 'mainsite',
             model: activeModel,
             input_tokens: usageMetadata.promptTokens,
@@ -250,7 +268,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   } catch (error) {
     // Telemetria de erro
-    logAiUsage(((context as any).data?.env || context.env).BIGDATA_DB, {
+    logAiUsage(resolvedEnv.BIGDATA_DB as D1Database | undefined, {
       module: 'mainsite',
       model: activeModel,
       input_tokens: 0,
@@ -259,7 +277,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       status: 'error',
       error_detail: error instanceof Error ? error.message : 'unknown',
     });
-    structuredLog('error', 'transform fatal error', { error: error instanceof Error ? error.message : "Erro desconhecido" });
+    structuredLog('error', 'transform fatal error', { model: activeModel, baseUrl, error: error instanceof Error ? error.message : 'Erro desconhecido' });
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erro desconhecido na geração por IA." }), { status: 500 });
   }
 };
