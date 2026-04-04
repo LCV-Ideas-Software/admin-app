@@ -19,11 +19,6 @@
       "secret_name": "gemini-api-key"
     },
     {
-      "binding": "CF_AI_GATEWAY",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "cf-ai-gateway"
-    },
-    {
       "binding": "CLOUDFLARE_PW",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "cloudflare-pw"
@@ -67,11 +62,6 @@
       "binding": "GCP_PROJECT_ID",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "gcp-project-id"
-    },
-    {
-      "binding": "CF_AI_TOKEN",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "cf-ai-token"
     }
   ],
   "d1_databases": [
@@ -80,8 +70,5 @@
       "database_name": "bigdata_db",
       "database_id": "00000000-0000-0000-0000-000000000000"
     }
-  ],
-  "ai": {
-    "binding": "AI"
-  }
+  ]
 }
