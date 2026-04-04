@@ -197,6 +197,24 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
   }
 
   const activeModel = await resolveModel(env.BIGDATA_DB as D1Like | undefined);
+  if (!activeModel) {
+    console.error('[ai-status/health] model:missing', {
+      reason: 'mainsite/ai_models.chat vazio ou ausente no BIGDATA_DB',
+    });
+    return json(
+      {
+        ok: false,
+        keyConfigured: true,
+        apiReachable: false,
+        latencyMs: null,
+        httpStatus: null,
+        error: 'Nenhum modelo ativo configurado em mainsite/ai_models.chat.',
+        checkedAt: new Date().toISOString(),
+      },
+      500,
+    );
+  }
+
   const gatewayUrl =
     'https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio';
   const baseUrl = env.CF_AI_GATEWAY ? gatewayUrl : 'https://generativelanguage.googleapis.com';
@@ -216,6 +234,11 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
     const latencyMs = Date.now() - start;
 
     if (res.ok) {
+      console.info('[ai-status/health] request:ok', {
+        model: activeModel,
+        latencyMs,
+        gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      });
       return json({
         ok: true,
         keyConfigured: true,
@@ -226,6 +249,14 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
         checkedAt: new Date().toISOString(),
       });
     }
+
+    const upstreamBody = await res.text().catch(() => '');
+    console.error('[ai-status/health] upstream:error', {
+      model: activeModel,
+      status: res.status,
+      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      bodyPreview: upstreamBody.slice(0, 300),
+    });
 
     return json({
       ok: false,
@@ -239,6 +270,11 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
     });
   } catch (err) {
     const errorBody = err instanceof Error ? err.message : String(err);
+    console.error('[ai-status/health] request:error', {
+      model: activeModel,
+      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      error: errorBody,
+    });
     return json(
       {
         ok: false,
@@ -257,6 +293,7 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
 const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEnv): Promise<Response> => {
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) {
+    console.error('[ai-status/models] api-key:missing');
     return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 500);
   }
 
@@ -276,7 +313,15 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
       headers: requestHeaders,
       signal: request.signal,
     });
-    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+    if (!res.ok) {
+      const upstreamBody = await res.text().catch(() => '');
+      console.error('[ai-status/models] upstream:error', {
+        status: res.status,
+        gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+        bodyPreview: upstreamBody.slice(0, 300),
+      });
+      throw new Error(`API Error: ${res.status}`);
+    }
 
     interface ModelOutput {
       name: string;
@@ -314,8 +359,16 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
       return aPro - bPro || a.id.localeCompare(b.id);
     });
 
+    console.info('[ai-status/models] request:ok', {
+      total: models.length,
+      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+    });
     return json({ ok: true, models, total: models.length });
   } catch (err) {
+    console.error('[ai-status/models] request:error', {
+      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      error: err instanceof Error ? err.message : String(err),
+    });
     return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos.' }, 500);
   }
 };

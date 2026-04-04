@@ -28,9 +28,20 @@ export const proxyToAdminMotor = async (context: ProxyContext): Promise<Response
   const requestToService = new Request(targetUrl.toString(), context.request);
 
   try {
-    return await service.fetch(requestToService);
+    const response = await service.fetch(requestToService);
+    if (response.status >= 500) {
+      console.error('[admin-motor-proxy] upstream:5xx', {
+        path: originalUrl.pathname,
+        status: response.status,
+      });
+    }
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao encaminhar requisição para o admin-motor.';
+    console.error('[admin-motor-proxy] request:error', {
+      path: originalUrl.pathname,
+      error: message,
+    });
     return json(502, {
       ok: false,
       error: message,
