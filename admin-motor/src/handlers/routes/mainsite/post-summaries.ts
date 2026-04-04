@@ -22,8 +22,6 @@ interface D1Database {
 
 interface SummaryEnv {
   BIGDATA_DB?: D1Database
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  AI?: any
   GEMINI_API_KEY?: string
   CF_AI_GATEWAY?: string
 }
@@ -69,12 +67,15 @@ async function hashContent(text: string): Promise<string> {
     .join('')
 }
 
-const DEFAULT_GEMINI_MODEL = ''
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 
 // ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
-// Removed SUMMARY_SAFETY_SETTINGS as we now use Cloudflare AI
-
-// Módulo SDK do Gemini removido. Usando Fetch Edge-Native.
+const SUMMARY_SAFETY_SETTINGS = [
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+]
 
 function extractJsonFromText(rawText: string): string {
   let str = rawText.trim()
@@ -92,10 +93,15 @@ function extractJsonFromText(rawText: string): string {
 async function generateShareSummary(
   title: string,
   htmlContent: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  aiBinding: any
+  env: SummaryEnv,
+  model: string,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const cleanContent = stripHtml(htmlContent).substring(0, 3000)
+  const apiKey = env.GEMINI_API_KEY
+  if (!apiKey) return { error: 'GEMINI_API_KEY não configurada.' }
+
+  const gatewayUrl = 'https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio'
+  const baseUrl = env.CF_AI_GATEWAY ? gatewayUrl : 'https://generativelanguage.googleapis.com'
 
   const messages = [
     { 
@@ -116,15 +122,38 @@ REGRAS:
   const MAX_RETRIES = 2
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      if (!aiBinding) throw new Error('AI binding não configurado.')
-      
-      const response = await aiBinding.run('@cf/meta/llama-3.1-8b-instruct', {
-        messages,
-        max_tokens: 500,
-        temperature: 0.3
+      const requestHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (env.CF_AI_GATEWAY) {
+        requestHeaders['cf-aig-authorization'] = `Bearer ${env.CF_AI_GATEWAY}`
+      }
+
+      const response = await fetch(`${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${messages[0].content}\n\n${messages[1].content}` }] }],
+          safetySettings: SUMMARY_SAFETY_SETTINGS,
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 500,
+          },
+        }),
       })
 
-      const rawText = response.response
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => '')
+        throw new Error(`API Error: ${response.status} ${errBody.slice(0, 200)}`)
+      }
+
+      type GeminiResp = {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+      }
+
+      const parsedResponse = await response.json() as GeminiResp
+
+      const rawText = parsedResponse.candidates?.[0]?.content?.parts?.[0]?.text
       if (!rawText) return { error: `AI sem texto útil.` }
 
       const jsonStr = extractJsonFromText(rawText)
@@ -181,7 +210,8 @@ const json = (data: unknown, status = 200) =>
 export async function onRequestGet(context: SummaryContext) {
   const trace = createResponseTrace(context.request)
   try {
-    const db = (context.data?.env || context.env).BIGDATA_DB
+    const runtimeEnv = (context.data?.env || context.env)
+    const db = runtimeEnv.BIGDATA_DB
     if (!db) return json({ ok: false, error: 'BIGDATA_DB não configurado.', ...trace }, 500)
 
     await ensureTable(db)
@@ -301,7 +331,7 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, (context.data?.env || context.env).AI)
+          const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel)
           if ('error' in result) {
             failed++
             details.push({ postId: post.id, title: post.title, status: result.error })
@@ -353,7 +383,7 @@ export async function onRequestPost(context: SummaryContext) {
 
       const resolvedModel = await resolveSummaryModel(db, body.model)
 
-      const result = await generateShareSummary(post.title, post.content, (context.data?.env || context.env).AI)
+      const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel)
       if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 502)
 
       const contentHash = await hashContent(stripHtml(post.content))
