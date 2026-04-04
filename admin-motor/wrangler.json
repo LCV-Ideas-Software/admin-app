@@ -29,6 +29,11 @@
       "secret_name": "cloudflare-pw"
     },
     {
+      "binding": "CLOUDFLARE_DNS",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "cloudflare-dns"
+    },
+    {
       "binding": "CF_ACCOUNT_ID",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "cloudflare-account-id"
