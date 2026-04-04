@@ -1,5 +1,13 @@
 # Changelog — Admin App
 
+## [v01.77.39] - 2026-04-04
+### Alterado
+- **Gemini v1beta Modernization**: O endpoint de geração de resumos (`admin-motor/src/handlers/routes/mainsite/post-summaries.ts`) foi unificado com a arquitetura moderna nativa da API Gemini usando diretamente o SDK `@google/genai`. 
+- Incorporadas todas as 10 features obrigatórias das diretrizes de infraestrutura: Token Counting API pré-requisição para previnir processamento fútil, limitadores definidos via `GEMINI_CONFIG` e context length, Type safety nativo, Logging estrutural, Fallback parse array pra handling de Thinking Models e Usage logging Metadata.
+
+### Controle de versão
+- `admin-app`: APP v01.77.38 -> APP v01.77.39
+
 ## [v01.77.38] - 2026-04-04
 ### Alterado
 - **Migração Concluída: Retorno ao SDK Gemini**: Finalizada com sucesso a desativação completa do Cloudflare AI Gateway e Workers AI. Os sistemas de inteligência artificial de leitura, sumarização e criação do repositório operam direta e estritamente sob a API Google, mitigando erros 524 de timeout na formatação/tradução induzidos pelo proxy Layer da Cloudflare.

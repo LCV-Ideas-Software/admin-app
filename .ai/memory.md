@@ -1,5 +1,14 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-04 — Gemini v1beta Modernization in Post Summaries
+### Scope
+Extensão da Modernização do Gemini API (v1beta) com aplicação de suas 10 features estruturais diretamente no middleware / pipeline de resumos de SEO e Linked Data do mainsite (`admin-motor/src/handlers/routes/mainsite/post-summaries.ts`).
+### Resolved
+- **@google/genai SDK**: A adoção nativa do SDK resolve a formatação defasada de headers, introduzindo nativamente as restrições arquiteturais.
+- **Implementações das 10 Features**: O código agora conta os pre-tokens via `countTokens`, gerencia o log detalhadamente via `structuredLog`, impõe os safe-guards obrigatórios (`BLOCK_ONLY_HIGH` + `CIVIC_INTEGRITY`), restringe a resiliação via retry limits formatados, loga os costs reais (usage metadata) e escapa corretamente as partes em modo de Thinking Model.
+
+### Controle de versão
+- `admin-app`: APP v01.77.38 -> APP v01.77.39
 ## 2026-04-04 — Gemini Direct API Migration & Gateway Elimination
 ### Scope
 Remoção integral do Cloudflare AI Gateway e do fallback estrito para Cloudflare Workers AI nas operações de geração e processamento de textos do MainSite e backends de edição (`post-summaries`, `transform.ts`, `gemini-import.ts`), prevenindo erros \`524 Timeout\` em operações pesadas no proxy do Cloudflare.

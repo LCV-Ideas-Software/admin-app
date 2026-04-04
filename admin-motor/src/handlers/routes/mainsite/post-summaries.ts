@@ -8,6 +8,7 @@
 import { toHeaders } from '../_lib/mainsite-admin'
 import { logModuleOperationalEvent } from '../_lib/operational'
 import { createResponseTrace } from '../_lib/request-trace'
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai'
 
 interface D1PreparedStatement {
   bind: (...values: Array<unknown>) => D1PreparedStatement
@@ -55,7 +56,33 @@ type PostRow = {
   content: string
 }
 
-// ── Gemini summary generation (self-contained, no external deps) ──
+// ── Gemini summary generation (v1beta Modernization) ──
+
+function structuredLog(level: 'INFO' | 'WARN' | 'ERROR', message: string, context?: Record<string, unknown>) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    ...(context && { context })
+  }
+  console.log(JSON.stringify(logEntry))
+}
+
+const GEMINI_CONFIG = {
+  model: 'gemini-2.5-flash',
+  apiVersion: 'v1beta',
+  maxOutputTokens: 500,
+  temperature: 0.3
+}
+
+// ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
+const SUMMARY_SAFETY_SETTINGS = [
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+]
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
@@ -68,16 +95,6 @@ async function hashContent(text: string): Promise<string> {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
 }
-
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
-
-// ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
-const SUMMARY_SAFETY_SETTINGS = [
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
-  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-]
 
 function extractJsonFromText(rawText: string): string {
   let str = rawText.trim()
@@ -92,22 +109,36 @@ function extractJsonFromText(rawText: string): string {
   return str
 }
 
+async function estimateTokenCount(ai: GoogleGenAI, prompt: string, model: string): Promise<number> {
+  try {
+    const resp = await ai.models.countTokens({
+      model,
+      contents: prompt
+    });
+    return resp.totalTokens ?? -1;
+  } catch (err) {
+    structuredLog('WARN', 'Erro ao contar tokens', { error: String(err) });
+    return -1;
+  }
+}
+
 async function generateShareSummary(
   title: string,
   htmlContent: string,
   env: SummaryEnv,
   model: string,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
-  const cleanContent = stripHtml(htmlContent).substring(0, 3000)
+  const cleanContent = stripHtml(htmlContent)
   const apiKey = env.GEMINI_API_KEY
-  if (!apiKey) return { error: 'GEMINI_API_KEY não configurada.' }
+  if (!apiKey) {
+    structuredLog('ERROR', 'GEMINI_API_KEY não configurada')
+    return { error: 'GEMINI_API_KEY não configurada.' }
+  }
 
-  const baseUrl = 'https://generativelanguage.googleapis.com'
+  const ai = new GoogleGenAI({ apiKey })
+  const targetModel = model || GEMINI_CONFIG.model
 
-  const messages = [
-    { 
-      role: 'system', 
-      content: `Você é um editor especializado em SEO e compartilhamento social.
+  const systemPrompt = `Você é um editor especializado em SEO e compartilhamento social.
 Dado o título e o conteúdo de um artigo/post, gere DOIS resumos em português brasileiro:
 1. summary_og (máx. 160 caracteres): descrição curta, factual e envolvente para Open Graph (og:description).
 2. summary_ld (máx. 300 caracteres): descrição mais completa para Schema.org/JSON-LD.
@@ -115,62 +146,85 @@ Dado o título e o conteúdo de um artigo/post, gere DOIS resumos em português 
 REGRAS:
 - Retorne APENAS um objeto JSON válido no formato: {"summary_og": "...", "summary_ld": "..."}
 - Seja neutro e informativo.
-- SEM marcação markdown, SEM explicações. APENAS o JSON puro.` 
-    },
-    { role: 'user', content: `TÍTULO: ${title}\nCONTEÚDO: ${cleanContent}` }
-  ]
+- SEM marcação markdown, SEM explicações. APENAS o JSON puro.`
+
+  const userPrompt = `TÍTULO: ${title}\nCONTEÚDO: ${cleanContent}`
+  const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
+
+  // 1. Validation de Contexto API e Pre-req Token Counting
+  const tokenCount = await estimateTokenCount(ai, fullPrompt, targetModel)
+  if (tokenCount > 120000) {
+    structuredLog('ERROR', 'Conteúdo muito extenso para processar', { tokens: tokenCount })
+    return { error: 'Dados muito extensos para geração do resumo.' }
+  } else if (tokenCount > 0) {
+    structuredLog('INFO', 'Token estimation para summarização', { tokens: tokenCount })
+  }
 
   const MAX_RETRIES = 2
+  let lastErrorMsg = 'Desconhecido'
+  let parsedResponse
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const requestHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-
-      const response = await fetch(`${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: requestHeaders,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${messages[0].content}\n\n${messages[1].content}` }] }],
+      parsedResponse = await ai.models.generateContent({
+        model: targetModel,
+        contents: userPrompt,
+        config: {
+          systemInstruction: systemPrompt,
           safetySettings: SUMMARY_SAFETY_SETTINGS,
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 500,
-          },
-        }),
+          temperature: GEMINI_CONFIG.temperature,
+          maxOutputTokens: GEMINI_CONFIG.maxOutputTokens,
+          responseMimeType: 'application/json',
+        }
       })
-
-      if (!response.ok) {
-        const errBody = await response.text().catch(() => '')
-        throw new Error(`API Error: ${response.status} ${errBody.slice(0, 200)}`)
-      }
-
-      type GeminiResp = {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-      }
-
-      const parsedResponse = await response.json() as GeminiResp
-
-      const rawText = parsedResponse.candidates?.[0]?.content?.parts?.[0]?.text
-      if (!rawText) return { error: `AI sem texto útil.` }
-
-      const jsonStr = extractJsonFromText(rawText)
-      const parsed = JSON.parse(jsonStr) as { summary_og?: string; summary_ld?: string }
-      if (!parsed.summary_og) {
-        return { error: `JSON sem summary_og.` }
-      }
-
-      return {
-        summary_og: parsed.summary_og.substring(0, 200),
-        summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
-      }
+      break
     } catch (err) {
-      if (attempt === 0) continue
-      return { error: `Exception: ${err instanceof Error ? err.message : String(err)}` }
+      lastErrorMsg = err instanceof Error ? err.message : String(err)
+      structuredLog('WARN', `Tentativa ${attempt + 1}/${MAX_RETRIES} falhou`, { error: lastErrorMsg })
+      if (attempt === 0) await new Promise(r => setTimeout(r, 800))
     }
   }
 
-  return { error: 'AI falhou após tentativas.' }
+  if (!parsedResponse) {
+    structuredLog('ERROR', 'Falha permanente no Gemini após retry', { lastError: lastErrorMsg })
+    return { error: `AI falhou. Útimo erro: ${lastErrorMsg.slice(0, 100)}` }
+  }
+
+  // Usage Metadata Logging
+  if (parsedResponse.usageMetadata) {
+    structuredLog('INFO', 'Tokens utilizados no summary', {
+      prompt_tokens: parsedResponse.usageMetadata.promptTokenCount,
+      cached_tokens: parsedResponse.usageMetadata.cachedContentTokenCount,
+      output_tokens: parsedResponse.usageMetadata.candidatesTokenCount,
+      total_tokens: parsedResponse.usageMetadata.totalTokenCount,
+    })
+  }
+
+  const parts = parsedResponse.candidates?.[0]?.content?.parts || []
+  const visibleParts = parts.filter(p => p.text && !('thought' in p && p.thought))
+  const rawText = visibleParts.map(p => p.text).join('\\n\\n') || parts?.[0]?.text
+
+  if (!rawText) {
+    structuredLog('ERROR', 'Resposta vazia ou silenciada pelo safety', { candidates: parsedResponse.candidates })
+    return { error: `AI sem texto útil.` }
+  }
+
+  try {
+    const jsonStr = extractJsonFromText(rawText)
+    const parsed = JSON.parse(jsonStr) as { summary_og?: string; summary_ld?: string }
+    if (!parsed.summary_og) {
+      structuredLog('ERROR', 'JSON retornado inválido', { parsed })
+      return { error: `JSON sem summary_og.` }
+    }
+
+    return {
+      summary_og: parsed.summary_og.substring(0, 200),
+      summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
+    }
+  } catch (parseError) {
+    structuredLog('ERROR', 'Erro ao extrair JSON da IA', { error: String(parseError), rawText })
+    return { error: `Erro no JSON gerado: ${String(parseError).slice(0, 50)}` }
+  }
 }
 
 // ── Ensure table + self-healing migration for missing columns ──
@@ -254,7 +308,7 @@ async function resolveSummaryModel(db: D1Database, reqModel?: string): Promise<s
   } catch {
     // fallback ignorado, usa default
   }
-  return DEFAULT_GEMINI_MODEL
+  return GEMINI_CONFIG.model
 }
 
 // ── POST: actions (generate-all, regenerate, edit) ──
@@ -392,7 +446,7 @@ export async function onRequestPost(context: SummaryContext) {
       const resolvedModel = await resolveSummaryModel(db, body.model)
 
       const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel)
-      if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 502)
+      if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 500)
 
       const contentHash = await hashContent(stripHtml(post.content))
 
