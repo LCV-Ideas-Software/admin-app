@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.34] - 2026-04-03
+### Corrigido
+- `functions/_middleware.ts`: Removida variável ociosa `SECRET_KEYS` para satisfazer validação de tipos após a refatoração do Proxy Interceptor da Cloudflare.
+
+### Controle de versão
+- `admin-app`: APP v01.77.33 -> APP v01.77.34
+
 ## [v01.77.33] - 2026-04-03
 ### Corrigido
 - `functions/api/mainsite/gemini-import.ts`: Erradicado bypass do modelo que forçava uso do `gemini-2.5-flash` devido a query SQL antiga usando a coluna `dados_json`. Ajustado para consumir dinamicamente a coluna `payload` com a chave correta `mainsite/ai_models`. Adicionado tipagem stricta corrigindo falha de "Unexpected any".
