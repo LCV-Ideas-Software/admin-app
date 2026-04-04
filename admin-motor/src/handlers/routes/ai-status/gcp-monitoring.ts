@@ -18,7 +18,7 @@ interface ServiceAccountKey {
   token_uri?: string
 }
 
-function json(data: unknown, status = 200) {
+export function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' },
@@ -53,7 +53,7 @@ function normalizePrivateKey(privateKey: string): string {
     .trim()
 }
 
-function parseServiceAccount(saKey: string): ServiceAccountKey {
+export function parseServiceAccount(saKey: string): ServiceAccountKey {
   const rawValue = saKey.trim()
   const candidates = [rawValue]
 
@@ -103,14 +103,14 @@ function parseServiceAccount(saKey: string): ServiceAccountKey {
 }
 
 // Helper: gerar JWT para OAuth2 com service account
-async function getAccessToken(saKey: string): Promise<string> {
+export async function getAccessToken(saKey: string): Promise<string> {
   const sa = parseServiceAccount(saKey)
 
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'RS256', typ: 'JWT' }
   const payload = {
     iss: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/monitoring.read https://www.googleapis.com/auth/cloud-platform.read-only',
+    scope: 'https://www.googleapis.com/auth/monitoring.read https://www.googleapis.com/auth/cloud-platform.read-only https://www.googleapis.com/auth/logging.read',
     aud: sa.token_uri || 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,

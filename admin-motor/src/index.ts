@@ -15,6 +15,7 @@ import {
   handleMpCancelPost,
 } from './handlers/financeiroActions';
 import { onRequestGet as handleAiStatusGcpMonitoringGet } from './handlers/routes/ai-status/gcp-monitoring';
+import { onRequestGet as handleAiStatusGcpLogsGet } from './handlers/routes/ai-status/gcp-logs';
 import { onRequestGet as handleCfdnsRecordsGet } from './handlers/routes/cfdns/records';
 import { onRequestGet as handleCfpwOverviewGet } from './handlers/routes/cfpw/overview';
 import { onRequestPost as handleCfpwOpsPost } from './handlers/routes/cfpw/ops';
@@ -403,6 +404,10 @@ export default {
 
     if (method === 'GET' && pathname === '/api/ai-status/gcp-monitoring') {
       return handleAiStatusGcpMonitoringGet(routeContext<Parameters<typeof handleAiStatusGcpMonitoringGet>[0]>());
+    }
+
+    if (method === 'GET' && pathname === '/api/ai-status/gcp-logs') {
+      return handleAiStatusGcpLogsGet(routeContext<Parameters<typeof handleAiStatusGcpLogsGet>[0]>());
     }
 
     if (method === 'GET' && pathname === '/api/mainsite/modelos') {

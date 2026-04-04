@@ -100,7 +100,7 @@ interface GcpMonitoringData {
   timeSeries?: Record<string, unknown[]>
 }
 
-type TabId = 'models' | 'usage' | 'gcp'
+type TabId = 'models' | 'usage' | 'gcp' | 'gcp-logs'
 
 /* ────────────────────────────────────────────────────────────────
    HELPERS
@@ -236,6 +236,7 @@ export function AiStatusModule() {
           { id: 'models' as TabId, label: 'Modelos & Rate Limits', icon: Layers },
           { id: 'usage' as TabId, label: 'Uso & Telemetria', icon: BarChart3 },
           { id: 'gcp' as TabId, label: 'GCP Monitoring', icon: Cloud },
+          { id: 'gcp-logs' as TabId, label: 'GCP Raw Logs', icon: Settings }
         ]).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -260,6 +261,7 @@ export function AiStatusModule() {
         {activeTab === 'models' && <ModelsTab />}
         {activeTab === 'usage' && <UsageTab />}
         {activeTab === 'gcp' && <GcpTab />}
+        {activeTab === 'gcp-logs' && <GcpLogsTab />}
       </div>
     </section>
   )
@@ -1290,6 +1292,170 @@ function GcpTab() {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TAB 4: GCP RAW LOGS
+   ═══════════════════════════════════════════════════════════════ */
+
+interface GcpLogEntry {
+  insertId: string
+  timestamp: string
+  protoPayload?: {
+    request?: Record<string, unknown>
+    response?: Record<string, unknown>
+    authenticationInfo?: Record<string, unknown>
+    requestMetadata?: Record<string, unknown>
+    methodName?: string
+  }
+}
+
+function GcpLogsTab() {
+  const [logs, setLogs] = useState<GcpLogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [expandedLog, setExpandedLog] = useState<string | null>(null)
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/ai-status/gcp-logs')
+      const data = await res.json() as { ok: boolean; entries?: GcpLogEntry[]; error?: string }
+      if (data.ok) {
+        setLogs(data.entries || [])
+      } else {
+        setError(data.error || 'Erro desconhecido')
+      }
+    } catch {
+      setError('Falha de conexão com o backend.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void fetchLogs() }, [fetchLogs])
+
+  if (loading) {
+    return <div className="module-loading"><Loader2 size={24} className="spin" /></div>
+  }
+
+  if (error) {
+    return (
+      <div className="form-card" style={{ textAlign: 'center', padding: 32 }}>
+        <AlertTriangle size={32} style={{ color: '#dc2626', marginBottom: 10 }} />
+        <p style={{ color: '#dc2626' }}>{error}</p>
+        <button type="button" className="ghost-button" onClick={fetchLogs} style={{ marginTop: 12 }}>
+          <RefreshCw size={14} /> Tentar novamente
+        </button>
+      </div>
+    )
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div className="form-card" style={{ textAlign: 'center', padding: 32 }}>
+        <CloudOff size={36} style={{ color: '#6b7280', opacity: 0.5, marginBottom: 12 }} />
+        <p style={{ color: '#6b7280', fontWeight: 500 }}>Nenhum log encontrado ou retornado pela API.</p>
+        <button type="button" className="ghost-button" onClick={fetchLogs} style={{ marginTop: 16, padding: '10px 20px' }}>
+          <RefreshCw size={14} /> Atualizar
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="ai-gcp-logs-live">
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 20px', borderRadius: 16, marginBottom: 16,
+        background: 'linear-gradient(135deg, rgba(8, 145, 178, 0.06), rgba(8, 145, 178, 0.04))',
+        border: '1px solid rgba(8, 145, 178, 0.12)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff',
+          }}>
+            <Settings size={20} />
+          </div>
+          <div>
+            <span className="eyebrow" style={{ fontSize: '0.7rem' }}>Google Cloud Logging</span>
+            <strong style={{ display: 'block', fontSize: '1rem' }}>Generative Language API Logs</strong>
+          </div>
+        </div>
+        <button type="button" className="ghost-button" onClick={fetchLogs}
+          style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <RefreshCw size={14} /> Atualizar
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {logs.map((log) => {
+          const methodName = log.protoPayload?.methodName?.split('.').pop() || 'Unknown Method'
+          const callerIp = String(log.protoPayload?.requestMetadata?.callerIp || 'IP Oculto')
+          const date = new Date(log.timestamp)
+          const isExpanded = expandedLog === log.insertId
+
+          return (
+            <div key={log.insertId} className="form-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <button type="button" onClick={() => setExpandedLog(isExpanded ? null : log.insertId)}
+                style={{
+                  width: '100%', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14,
+                  background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left'
+                }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(8, 145, 178, 0.1)', color: '#0891b2', flexShrink: 0
+                }}>
+                  <Activity size={16} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <strong style={{ fontSize: '0.92rem', color: '#111827' }}>{methodName}</strong>
+                    <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: 100, background: 'rgba(0,0,0,0.05)', color: '#6b7280' }}>
+                      {callerIp.includes('::1') ? 'Localhost' : callerIp}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                    {date.toLocaleDateString('pt-BR')} às {date.toLocaleTimeString('pt-BR')}
+                  </span>
+                </div>
+                {isExpanded ? <ChevronDown size={18} style={{ color: '#9ca3af' }} /> : <ChevronRight size={18} style={{ color: '#9ca3af' }} />}
+              </button>
+              
+              {isExpanded && (
+                <div style={{ padding: '0 20px 20px', animation: 'fadeSlideIn 0.2s ease' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>
+                    <div>
+                      <span className="eyebrow" style={{ fontSize: '0.72rem', marginBottom: 8, display: 'block' }}>REQUEST PAYLOAD</span>
+                      <pre style={{
+                        margin: 0, padding: 16, borderRadius: 12, background: '#1a1a2e', color: '#dadce0',
+                        fontSize: '0.72rem', overflow: 'auto', maxHeight: 400, border: '1px solid rgba(255,255,255,0.06)',
+                        fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'pre-wrap'
+                      }}>
+                        {JSON.stringify(log.protoPayload?.request || {}, null, 2)}
+                      </pre>
+                    </div>
+                    <div>
+                      <span className="eyebrow" style={{ fontSize: '0.72rem', marginBottom: 8, display: 'block' }}>RESPONSE PAYLOAD</span>
+                      <pre style={{
+                        margin: 0, padding: 16, borderRadius: 12, background: '#1e293b', color: '#f8fafc',
+                        fontSize: '0.72rem', overflow: 'auto', maxHeight: 400, border: '1px solid rgba(255,255,255,0.06)',
+                        fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'pre-wrap'
+                      }}>
+                        {JSON.stringify(log.protoPayload?.response || {}, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
