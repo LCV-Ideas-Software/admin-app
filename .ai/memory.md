@@ -2,6 +2,17 @@
 
 > **Nota:** Este arquivo contém o histórico de desenvolvimento e decisões arquiteturais exclusivos do módulo `admin-app`. Refere-se a atualizações, correções e novos recursos referentes ao app administrativo.
 
+## 2026-04-04 — Admin API Connectivity & Infra Parity Restored (Proxy Native Fix)
+### Escopo
+Resolução finalíssima do vazamento de ambiente responsável pelos códigos 500 e 503 (`/api/ai-status/health`, `/api/mainsite/modelos`, `/api/cfpw/cleanup-deployments`, e `/api/financeiro/insights`). O erro decorria da tentativa de mutação/clone do objeto `context.env`, o que conflitava as chaves ocultas do ecosistema nativo Cloudflare no _middleware, quebrando as referências `GEMINI_API_KEY` e `CLOUDFLARE_PW` em vez de preservá-las.
+
+### Corrigido
+- **Proxy Context.Env Interceptor (`_middleware.ts`)**: Implementada a injeção não mutável usando construtor nativo `new Proxy()` acoplado direto ao handler `Reflect.get(target, prop, receiver)`, com override assinalado via `Object.defineProperty`. Isso resolve instantaneamente a perda do contexto original ao contornar fallbacks dash-case sem instanciar arrays/closures descartadas e preservando a resiliência asíncrona aos demais métodos exóticos e Getters do Workerd.
+
+### Resultado
+- Zero TypeScript Errors (`exit 0`).
+- APIs restauradas e restabelecimento full connectivity.
+
 ## 2026-04-03 — Cloudflare Paid Scale Integration
 ### Escopo
 Migração arquitetural unificada para aproveitamento da infraestrutura Cloudflare Paid. Implementação de **Smart Placement** transversal para redução de latência via proximidade física com o banco de dados (BIGDATA_DB). Adoção da diretiva `usage_model: unbound` para mitigar o `Error 1102` (CPU limit excess). Embutimento global do proxy **Cloudflare AI Gateway** sobrepondo o SDK nativo (`@google/genai`) e habilitando Caching, Rate limiting Nativo e Observabilidade Unificada, mantendo operação híbrida com os LLMs da rede.
