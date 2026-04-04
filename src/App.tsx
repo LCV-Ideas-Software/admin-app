@@ -239,7 +239,7 @@ function App() {
           </div>
         </header>
 
-        <LazyModuleErrorBoundary>
+        <LazyModuleErrorBoundary key={activeModule}>
           <Suspense fallback={<div className="module-loading"><Loader2 size={24} className="spin" /></div>}>
           {activeModule === 'overview' ? (
             <NewsPanel />

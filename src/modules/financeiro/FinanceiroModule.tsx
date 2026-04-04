@@ -604,7 +604,7 @@ export function FinanceiroModule() {
                             <span className="fin-col-status">
                               <span className={`fin-status-badge ${getFinancialToneClass(cfg.label)}`}>{cfg.label}</span>
                             </span>
-                            <span className="fin-col-amount">{tx.amount.toFixed(2)}</span>
+                            <span className="fin-col-amount">{formatBRL(tx.amount)}</span>
                             <span className="fin-col-email">{tx.payerEmail || tx.user || '—'}</span>
                           </div>
                         </button>
