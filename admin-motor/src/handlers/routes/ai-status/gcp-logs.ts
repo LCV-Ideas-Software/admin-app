@@ -38,7 +38,7 @@ export const onRequestGet = async (context: { env: Record<string, string>; data?
       return json({ ok: false, error: `${res.status}: ${errText.slice(0, 300)}` }, res.status)
     }
 
-    const data = await res.json() as any
+    const data = await res.json() as Record<string, unknown>
     
     // Fallback debug: se não vier entries (mesmo 200 OK), expõe o payload original e alerta
     if (!data.entries) {
@@ -54,10 +54,15 @@ export const onRequestGet = async (context: { env: Record<string, string>; data?
     return new Response(JSON.stringify({ entries: data.entries }), {
       headers: { 'Content-Type': 'application/json' }
     })
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message, stack: err.stack }), {
+  } catch (err: unknown) {
+    const isError = err instanceof Error
+    return new Response(JSON.stringify({ 
+      error: isError ? err.message : String(err),
+      stack: isError ? err.stack : undefined
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     })
   }
 }
+
