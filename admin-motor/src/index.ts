@@ -48,6 +48,22 @@ import {
 } from './handlers/routes/apphub/config';
 import { toHeaders } from '../../functions/api/_lib/mainsite-admin';
 
+// ========== MERCADO PAGO SDK POLYFILL ==========
+// O SDK do Mercado Pago usa node-fetch internamente, o que exige
+// que objetos Headers tenham a função .raw()
+if (typeof Headers !== 'undefined' && !('raw' in Headers.prototype)) {
+  Object.defineProperty(Headers.prototype, 'raw', {
+    value: function (this: Headers) {
+      const raw: Record<string, string[]> = {};
+      this.forEach((value, key) => {
+        raw[key] = [value];
+      });
+      return raw;
+    },
+    configurable: true,
+  });
+}
+
 type AdminMotorEnv = {
   BIGDATA_DB?: D1Like;
   GEMINI_API_KEY?: unknown;

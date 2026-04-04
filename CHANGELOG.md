@@ -1,5 +1,19 @@
 # Changelog — Admin App
 
+## [v01.77.36] - 2026-04-04
+### Corrigido
+- `admin-motor/src/handlers/routes/mainsite/ai/transform.ts`: Causa raiz do HTTP 500 silencioso em `/api/mainsite/ai/transform` eliminada — `DEFAULT_MODEL = ''` substituído por `FALLBACK_MODEL = 'gemini-2.5-flash'`, tornando a URL da API Gemini sempre válida mesmo quando nenhum modelo está configurado no D1.
+- `admin-motor/src/handlers/routes/mainsite/ai/transform.ts`: Corrigidos 3 erros TypeScript (`as any` no context → cast tipado `{ data?: { env?: Env } }`, `as any` no JSON response → tipo Gemini explícito, campo inexistente `totalTokens` → `{ totalTokens?: number }`).
+- `admin-motor/src/index.ts` e `admin-motor/src/handlers/aiStatusModels.ts`: Módulo AI Status desvinculado do Cloudflare AI Gateway — rotas `/api/ai-status/health` e `/api/ai-status/models` consultam diretamente `https://generativelanguage.googleapis.com`, eliminando falhas code `2002` do Gateway.
+- `functions/api/_lib/admin-motor-proxy.ts`: Logging explícito adicionado para respostas 5xx do `admin-motor`.
+- `mainsite-app/mainsite-worker/wrangler.json`: `secret_name: "CF_AI_GATEWAY"` corrigido para `"cf-ai-gateway"` (kebab-case minúsculo, padrão canônico do Secrets Store).
+
+### Alterado
+- `admin-motor/src/handlers/routes/mainsite/ai/transform.ts`: `resolvedEnv` extraído como alias único no início do handler; logging estruturado adicionado em todos os caminhos de `resolveModel` e respostas de erro da Gemini API.
+
+### Controle de versão
+- `admin-app`: APP v01.77.35 -> APP v01.77.36
+
 ## [v01.77.35] - 2026-04-04
 ### Adicionado
 - `admin-motor/`: Criado Worker nativo interno ao `admin-app` para concentrar rotas que dependem de `Secrets Store`, com bindings reais para Gemini, AI Gateway, Cloudflare PW, SumUp, Mercado Pago e Resend.
