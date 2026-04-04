@@ -248,6 +248,64 @@ export const handleFinanceiroInsightsGet = async (context: InsightsContext) => {
         return Response.json({ error: err instanceof Error ? err.message : 'Falha no resumo MP.' }, { status: 500 });
       }
     }
+
+    if (type === 'transactions-advanced') {
+      try {
+        const limitRaw = Number(url.searchParams.get('limit'));
+        const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 50;
+        const offsetRaw = Number(url.searchParams.get('offset'));
+        const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
+        const begin_date = getStartIsoWithCutoff(url.searchParams.get('begin_date') || url.searchParams.get('start_date'));
+        const end_date = url.searchParams.get('end_date') ? new Date(url.searchParams.get('end_date')!).toISOString() : new Date().toISOString();
+
+        const searchUrl = new URL('https://api.mercadopago.com/v1/payments/search');
+        searchUrl.searchParams.set('sort', 'date_created');
+        searchUrl.searchParams.set('criteria', 'desc');
+        searchUrl.searchParams.set('range', 'date_created');
+        searchUrl.searchParams.set('begin_date', begin_date);
+        searchUrl.searchParams.set('end_date', end_date);
+        searchUrl.searchParams.set('limit', String(limit));
+        searchUrl.searchParams.set('offset', String(offset));
+
+        const res = await fetch(searchUrl.toString(), { headers: mpHeaders });
+        if (!res.ok) {
+          const errMsg = await readMpError(res, res.statusText);
+          return Response.json({ error: errMsg }, { status: res.status });
+        }
+
+        const payload = await res.json() as AnyRecord;
+        const items: AnyRecord[] = Array.isArray(payload?.results) ? payload.results : [];
+        const normalized = items.map((tx) => ({
+          id: tx?.id ?? null,
+          status: tx?.status ?? 'unknown',
+          statusDetail: tx?.status_detail ?? null,
+          paymentType: tx?.payment_type_id ?? 'unknown',
+          paymentMethod: tx?.payment_method_id ?? null,
+          transactionAmount: Number(tx?.transaction_amount || 0),
+          netReceivedAmount: Number(tx?.transaction_details?.net_received_amount || 0),
+          totalPaidAmount: Number(tx?.transaction_details?.total_paid_amount || 0),
+          installmentAmount: Number(tx?.transaction_details?.installment_amount || 0),
+          installments: tx?.installments ?? null,
+          currency: tx?.currency_id ?? 'BRL',
+          dateCreated: tx?.date_created ?? null,
+          dateApproved: tx?.date_approved ?? null,
+          payerEmail: tx?.payer?.email ?? null,
+          payerId: tx?.payer?.id ?? null,
+          description: tx?.description ?? null,
+          externalReference: tx?.external_reference ?? null,
+          orderId: tx?.order?.id ?? null,
+        }));
+
+        return Response.json({
+          success: true,
+          total: normalized.length,
+          items: normalized,
+          paging: payload?.paging || { total: 0, limit, offset },
+        });
+      } catch (err) {
+        return Response.json({ error: err instanceof Error ? err.message : 'Falha em transações avançadas MP.' }, { status: 500 });
+      }
+    }
   }
 
   return Response.json({ error: 'Parâmetros inválidos: provider e type são obrigatórios.' }, { status: 400 });
