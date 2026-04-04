@@ -22,6 +22,9 @@ interface D1Database {
 
 interface SummaryEnv {
   BIGDATA_DB?: D1Database
+  AI?: {
+    run?: (model: string, payload: unknown, options?: unknown) => Promise<unknown>
+  }
   GEMINI_API_KEY?: string
   CF_AI_GATEWAY?: string
 }
@@ -97,8 +100,10 @@ async function generateShareSummary(
   model: string,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const cleanContent = stripHtml(htmlContent).substring(0, 3000)
+  const isWorkersAiModel = model.startsWith('@cf/')
   const apiKey = env.GEMINI_API_KEY
-  if (!apiKey) return { error: 'GEMINI_API_KEY não configurada.' }
+
+  if (!isWorkersAiModel && !apiKey) return { error: 'GEMINI_API_KEY não configurada.' }
 
   const gatewayUrl = 'https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio'
   const baseUrl = env.CF_AI_GATEWAY ? gatewayUrl : 'https://generativelanguage.googleapis.com'
@@ -122,6 +127,37 @@ REGRAS:
   const MAX_RETRIES = 2
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
+      if (isWorkersAiModel) {
+        const ai = env.AI
+        if (!ai?.run) {
+          return { error: 'AI binding não configurado para executar modelo Workers AI.' }
+        }
+
+        const response = await ai.run(
+          model,
+          {
+            messages,
+            max_tokens: 500,
+            temperature: 0.3,
+          },
+          { gateway: { id: 'workspace-gateway' } },
+        )
+
+        const rawText = (response as { response?: string }).response
+        if (!rawText) return { error: 'AI sem texto útil.' }
+
+        const jsonStr = extractJsonFromText(rawText)
+        const parsed = JSON.parse(jsonStr) as { summary_og?: string; summary_ld?: string }
+        if (!parsed.summary_og) {
+          return { error: 'JSON sem summary_og.' }
+        }
+
+        return {
+          summary_og: parsed.summary_og.substring(0, 200),
+          summary_ld: (parsed.summary_ld || parsed.summary_og).substring(0, 300),
+        }
+      }
+
       const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
       }
@@ -263,7 +299,8 @@ async function resolveSummaryModel(db: D1Database, reqModel?: string): Promise<s
 export async function onRequestPost(context: SummaryContext) {
   const trace = createResponseTrace(context.request)
   try {
-    const db = (context.data?.env || context.env).BIGDATA_DB
+    const runtimeEnv = (context.data?.env || context.env)
+    const db = runtimeEnv.BIGDATA_DB
     if (!db) return json({ ok: false, error: 'BIGDATA_DB não configurado.', ...trace }, 500)
 
     await ensureTable(db)

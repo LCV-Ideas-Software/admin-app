@@ -26,7 +26,7 @@ export type AIModelRegistry = {
   topP?: number
   topK?: number
   vision?: boolean
-  api: 'gemini'
+  api: string
 }
 
 type AdminRuntimeConfig = {
@@ -105,7 +105,6 @@ export function ConfigModule() {
   const [modelsLoading, setModelsLoading] = useState(false)
   const [seoReaderModels, setSeoReaderModels] = useState<AIModelRegistry[]>([])
   const [seoReaderModelsLoading, setSeoReaderModelsLoading] = useState(false)
-  const [seoReaderSyncing, setSeoReaderSyncing] = useState(false)
   
   const loadModels = useCallback(async () => {
     setModelsLoading(true)
@@ -148,32 +147,6 @@ export function ConfigModule() {
   useEffect(() => {
     void loadSeoReaderModels()
   }, [loadSeoReaderModels])
-
-  const syncSeoReaderModels = useCallback(async () => {
-    setSeoReaderSyncing(true)
-    try {
-      const res = await fetch('/api/mainsite/modelos/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Actor': adminActor,
-        },
-        body: JSON.stringify({ scope: 'seo-reader' }),
-      })
-
-      const payload = await res.json() as { ok: boolean; error?: string }
-      if (!res.ok || !payload.ok) {
-        throw new Error(payload.error || 'Falha ao sincronizar catálogo de modelos (SEO/Leitor).')
-      }
-
-      await loadSeoReaderModels()
-      showNotification('Catálogo de modelos (SEO/Leitor) sincronizado.', 'success')
-    } catch (err) {
-      showNotification(err instanceof Error ? err.message : 'Erro no sync de modelos.', 'error')
-    } finally {
-      setSeoReaderSyncing(false)
-    }
-  }, [adminActor, loadSeoReaderModels, showNotification])
 
   // ── Upload state (R2 Backgrounds) ──
   const [isUploadingBg, setIsUploadingBg] = useState(false)
@@ -920,11 +893,11 @@ export function ConfigModule() {
                 <button 
                   type="button" 
                   className="ghost-button" 
-                  onClick={() => void syncSeoReaderModels()} 
-                  disabled={seoReaderModelsLoading || seoReaderSyncing} 
+                  onClick={() => void loadSeoReaderModels()} 
+                  disabled={seoReaderModelsLoading} 
                   style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
                 >
-                  {seoReaderModelsLoading || seoReaderSyncing ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+                  {seoReaderModelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
                   Atualizar
                 </button>
               </label>
@@ -950,11 +923,11 @@ export function ConfigModule() {
                 <button 
                   type="button" 
                   className="ghost-button" 
-                  onClick={() => void syncSeoReaderModels()} 
-                  disabled={seoReaderModelsLoading || seoReaderSyncing} 
+                  onClick={() => void loadSeoReaderModels()} 
+                  disabled={seoReaderModelsLoading} 
                   style={{ padding: '2px 8px', fontSize: '11px', height: 'auto' }}
                 >
-                  {seoReaderModelsLoading || seoReaderSyncing ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+                  {seoReaderModelsLoading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
                   Atualizar
                 </button>
               </label>

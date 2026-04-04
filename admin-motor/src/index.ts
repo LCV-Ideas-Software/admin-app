@@ -122,7 +122,6 @@ type ModelOption = {
 };
 
 const SEO_READER_SCOPE = 'seo-reader';
-const MODEL_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -277,41 +276,6 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
   }
 };
 
-const parseSqliteTimestamp = (value: string | null): number => {
-  if (!value) return 0;
-  const iso = value.includes('T') ? value : `${value.replace(' ', 'T')}Z`;
-  const ts = Date.parse(iso);
-  return Number.isFinite(ts) ? ts : 0;
-};
-
-const shouldAutoSync = (lastSyncedAt: string | null): boolean => {
-  const lastSyncTs = parseSqliteTimestamp(lastSyncedAt);
-  if (!lastSyncTs) return true;
-  return Date.now() - lastSyncTs >= MODEL_SYNC_INTERVAL_MS;
-};
-
-const ensureMainsiteIaModelsTable = async (db: D1Like): Promise<void> => {
-  await db.prepare(`
-    CREATE TABLE IF NOT EXISTS mainsite_ia_models (
-      model_id TEXT NOT NULL,
-      module_scope TEXT NOT NULL,
-      display_name TEXT NOT NULL,
-      api TEXT NOT NULL DEFAULT 'sdk',
-      vision INTEGER NOT NULL DEFAULT 0,
-      active INTEGER NOT NULL DEFAULT 1,
-      synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (model_id, module_scope)
-    )
-  `).bind().run();
-
-  await db.prepare(`
-    CREATE INDEX IF NOT EXISTS idx_mainsite_ia_models_scope_active
-    ON mainsite_ia_models (module_scope, active, model_id)
-  `).bind().run();
-};
-
 const fetchMainsiteGeminiModels = async (
   request: Request,
   env: ResolvedAdminMotorEnv,
@@ -385,72 +349,56 @@ const fetchMainsiteGeminiModels = async (
   });
 };
 
-const readCachedScopeModels = async (db: D1Like, scope: string): Promise<ModelOption[]> => {
-  const rows = await db.prepare(`
-    SELECT model_id AS id, display_name AS displayName, api, vision
-    FROM mainsite_ia_models
-    WHERE module_scope = ? AND active = 1
-    ORDER BY model_id ASC
-  `).bind(scope).all<{ id: string; displayName: string; api: string; vision: number }>();
+const fetchWorkersAiModels = async (env: ResolvedAdminMotorEnv): Promise<ModelOption[]> => {
+  const accountId = env.CF_ACCOUNT_ID;
+  const token = env.CLOUDFLARE_PW;
 
-  return (rows.results || []).map((row) => ({
-    id: row.id,
-    displayName: row.displayName,
-    api: row.api,
-    vision: Boolean(row.vision),
-  }));
-};
-
-const readScopeLastSync = async (db: D1Like, scope: string): Promise<string | null> => {
-  const row = await db.prepare(`
-    SELECT MAX(synced_at) AS lastSyncedAt
-    FROM mainsite_ia_models
-    WHERE module_scope = ?
-  `).bind(scope).first<{ lastSyncedAt: string | null }>();
-
-  return row?.lastSyncedAt ?? null;
-};
-
-const syncScopeModels = async (
-  request: Request,
-  env: ResolvedAdminMotorEnv,
-  scope: string,
-): Promise<{ models: ModelOption[]; syncedAt: string }> => {
-  const db = env.BIGDATA_DB;
-  if (!db) {
-    throw new Error('BIGDATA_DB não configurado no runtime.');
+  if (!accountId || !token) {
+    throw new Error('CF_ACCOUNT_ID/CLOUDFLARE_PW não configurados para listar modelos Cloudflare.');
   }
 
-  await ensureMainsiteIaModelsTable(db);
-  const models = await fetchMainsiteGeminiModels(request, env);
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?per_page=100&hide_experimental=true`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
 
-  await db.prepare('DELETE FROM mainsite_ia_models WHERE module_scope = ?').bind(scope).run();
-
-  for (const model of models) {
-    await db.prepare(`
-      INSERT INTO mainsite_ia_models (
-        model_id,
-        module_scope,
-        display_name,
-        api,
-        vision,
-        active,
-        synced_at,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `)
-      .bind(
-        model.id,
-        scope,
-        model.displayName,
-        model.api,
-        model.vision ? 1 : 0,
-      )
-      .run();
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Cloudflare AI models search falhou (${res.status}): ${body.slice(0, 200)}`);
   }
 
-  const syncedAt = new Date().toISOString();
-  return { models, syncedAt };
+  type WorkersAiModel = {
+    id?: string;
+    name?: string;
+    description?: string;
+    task?: string;
+  };
+
+  const payload = (await res.json()) as { result?: WorkersAiModel[] };
+  const results = payload.result || [];
+
+  const filtered = results.filter((item) => {
+    const task = (item.task || '').toLowerCase();
+    return task.includes('text generation') || task.includes('chat');
+  });
+
+  const mapped = (filtered.length > 0 ? filtered : results)
+    .filter((item) => Boolean(item.id))
+    .map((item) => {
+      const id = String(item.id);
+      const lower = id.toLowerCase();
+      return {
+        id,
+        displayName: item.name || id,
+        api: 'workers-ai',
+        vision: lower.includes('vision') || lower.includes('vl') || lower.includes('llava') || lower.includes('pixtral'),
+      } satisfies ModelOption;
+    });
+
+  return mapped.sort((a, b) => a.displayName.localeCompare(b.displayName));
 };
 
 const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEnv): Promise<Response> => {
@@ -458,36 +406,22 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
   const scope = url.searchParams.get('scope');
 
   if (scope === SEO_READER_SCOPE) {
-    const db = env.BIGDATA_DB;
-    if (!db) {
-      return json({ ok: false, error: 'BIGDATA_DB não configurado no runtime.' }, 503);
-    }
-
     try {
-      await ensureMainsiteIaModelsTable(db);
-      let cachedModels = await readCachedScopeModels(db, scope);
-      let lastSyncedAt = await readScopeLastSync(db, scope);
-
-      if (cachedModels.length === 0 || shouldAutoSync(lastSyncedAt)) {
-        const synced = await syncScopeModels(request, env, scope);
-        cachedModels = synced.models;
-        lastSyncedAt = synced.syncedAt;
-      }
+      const models = await fetchWorkersAiModels(env);
 
       return json({
         ok: true,
         scope,
-        source: 'd1-cache',
-        syncedAt: lastSyncedAt,
-        models: cachedModels,
-        total: cachedModels.length,
+        source: 'cloudflare-api',
+        models,
+        total: models.length,
       });
     } catch (err) {
-      console.error('[mainsite/modelos] cache:read-or-sync:error', {
+      console.error('[mainsite/modelos] cloudflare-api:error', {
         scope,
         error: err instanceof Error ? err.message : String(err),
       });
-      return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos cacheados.' }, 500);
+      return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos Cloudflare.' }, 500);
     }
   }
 
@@ -505,39 +439,6 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
       error: err instanceof Error ? err.message : String(err),
     });
     return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos.' }, 500);
-  }
-};
-
-const handleMainsiteModelosSync = async (request: Request, env: ResolvedAdminMotorEnv): Promise<Response> => {
-  if (!env.BIGDATA_DB) {
-    return json({ ok: false, error: 'BIGDATA_DB não configurado no runtime.' }, 503);
-  }
-
-  let scope = SEO_READER_SCOPE;
-  try {
-    const body = (await request.json().catch(() => ({}))) as { scope?: string };
-    if (body.scope) {
-      scope = body.scope;
-    }
-  } catch {
-    scope = SEO_READER_SCOPE;
-  }
-
-  if (scope !== SEO_READER_SCOPE) {
-    return json({ ok: false, error: 'Escopo de sync inválido para esta rota.' }, 400);
-  }
-
-  try {
-    const synced = await syncScopeModels(request, env, scope);
-    return json({
-      ok: true,
-      scope,
-      syncedAt: synced.syncedAt,
-      total: synced.models.length,
-      models: synced.models,
-    });
-  } catch (err) {
-    return json({ ok: false, error: err instanceof Error ? err.message : 'Falha no sync manual de modelos.' }, 500);
   }
 };
 
@@ -591,10 +492,6 @@ export default {
 
     if (method === 'GET' && pathname === '/api/mainsite/modelos') {
       return handleMainsiteModelos(request, runtimeEnv);
-    }
-
-    if (method === 'POST' && pathname === '/api/mainsite/modelos/sync') {
-      return handleMainsiteModelosSync(request, runtimeEnv);
     }
 
     if (method === 'GET' && pathname === '/api/calculadora/modelos') {
