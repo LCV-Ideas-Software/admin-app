@@ -27,5 +27,14 @@ export const proxyToAdminMotor = async (context: ProxyContext): Promise<Response
   const targetUrl = new URL(originalUrl.pathname + originalUrl.search, 'https://admin-motor.internal');
   const requestToService = new Request(targetUrl.toString(), context.request);
 
-  return service.fetch(requestToService);
+  try {
+    return await service.fetch(requestToService);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao encaminhar requisição para o admin-motor.';
+    return json(502, {
+      ok: false,
+      error: message,
+      path: originalUrl.pathname,
+    });
+  }
 };

@@ -340,6 +340,10 @@ export default {
       return handleMainsiteModelos(request, runtimeEnv);
     }
 
+    if (method === 'GET' && pathname === '/api/calculadora/modelos') {
+      return handleMainsiteModelos(request, runtimeEnv);
+    }
+
     if (method === 'GET' && pathname === '/api/oraculo/modelos') {
       return handleOraculoModelosGet({ request, env: runtimeEnv });
     }

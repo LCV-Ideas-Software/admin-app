@@ -61,6 +61,7 @@ export type CloudflareDnsRecordInput = {
 type EnvWithCloudflareToken = {
   CLOUDFLARE_DNS?: string
   CLOUDFLARE_PW?: string
+  CLOUDFLARE_CACHE?: string
 }
 
 const resolveToken = (env: EnvWithCloudflareToken) => {
@@ -72,6 +73,11 @@ const resolveToken = (env: EnvWithCloudflareToken) => {
   const byPwToken = env.CLOUDFLARE_PW?.trim()
   if (byPwToken) {
     return byPwToken
+  }
+
+  const byCacheToken = env.CLOUDFLARE_CACHE?.trim()
+  if (byCacheToken) {
+    return byCacheToken
   }
 
   return ''
@@ -120,7 +126,7 @@ const cloudflareRequestPayload = async <T>(
 ) => {
   const token = resolveToken(env)
   if (!token) {
-    throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_DNS).')
+    throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_DNS, CLOUDFLARE_PW ou CLOUDFLARE_CACHE).')
   }
 
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {

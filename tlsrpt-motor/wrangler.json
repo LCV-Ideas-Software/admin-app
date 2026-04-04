@@ -19,36 +19,5 @@
       "database_id": "00000000-0000-0000-0000-000000000000"
     }
   ],
-  "secrets_store_secrets": [
-    {
-      "binding": "GEMINI_API_KEY",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "gemini-api-key"
-    },
-    {
-      "binding": "RESEND_API_KEY",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "resend-api-key"
-    },
-    {
-      "binding": "MP_ACCESS_TOKEN",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "mp-access-token"
-    },
-    {
-      "binding": "SUMUP_API_KEY_PRIVATE",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "sumup-api-key-private"
-    },
-    {
-      "binding": "SUMUP_MERCHANT_CODE",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "sumup-merchant-code"
-    },
-    {
-      "binding": "CF_AI_GATEWAY",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "cf-ai-gateway"
-    }
-  ]
+  "secrets_store_secrets": []
 }
