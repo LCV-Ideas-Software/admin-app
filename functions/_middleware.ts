@@ -78,39 +78,48 @@ const resolveFromAliases = async (
 };
 
 export async function onRequest(context: { request: Request; env: Record<string, unknown>; next: () => Promise<Response> }) {
-  const url = new URL(context.request.url);
+  try {
+    const url = new URL(context.request.url);
 
-  // Bloqueio de exposição pública via URL interna .pages.dev
-  if (url.hostname.endsWith('.pages.dev')) {
-    url.hostname = 'admin.lcv.app.br';
-    return Response.redirect(url.toString(), 301);
-  }
-
-  // ========== SECRET/ENV RESOLVER MIDDLEWARE ==========
-  // Normaliza aliases e bindings para variáveis canônicas em UPPER_SNAKE_CASE.
-  const envClone = { ...context.env };
-
-  for (const key of Object.keys(SECRET_ALIASES) as Array<keyof typeof SECRET_ALIASES>) {
-    const resolved = await resolveFromAliases(envClone, key);
-    if (resolved) {
-      envClone[key] = resolved;
+    // Bloqueio de exposição pública via URL interna .pages.dev
+    if (url.hostname.endsWith('.pages.dev')) {
+      url.hostname = 'admin.lcv.app.br';
+      return Response.redirect(url.toString(), 301);
     }
+
+    // ========== SECRET/ENV RESOLVER MIDDLEWARE ==========
+    // Normaliza aliases e bindings para variáveis canônicas em UPPER_SNAKE_CASE.
+    const envClone = { ...context.env };
+
+    for (const key of Object.keys(SECRET_ALIASES) as Array<keyof typeof SECRET_ALIASES>) {
+      const resolved = await resolveFromAliases(envClone, key);
+      if (resolved) {
+        envClone[key] = resolved;
+      }
+    }
+
+    const missingCritical = CRITICAL_KEYS.filter((key) => {
+      const value = envClone[key];
+      return typeof value !== 'string' || !value.trim();
+    });
+
+    if (missingCritical.length > 0) {
+      console.warn(`[Env Resolver] Secrets críticos ausentes no runtime: ${missingCritical.join(', ')}`);
+    }
+
+    // Inject clone directly to context.data, which is propagated correctly across handlers.
+    const mutableContext = context as unknown as Record<string, unknown>;
+    const mutableData = (mutableContext.data || {}) as Record<string, unknown>;
+    mutableData.env = envClone;
+    mutableContext.data = mutableData;
+
+    return await context.next();
+  } catch (err) {
+    const errorBody = err instanceof Error ? err.message : String(err);
+    console.error('[Middleware Global Catch] Erro fatal não tratado:', errorBody);
+    return new Response(JSON.stringify({ ok: false, error: 'Erro de processamento interno no Roteamento das Pages API.', detail: errorBody }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
-
-  const missingCritical = CRITICAL_KEYS.filter((key) => {
-    const value = envClone[key];
-    return typeof value !== 'string' || !value.trim();
-  });
-
-  if (missingCritical.length > 0) {
-    console.warn(`[Env Resolver] Secrets críticos ausentes no runtime: ${missingCritical.join(', ')}`);
-  }
-
-  // Inject clone directly to context.data, which is propagated correctly across handlers.
-  const mutableContext = context as unknown as Record<string, unknown>;
-  const mutableData = (mutableContext.data || {}) as Record<string, unknown>;
-  mutableData.env = envClone;
-  mutableContext.data = mutableData;
-
-  return context.next();
 }

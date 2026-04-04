@@ -90,33 +90,11 @@ type D1Like = {
   prepare(query: string): { bind(...values: unknown[]): { first<T>(): Promise<T | null> } };
 };
 
-const DEFAULT_MODEL = '';
-
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
     headers: toHeaders(),
   });
-
-const resolveModel = async (db: D1Like | undefined): Promise<string> => {
-  if (!db) return DEFAULT_MODEL;
-  try {
-    const row = await db
-      .prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1')
-      .bind('mainsite/ai_models')
-      .first<{ payload?: string }>();
-
-    if (row?.payload) {
-      const parsed = JSON.parse(row.payload) as Record<string, unknown>;
-      if (typeof parsed.chat === 'string' && parsed.chat) {
-        return parsed.chat;
-      }
-    }
-  } catch {
-    // noop
-  }
-  return DEFAULT_MODEL;
-};
 
 const formatModelName = (id: string): string => {
   if (!id) return '';
@@ -195,38 +173,12 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
       debugResolved: resolvedMap
     }, 503);
   }
-
-  const activeModel = await resolveModel(env.BIGDATA_DB as D1Like | undefined);
-  if (!activeModel) {
-    console.error('[ai-status/health] model:missing', {
-      reason: 'mainsite/ai_models.chat vazio ou ausente no BIGDATA_DB',
-    });
-    return json(
-      {
-        ok: false,
-        keyConfigured: true,
-        apiReachable: false,
-        latencyMs: null,
-        httpStatus: null,
-        error: 'Nenhum modelo ativo configurado em mainsite/ai_models.chat.',
-        checkedAt: new Date().toISOString(),
-      },
-      500,
-    );
-  }
-
-  const gatewayUrl =
-    'https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio';
-  const baseUrl = env.CF_AI_GATEWAY ? gatewayUrl : 'https://generativelanguage.googleapis.com';
-
+  const baseUrl = 'https://generativelanguage.googleapis.com';
   const requestHeaders = toHeaders() as Record<string, string>;
-  if (env.CF_AI_GATEWAY) {
-    requestHeaders['cf-aig-authorization'] = `Bearer ${env.CF_AI_GATEWAY}`;
-  }
 
   try {
     const start = Date.now();
-    const res = await fetch(`${baseUrl}/v1beta/models/${activeModel}?key=${apiKey}`, {
+    const res = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`, {
       method: 'GET',
       headers: requestHeaders,
       signal: request.signal,
@@ -235,15 +187,15 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
 
     if (res.ok) {
       console.info('[ai-status/health] request:ok', {
-        model: activeModel,
+        endpoint: 'models:list',
         latencyMs,
-        gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+        directGoogle: true,
       });
       return json({
         ok: true,
         keyConfigured: true,
         apiReachable: true,
-        model: activeModel,
+        model: 'google-direct',
         latencyMs,
         httpStatus: 200,
         checkedAt: new Date().toISOString(),
@@ -252,9 +204,9 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
 
     const upstreamBody = await res.text().catch(() => '');
     console.error('[ai-status/health] upstream:error', {
-      model: activeModel,
+      endpoint: 'models:list',
       status: res.status,
-      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      directGoogle: true,
       bodyPreview: upstreamBody.slice(0, 300),
     });
 
@@ -262,17 +214,17 @@ const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv
       ok: false,
       keyConfigured: true,
       apiReachable: true,
-      model: activeModel,
+      model: 'google-direct',
       latencyMs,
       httpStatus: res.status,
-      errorDetail: `Modelo ${activeModel} não encontrado pela API`,
+      errorDetail: 'Falha ao consultar a API do Google Gemini diretamente.',
       checkedAt: new Date().toISOString(),
     });
   } catch (err) {
     const errorBody = err instanceof Error ? err.message : String(err);
     console.error('[ai-status/health] request:error', {
-      model: activeModel,
-      gatewayEnabled: Boolean(env.CF_AI_GATEWAY),
+      endpoint: 'models:list',
+      directGoogle: true,
       error: errorBody,
     });
     return json(

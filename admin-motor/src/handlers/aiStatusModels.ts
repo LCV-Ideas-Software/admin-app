@@ -1,4 +1,4 @@
-type Env = { GEMINI_API_KEY?: string; CF_AI_GATEWAY?: string };
+type Env = { GEMINI_API_KEY?: string };
 
 type Context = { request: Request; env: Env };
 
@@ -23,7 +23,10 @@ const formatModelName = (id: string): string => {
 export const handleAiStatusModelsGet = async (context: Context) => {
   const { env } = context;
   const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 503);
+  if (!apiKey) {
+    console.error('[ai-status/models] api-key:missing');
+    return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 503);
+  }
 
   try {
     const start = Date.now();
@@ -45,16 +48,19 @@ export const handleAiStatusModelsGet = async (context: Context) => {
       }
     >();
 
-    const gatewayUrl = 'https://gateway.ai.cloudflare.com/v1/d65b76a0e64c3791e932edd9163b1c71/workspace-gateway/google-ai-studio';
-    const baseUrl = env.CF_AI_GATEWAY ? gatewayUrl : 'https://generativelanguage.googleapis.com';
-
+    const baseUrl = 'https://generativelanguage.googleapis.com';
     const requestHeaders: Record<string, string> = {};
-    if (env.CF_AI_GATEWAY) {
-      requestHeaders['cf-aig-authorization'] = `Bearer ${env.CF_AI_GATEWAY}`;
-    }
 
     const res = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`, { headers: requestHeaders });
-    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+    if (!res.ok) {
+      const upstreamBody = await res.text().catch(() => '');
+      console.error('[ai-status/models] upstream:error', {
+        status: res.status,
+        directGoogle: true,
+        bodyPreview: upstreamBody.slice(0, 300),
+      });
+      throw new Error(`API Error: ${res.status}`);
+    }
 
     interface ModelOutput {
       name: string;
@@ -114,8 +120,17 @@ export const handleAiStatusModelsGet = async (context: Context) => {
       return a.id.localeCompare(b.id);
     });
 
+    console.info('[ai-status/models] request:ok', {
+      total: models.length,
+      latencyMs,
+      directGoogle: true,
+    });
     return json({ ok: true, models, total: models.length, latencyMs });
   } catch (err) {
+    console.error('[ai-status/models] request:error', {
+      directGoogle: true,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos.' }, 500);
   }
 };
