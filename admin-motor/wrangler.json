@@ -34,6 +34,11 @@
       "secret_name": "cloudflare-account-id"
     },
     {
+      "binding": "CLOUDFLARE_CACHE",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "cloudflare-cache"
+    },
+    {
       "binding": "SUMUP_API_KEY_PRIVATE",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "sumup-api-key-private"
