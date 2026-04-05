@@ -62,35 +62,40 @@ async function resolveModel(db: D1Database | undefined): Promise<string> {
 // Tier 2: GET com URL no path  (https://r.jina.ai/{url})
 const JINA_BASE_URL = 'https://r.jina.ai/';
 
-// ── Tier 1: cf-browser-rendering + readerlm-v2 (config oficial jina.ai, qualidade máxima)
-// X-Engine: cf-browser-rendering — engine Cloudflare-nativo (diferente do genérico 'browser')
-// readerlm-v2 é modelo serverless com cold-start e capacidade limitada → pode retornar 503
-const JINA_TIMEOUT_MS_T1        = 55_000; // margem 7s acima do X-Timeout server
-const JINA_SERVER_TIMEOUT_T1_S  = 48;     // Jina aguarda browser render + ReaderLM
+// ── Tier 1: browser + readerlm-v2 (qualidade máxima, serverless com cold-start)
+// X-Engine: 'browser' — Chromium headless (único engine válido para SPAs)
+// readerlm-v2 é modelo AI serverless em beta — pode dar 503 ou timeout em páginas pesadas
+// SEM retry no T1: se falhar, faz fallback IMEDIATO para T2 (evita desperdiçar 55s extra)
+const JINA_TIMEOUT_MS_T1        = 65_000; // margem 7s acima do X-Timeout server
+const JINA_SERVER_TIMEOUT_T1_S  = 58;     // Jina aguarda browser render (~20s) + ReaderLM (~30s)
 
-// ── Tier 2: browser-only (fallback quando readerlm-v2 está em capacidade)
+// ── Tier 2: browser-only (fallback universal quando T1 falha por qualquer motivo)
 // Confirmado via teste live (2026-04-05): X-Engine: 'browser' sem readerlm-v2 retorna 200 OK
 const JINA_TIMEOUT_MS_T2        = 38_000;
 const JINA_SERVER_TIMEOUT_T2_S  = 30;
 
-// Retry por tier (2×T1 + 2×T2 = até 4 tentativas totais)
-const JINA_MAX_RETRIES         = 2;
+// Retry: T1 = 1 tentativa (sem retry); T2 = 2 tentativas com backoff
+const JINA_MAX_RETRIES_T1      = 1;      // sem retry — fallback imediato para T2
+const JINA_MAX_RETRIES_T2      = 2;      // retry com backoff exponencial
 const JINA_RETRY_BASE_DELAY_MS = 1_500;
 
 /**
  * Fetch Gemini share page content as markdown via Jina Reader.
  *
- * Estratégia de 2 tiers (confirmada via teste ao vivo em 2026-04-05):
- *   Tier 1 — cf-browser-rendering + readerlm-v2 (config oficial jina.ai):
+ * Estratégia de 2 tiers (auditada e otimizada em 2026-04-05):
+ *   Tier 1 — browser + readerlm-v2 (qualidade máxima, 1 tentativa):
  *             POST com JSON body, Accept: text/event-stream, resposta parseada via SSE.
- *             readerlm-v2 retorna 503 "ServiceNodeResourceDrainError" quando superlotado.
- *   Tier 2 — browser-only: fallback automático quando Tier 1 retorna 503;
+ *             readerlm-v2 é serverless beta — pode dar 503, timeout, ou SSE error.
+ *             SEM retry: se falhar por QUALQUER motivo → fallback IMEDIATO para T2.
+ *   Tier 2 — browser-only (fallback universal, 2 tentativas com backoff):
  *             GET clássico, Accept: text/markdown; confirmado 200 OK em testes live.
  *
  * Limites Jina (ref: https://jina.ai/reader/):
  *  - Sem API key: 20 RPM por IP (IP compartilhado Cloudflare → risco alto)
  *  - Com API key: 500 RPM por key
  * Solução: JINA_API_KEY sempre presente via Cloudflare Secrets.
+ *
+ * Worst case total: ~65s (T1) + ~77s (T2×2) ≈ 142s — viável em Workers paid plan.
  */
 async function fetchSharePageContent(url: string, jinaApiKey?: string): Promise<string> {
   // Diagnóstico de API key — não expõe o valor, apenas presença
@@ -100,27 +105,24 @@ async function fetchSharePageContent(url: string, jinaApiKey?: string): Promise<
   });
 
   try {
-    // Tier 1: cf-browser-rendering + readerlm-v2 (qualidade máxima)
+    // Tier 1: browser + readerlm-v2 (qualidade máxima, 1 tentativa única)
     return await fetchJinaTier(url, jinaApiKey, true);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // 503 = readerlm-v2 at capacity → degrade automaticamente para Tier 2
-    if (msg.includes('503')) {
-      structuredLog('warn', 'Jina readerlm-v2 em capacidade – degradando para Tier 2 (browser-only)', {
-        url: url.substring(0, 80),
-        originalError: msg,
-      });
-      return await fetchJinaTier(url, jinaApiKey, false);
-    }
-    throw err;
+    // Fallback UNIVERSAL para T2 — qualquer falha do T1 (timeout, 503, SSE error, etc)
+    structuredLog('warn', 'Jina T1 falhou – degradando para Tier 2 (browser-only)', {
+      url: url.substring(0, 80),
+      t1Error: msg,
+    });
+    return await fetchJinaTier(url, jinaApiKey, false);
   }
 }
 
 /**
  * Executa fetch via Jina Reader com retry e exponential backoff.
  *
- * @param useReaderlm true = Tier 1 (POST + cf-browser-rendering + readerlm-v2 + SSE)
- *                    false = Tier 2 (GET + browser + text/markdown)
+ * @param useReaderlm true = Tier 1 (POST + browser + readerlm-v2 + SSE, 1 tentativa)
+ *                    false = Tier 2 (GET + browser + text/markdown, 2 tentativas)
  */
 async function fetchJinaTier(
   url: string,
@@ -129,10 +131,11 @@ async function fetchJinaTier(
 ): Promise<string> {
   const serverTimeoutS  = useReaderlm ? JINA_SERVER_TIMEOUT_T1_S : JINA_SERVER_TIMEOUT_T2_S;
   const clientTimeoutMs = useReaderlm ? JINA_TIMEOUT_MS_T1 : JINA_TIMEOUT_MS_T2;
-  const tierLabel       = useReaderlm ? 'T1(cf-browser+readerlm-v2)' : 'T2(browser-only)';
+  const maxRetries      = useReaderlm ? JINA_MAX_RETRIES_T1 : JINA_MAX_RETRIES_T2;
+  const tierLabel       = useReaderlm ? 'T1(browser+readerlm-v2)' : 'T2(browser-only)';
 
-  // ─ Tier 1: POST com JSON body (engine Cloudflare-nativo + readerlm-v2 + SSE)
-  // ─ Tier 2: GET com URL no path (engine browser genérico + markdown)
+  // ─ Tier 1: POST com JSON body (browser + readerlm-v2 + SSE)
+  // ─ Tier 2: GET com URL no path (browser + markdown)
   const authHeader: Record<string, string> = jinaApiKey
     ? { 'Authorization': `Bearer ${jinaApiKey}` }
     : {};
@@ -182,7 +185,7 @@ async function fetchJinaTier(
 
   let lastError: Error = new Error('Falha desconhecida ao buscar via Jina Reader.');
 
-  for (let attempt = 0; attempt < JINA_MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     // Backoff antes da 2ª tentativa do mesmo tier
     if (attempt > 0) {
       const backoffMs = JINA_RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1); // 1.5s
@@ -204,7 +207,7 @@ async function fetchJinaTier(
           : JINA_RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
         lastError = new Error('Jina Reader retornou status 429 (tente novamente em breve).');
         structuredLog('warn', `Jina ${tierLabel} 429 – aguardando`, { attempt, waitMs });
-        if (attempt < JINA_MAX_RETRIES - 1) {
+        if (attempt < maxRetries - 1) {
           await new Promise(r => setTimeout(r, waitMs));
           continue;
         }
@@ -228,15 +231,15 @@ async function fetchJinaTier(
       clearTimeout(timeoutId);
 
       if (err instanceof Error && err.name === 'AbortError') {
-        lastError = new Error(`Jina Reader timeout (${serverTimeoutS}s). A página pode ser muito pesada.`);
-        structuredLog('warn', `Jina ${tierLabel} timeout – retentando`, { attempt });
-        if (attempt < JINA_MAX_RETRIES - 1) continue;
+        lastError = new Error(`Jina ${tierLabel} timeout (${serverTimeoutS}s). A página pode ser muito pesada.`);
+        structuredLog('warn', `Jina ${tierLabel} timeout`, { attempt, serverTimeoutS, clientTimeoutMs });
+        if (attempt < maxRetries - 1) continue;
         throw lastError;
       }
 
       lastError = err instanceof Error ? err : new Error(String(err));
-      structuredLog('warn', `Jina ${tierLabel} erro – retentando`, { attempt, detail: lastError.message });
-      if (attempt < JINA_MAX_RETRIES - 1) continue;
+      structuredLog('warn', `Jina ${tierLabel} erro`, { attempt, detail: lastError.message });
+      if (attempt < maxRetries - 1) continue;
       throw lastError;
     }
   }
