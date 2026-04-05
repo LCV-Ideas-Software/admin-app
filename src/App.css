@@ -2761,6 +2761,10 @@ input[type="color"]:focus-visible {
   /* ProseMirror requires this */
 }
 
+.tiptap-editor .tiptap p {
+  margin-bottom: 0.65em;
+}
+
 .tiptap-editor .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: #9aa0a6;
