@@ -145,8 +145,9 @@ async function fetchJinaTier(
           // SSE stream — Jina entrega conteúdo progressivamente;
           // parseJinaSSEStream extrai o conteúdo final acumulado
           'Accept':               'text/event-stream',
-          // Engine Cloudflare-nativo: mais estável que 'browser' genérico em Workers CF
-          'X-Engine':             'cf-browser-rendering',
+          // Engine browser (Chromium headless) — engine correto para SPAs como Gemini Share
+          // NOTA: 'cf-browser-rendering' é inválido no Jina Reader; usar 'browser'
+          'X-Engine':             'browser',
           // Extração AI de conteúdo principal (remove nav/menus/botões)
           'X-Respond-With':       'readerlm-v2',
           // Gera alt-text para imagens (melhora fidelidade do markdown)
@@ -246,14 +247,18 @@ async function fetchJinaTier(
 /**
  * Parseia stream SSE do Jina Reader (Accept: text/event-stream).
  *
- * O Jina entrega conteúdo progressivamente — cada evento 'data:' contém
- * uma versão mais completa do markdown extraído. Retorna o conteúdo do
- * último evento válido (resultado final acumulado).
+ * O Jina usa compound SSE events com campo 'event:' que indica o tipo:
+ *   - Evento normal:  sem 'event:' (default 'message') → data contém JSON com 'content'
+ *   - Evento de erro: 'event: error' → data contém JSON com 'code' e 'message'
  *
- * Formato SSE Jina:
- *   data: {"url":"...","title":"...","content":"markdown...","tokens":N}\n\n
- *   data: {"url":"...","title":"...","content":"markdown mais completo..."}\n\n
- *   data: [DONE]\n\n
+ * IMPORTANTE: Jina retorna HTTP 200 mesmo quando readerlm-v2 está em capacidade!
+ * O 503 é transmitido DENTRO do stream SSE como 'event: error'.
+ * Este parser detecta e propaga esse erro com o código embutido na mensagem,
+ * permitindo que fetchSharePageContent acione o fallback Tier 2 via msg.includes('503').
+ *
+ * Formato confirmado via live test (2026-04-05):
+ *   event: error\n
+ *   data: {"code":503,"name":"ServiceNodeResourceDrainError","message":"..."}\n\n
  */
 async function parseJinaSSEStream(response: Response): Promise<string> {
   if (!response.body) {
@@ -264,6 +269,55 @@ async function parseJinaSSEStream(response: Response): Promise<string> {
   const decoder = new TextDecoder('utf-8');
   let buffer      = '';
   let lastContent = '';
+
+  /**
+   * Processa um bloco SSE completo (separado por \n\n).
+   * Retorna false (noop) ou lança erro se for evento de erro.
+   */
+  function processSSEBlock(block: string): void {
+    const lines = block.split('\n');
+    let eventType  = 'message'; // default SSE type quando 'event:' ausente
+    const dataLines: string[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        eventType = line.slice(7).trim();
+      } else if (line.startsWith('data: ')) {
+        dataLines.push(line.slice(6));
+      }
+    }
+
+    const raw = dataLines.join('\n').trim();
+    if (!raw || raw === '[DONE]') return;
+
+    if (eventType === 'error') {
+      // Jina transmite 'event: error' com código HTTP dentro do JSON
+      // (ex.: 503 quando readerlm-v2 está em capacidade)
+      try {
+        const errPayload = JSON.parse(raw) as {
+          code?: number; status?: number; message?: string;
+        };
+        const code = errPayload.code ?? errPayload.status ?? 0;
+        const msg  = errPayload.message ?? 'Erro no Jina SSE';
+        // Inclui o código na mensagem para que o caller detecte '503'
+        throw new Error(`Jina SSE erro ${code}: ${msg}`);
+      } catch (e) {
+        // Re-lança erros já formatados; para parse failure usa raw
+        if (e instanceof Error && e.message.startsWith('Jina SSE erro')) throw e;
+        throw new Error(`Jina SSE erro: ${raw.substring(0, 100)}`);
+      }
+    }
+
+    // Evento de dados normal: extrai 'content' do JSON
+    try {
+      const payload = JSON.parse(raw) as { content?: string; text?: string };
+      const text = payload.content ?? payload.text ?? '';
+      if (text) lastContent = text;
+    } catch {
+      // Fallback: dado não-JSON — trata como markdown literal acumulado
+      if (raw.length > lastContent.length) lastContent = raw;
+    }
+  }
 
   try {
     while (true) {
@@ -278,21 +332,7 @@ async function parseJinaSSEStream(response: Response): Promise<string> {
       buffer = events.pop() ?? '';
 
       for (const event of events) {
-        for (const line of event.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6).trim();
-          if (!raw || raw === '[DONE]') continue;
-
-          try {
-            // Jina envia JSON com campo 'content' contendo o markdown
-            const payload = JSON.parse(raw) as { content?: string; text?: string };
-            const text = payload.content ?? payload.text ?? '';
-            if (text) lastContent = text;
-          } catch {
-            // Fallback: dado não-JSON — trata como markdown literal acumulado
-            if (raw.length > lastContent.length) lastContent = raw;
-          }
-        }
+        processSSEBlock(event);
       }
     }
   } finally {
@@ -300,19 +340,8 @@ async function parseJinaSSEStream(response: Response): Promise<string> {
   }
 
   // Processa buffer residual após stream finalizar
-  if (buffer) {
-    for (const line of buffer.split('\n')) {
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6).trim();
-      if (!raw || raw === '[DONE]') continue;
-      try {
-        const payload = JSON.parse(raw) as { content?: string; text?: string };
-        const text = payload.content ?? payload.text ?? '';
-        if (text) lastContent = text;
-      } catch {
-        if (raw.length > lastContent.length) lastContent = raw;
-      }
-    }
+  if (buffer.trim()) {
+    processSSEBlock(buffer);
   }
 
   if (!lastContent) {
