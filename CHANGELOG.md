@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [v01.77.44] - 2026-04-06
+### Corrigido
+- **AstrologoModule — DOMPurify style attributes**: Adicionado `'style'` ao `ALLOWED_ATTR` do `sanitizeRichHtml` no `AstrologoModule.tsx`, permitindo que atributos `text-align` e `text-indent` gerados pelo Gemini sejam renderizados corretamente na aba "Consultas Registradas" e "Dados de Usuários".
+
+### Controle de versão
+- `admin-app`: APP v01.77.43 → APP v01.77.44
+
 ## [v01.77.43] - 2026-04-05
 ### Corrigido
 - **Gemini Import — Estabilização do Pipeline Jina Reader**: Refatorada toda a arquitetura de importação de um modelo de 2 tiers (readerlm-v2 + browser fallback) para um tier único **browser-only** (`X-Engine: browser`), eliminando erros recorrentes `503 Reader LM is at capacity` e timeouts `524` do Cloudflare. Latência média reduzida de 40-80s para 15-30s.

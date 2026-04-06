@@ -1,5 +1,11 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-06 — Admin-App v01.77.44 — AstrologoModule DOMPurify Style Fix
+### Scope
+Adicionado `'style'` ao `ALLOWED_ATTR` do `sanitizeRichHtml` no `AstrologoModule.tsx`, permitindo que atributos de estilo (`text-align`, `text-indent`) gerados pelo Gemini sejam renderizados corretamente nas abas "Consultas Registradas" e "Dados de Usuários".
+### Controle de versão
+- `admin-app`: APP v01.77.43 → APP v01.77.44
+
 ## 2026-04-05 — Gemini Import Pipeline Estabilização + Formatting Fixes (v01.77.43)
 ### Scope
 Estabilização do pipeline de importação Gemini e correção de bugs visuais de formatação no PostEditor e PostReader.
