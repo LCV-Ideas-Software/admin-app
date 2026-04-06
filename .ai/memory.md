@@ -1,5 +1,17 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-06 — Admin-App v01.78.02 — News Feed 502 Fix + Observability
+### Scope
+Corrigido crash 502 no `/api/news/feed` causado por `context.waitUntil is not a function`. O `fetch()` handler do admin-motor não recebia `ctx: ExecutionContext`, e o `routeContext` não incluía `waitUntil`.
+### Corrigido
+- `index.ts`: `fetch(request, env)` → `fetch(request, env, ctx: ExecutionContext)`
+- `routeContext`: agora inclui `waitUntil: (p) => ctx.waitUntil(p)`
+### Observability
+- `admin-motor/wrangler.json`: já tinha config completa
+- `tlsrpt-motor/wrangler.json`: expandido para `head_sampling_rate: 1` + `invocation_logs: true`
+### Controle de versão
+- `admin-app`: APP v01.78.01 → APP v01.78.02
+
 ## 2026-04-06 — Admin-App v01.78.01 — Homepage Selector (Sidebar)
 ### Scope
 Seletor de página inicial no menu lateral. Cada nav-item (exceto "Visão Geral") exibe ícone Home (Lucide) on hover. Click toggle define/remove homepage. Persistência 100% D1 via `/api/config-store` (key: `admin-app/homepage`), zero localStorage. On mount, useEffect carrega do D1 e navega automaticamente.

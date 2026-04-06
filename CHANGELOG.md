@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.78.02] - 2026-04-06
+### Corrigido
+- **News Feed 502 Fix**: Adicionado `ExecutionContext` ao fetch handler do `admin-motor` e `waitUntil` ao `routeContext`, corrigindo crash em `/api/news/feed` que dependia de `context.waitUntil()` para cache assíncrono.
+
+### Alterado
+- **Observability 100% (admin-motor + tlsrpt-motor)**: `head_sampling_rate: 1` e `invocation_logs: true` ativados em todos os wrangler.json dos workers do admin-app.
+
+### Controle de versão
+- `admin-app`: APP v01.78.01 → APP v01.78.02
+
 ## [v01.78.01] - 2026-04-06
 ### Adicionado
 - **Homepage Selector (Sidebar)**: Cada item do menu lateral agora possui um seletor de página inicial (ícone 🏠). Permite definir livremente qual módulo será a landing page ao abrir o admin-app. Seleção exclusiva, desselecionável (retorna à Visão Geral), auto-save com persistência D1 via `/api/config-store` (key: `admin-app/homepage`), zero localStorage.
