@@ -423,7 +423,7 @@ const logError = (message: string, context: Record<string, unknown> = {}) => {
 };
 
 export default {
-  async fetch(request: Request, env: AdminMotorEnv): Promise<Response> {
+  async fetch(request: Request, env: AdminMotorEnv, ctx: ExecutionContext): Promise<Response> {
     const startedAt = Date.now();
     const url = new URL(request.url);
     const pathname = url.pathname;
@@ -433,7 +433,7 @@ export default {
 
     try {
       const runtimeEnv = await resolveRuntimeEnv(env);
-      const routeContext = <T>() => ({ request, env: runtimeEnv } as unknown as T);
+      const routeContext = <T>() => ({ request, env: runtimeEnv, waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } as unknown as T);
       if (method === 'GET' && pathname === '/api/ai-status/health') {
         return handleAiStatusHealth(request, runtimeEnv, env);
       }
