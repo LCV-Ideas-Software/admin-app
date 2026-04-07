@@ -1,4 +1,19 @@
 # Changelog — Admin App
+## [v01.80.01] - 2026-04-07
+### Corrigido
+- **Observability — Operador P50 inválido**: Substituído `P50` por `MEDIAN` na query de latência; a API CF Observability não aceita `P50` no enum de operadores.
+- **Observability — Extração de eventos (nested wrapper)**: Corrigido path de extração de `result.events` (objeto wrapper) para `result.events.events` (array real) em Events, Errors e Live.
+- **Observability — Campos de eventos "—"**: Corrigido mapeamento de campos que usava dot-notation flat (`evt['$workers.scriptName']`) para acessar objetos nested (`evt.$workers.scriptName`). Timestamp, Worker, Level e Detalhes agora populam corretamente.
+- **Observability — Live sem eventos (ingestion delay)**: Janela do Live ampliada de 30s para 90s para compensar ~30s de delay de ingestão da API CF Observability.
+- **Observability — Error parsing incompleto**: Backend agora captura `error.issues` (formato Zod validation) além de `errors[]`, fornecendo mensagens de erro mais detalhadas.
+
+### Adicionado
+- **Observability — Painel de detalhes inline**: Clicar em qualquer evento expande um painel inline mostrando todos os campos organizados em seções (`source`, `$workers`, `$metadata`) com chaves em monospace azul e valores alinhados. Animação suave de abertura. Toggle click para fechar.
+
+### Controle de versão
+- `admin-app`: APP v01.80.00 → APP v01.80.01
+
+
 ## [v01.80.00] - 2026-04-07
 ### Adicionado
 - **Cloudflare Workers Observability (CF P&W)**: Novo bloco "Observability" completo integrado ao final do módulo CF P&W com 6 abas:

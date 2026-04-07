@@ -1,5 +1,23 @@
 # AI Memory Log — Admin-App
-## 2026-04-07 — Admin-App v01.80.00 — Workers Observability + Live Mode
+## 2026-04-07 — Admin-App v01.80.01 — Observability Stabilization & Detail Panel
+### Scope
+Estabilização completa do dashboard Workers Observability: correção de 5 bugs de integração com a API CF e adição de painel de detalhes inline clicável.
+### Corrigido
+- **Operador `P50` inválido**: API CF Observability não suporta `P50`; substituído por `MEDIAN` no enum aceito.
+- **Extração nested de eventos**: API retorna `result.events = { events: [], fields: [], count: N }` (objeto wrapper); extração corrigida para `result.events.events` em Events, Errors e Live.
+- **Campos "—" nos eventos**: Mapeamento corrigido de dot-notation flat (`evt['$workers.scriptName']`) para objetos nested (`evt.$workers.scriptName`).
+- **Live sem eventos (ingestion delay)**: Medição precisa revelou ~30s de delay de ingestão CF. Janela ampliada de 30s para 90s.
+- **Error parsing `error.issues`**: Backend agora captura formato Zod validation (`payload.error.issues[]`) além de `payload.errors[]`.
+### Adicionado
+- **Painel de detalhes inline**: Click-to-expand em qualquer evento mostra todas as propriedades organizadas em seções (`source`, `$workers`, `$metadata`). Flatten recursivo de objetos nested. CSS com animação suave, chaves monospace azul, toggle click.
+### Lições Operacionais
+- **CF Observability API enum**: Operadores válidos NÃO incluem P50. Para percentil 50, usar `MEDIAN` ou `median`.
+- **CF Observability ingestion delay**: ~30 segundos. Janelas menores que 30s retornarão 0 eventos.
+- **CF Observability error format**: Erros de validação usam `{ error: { issues: [...] } }` ao invés de `{ errors: [...] }`.
+### Controle de versão
+- `admin-app`: APP v01.80.00 → APP v01.80.01
+
+
 ### Scope
 Integração completa do dashboard Cloudflare Workers Observability no módulo CF P&W com 6 abas, incluindo modo Live com polling de 3 segundos.
 ### Adicionado
