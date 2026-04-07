@@ -1,4 +1,11 @@
 # Changelog — Admin App
+## [v01.80.03] - 2026-04-07
+### Segurança
+- **Vite 8.0.3 → 8.0.7**: Correção de 3 CVEs de severidade alta/média (server.fs.deny bypass, WebSocket arbitrary file read, path traversal `.map` handling).
+
+### Controle de versão
+- `admin-app`: APP v01.80.02 → APP v01.80.03
+
 ## [v01.80.02] - 2026-04-07
 ### Corrigido
 - **Observability — Live Tab Deduping**: Corrigido bug onde aba Live não recebia novos eventos via polling. O mecanismo de deduplicação usava dot-notation flat em `evt['$metadata.id']` (resultando sempre em `undefined`), o que classificava incorretamente todos os novos eventos como duplicados dos imediatamente anteriores. Agora utiliza o helper `eventKey` acessando chaves nested com fallback para timestamp/requestId.
