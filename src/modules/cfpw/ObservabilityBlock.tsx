@@ -392,6 +392,7 @@ export function ObservabilityBlock() {
         timeframe: { from: now - 30_000, to: now }, // last 30s window
         view: 'events',
         limit: 100,
+        parameters: {},
       })
 
       if (res.ok && res.result) {
