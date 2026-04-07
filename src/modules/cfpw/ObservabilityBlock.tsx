@@ -183,11 +183,13 @@ export function ObservabilityBlock() {
       })
 
       if (countRes.ok && countRes.result) {
-        const calcs = (countRes.result as { calculations?: CalcResult[] }).calculations || []
+        const rawCalcs = (countRes.result as { calculations?: CalcResult[] }).calculations
+        const calcs = Array.isArray(rawCalcs) ? rawCalcs : []
         setDashCalcs(calcs)
         // Compute total from aggregates
         const totalCalc = calcs.find(c => c.alias === 'total' || c.calculation === 'COUNT')
-        const total = totalCalc?.aggregates?.reduce((sum, a) => sum + (a.count || 0), 0) || 0
+        const aggs = Array.isArray(totalCalc?.aggregates) ? totalCalc.aggregates : []
+        const total = aggs.reduce((sum, a) => sum + (a.count || 0), 0)
         setDashTotalCount(total)
       }
 
@@ -208,9 +210,11 @@ export function ObservabilityBlock() {
       })
 
       if (errRes.ok && errRes.result) {
-        const errCalcs = (errRes.result as { calculations?: CalcResult[] }).calculations || []
+        const rawErrCalcs = (errRes.result as { calculations?: CalcResult[] }).calculations
+        const errCalcs = Array.isArray(rawErrCalcs) ? rawErrCalcs : []
         const errCalc = errCalcs.find(c => c.alias === 'errors' || c.calculation === 'COUNT')
-        const errTotal = errCalc?.aggregates?.reduce((sum, a) => sum + (a.count || 0), 0) || 0
+        const errAggs = Array.isArray(errCalc?.aggregates) ? errCalc.aggregates : []
+        const errTotal = errAggs.reduce((sum, a) => sum + (a.count || 0), 0)
         setDashErrorCount(errTotal)
       }
     } catch (err) {
@@ -237,8 +241,8 @@ export function ObservabilityBlock() {
       })
 
       if (res.ok && res.result) {
-        const evts = (res.result as { events?: EventRow[] }).events || []
-        setEvents(evts)
+        const rawEvts = (res.result as { events?: EventRow[] }).events
+        setEvents(Array.isArray(rawEvts) ? rawEvts : [])
       }
     } catch (err) {
       showNotification(err instanceof Error ? err.message : 'Erro ao carregar eventos.', 'error')
@@ -268,8 +272,8 @@ export function ObservabilityBlock() {
       })
 
       if (res.ok && res.result) {
-        const evts = (res.result as { events?: EventRow[] }).events || []
-        setErrors(evts)
+        const rawEvts = (res.result as { events?: EventRow[] }).events
+        setErrors(Array.isArray(rawEvts) ? rawEvts : [])
       }
     } catch (err) {
       showNotification(err instanceof Error ? err.message : 'Erro ao carregar erros.', 'error')
@@ -301,8 +305,8 @@ export function ObservabilityBlock() {
       })
 
       if (res.ok && res.result) {
-        const calcs = (res.result as { calculations?: CalcResult[] }).calculations || []
-        setLatencyCalcs(calcs)
+        const rawCalcs = (res.result as { calculations?: CalcResult[] }).calculations
+        setLatencyCalcs(Array.isArray(rawCalcs) ? rawCalcs : [])
       }
     } catch (err) {
       showNotification(err instanceof Error ? err.message : 'Erro ao carregar latência.', 'error')
@@ -318,7 +322,8 @@ export function ObservabilityBlock() {
     try {
       const res = await obsGet()
       if (res.ok) {
-        setDestinations(res.destinations || [])
+        const rawDests = res.destinations
+        setDestinations(Array.isArray(rawDests) ? rawDests : [])
       }
     } catch (err) {
       showNotification(err instanceof Error ? err.message : 'Erro ao carregar destinos.', 'error')
@@ -396,12 +401,14 @@ export function ObservabilityBlock() {
       })
 
       if (res.ok && res.result) {
-        const newEvts = (res.result as { events?: EventRow[] }).events || []
+        const rawEvts = (res.result as { events?: EventRow[] }).events
+        const newEvts = Array.isArray(rawEvts) ? rawEvts : []
         setLiveEvents(prev => {
+          const safePrev = Array.isArray(prev) ? prev : []
           // Merge: prepend new events, deduplicate by $metadata.id, cap at 200
-          const existing = new Set(prev.map(e => String(e['$metadata.id'] ?? '')))
+          const existing = new Set(safePrev.map(e => String(e['$metadata.id'] ?? '')))
           const fresh = newEvts.filter(e => !existing.has(String(e['$metadata.id'] ?? '')))
-          return [...fresh, ...prev].slice(0, 200)
+          return [...fresh, ...safePrev].slice(0, 200)
         })
       }
     } catch {
@@ -465,11 +472,13 @@ export function ObservabilityBlock() {
   // ── Extract per-worker data from calculations ──
 
   const perWorkerData = useMemo(() => {
+    if (!Array.isArray(dashCalcs)) return []
     const totalCalc = dashCalcs.find(c => c.alias === 'total' || c.calculation === 'COUNT')
-    if (!totalCalc?.aggregates) return []
+    const aggs = Array.isArray(totalCalc?.aggregates) ? totalCalc.aggregates : []
+    if (aggs.length === 0) return []
 
-    return totalCalc.aggregates
-      .filter(a => a.groups && a.groups.length > 0)
+    return aggs
+      .filter(a => a.groups && Array.isArray(a.groups) && a.groups.length > 0)
       .map(a => ({
         scriptName: String(a.groups?.[0]?.value ?? '(unknown)'),
         count: a.count || 0,
@@ -481,7 +490,7 @@ export function ObservabilityBlock() {
   // ── Extract per-worker latency data ──
 
   const perWorkerLatency = useMemo(() => {
-    if (latencyCalcs.length === 0) return []
+    if (!Array.isArray(latencyCalcs) || latencyCalcs.length === 0) return []
 
     const p50Calc = latencyCalcs.find(c => c.alias === 'p50')
     const p95Calc = latencyCalcs.find(c => c.alias === 'p95')
@@ -492,7 +501,7 @@ export function ObservabilityBlock() {
     const map = new Map<string, { p50: number; p95: number; p99: number; avg: number }>()
 
     const processCalc = (calc: CalcResult | undefined, metric: 'p50' | 'p95' | 'p99' | 'avg') => {
-      if (!calc?.aggregates) return
+      if (!calc?.aggregates || !Array.isArray(calc.aggregates)) return
       for (const agg of calc.aggregates) {
         const name = String(agg.groups?.[0]?.value ?? '(unknown)')
         if (!map.has(name)) map.set(name, { p50: 0, p95: 0, p99: 0, avg: 0 })
