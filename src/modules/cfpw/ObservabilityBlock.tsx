@@ -241,7 +241,9 @@ export function ObservabilityBlock() {
       })
 
       if (res.ok && res.result) {
-        const rawEvts = (res.result as { events?: EventRow[] }).events
+        // CF API: result.events é um objeto { events: [], fields: [], count: N }
+        const eventsWrapper = (res.result as { events?: { events?: EventRow[] } }).events
+        const rawEvts = eventsWrapper?.events
         setEvents(Array.isArray(rawEvts) ? rawEvts : [])
       }
     } catch (err) {
@@ -272,7 +274,8 @@ export function ObservabilityBlock() {
       })
 
       if (res.ok && res.result) {
-        const rawEvts = (res.result as { events?: EventRow[] }).events
+        const eventsWrapper = (res.result as { events?: { events?: EventRow[] } }).events
+        const rawEvts = eventsWrapper?.events
         setErrors(Array.isArray(rawEvts) ? rawEvts : [])
       }
     } catch (err) {
@@ -401,7 +404,8 @@ export function ObservabilityBlock() {
       })
 
       if (res.ok && res.result) {
-        const rawEvts = (res.result as { events?: EventRow[] }).events
+        const eventsWrapper = (res.result as { events?: { events?: EventRow[] } }).events
+        const rawEvts = eventsWrapper?.events
         const newEvts = Array.isArray(rawEvts) ? rawEvts : []
         setLiveEvents(prev => {
           const safePrev = Array.isArray(prev) ? prev : []
