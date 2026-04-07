@@ -67,9 +67,17 @@ const cloudflareObsRequest = async <T>(
   const payload = parseJsonOrThrow<CloudflareApiResponse<T>>(rawText, fallback, response)
 
   if (!response.ok || payload.success !== true) {
-    const firstError = Array.isArray(payload.errors) && payload.errors.length > 0
-      ? payload.errors[0]?.message?.trim()
-      : null
+    const allErrors = Array.isArray(payload.errors) ? payload.errors : []
+    const firstError = allErrors.length > 0 ? allErrors[0]?.message?.trim() : null
+    // Log detalhado para diagnóstico de erros da API CF
+    console.error(`[observability-api] ${fallback}`, {
+      status: response.status,
+      path,
+      method: init?.method ?? 'GET',
+      body: init?.body ? String(init.body).substring(0, 500) : null,
+      errors: allErrors,
+      rawResponse: rawText.substring(0, 500),
+    })
     throw new Error(firstError ? `${fallback}: ${firstError}` : `${fallback}: HTTP ${response.status}`)
   }
 
