@@ -18,6 +18,7 @@ import { PopupPortal } from '../../components/PopupPortal'
 
 // Lazy-loaded PostEditor — TipTap chunk only loads when editor is opened
 const PostEditor = lazy(() => import('./PostEditor'))
+import { ModerationPanel } from './ModerationPanel'
 
 
 
@@ -1139,6 +1140,9 @@ export function MainsiteModule() {
           Esses resumos são usados automaticamente nos previews de links compartilhados (og:description, twitter:description, Schema.org). Edições manuais não serão sobrescritas pela IA.
         </p>
       </div>
+
+      {/* ── Moderação de Comentários ── */}
+      <ModerationPanel showNotification={showNotification} />
 
     </section>
   )

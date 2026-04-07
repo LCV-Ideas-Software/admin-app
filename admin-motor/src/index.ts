@@ -77,6 +77,13 @@ import { onRequestGet as handleMainsiteMediaGet } from './handlers/routes/mainsi
 import { onRequestPost as handleWorkersAiSentimentPost } from './handlers/routes/mainsite/workers-ai/sentiment';
 import { onRequestPost as handleWorkersAiTagsPost } from './handlers/routes/mainsite/workers-ai/tags';
 import { onRequestPost as handleWorkersAiTranslatePost } from './handlers/routes/mainsite/workers-ai/translate';
+import {
+  handleCommentsAdminAll,
+  handleCommentsAdminModerate,
+  handleCommentsAdminDelete,
+  handleCommentsAdminReply,
+  handleCommentsAdminBulk,
+} from './handlers/routes/mainsite/comments-admin';
 import { onRequestGet as handleMtastsOverviewGet } from './handlers/routes/mtasts/overview';
 import { onRequestPost as handleMtastsSyncPost } from './handlers/routes/mtasts/sync';
 import { onRequestGet as handleNewsFeedGet } from './handlers/routes/news/feed';
@@ -652,6 +659,24 @@ export default {
     }
     if (method === 'POST' && pathname === '/api/mainsite/workers-ai/translate') {
       return handleWorkersAiTranslatePost(routeContext<Parameters<typeof handleWorkersAiTranslatePost>[0]>());
+    }
+
+    // mainsite comments admin (moderation)
+    if (method === 'GET' && pathname === '/api/mainsite/comments/admin/all') {
+      return handleCommentsAdminAll({ request, env: runtimeEnv });
+    }
+    if (method === 'POST' && pathname === '/api/mainsite/comments/admin/bulk') {
+      return handleCommentsAdminBulk({ request, env: runtimeEnv });
+    }
+    if (pathname.startsWith('/api/mainsite/comments/admin/')) {
+      // Extract comment ID from path: /api/mainsite/comments/admin/:id[/reply]
+      const segments = pathname.replace('/api/mainsite/comments/admin/', '').split('/');
+      const commentId = parseInt(segments[0], 10);
+      if (!isNaN(commentId)) {
+        if (method === 'PATCH') return handleCommentsAdminModerate({ request, env: runtimeEnv }, commentId);
+        if (method === 'DELETE') return handleCommentsAdminDelete({ request, env: runtimeEnv }, commentId);
+        if (method === 'POST' && segments[1] === 'reply') return handleCommentsAdminReply({ request, env: runtimeEnv }, commentId);
+      }
     }
 
     // mtasts
