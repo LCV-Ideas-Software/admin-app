@@ -10,6 +10,7 @@ type CloudflareApiError = {
 type CloudflareApiResponse<T> = {
   success?: boolean
   errors?: CloudflareApiError[]
+  error?: { issues?: Array<{ message?: string; received?: string; path?: unknown[] }> }
   result?: T
 }
 
@@ -69,6 +70,10 @@ const cloudflareObsRequest = async <T>(
   if (!response.ok || payload.success !== true) {
     const allErrors = Array.isArray(payload.errors) ? payload.errors : []
     const firstError = allErrors.length > 0 ? allErrors[0]?.message?.trim() : null
+    // Captura error.issues (formato Zod validation da API Observability)
+    const issues = Array.isArray(payload.error?.issues) ? payload.error.issues : []
+    const firstIssue = issues.length > 0 ? issues[0]?.message?.trim() : null
+    const errorDetail = firstError || firstIssue || null
     // Log detalhado para diagnóstico de erros da API CF
     console.error(`[observability-api] ${fallback}`, {
       status: response.status,
@@ -76,9 +81,10 @@ const cloudflareObsRequest = async <T>(
       method: init?.method ?? 'GET',
       body: init?.body ? String(init.body).substring(0, 500) : null,
       errors: allErrors,
+      issues,
       rawResponse: rawText.substring(0, 500),
     })
-    throw new Error(firstError ? `${fallback}: ${firstError}` : `${fallback}: HTTP ${response.status}`)
+    throw new Error(errorDetail ? `${fallback}: ${errorDetail}` : `${fallback}: HTTP ${response.status}`)
   }
 
   return payload.result as T

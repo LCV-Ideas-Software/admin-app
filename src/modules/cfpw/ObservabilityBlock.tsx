@@ -293,7 +293,7 @@ export function ObservabilityBlock() {
         view: 'calculations',
         parameters: {
           calculations: [
-            { operator: 'P50', key: '$workers.wallTimeMs', keyType: 'number', alias: 'p50' },
+            { operator: 'MEDIAN', key: '$workers.wallTimeMs', keyType: 'number', alias: 'p50' },
             { operator: 'P95', key: '$workers.wallTimeMs', keyType: 'number', alias: 'p95' },
             { operator: 'P99', key: '$workers.wallTimeMs', keyType: 'number', alias: 'p99' },
             { operator: 'AVG', key: '$workers.wallTimeMs', keyType: 'number', alias: 'avg' },
