@@ -1,4 +1,9 @@
 # Changelog — Admin App
+## [v01.81.01] - 2026-04-07
+### Alterado
+- **ModerationPanel**: Toggle "Permitir anônimos" renomeado para "Exigir nome" com lógica invertida (`!allowAnonymous`), paritário com "Exigir email".
+- **Mensagem de Cache**: Texto alterado de "cache de 60 segundos" para "aplicadas imediatamente após salvar" (cache removido do worker).
+
 ## [v01.81.00] - 2026-04-07
 ### Adicionado
 - **Moderação de Comentários — Painel de Configurações Completo**: Novo painel de configurações avançadas no módulo MainSite com 18 parâmetros configuráveis, todos persistidos no D1 (`mainsite_settings`):

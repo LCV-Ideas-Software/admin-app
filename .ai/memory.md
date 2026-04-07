@@ -1,4 +1,13 @@
 # AI Memory Log — Admin-App
+## 2026-04-07 — Admin-App v01.81.01 — Exigir Nome Toggle + Cache Removal
+### Scope
+Renomeação do toggle "Permitir anônimos" para "Exigir nome" com lógica invertida, e remoção da mensagem de cache de 60s.
+### Alterado
+- **ModerationPanel.tsx**: Toggle `allowAnonymous` agora exibe como "Exigir nome" (`checked={!settings.allowAnonymous}`, `onChange={v => setSettings(s => ({ ...s, allowAnonymous: !v }))}`). Paritário com "Exigir email".
+- **Mensagem de Cache**: "cache de 60 segundos" → "aplicadas imediatamente após salvar".
+### Controle de versão
+- `admin-app`: APP v01.81.00 → APP v01.81.01
+
 ## 2026-04-07 — Admin-App v01.81.00 — Moderation Settings UI + Backend Enforcement
 ### Scope
 Painel completo de configurações do motor de moderação de comentários com 18 parâmetros configuráveis, organizados em 4 seções (Funcionalidades, Limites de Conteúdo, Moderação Automática GCP NL, Anti-Spam). Backend com enforcement de rate limiting, blocklist, link policy, auto-close e duplicate detection.
