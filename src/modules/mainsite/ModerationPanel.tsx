@@ -406,8 +406,8 @@ export function ModerationPanel({ showNotification }: ModerationPanelProps) {
                   <Toggle checked={settings.ratingsEnabled} onChange={v => setSettings(s => ({ ...s, ratingsEnabled: v }))}
                     label="Avaliações habilitadas" hint="Permitir que leitores avaliem os posts"
                   />
-                  <Toggle checked={settings.allowAnonymous} onChange={v => setSettings(s => ({ ...s, allowAnonymous: v }))}
-                    label="Permitir anônimos" hint="Aceitar comentários sem nome preenchido"
+                  <Toggle checked={!settings.allowAnonymous} onChange={v => setSettings(s => ({ ...s, allowAnonymous: !v }))}
+                    label="Exigir nome" hint="Tornar o campo de nome obrigatório"
                   />
                   <Toggle checked={settings.requireEmail} onChange={v => setSettings(s => ({ ...s, requireEmail: v }))}
                     label="Exigir email" hint="Tornar o campo de email obrigatório"
@@ -648,7 +648,7 @@ export function ModerationPanel({ showNotification }: ModerationPanelProps) {
                 </button>
                 <span style={{ fontSize: '11px', opacity: 0.4, marginLeft: 'auto' }}>
                   <Timer size={11} style={{ verticalAlign: '-1px', marginRight: '3px' }} />
-                  As configurações são aplicadas pelo motor com cache de 60 segundos.
+                  As configurações são aplicadas imediatamente após salvar.
                 </span>
               </div>
             </>
