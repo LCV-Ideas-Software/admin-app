@@ -1,4 +1,12 @@
 # AI Memory Log — Admin-App
+## 2026-04-07 — Admin-App v01.79.01 — Rotation Bar Review Fixes
+### Scope
+Correções de code review na faixa de rotação: estado "pausada" agora mostra "Última Rotação" + re-fetch automático pós-"Iminente".
+### Corrigido
+- **Fix #1**: Estado `hasPinnedPost` agora mostra "Última Rotação: timestamp" + "Próxima Rotação: pausada — post fixado" ao invés de suprimir toda informação com apenas "Rotação pausada".
+- **Fix #2**: `useRef(imminentRefetchedRef)` + `setTimeout(loadPublicSettings, 30_000)` one-shot ao atingir countdown zero. Guard impede re-fetches repetidos. Reseta na troca de `rotationInfo`. Dep array inclui `loadPublicSettings` (já é `useCallback`).
+### Controle de versão
+- `admin-app`: APP v01.79.00 → APP v01.79.01
 
 ## 2026-04-07 — Admin-App v01.79.00 — Faixa de Status da Rotação (MainSite)
 ### Scope

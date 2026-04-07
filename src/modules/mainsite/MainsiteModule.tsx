@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Leonardo Cardozo Vargas
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Suspense, lazy } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -321,7 +321,9 @@ export function MainsiteModule() {
   const hasPinnedPost = managedPosts.some(p => Number(p.is_pinned) === 1 || p.is_pinned === true)
 
   // ── Countdown timer para próxima rotação ──
+  const imminentRefetchedRef = useRef(false)
   useEffect(() => {
+    imminentRefetchedRef.current = false
     if (!rotationInfo?.enabled || !rotationInfo.last_rotated_at) {
       setCountdown('')
       return
@@ -332,7 +334,15 @@ export function MainsiteModule() {
 
     const tick = () => {
       const remaining = nextAt - Date.now()
-      if (remaining <= 0) { setCountdown('Iminente'); return }
+      if (remaining <= 0) {
+        setCountdown('Iminente')
+        // Re-fetch 30s após iminente para capturar o novo last_rotated_at do cron
+        if (!imminentRefetchedRef.current) {
+          imminentRefetchedRef.current = true
+          setTimeout(() => void loadPublicSettings(), 30_000)
+        }
+        return
+      }
       const h = Math.floor(remaining / 3_600_000)
       const m = Math.floor((remaining % 3_600_000) / 60_000)
       const s = Math.floor((remaining % 60_000) / 1_000)
@@ -342,7 +352,7 @@ export function MainsiteModule() {
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [rotationInfo])
+  }, [rotationInfo, loadPublicSettings])
 
   useEffect(() => {
     void loadManagedPosts()
@@ -650,10 +660,6 @@ export function MainsiteModule() {
 
           {!rotationInfo.enabled ? (
             <span style={{ opacity: 0.6 }}>Rotação desativada</span>
-          ) : hasPinnedPost ? (
-            <span style={{ color: 'var(--color-warning, #f59e0b)' }}>
-              Rotação pausada — post fixado
-            </span>
           ) : (
             <>
               <span>
@@ -667,16 +673,27 @@ export function MainsiteModule() {
                     })
                   : 'Nunca executada'}
               </span>
-              <span style={{ opacity: 0.3 }}>|</span>
-              <span>
-                <strong>Próxima Rotação:</strong>{' '}
-                <span style={{
-                  fontFamily: 'monospace',
-                  color: countdown === 'Iminente' ? 'var(--color-success, #34a853)' : 'inherit',
-                }}>
-                  {countdown || '—'}
-                </span>
-              </span>
+              {hasPinnedPost ? (
+                <>
+                  <span style={{ opacity: 0.3 }}>|</span>
+                  <span style={{ color: 'var(--color-warning, #f59e0b)' }}>
+                    Próxima Rotação: pausada — post fixado
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span style={{ opacity: 0.3 }}>|</span>
+                  <span>
+                    <strong>Próxima Rotação:</strong>{' '}
+                    <span style={{
+                      fontFamily: 'monospace',
+                      color: countdown === 'Iminente' ? 'var(--color-success, #34a853)' : 'inherit',
+                    }}>
+                      {countdown || '—'}
+                    </span>
+                  </span>
+                </>
+              )}
             </>
           )}
         </div>

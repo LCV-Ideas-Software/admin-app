@@ -1,4 +1,11 @@
 # Changelog — Admin App
+## [v01.79.01] - 2026-04-07
+### Corrigido
+- **Faixa de Rotação — Estado "pausada" mostra Última Rotação**: Quando há post fixado, a faixa agora exibe "Última Rotação: dd/mm/aaaa, hh:mm:ss | Próxima Rotação: pausada — post fixado" ao invés de suprimir completamente o timestamp da última rotação.
+- **Faixa de Rotação — Re-fetch automático ao atingir "Iminente"**: Ao atingir countdown zero, o componente agora agenda um re-fetch de `loadPublicSettings()` após 30 segundos (via `setTimeout` one-shot com guard `useRef`) para capturar o novo `last_rotated_at` gravado pelo cron, evitando que o status fique travado em "Iminente" indefinidamente.
+
+### Controle de versão
+- `admin-app`: APP v01.79.00 → APP v01.79.01
 
 ## [v01.79.00] - 2026-04-07
 ### Adicionado
