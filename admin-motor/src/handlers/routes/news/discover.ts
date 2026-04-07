@@ -22,7 +22,7 @@ interface Env {
 }
 
 interface D1Binding {
-  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown>, first<T>(): Promise<T|null> } }
+  prepare(query: string): { bind(...values: unknown[]): { run(): Promise<unknown>, first<T>(): Promise<T|null> }; run(): Promise<unknown> }
 }
 
 const FALLBACK_MODEL = 'gemini-2.5-flash';
@@ -361,22 +361,46 @@ REGRAS:
     // Telemetria fire-and-forget
     if (db) {
       const usage = data?.usageMetadata || {};
-      db.prepare(`
-        INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).bind('news-discover', activeModel, usage?.promptTokenCount || 0, usage?.candidatesTokenCount || 0, Date.now() - _telStart, 'ok'
-      ).run().catch(() => {});
+      (async () => {
+        try {
+          await db.prepare(`
+            CREATE TABLE IF NOT EXISTS ai_usage_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+              module TEXT NOT NULL, model TEXT NOT NULL, input_tokens INTEGER DEFAULT 0,
+              output_tokens INTEGER DEFAULT 0, latency_ms INTEGER DEFAULT 0,
+              status TEXT DEFAULT 'ok', error_detail TEXT
+            )
+          `).run();
+          await db.prepare(`
+            INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).bind('news-discover', activeModel, usage?.promptTokenCount || 0, usage?.candidatesTokenCount || 0, Date.now() - _telStart, 'ok'
+          ).run();
+        } catch (e) { console.warn('[telemetry] ai_usage_logs INSERT failed:', e instanceof Error ? e.message : e); }
+      })();
     }
 
     return results;
   } catch (error) {
     console.warn('[discover] Gemini discovery failed:', error);
     if (db) {
-      db.prepare(`
-        INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).bind('news-discover', activeModel, 0, 0, Date.now() - _telStart, 'error', error instanceof Error ? error.message : 'Unknown error'
-      ).run().catch(() => {});
+      (async () => {
+        try {
+          await db.prepare(`
+            CREATE TABLE IF NOT EXISTS ai_usage_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+              module TEXT NOT NULL, model TEXT NOT NULL, input_tokens INTEGER DEFAULT 0,
+              output_tokens INTEGER DEFAULT 0, latency_ms INTEGER DEFAULT 0,
+              status TEXT DEFAULT 'ok', error_detail TEXT
+            )
+          `).run();
+          await db.prepare(`
+            INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).bind('news-discover', activeModel, 0, 0, Date.now() - _telStart, 'error', error instanceof Error ? error.message : 'Unknown error'
+          ).run();
+        } catch (e) { console.warn('[telemetry] ai_usage_logs INSERT failed:', e instanceof Error ? e.message : e); }
+      })();
     }
     return [];
   }
@@ -520,12 +544,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   // Layer 3: Gemini AI (se API key disponível e query ≥3 chars)
-  const apiKey = ((context as any).data?.env || context.env).GEMINI_API_KEY
+  const runtimeEnv = ((context as unknown as { data?: { env?: Env } }).data?.env || context.env)
+  const apiKey = runtimeEnv.GEMINI_API_KEY
   const baseUrl = 'https://generativelanguage.googleapis.com';
   if (apiKey && query.length >= 3) {
     try {
       const geminiResults = await Promise.race([
-        discoverWithGemini(query, apiKey, baseUrl, ((context as any).data?.env || context.env).BIGDATA_DB as unknown as D1Binding),
+        discoverWithGemini(query, apiKey, baseUrl, runtimeEnv.BIGDATA_DB as unknown as D1Binding),
         new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), 6000)),
       ])
       addUnique(geminiResults)

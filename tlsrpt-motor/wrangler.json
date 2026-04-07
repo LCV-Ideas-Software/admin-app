@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "tlsrpt-motor",
   "main": "src/index.js",
-  "compatibility_date": "2026-02-28",
+  "compatibility_date": "2026-04-06",
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,

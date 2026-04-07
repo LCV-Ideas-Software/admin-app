@@ -130,12 +130,49 @@ async function estimateTokenCount(ai: GoogleGenAI, prompt: string, model: string
   }
 }
 
+// ── Telemetria: registra uso de AI no BIGDATA_DB ──
+async function logAiUsage(
+  db: D1Database | undefined,
+  entry: { module: string; model: string; input_tokens: number; output_tokens: number; latency_ms: number; status: string; error_detail?: string },
+) {
+  if (!db) return
+  try {
+    // Ensure table exists (idempotent)
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS ai_usage_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+        module TEXT NOT NULL,
+        model TEXT NOT NULL,
+        input_tokens INTEGER DEFAULT 0,
+        output_tokens INTEGER DEFAULT 0,
+        latency_ms INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'ok',
+        error_detail TEXT
+      )
+    `).run()
+    await db.prepare(`
+      INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      entry.module, entry.model,
+      entry.input_tokens, entry.output_tokens,
+      entry.latency_ms, entry.status,
+      entry.error_detail || null,
+    ).run()
+  } catch (err) {
+    console.warn('[telemetry] ai_usage_logs INSERT failed:', err instanceof Error ? err.message : err)
+  }
+}
+
 async function generateShareSummary(
   title: string,
   htmlContent: string,
   env: SummaryEnv,
   model: string,
+  db?: D1Database,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
+  const telStart = Date.now()
   const cleanContent = stripHtml(htmlContent)
   const apiKey = env.GEMINI_API_KEY
   if (!apiKey) {
@@ -195,16 +232,19 @@ REGRAS:
 
   if (!parsedResponse) {
     structuredLog('ERROR', 'Falha permanente no Gemini após retry', { lastError: lastErrorMsg })
+    // Telemetria de falha
+    void logAiUsage(db, { module: 'post-summaries', model: targetModel, input_tokens: 0, output_tokens: 0, latency_ms: Date.now() - telStart, status: 'error', error_detail: lastErrorMsg.slice(0, 200) })
     return { error: `AI falhou. Útimo erro: ${lastErrorMsg.slice(0, 100)}` }
   }
 
   // Usage Metadata Logging
-  if (parsedResponse.usageMetadata) {
+  const usage = parsedResponse.usageMetadata
+  if (usage) {
     structuredLog('INFO', 'Tokens utilizados no summary', {
-      prompt_tokens: parsedResponse.usageMetadata.promptTokenCount,
-      cached_tokens: parsedResponse.usageMetadata.cachedContentTokenCount,
-      output_tokens: parsedResponse.usageMetadata.candidatesTokenCount,
-      total_tokens: parsedResponse.usageMetadata.totalTokenCount,
+      prompt_tokens: usage.promptTokenCount,
+      cached_tokens: usage.cachedContentTokenCount,
+      output_tokens: usage.candidatesTokenCount,
+      total_tokens: usage.totalTokenCount,
     })
   }
 
@@ -214,6 +254,7 @@ REGRAS:
 
   if (!rawText) {
     structuredLog('ERROR', 'Resposta vazia ou silenciada pelo safety', { candidates: parsedResponse.candidates })
+    void logAiUsage(db, { module: 'post-summaries', model: targetModel, input_tokens: usage?.promptTokenCount || 0, output_tokens: 0, latency_ms: Date.now() - telStart, status: 'error', error_detail: 'Empty response / safety block' })
     return { error: `AI sem texto útil.` }
   }
 
@@ -222,8 +263,12 @@ REGRAS:
     const parsed = JSON.parse(jsonStr) as { summary_og?: string; summary_ld?: string }
     if (!parsed.summary_og) {
       structuredLog('ERROR', 'JSON retornado inválido', { parsed })
+      void logAiUsage(db, { module: 'post-summaries', model: targetModel, input_tokens: usage?.promptTokenCount || 0, output_tokens: usage?.candidatesTokenCount || 0, latency_ms: Date.now() - telStart, status: 'error', error_detail: 'Invalid JSON: missing summary_og' })
       return { error: `JSON sem summary_og.` }
     }
+
+    // Telemetria de sucesso
+    void logAiUsage(db, { module: 'post-summaries', model: targetModel, input_tokens: usage?.promptTokenCount || 0, output_tokens: usage?.candidatesTokenCount || 0, latency_ms: Date.now() - telStart, status: 'ok' })
 
     return {
       summary_og: parsed.summary_og.substring(0, 200),
@@ -231,6 +276,7 @@ REGRAS:
     }
   } catch (parseError) {
     structuredLog('ERROR', 'Erro ao extrair JSON da IA', { error: String(parseError), rawText })
+    void logAiUsage(db, { module: 'post-summaries', model: targetModel, input_tokens: usage?.promptTokenCount || 0, output_tokens: usage?.candidatesTokenCount || 0, latency_ms: Date.now() - telStart, status: 'error', error_detail: `JSON parse: ${String(parseError).slice(0, 100)}` })
     return { error: `Erro no JSON gerado: ${String(parseError).slice(0, 50)}` }
   }
 }
@@ -401,7 +447,7 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel)
+          const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel, db)
           if ('error' in result) {
             failed++
             details.push({ postId: post.id, title: post.title, status: result.error })
@@ -453,7 +499,7 @@ export async function onRequestPost(context: SummaryContext) {
 
       const resolvedModel = await resolveSummaryModel(db, body.model)
 
-      const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel)
+      const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel, db)
       if ('error' in result) return json({ ok: false, error: result.error, ...trace }, 500)
 
       const contentHash = await hashContent(stripHtml(post.content))

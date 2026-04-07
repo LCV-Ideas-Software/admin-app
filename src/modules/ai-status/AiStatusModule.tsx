@@ -9,8 +9,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Activity, AlertTriangle, BarChart3, BookOpen, Brain, CheckCircle,
   ChevronDown, ChevronRight, Clock, Cloud, CloudOff, Copy, CpuIcon,
-  ExternalLink, HelpCircle, Layers, Loader2, RefreshCw,
-  Server, Settings, Sparkles, TrendingUp, Zap
+  Download, ExternalLink, Filter, HelpCircle, Layers, Loader2, RefreshCw,
+  Search, Server, Settings, Sparkles, TrendingUp, X, Zap
 } from 'lucide-react'
 
 /* ────────────────────────────────────────────────────────────────
@@ -1397,11 +1397,57 @@ function PropRow({ icon, label, value, mono }: { icon: string; label: string; va
   )
 }
 
+/* ── Export helpers ── */
+function exportLogsCSV(logs: GcpLogEntry[]) {
+  const header = 'Timestamp,Method,Status,Model,Email,IP,PromptTokens,ResponseTokens,TotalTokens,FinishReason'
+  const rows = logs.map(log => {
+    const p = log.protoPayload || {}
+    const method = p.methodName?.split('.').pop() || ''
+    const status = p.status?.code || 0
+    const req = (p.request || {}) as Record<string, unknown>
+    const res = (p.response || {}) as Record<string, unknown>
+    const model = String(req.model || '').split('/').pop() || ''
+    const email = p.authenticationInfo?.principalEmail || ''
+    const ip = String(p.requestMetadata?.callerIp || '')
+    const usage = (res.usageMetadata || {}) as Record<string, number>
+    const candidates = (res.candidates || []) as { finishReason?: string }[]
+    const finish = candidates[0]?.finishReason || ''
+    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`
+    return [log.timestamp, esc(method), status, esc(model), esc(email), esc(ip), usage.promptTokenCount ?? '', usage.candidatesTokenCount ?? '', usage.totalTokenCount ?? '', finish].join(',')
+  })
+  const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = `gcp-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportLogsJSONL(logs: GcpLogEntry[]) {
+  const lines = logs.map(log => JSON.stringify({
+    insertId: log.insertId,
+    timestamp: log.timestamp,
+    severity: log.severity,
+    method: log.protoPayload?.methodName,
+    status: log.protoPayload?.status,
+    auth: log.protoPayload?.authenticationInfo,
+    requestMetadata: log.protoPayload?.requestMetadata,
+    request: log.protoPayload?.request,
+    response: log.protoPayload?.response,
+  }))
+  const blob = new Blob([lines.join('\n')], { type: 'application/x-ndjson' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = `gcp-audit-logs-${new Date().toISOString().slice(0, 10)}.jsonl`; a.click()
+  URL.revokeObjectURL(url)
+}
+
 function GcpLogsTab() {
   const [logs, setLogs] = useState<GcpLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [expandedLog, setExpandedLog] = useState<string | null>(null)
+  const [filterMethod, setFilterMethod] = useState('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'ok' | 'error'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortNewest, setSortNewest] = useState(true)
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
@@ -1422,6 +1468,55 @@ function GcpLogsTab() {
   }, [])
 
   useEffect(() => { void fetchLogs() }, [fetchLogs])
+
+  /* ── Stats summary (hook must be before early returns) ── */
+  const stats = useMemo(() => {
+    const methods: Record<string, number> = {}
+    let errors = 0
+    for (const log of logs) {
+      const m = log.protoPayload?.methodName?.split('.').pop() || 'Unknown'
+      methods[m] = (methods[m] || 0) + 1
+      if (log.severity === 'ERROR' || (log.protoPayload?.status?.code && log.protoPayload.status.code > 0)) errors++
+    }
+    const topMethod = Object.entries(methods).sort((a, b) => b[1] - a[1])[0]
+    return { total: logs.length, errors, methods, topMethod }
+  }, [logs])
+
+  /* ── Filtered & sorted logs ── */
+  const filteredLogs = useMemo(() => {
+    let result = [...logs]
+    if (filterMethod !== 'all') {
+      result = result.filter(l => (l.protoPayload?.methodName?.split('.').pop() || 'Unknown') === filterMethod)
+    }
+    if (filterStatus === 'error') {
+      result = result.filter(l => l.severity === 'ERROR' || (l.protoPayload?.status?.code && l.protoPayload.status.code > 0))
+    } else if (filterStatus === 'ok') {
+      result = result.filter(l => l.severity !== 'ERROR' && (!l.protoPayload?.status?.code || l.protoPayload.status.code === 0))
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(l => {
+        const p = l.protoPayload || {}
+        const searchable = [
+          p.methodName, p.authenticationInfo?.principalEmail,
+          String(p.requestMetadata?.callerIp || ''),
+          String((p.request as Record<string, unknown>)?.model || ''),
+        ].filter(Boolean).join(' ').toLowerCase()
+        return searchable.includes(q)
+      })
+    }
+    result.sort((a, b) => {
+      const d = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      return sortNewest ? -d : d
+    })
+    return result
+  }, [logs, filterMethod, filterStatus, searchQuery, sortNewest])
+
+  const uniqueMethods = useMemo(() => {
+    const set = new Set<string>()
+    for (const l of logs) set.add(l.protoPayload?.methodName?.split('.').pop() || 'Unknown')
+    return Array.from(set).sort()
+  }, [logs])
 
   if (loading) {
     return <div className="module-loading"><Loader2 size={24} className="spin" /></div>
@@ -1463,19 +1558,6 @@ function GcpLogsTab() {
       </div>
     )
   }
-
-  /* ── Stats summary ── */
-  const stats = (() => {
-    const methods: Record<string, number> = {}
-    let errors = 0
-    for (const log of logs) {
-      const m = log.protoPayload?.methodName?.split('.').pop() || 'Unknown'
-      methods[m] = (methods[m] || 0) + 1
-      if (log.severity === 'ERROR' || (log.protoPayload?.status?.code && log.protoPayload.status.code > 0)) errors++
-    }
-    const topMethod = Object.entries(methods).sort((a, b) => b[1] - a[1])[0]
-    return { total: logs.length, errors, methods, topMethod }
-  })()
 
   return (
     <div className="ai-gcp-logs-live">
@@ -1531,9 +1613,114 @@ function GcpLogsTab() {
         </div>
       </div>
 
+      {/* ── Filter & Export Toolbar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        padding: '12px 16px', borderRadius: 12, marginBottom: 14,
+        background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.04)',
+      }}>
+        {/* Search */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 160,
+          padding: '6px 12px', borderRadius: 8, background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+        }}>
+          <Search size={14} style={{ color: '#9ca3af', flexShrink: 0 }} />
+          <input
+            type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Buscar por método, email, modelo, IP..."
+            style={{
+              border: 'none', outline: 'none', fontSize: '0.82rem', width: '100%', background: 'transparent', color: '#1e293b',
+            }}
+          />
+          {searchQuery && (
+            <button type="button" onClick={() => setSearchQuery('')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}>
+              <X size={14} style={{ color: '#9ca3af' }} />
+            </button>
+          )}
+        </div>
+
+        {/* Method filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Filter size={13} style={{ color: '#6b7280' }} />
+          <select value={filterMethod} onChange={e => setFilterMethod(e.target.value)}
+            style={{
+              fontSize: '0.8rem', padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.1)',
+              background: '#fff', color: '#374151', cursor: 'pointer',
+            }}>
+            <option value="all">Todos os métodos</option>
+            {uniqueMethods.map(m => <option key={m} value={m}>{METHOD_LABELS[m]?.label || m}</option>)}
+          </select>
+        </div>
+
+        {/* Status filter */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['all', 'ok', 'error'] as const).map(s => (
+            <button key={s} type="button" onClick={() => setFilterStatus(s)}
+              style={{
+                fontSize: '0.75rem', padding: '4px 10px', borderRadius: 6, fontWeight: 600, cursor: 'pointer',
+                border: filterStatus === s ? '1px solid' : '1px solid rgba(0,0,0,0.08)',
+                background: filterStatus === s
+                  ? (s === 'error' ? 'rgba(239,68,68,0.1)' : s === 'ok' ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.1)')
+                  : '#fff',
+                color: filterStatus === s
+                  ? (s === 'error' ? '#dc2626' : s === 'ok' ? '#059669' : '#6366f1')
+                  : '#6b7280',
+                borderColor: filterStatus === s
+                  ? (s === 'error' ? '#dc2626' : s === 'ok' ? '#059669' : '#6366f1')
+                  : 'rgba(0,0,0,0.08)',
+              }}>
+              {s === 'all' ? 'Todos' : s === 'ok' ? '✓ OK' : '✗ Erros'}
+            </button>
+          ))}
+        </div>
+
+        {/* Sort toggle */}
+        <button type="button" onClick={() => setSortNewest(!sortNewest)}
+          className="ghost-button" style={{ padding: '5px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Clock size={13} /> {sortNewest ? '↓ Recentes' : '↑ Antigos'}
+        </button>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Export buttons */}
+        <button type="button" onClick={() => exportLogsCSV(filteredLogs)}
+          className="ghost-button" style={{ padding: '5px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Download size={13} /> CSV
+        </button>
+        <button type="button" onClick={() => exportLogsJSONL(filteredLogs)}
+          className="ghost-button" style={{ padding: '5px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Download size={13} /> JSONL
+        </button>
+      </div>
+
+      {/* Filter status indicator */}
+      {filteredLogs.length !== logs.length && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px', borderRadius: 8, marginBottom: 10,
+          background: 'rgba(99, 102, 241, 0.04)', border: '1px solid rgba(99, 102, 241, 0.1)',
+          fontSize: '0.78rem', color: '#6366f1', fontWeight: 500,
+        }}>
+          <Filter size={13} />
+          Mostrando {filteredLogs.length} de {logs.length} eventos
+          <button type="button" onClick={() => { setFilterMethod('all'); setFilterStatus('all'); setSearchQuery('') }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366f1', fontWeight: 600, textDecoration: 'underline', fontSize: '0.78rem' }}>
+            Limpar filtros
+          </button>
+        </div>
+      )}
+
       {/* ── Log entries ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {logs.map((log) => {
+        {filteredLogs.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 32, color: '#9ca3af' }}>
+            <Search size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
+            <p style={{ fontWeight: 500 }}>Nenhum log corresponde aos filtros aplicados.</p>
+          </div>
+        )}
+        {filteredLogs.map((log) => {
           const proto = log.protoPayload || {}
           const rawMethod = proto.methodName?.split('.').pop() || 'Unknown'
           const methodInfo = METHOD_LABELS[rawMethod] || { label: rawMethod, emoji: '📄', category: 'other' as const }
@@ -1662,17 +1849,18 @@ function GcpLogsTab() {
 
                   {/* ── 3. Content-Aware Rendering ── */}
                   {(() => {
-                    interface LogPart { text?: string }
+                    interface LogPart { text?: string; functionCall?: { name: string; args: Record<string, unknown> }; functionResponse?: { name: string; response: Record<string, unknown> } }
                     interface LogContent { role?: string; parts?: LogPart[] }
 
                     const isGenerate = methodInfo.category === 'generate'
 
                     if (isGenerate) {
-                      // ── Generate Content: show prompts and response ──
+                      // ── Generate Content: show prompts, tool calls, and response ──
                       const req = (proto.request || {}) as {
                         model?: string
                         systemInstruction?: { parts?: LogPart[] }
                         contents?: LogContent[]
+                        tools?: { functionDeclarations?: { name: string; description?: string; parameters?: Record<string, unknown> }[] }[]
                         generationConfig?: { temperature?: number; maxOutputTokens?: number; topP?: number; topK?: number }
                       }
                       const res = (proto.response || {}) as {
@@ -1684,13 +1872,19 @@ function GcpLogsTab() {
                       const systemInstructions = req.systemInstruction?.parts?.map(p => p.text).filter(Boolean).join('\n') || ''
                       const userContents = req.contents?.map(c => ({
                         role: c.role || 'user',
-                        text: c.parts?.map(p => p.text).filter(Boolean).join('\n') || ''
+                        text: c.parts?.map(p => p.text).filter(Boolean).join('\n') || '',
+                        functionCalls: c.parts?.filter(p => p.functionCall).map(p => p.functionCall!) || [],
+                        functionResponses: c.parts?.filter(p => p.functionResponse).map(p => p.functionResponse!) || [],
                       })) || []
                       const candidate = res.candidates?.[0]
                       const responseText = candidate?.content?.parts?.map(p => p.text).filter(Boolean).join('\n') || ''
+                      const responseFunctionCalls = candidate?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall!) || []
                       const finishReason = candidate?.finishReason || ''
                       const tokens = res.usageMetadata || {}
                       const genConfig = req.generationConfig
+                      // Tool declarations
+                      const toolDeclarations = req.tools?.flatMap(t => t.functionDeclarations || []) || []
+                      const hasToolUsage = toolDeclarations.length > 0 || responseFunctionCalls.length > 0 || userContents.some(c => c.functionCalls.length > 0 || c.functionResponses.length > 0)
 
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1743,13 +1937,48 @@ function GcpLogsTab() {
                               )}
 
                               {userContents.map((c, i) => (
-                                <div key={i} style={{ padding: 14, borderRadius: 10, background: c.role === 'model' ? 'rgba(139,92,246,0.03)' : 'rgba(26,115,232,0.03)', border: `1px solid ${c.role === 'model' ? 'rgba(139,92,246,0.1)' : 'rgba(26,115,232,0.1)'}` }}>
-                                  <div style={{ fontSize: '0.7rem', fontWeight: 600, color: c.role === 'model' ? '#7c3aed' : '#1a73e8', marginBottom: 6, textTransform: 'uppercase' }}>
-                                    {c.role === 'model' ? '🤖 Model' : '👤 User'}
+                                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  <div style={{ padding: 14, borderRadius: 10, background: c.role === 'model' ? 'rgba(139,92,246,0.03)' : 'rgba(26,115,232,0.03)', border: `1px solid ${c.role === 'model' ? 'rgba(139,92,246,0.1)' : 'rgba(26,115,232,0.1)'}` }}>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: c.role === 'model' ? '#7c3aed' : '#1a73e8', marginBottom: 6, textTransform: 'uppercase' }}>
+                                      {c.role === 'model' ? '🤖 Model' : c.role === 'function' ? '🔧 Function' : '👤 User'}
+                                    </div>
+                                    {c.text && (
+                                      <div style={{ fontSize: '0.82rem', color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: 300, overflow: 'auto' }}>
+                                        {c.text}
+                                      </div>
+                                    )}
+                                    {!c.text && c.functionCalls.length === 0 && c.functionResponses.length === 0 && (
+                                      <em style={{ fontSize: '0.82rem', opacity: 0.5 }}>(Sem texto / Mídia)</em>
+                                    )}
                                   </div>
-                                  <div style={{ fontSize: '0.82rem', color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: 300, overflow: 'auto' }}>
-                                    {c.text || <em style={{ opacity: 0.5 }}>(Sem texto / Mídia)</em>}
-                                  </div>
+                                  {/* Function calls within this turn */}
+                                  {c.functionCalls.map((fc, fi) => (
+                                    <div key={`fc-${fi}`} style={{
+                                      padding: 12, borderRadius: 10,
+                                      background: 'rgba(234, 88, 12, 0.04)', border: '1px solid rgba(234, 88, 12, 0.12)',
+                                    }}>
+                                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#c2410c', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        🔧 Tool Call: <code style={{ background: 'rgba(234,88,12,0.08)', padding: '1px 6px', borderRadius: 4 }}>{fc.name}</code>
+                                      </div>
+                                      <pre style={{ fontSize: '0.72rem', color: '#7c2d12', background: 'rgba(234,88,12,0.03)', padding: 10, borderRadius: 8, overflow: 'auto', maxHeight: 150, margin: 0, border: '1px solid rgba(234,88,12,0.06)' }}>
+                                        {JSON.stringify(fc.args, null, 2)}
+                                      </pre>
+                                    </div>
+                                  ))}
+                                  {/* Function responses within this turn */}
+                                  {c.functionResponses.map((fr, fri) => (
+                                    <div key={`fr-${fri}`} style={{
+                                      padding: 12, borderRadius: 10,
+                                      background: 'rgba(5, 150, 105, 0.04)', border: '1px solid rgba(5, 150, 105, 0.12)',
+                                    }}>
+                                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#059669', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        📦 Tool Result: <code style={{ background: 'rgba(5,150,105,0.08)', padding: '1px 6px', borderRadius: 4 }}>{fr.name}</code>
+                                      </div>
+                                      <pre style={{ fontSize: '0.72rem', color: '#064e3b', background: 'rgba(5,150,105,0.03)', padding: 10, borderRadius: 8, overflow: 'auto', maxHeight: 150, margin: 0, border: '1px solid rgba(5,150,105,0.06)' }}>
+                                        {JSON.stringify(fr.response, null, 2)}
+                                      </pre>
+                                    </div>
+                                  ))}
                                 </div>
                               ))}
 
@@ -1757,6 +1986,32 @@ function GcpLogsTab() {
                                 <div style={{ padding: 14, borderRadius: 10, background: 'rgba(0,0,0,0.02)', textAlign: 'center' }}>
                                   <em style={{ fontSize: '0.82rem', color: '#9ca3af' }}>Sem conteúdo de prompt extraído</em>
                                 </div>
+                              )}
+
+                              {/* Tool Declarations */}
+                              {hasToolUsage && toolDeclarations.length > 0 && (
+                                <details style={{ borderRadius: 10, border: '1px solid rgba(234, 88, 12, 0.1)', overflow: 'hidden' }}>
+                                  <summary style={{
+                                    cursor: 'pointer', padding: '10px 14px', fontSize: '0.75rem', fontWeight: 600,
+                                    color: '#c2410c', background: 'rgba(234, 88, 12, 0.03)',
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                  }}>
+                                    🛠️ {toolDeclarations.length} Tool{toolDeclarations.length > 1 ? 's' : ''} Declarado{toolDeclarations.length > 1 ? 's' : ''}
+                                  </summary>
+                                  <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {toolDeclarations.map((td, tdi) => (
+                                      <div key={tdi} style={{ padding: 10, borderRadius: 8, background: 'rgba(234,88,12,0.02)', border: '1px solid rgba(234,88,12,0.06)' }}>
+                                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#9a3412' }}>{td.name}</div>
+                                        {td.description && <div style={{ fontSize: '0.72rem', color: '#78350f', marginTop: 2 }}>{td.description}</div>}
+                                        {td.parameters && (
+                                          <pre style={{ fontSize: '0.68rem', color: '#7c2d12', marginTop: 6, padding: 8, borderRadius: 6, background: 'rgba(0,0,0,0.02)', overflow: 'auto', maxHeight: 100, margin: '6px 0 0' }}>
+                                            {JSON.stringify(td.parameters, null, 2)}
+                                          </pre>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </details>
                               )}
                             </div>
 
@@ -1778,6 +2033,26 @@ function GcpLogsTab() {
                                   </div>
                                 )}
                               </div>
+
+                              {/* Model-initiated function calls in response */}
+                              {responseFunctionCalls.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#c2410c', textTransform: 'uppercase' }}>🔧 Tool Calls (Model)</span>
+                                  {responseFunctionCalls.map((fc, fi) => (
+                                    <div key={fi} style={{
+                                      padding: 12, borderRadius: 10,
+                                      background: 'rgba(234, 88, 12, 0.04)', border: '1px solid rgba(234, 88, 12, 0.12)',
+                                    }}>
+                                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#c2410c', marginBottom: 6 }}>
+                                        <code style={{ background: 'rgba(234,88,12,0.08)', padding: '2px 8px', borderRadius: 4 }}>{fc.name}</code>
+                                      </div>
+                                      <pre style={{ fontSize: '0.72rem', color: '#7c2d12', background: 'rgba(234,88,12,0.03)', padding: 10, borderRadius: 8, overflow: 'auto', maxHeight: 150, margin: 0, border: '1px solid rgba(234,88,12,0.06)' }}>
+                                        {JSON.stringify(fc.args, null, 2)}
+                                      </pre>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

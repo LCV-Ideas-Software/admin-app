@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.78.05] - 2026-04-06
+### Adicionado
+- **Cross-Service AI Telemetry**: Instrumentação completa de `logAiUsage` em `discover.ts` do admin-motor para registro de tokens, latência e status no `ai_usage_logs` (D1).
+### Alterado
+- **Worker Rename (taxaipca-motor)**: Referências de `cron-taxa-ipca` atualizadas em `OraculoModule.tsx` (UI) e `oraculoCron.ts` (API URLs do Cloudflare Workers Schedules).
+- **Compatibility Date**: Todos os `wrangler.json` do admin-app atualizados para `2026-04-06`.
+### Controle de versão
+- `admin-app`: APP v01.78.04 → APP v01.78.05
+
+
 ## [v01.78.03] - 2026-04-06
 ### Alterado
 - **GCP Audit Logs (UI Redesign)**: Aba "GCP Raw Logs" completamente redesenhada e renomeada para "GCP Audit Logs". JSON bruto substituído por painel visual com cards por evento, badges de status coloridos, identidade estruturada (conta, IP, user-agent), renderização inteligente por tipo de método (GenerateContent exibe prompts/respostas; métodos de configuração exibem property grid), métricas de tokens discriminadas (prompt/resposta/total), e JSON bruto preservado como toggle colapsável. Banner superior com estatísticas agregadas (total de eventos, erros, método mais frequente).

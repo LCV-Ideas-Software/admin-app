@@ -20,7 +20,7 @@ export const handleOraculoCronGet = async (context: Context) => {
 
   try {
     const res = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/cron-taxa-ipca/schedules`,
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/taxaipca-motor/schedules`,
       { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
     );
 
@@ -68,7 +68,7 @@ export const handleOraculoCronPut = async (context: Context) => {
 
   try {
     const res = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/cron-taxa-ipca/schedules`,
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/taxaipca-motor/schedules`,
       {
         method: 'PUT',
         headers: {

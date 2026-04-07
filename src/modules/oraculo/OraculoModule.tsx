@@ -773,7 +773,7 @@ export function OraculoModule() {
             <fieldset className="settings-fieldset">
               <legend><Clock size={14} style={{ verticalAlign: 'middle' }} /> Atualização Automática (Cron)</legend>
               <p className="field-hint" style={{ marginBottom: '0.75rem' }}>
-                O worker <code>cron-taxa-ipca</code> atualiza o cache automaticamente.
+                O worker <code>taxaipca-motor</code> atualiza o cache automaticamente.
                 {cronLoading && <> <Loader2 size={12} className="spin" style={{ verticalAlign: 'middle' }} /> Carregando…</>}
               </p>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>

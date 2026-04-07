@@ -17,7 +17,7 @@ Migração arquitetural unificada para aproveitamento da infraestrutura Cloudfla
 
 ### Diretivas Respeitadas
 - Conformidade 100% com `wrangler.json`.
-- `tlsrpt-motor` e `cron-taxa-ipca` revalidados em infraestrutura moderna sem timeout.
+- `tlsrpt-motor` e `taxaipca-motor` revalidados em infraestrutura moderna sem timeout.
 
 ## 2026-04-03 — Admin-App v01.77.30 — Editor Spacing Custom Extension
 ### Contexto
@@ -596,7 +596,7 @@ Auditoria completa do módulo `CF P&W` contra a API oficial Cloudflare para elim
 
 ## 2026-03-27 — Oráculo Financeiro v01.06.01 + Admin-App v01.56.01 — Cron Modernization + Observability + Fixes
 ### Adicionado
-- **Admin-App OraculoModule — Cron Schedule Live**: campos cosmético/read-only de cron substituídos por selects de hora/minuto BRT compactos + botão "Salvar" que chama Cloudflare Workers Schedules API (`PUT /accounts/{id}/workers/scripts/cron-taxa-ipca/schedules`). Carrega schedule atual ao abrir aba Configurações.
+- **Admin-App OraculoModule — Cron Schedule Live**: campos cosmético/read-only de cron substituídos por selects de hora/minuto BRT compactos + botão "Salvar" que chama Cloudflare Workers Schedules API (`PUT /accounts/{id}/workers/scripts/taxaipca-motor/schedules`). Carrega schedule atual ao abrir aba Configurações.
 - **[NEW] `functions/api/oraculo/cron.ts`**: endpoint GET (lê schedule) e PUT (atualiza schedule) via `CF_API_TOKEN` + `CF_ACCOUNT_ID`.
 ### Corrigido
 - **Cron Worker CSV Parser**: `parseCSV` reescrito com mapeamento correto de 7 colunas (antes usava 8, causando dados corrompidos). Full-scan para data-base mais recente implementado.
@@ -624,7 +624,7 @@ Auditoria completa do módulo `CF P&W` contra a API oficial Cloudflare para elim
 ## 2026-03-26 — Oráculo Financeiro v01.03.00 + Admin-App v01.53.00 — Tesouro Transparente + Cron + Redesign Admin
 ### Adicionado
 - **Tesouro Transparente**: Worker `/api/taxa-ipca-atual` migrado de ANBIMA (paga) para CSV público gratuito. Cache D1 (`oraculo_taxa_ipca_cache`). Suporta `?force=true`.
-- **Cron Worker**: `workers/cron-taxa-ipca/` — scheduled handler `0 5 * * *` (02:00 BRT). CI/CD via `deploy.yml`.
+- **Cron Worker**: `workers/taxaipca-motor/` — scheduled handler `0 5 * * *` (02:00 BRT). CI/CD via `deploy.yml`.
 - **Máscaras Input BR**: `formatBRL`/`parseBRL`/`formatTaxa` — 7 inputs convertidos para formato brasileiro.
 - **Admin-App OraculoModule**: redesign 3 abas. Configurações: status cache, URL CSV, cron, modelos IA, trigger manual CSV.
 ### Alterado
