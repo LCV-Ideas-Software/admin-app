@@ -35,7 +35,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
 
       - name: Install Admin App
-        run: npm ci
+        run: npm install
         working-directory: ./
 
       - name: Deploy Admin Motor
