@@ -1,4 +1,8 @@
 # AI Memory Log — Admin-App
+
+## 2026-04-08 — GitHub Actions Purge & Dependabot Standardization
+### Escopo
+Auditoria completa de CI/CD para eliminação de "ghost runs" em toda a rede de repositórios do workspace, juntamente com a universalização da configuração do Dependabot ajustada às necessidades de empacotamento locais para mitigar tráfego e limites no API.
 ## 2026-04-07 — Admin-App v01.82.00 — Ratings Moderation Panel
 ### Scope
 Nova funcionalidade completa de moderação de avaliações (estrelas + reações) no admin-app, com backend CRUD no admin-motor e frontend RatingsPanel no MainsiteModule.
@@ -407,4 +411,5 @@ Resolução imediata de anomalia de middleware (em dmin-app/_middleware.ts) que
 
 ## 2026-04-03 — Enforcing Canonical Domain Security & TypeScript Audit
 ## 2026-04-03 — AI Models Selection Parity & Hardcoding Eradication
+
 

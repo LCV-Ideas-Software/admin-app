@@ -1,22 +1,79 @@
 version: 2
 updates:
-  - package-ecosystem: npm
+  - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: weekly
+      interval: "daily"
+      time: "03:00"
+      timezone: "America/Sao_Paulo"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    assignees:
+      - "lcv-leo"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
     open-pull-requests-limit: 10
-    groups:
-      cloudflare-tooling:
-        patterns:
-          - wrangler
-          - "@cloudflare/*"
-      tiptap-editor:
-        patterns:
-          - "@tiptap/*"
-          - tiptap-markdown
 
-  - package-ecosystem: github-actions
-    directory: "/.github/workflows"
+  - package-ecosystem: "npm"
+    directory: "/"
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: "daily"
+      time: "03:20"
+      timezone: "America/Sao_Paulo"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "frontend"
+    assignees:
+      - "lcv-leo"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    versioning-strategy: increase
+    groups:
+      dev-dependencies:
+        patterns:
+          - "eslint*"
+          - "typescript"
+          - "@types/*"
+          - "wrangler"
+          - "@cloudflare/*"
+          - "vite*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "npm"
+    directory: "/tlsrpt-motor"
+    schedule:
+      interval: "daily"
+      time: "03:40"
+      timezone: "America/Sao_Paulo"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "worker"
+    assignees:
+      - "lcv-leo"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    versioning-strategy: increase
+    groups:
+      dev-dependencies:
+        patterns:
+          - "eslint*"
+          - "typescript"
+          - "@types/*"
+          - "wrangler"
+          - "@cloudflare/*"
+          - "vite*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 10
