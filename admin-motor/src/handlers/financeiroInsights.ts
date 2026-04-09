@@ -275,32 +275,52 @@ export const handleFinanceiroInsightsGet = async (context: InsightsContext) => {
 
         const payload = await res.json() as AnyRecord;
         const items: AnyRecord[] = Array.isArray(payload?.results) ? payload.results : [];
-        const normalized = items.map((tx) => ({
-          id: tx?.id ?? null,
-          status: tx?.status ?? 'unknown',
-          statusDetail: tx?.status_detail ?? null,
-          paymentType: tx?.payment_type_id ?? 'unknown',
-          paymentMethod: tx?.payment_method_id ?? null,
-          transactionAmount: Number(tx?.transaction_amount || 0),
-          netReceivedAmount: Number(tx?.transaction_details?.net_received_amount || 0),
-          totalPaidAmount: Number(tx?.transaction_details?.total_paid_amount || 0),
-          installmentAmount: Number(tx?.transaction_details?.installment_amount || 0),
-          installments: tx?.installments ?? null,
-          currency: tx?.currency_id ?? 'BRL',
-          dateCreated: tx?.date_created ?? null,
-          dateApproved: tx?.date_approved ?? null,
-          payerEmail: tx?.payer?.email ?? null,
-          payerId: tx?.payer?.id ?? null,
-          description: tx?.description ?? null,
-          externalReference: tx?.external_reference ?? null,
-          orderId: tx?.order?.id ?? null,
-        }));
+        const normalized = items.map((tx) => {
+          const fees: AnyRecord[] = Array.isArray(tx?.fee_details) ? tx.fee_details : [];
+          const totalFee = fees.reduce((sum: number, f: AnyRecord) => sum + Number(f?.amount || 0), 0);
+          return {
+            // ── Campos alinhados com AdvancedTx (frontend) ──
+            id: tx?.id != null ? String(tx.id) : null,
+            transactionCode: tx?.id != null ? String(tx.id) : null,
+            amount: Number(tx?.transaction_amount || 0),
+            currency: tx?.currency_id ?? 'BRL',
+            status: tx?.status ?? 'unknown',
+            statusDetail: tx?.status_detail ?? null,
+            type: tx?.payment_type_id ?? 'unknown',
+            paymentType: tx?.payment_method_id ?? tx?.payment_type_id ?? 'unknown',
+            cardType: tx?.payment_method_id ?? null,
+            timestamp: tx?.date_created ?? null,
+            user: null,
+            payerEmail: tx?.payer?.email ?? null,
+            refundedAmount: Number(tx?.transaction_amount_refunded || 0),
+            authCode: tx?.authorization_code ?? null,
+            installments: tx?.installments ?? null,
+            externalRef: tx?.external_reference ?? null,
+            netReceivedAmount: Number(tx?.transaction_details?.net_received_amount || 0),
+            feeAmount: totalFee,
+            dateApproved: tx?.date_approved ?? null,
+          };
+        });
+
+        // Enriquecer paging com hasNext/hasPrev para o frontend
+        const rawPaging = payload?.paging || { total: 0, limit, offset };
+        const pagTotal = Number(rawPaging.total || 0);
+        const pagOffset = Number(rawPaging.offset || 0);
+        const pagLimit = Number(rawPaging.limit || limit);
+        const hasNext = pagOffset + pagLimit < pagTotal;
+        const hasPrev = pagOffset > 0;
 
         return Response.json({
           success: true,
           total: normalized.length,
           items: normalized,
-          paging: payload?.paging || { total: 0, limit, offset },
+          paging: {
+            ...rawPaging,
+            hasNext,
+            hasPrev,
+            nextOffset: hasNext ? pagOffset + pagLimit : null,
+            prevOffset: hasPrev ? Math.max(0, pagOffset - pagLimit) : null,
+          },
         });
       } catch (err) {
         return Response.json({ error: err instanceof Error ? err.message : 'Falha em transações avançadas MP.' }, { status: 500 });

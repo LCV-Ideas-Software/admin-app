@@ -1,4 +1,23 @@
 # Changelog — Admin App
+## [v01.82.05] - 2026-04-09
+### Corrigido
+- **Financeiro — Datas das transações Mercado Pago não exibidas**: O backend (`financeiroInsights.ts`) retornava campos com nomes diferentes dos esperados pelo frontend (`AdvancedTx`). O mapper MP usava `dateCreated`, `transactionAmount`, `externalReference` etc., mas o frontend esperava `timestamp`, `amount`, `externalRef`. Isso fazia com que datas (e potencialmente outros campos) aparecessem como "—" na tabela.
+  - **Fix**: Mapper MP `transactions-advanced` realinhado com o contrato `AdvancedTx`:
+    - `timestamp` ← `date_created` (era `dateCreated`)
+    - `amount` ← `transaction_amount` (era `transactionAmount`)
+    - `type` ← `payment_type_id` (novo)
+    - `cardType` ← `payment_method_id` (novo)
+    - `refundedAmount` ← `transaction_amount_refunded` (novo)
+    - `feeAmount` ← soma de `fee_details[].amount` (novo)
+    - `authCode` ← `authorization_code` (novo)
+    - `externalRef` ← `external_reference` (era `externalReference`)
+    - `transactionCode` ← `id` como string (novo)
+  - **Paginação MP enriquecida**: `hasNext`/`hasPrev`/`nextOffset`/`prevOffset` agora computados a partir do `paging.total/offset/limit` retornado pela API MP. Permite navegação correta entre páginas.
+  - **SDK check**: `@sumup/sdk` já estava na versão mais recente (`^0.1.4`). API MP v1 `/payments/search` estável, sem breaking changes em `date_created`. Nota: a API MP agora omite dados do pagador em status `pending` (Abr/2025); nova "Orders API" disponível para novas integrações.
+
+### Controle de versão
+- `admin-app`: APP v01.82.04 → APP v01.82.05
+
 ## [v01.82.04] - 2026-04-09
 ### Corrigido
 - **Gemini Import — 524 timeout por overshoot de budget no Jina Reader**: O `clientTimeoutMs` (52s) era calculado **uma única vez** antes do loop de retries. Com 2 tentativas, o pior caso era 52s + 1.5s (backoff) + 52s = 105.5s, estourando o limite de 100s do proxy Cloudflare Pages e gerando erro 524 (Connection Timed Out).

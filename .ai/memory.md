@@ -1,5 +1,18 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-09 — Financeiro: MP Transaction Field Mapping Fix (v01.82.05)
+### Escopo
+Datas e outros campos das transações Mercado Pago não apareciam na tabela do módulo Financeiro.
+### Root Cause
+O mapper de `transactions-advanced` para MP no backend (`financeiroInsights.ts`) retornava campos com nomes diferentes do contrato `AdvancedTx` do frontend. Ex: `dateCreated` em vez de `timestamp`, `transactionAmount` em vez de `amount`. O frontend fazia `as AdvancedTx[]` sem transformação, então campos com nomes errados ficavam `undefined` → exibidos como "—".
+### Corrigido
+- Mapper MP alinhado com `AdvancedTx`: `timestamp` ← `date_created`, `amount` ← `transaction_amount`, `type`, `cardType`, `refundedAmount`, `feeAmount`, `authCode`, `externalRef`, `transactionCode` agora mapeados corretamente.
+- Paginação MP enriquecida com `hasNext/hasPrev/nextOffset/prevOffset` derivados de `paging.total/offset/limit`.
+### SDK Check
+- `@sumup/sdk` já na versão mais recente (`^0.1.4`). MP REST API v1 `/payments/search` estável, sem breaking changes em `date_created`. Nota: API MP omite dados do pagador em status `pending` desde Abr/2025.
+### Versão
+- APP v01.82.04 → APP v01.82.05
+
 ## 2026-04-09 — Gemini Import 524 Fix: Jina Reader Budget Overshoot (v01.82.04)
 ### Escopo
 Correção de timeout 524 na importação Gemini causado por overshoot do budget de tempo no retry loop do Jina Reader.
