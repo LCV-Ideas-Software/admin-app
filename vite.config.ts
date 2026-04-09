@@ -8,16 +8,6 @@ export default defineConfig({
     cssCodeSplit: false,
     chunkSizeWarningLimit: 900,
     rollupOptions: {
-      // Tiptap 3.22.x declara peer deps (collaboration, yjs, etc.) que o bundler
-      // tenta resolver mas que NÃO são usados em runtime neste app.
-      // NÃO externalizar deps usados em runtime (drag-handle, suggestion).
-      external: [
-        '@tiptap/extension-collaboration',
-        '@tiptap/extension-node-range',
-        '@tiptap/y-tiptap',
-        'yjs',
-        'y-prosemirror',
-      ],
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return
