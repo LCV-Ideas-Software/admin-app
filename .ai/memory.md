@@ -1,5 +1,16 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-08 — Monorepo Tech Upgrade: ESLint 10 + TypeScript Infrastructure
+### Escopo
+Migração ESLint 9→10 completa. Infraestrutura TS corrigida para Cloudflare Pages Functions.
+### Feito
+- **ESLint 10.2.0**: Upgrade de `eslint` e `@eslint/js`. Flat config existente validada como compatível.
+- **`.npmrc`**: Criado com `legacy-peer-deps=true` para contornar peer dep conflict `eslint-plugin-react-hooks@7` ↔ ESLint 10 no CI (`npm install`).
+- **`tsconfig.functions.json`**: `composite: true` + referência adicionada ao root `tsconfig.json` → resolve `Fetcher`/`PagesFunction` types no IDE.
+- **Lint fixes**: `gcp-monitoring.ts` cast `ArrayBuffer`, `listar.ts` tipagem `Record<string, unknown>`.
+### Versão
+- APP v01.82.00 → APP v01.82.01
+
 ## 2026-04-08 — GitHub Actions Purge & Dependabot Standardization
 ### Escopo
 Auditoria completa de CI/CD para eliminação de "ghost runs" em toda a rede de repositórios do workspace, juntamente com a universalização da configuração do Dependabot ajustada às necessidades de empacotamento locais para mitigar tráfego e limites no API.

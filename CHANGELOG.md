@@ -1,4 +1,17 @@
 # Changelog — Admin App
+## [v01.82.01] - 2026-04-08
+### Atualização Tecnológica
+- **ESLint 9 → 10**: Migração para `eslint@10.2.0` e `@eslint/js@10.0.1`. Configuração flat config validada como compatível.
+- **`.npmrc`**: Criado com `legacy-peer-deps=true` para resolver conflito de peer dependency entre `eslint-plugin-react-hooks@7` e ESLint 10 no CI/CD.
+- **`tsconfig.functions.json`**: Adicionado `composite: true` e referência no root `tsconfig.json` → resolve tipos `Fetcher`/`PagesFunction` ausentes em `functions/`.
+
+### Corrigido
+- **`gcp-monitoring.ts`**: Cast `keyBuffer.buffer as ArrayBuffer` para compatibilidade TS 5.3+ (`ArrayBufferLike`).
+- **`listar.ts`**: Tipagem explícita `Record<string, unknown>` nos callbacks `.map()` para satisfazer `noImplicitAny`.
+
+### Controle de versão
+- `admin-app`: APP v01.82.00 → APP v01.82.01
+
 ## [v01.82.00] - 2026-04-07
 ### Adicionado
 - **Moderação de Avaliações (Backend)**: Novo handler `ratings-admin.ts` no `admin-motor` com 5 endpoints CRUD para a tabela `mainsite_ratings` no D1:
