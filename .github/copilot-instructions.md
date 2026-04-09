@@ -1406,7 +1406,7 @@ Correção de bugs no módulo Astrólogo e simplificação do fluxo de e-mail.
 ### Decisão arquitetural registrada
 
 - **Padrão de acessibilidade**: após feedback positivo do usuário, padrões de acessibilidade (WCAG 2.1 AA, eMAG) devem ser aplicados em todo novo código como baseline de qualidade visual e funcional.
-
+
 
 ## 2026-04-03 — Enforcing Canonical Domain Security & TypeScript Audit
 ### Escopo
@@ -1434,5 +1434,15 @@ Auditoria e resolução do problema de regressão nos seletores de modelo AI do 
 - `admin-app`: APP v01.77.32 → APP v01.77.33
 
 
+
+
+## 🤖 Claude Code — Memória Sincronizada (2026-04-09)
+
+A memória persistente do **Claude Code** está em:
+`C:\Users\leona\.claude\projects\c--Users-leona-lcv-workspace\memory\`
+
+Arquivos: `MEMORY.md` (índice) · `project_workspace.md` · `version_control.md` · `infra_directives.md` · `app_memories_ref.md` · `ai_agents_files.md`
+
+**Diretiva:** Ao atualizar esta memória, atualizar também os arquivos correspondentes da memória do Claude Code para manter paridade entre Gemini, Copilot e Claude Code.
 
 > **DIRETIVA DE SEGURANÇA:** Ao sugerir código ou responder perguntas, leia rigorosamente o contexto e as memórias históricas acima para não divergir das decisões já tomadas pelo outro agente.
