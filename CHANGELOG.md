@@ -1,4 +1,11 @@
 # Changelog — Admin App
+## [v01.82.06] - 2026-04-09
+### Alterado
+- **MainSite — Resumos IA: layout de 3 colunas iguais**: O quadro "Resumos IA — Compartilhamento Social" passou a exibir cada resumo em 3 colunas de largura igual (`repeat(3, 1fr)`): título + metadados + ações | OG | LD. Anteriormente o conteúdo ficava empilhado verticalmente ou em 2 colunas desequilibradas. Textos longos agora quebram automaticamente (`word-break: break-word`) em todas as colunas. Em modo de edição, o layout reverte para coluna única. Arquivo: `src/modules/mainsite/MainsiteModule.tsx`.
+
+### Controle de versão
+- `admin-app`: APP v01.82.05 → APP v01.82.06
+
 ## [v01.82.05] - 2026-04-09
 ### Corrigido
 - **Financeiro — Datas das transações Mercado Pago não exibidas**: O backend (`financeiroInsights.ts`) retornava campos com nomes diferentes dos esperados pelo frontend (`AdvancedTx`). O mapper MP usava `dateCreated`, `transactionAmount`, `externalReference` etc., mas o frontend esperava `timestamp`, `amount`, `externalRef`. Isso fazia com que datas (e potencialmente outros campos) aparecessem como "—" na tabela.
