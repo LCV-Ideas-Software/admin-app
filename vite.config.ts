@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -37,5 +38,10 @@ export default defineConfig({
   // Desabilita lightningcss para resolver problema em Windows
   optimizeDeps: {
     exclude: ['lightningcss']
-  }
+  },
+  test: {
+    environment: 'happy-dom',
+    setupFiles: ['./src/test-setup.ts'],
+    exclude: ['node_modules', 'dist', 'admin-motor'],
+  },
 })
