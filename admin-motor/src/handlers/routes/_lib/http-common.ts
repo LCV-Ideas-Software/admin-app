@@ -66,7 +66,7 @@ export const CACHEABLE_HEADERS: Record<string, string> = {
 export function createJsonHeaders(
   additional?: Record<string, string>,
   secure = true,
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+ 
 ): Record<string, any> {
   const base = secure ? SECURE_HEADERS : STANDARD_JSON_HEADERS
   return {

@@ -944,21 +944,13 @@ export const listCloudflareZones = async (env: EnvWithCloudflarePwToken) => {
     throw new Error('Nenhum token Cloudflare configurado no ambiente para ler zonas.')
   }
 
-  let lastError: Error | null = null
-  let zones: CfpwZone[] | null = null
-
-  try {
-    zones = await cloudflareRequest<CfpwZone[]>(
-      env,
-      '/zones?per_page=500',
-      'Falha ao carregar zonas da Cloudflare',
-      undefined,
-      token,
-    )
-  } catch (err: unknown) {
-    lastError = err instanceof Error ? err : new Error(String(err))
-    throw lastError
-  }
+  const zones = await cloudflareRequest<CfpwZone[]>(
+    env,
+    '/zones?per_page=500',
+    'Falha ao carregar zonas da Cloudflare',
+    undefined,
+    token,
+  )
 
   return Array.isArray(zones) ? zones : []
 }
@@ -994,28 +986,16 @@ export const purgeCloudflareZoneCache = async (
     throw new Error('Token global ausente no runtime para Zone.CachePurge (configure CLOUDFLARE_CACHE).')
   }
 
-  let lastError: Error | null = null
-  let result: Record<string, unknown> | null = null
-
-  try {
-    result = await cloudflareRequest<Record<string, unknown>>(
-      env,
-      `/zones/${encodeURIComponent(normalizedZoneId)}/purge_cache`,
-      `Falha ao executar purge_cache na zona ${normalizedZoneId}`,
-      {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      },
-      token,
-    )
-  } catch (err: unknown) {
-    lastError = err instanceof Error ? err : new Error(String(err))
-    throw lastError
-  }
-
-  if (!result && lastError) {
-    throw lastError
-  }
+  const result = await cloudflareRequest<Record<string, unknown>>(
+    env,
+    `/zones/${encodeURIComponent(normalizedZoneId)}/purge_cache`,
+    `Falha ao executar purge_cache na zona ${normalizedZoneId}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token,
+  )
 
   return result
 }

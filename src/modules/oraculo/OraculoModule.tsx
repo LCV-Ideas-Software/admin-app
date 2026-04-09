@@ -597,7 +597,7 @@ export function OraculoModule() {
                 <ul className="result-list astro-akashico-scroll">
                   {userData.map((row) => {
                     const dt = new Date(row.atualizadoEm).toLocaleString('pt-BR')
-                    let preview = ''
+                    let preview: string
                     try {
                       const d = JSON.parse(row.dadosJson)
                       const tCount = (d.tesouroRegistros ?? []).length

@@ -145,7 +145,7 @@ async function handlePost(request: Request): Promise<Response> {
 /**
  * DELETE /api/config - Reset to defaults
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+ 
 async function handleDelete(_request: Request, _env: any): Promise<Response> {
   try {
     // In a real implementation, delete from D1 database

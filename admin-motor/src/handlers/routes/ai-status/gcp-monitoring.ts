@@ -2,11 +2,8 @@
 // Descrição: Tier C — Consulta Cloud Monitoring API para dados live de uso/quota do Gemini.
 // Requer GCP_SA_KEY (JSON da service account) e GCP_PROJECT_ID como secrets no Cloudflare.
 
-interface Env {
-  GCP_SA_KEY?: string    // JSON completo da service account key (Cloudflare Secret)
-  GCP_PROJECT_ID?: string
-}
-interface Ctx { env: Env }
+// Env: { GCP_SA_KEY?: string, GCP_PROJECT_ID?: string } — via context.data?.env || context.env
+
 
 interface ServiceAccountKey {
   type?: string

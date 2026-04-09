@@ -16,7 +16,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const serviceRequest = new Request(backendUrl.toString(), context.request);
   
   try {
-    const response = await ((context as any).data?.env || context.env).TLSRPT_MOTOR.fetch(serviceRequest);
+    const ctxData = (context as unknown as { data?: { env?: Env } }).data;
+    const env: Env = ctxData?.env || context.env;
+    const response = await env.TLSRPT_MOTOR.fetch(serviceRequest);
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

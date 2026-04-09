@@ -24,15 +24,15 @@ export const onRequestGet = async (context: BalanceContext) => {
 
   try {
     const client = new SumUp({ apiKey: token })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const txData = await (client.transactions as any).list({
       merchantCode,
       changes_since: `${startDate}T00:00:00-03:00`,
       limit: 100,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
     }) as any
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const items: any[] = Array.isArray(txData?.items) ? txData.items : []
 
     let available = 0

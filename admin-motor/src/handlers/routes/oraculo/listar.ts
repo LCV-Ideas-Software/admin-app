@@ -1,24 +1,6 @@
-interface D1Database {
-  prepare: (query: string) => D1PreparedStatement
-  batch: (statements: D1PreparedStatement[]) => Promise<D1Result[]>
-}
+// D1 types (via context.data?.env || context.env): db.prepare().bind().all(), db.batch()
+// Env: { BIGDATA_DB: D1Database } — accessed dynamically
 
-interface D1PreparedStatement {
-  bind: (...values: unknown[]) => D1PreparedStatement
-}
-
-interface D1Result {
-  results?: Record<string, unknown>[]
-}
-
-interface Env {
-  BIGDATA_DB: D1Database
-}
-
-interface Context {
-  env: Env
-  request: Request
-}
 
 export const onRequestGet = async (context: any) => {
   const { request } = context;

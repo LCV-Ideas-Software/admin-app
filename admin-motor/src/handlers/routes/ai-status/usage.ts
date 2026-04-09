@@ -4,8 +4,8 @@
 
 import type { D1Database } from '../../../../../functions/api/_lib/operational'
 
-interface Env { BIGDATA_DB: D1Database }
-interface Ctx { env: Env; request: Request }
+// Env: { BIGDATA_DB: D1Database } — via context.data?.env || context.env
+
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {

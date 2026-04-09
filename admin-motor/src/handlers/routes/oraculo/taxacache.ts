@@ -2,9 +2,9 @@
 // Descrição: Lê o status do cache de taxas IPCA+ diretamente do D1 (binding interno).
 // Suporta ?force=true para forçar re-download do CSV do Tesouro Transparente.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Env { BIGDATA_DB: any }
-interface Ctx { env: Env; request: Request }
+ 
+// Env: { BIGDATA_DB } — via context.data?.env || context.env
+
 
 interface TaxaIpcaCache {
   data_referencia: string

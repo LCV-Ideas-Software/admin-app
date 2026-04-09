@@ -11,7 +11,7 @@ type InsightsContext = {
   env: InsightsEnv;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type AnyRecord = Record<string, any>;
 
 const FINANCIAL_CUTOFF_BRT = '2026-03-01T00:00:00-03:00';

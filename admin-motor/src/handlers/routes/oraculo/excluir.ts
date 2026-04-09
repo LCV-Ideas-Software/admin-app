@@ -1,12 +1,5 @@
-interface Env {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  BIGDATA_DB: any
-}
+// Env: { BIGDATA_DB } — via context.data?.env || context.env
 
-interface Context {
-  env: Env
-  request: Request
-}
 
 export const onRequestPost = async (context: any) => {
   const { request } = context;

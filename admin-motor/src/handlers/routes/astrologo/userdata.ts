@@ -4,12 +4,9 @@
 
 interface D1RunResult { meta?: { changes?: number } }
 
-interface Env {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  BIGDATA_DB: any
-}
+// Env: { BIGDATA_DB } — via context.data?.env || context.env
 
-interface Ctx { env: Env; request: Request }
+
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {

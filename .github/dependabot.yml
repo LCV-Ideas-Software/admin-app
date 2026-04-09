@@ -45,6 +45,23 @@ updates:
           - "major"
           - "minor"
           - "patch"
+      tiptap-editor:
+        patterns:
+          - "@tiptap/*"
+          - "tiptap-*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+      eslint-ecosystem:
+        patterns:
+          - "@eslint/*"
+          - "eslint-plugin-*"
+          - "typescript-eslint"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
     open-pull-requests-limit: 10
 
   - package-ecosystem: "npm"
@@ -72,6 +89,15 @@ updates:
           - "wrangler"
           - "@cloudflare/*"
           - "vite*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+      eslint-ecosystem:
+        patterns:
+          - "@eslint/*"
+          - "eslint-plugin-*"
+          - "typescript-eslint"
         update-types:
           - "major"
           - "minor"
