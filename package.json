@@ -20,6 +20,7 @@
     "@google/genai": "^1.48.0",
     "@sumup/sdk": "^0.1.4",
     "@tanstack/react-query": "^5.0.0",
+    "@tanstack/react-router": "^1.168.13",
     "@tiptap/extension-bubble-menu": "^3.21.0",
     "@tiptap/extension-character-count": "^3.21.0",
     "@tiptap/extension-code-block-lowlight": "^3.21.0",
