@@ -1,5 +1,17 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-09 — Tier 1-3 Tech Upgrades (v01.83.00)
+### Escopo
+Três tiers de upgrades tecnológicos aplicados: TanStack Query completo, Biome linter, Husky, Knip.
+### Adicionado
+- **ReactQueryDevtools** em `main.tsx` (dev-only, tree-shaken em produção).
+- **AiStatusModule**: 5 fetch patterns migrados de `useState+useCallback+useEffect` para `useQuery`. Imports `useEffect`/`useCallback` removidos. Query keys: `ai-status-health`, `ai-status-models`, `ai-status-usage`, `ai-status-gcp`, `ai-status-logs`.
+- **Biome linter**: `biome.json` com `recommended: true` + overrides conservadores.
+- **Husky + lint-staged**: Pre-commit hook `biome format + eslint --fix` em `src/**/*.{ts,tsx}`.
+- **Knip**: `knip.json` + script `npm run knip` para dead code detection.
+### Versão
+- APP v01.82.07 → APP v01.83.00
+
 ## 2026-04-09 — MainSite: Reordenação do quadro Resumos IA (v01.82.07)
 ### Escopo
 Reordenação de painel no `MainsiteModule.tsx`.

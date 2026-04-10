@@ -1,4 +1,15 @@
 # Changelog — Admin App
+## [v01.83.00] - 2026-04-09
+### Adicionado
+- **TanStack Query DevTools**: `ReactQueryDevtools` adicionado a `main.tsx` (visible somente em dev via tree-shaking de produção).
+- **AiStatusModule — TanStack Query**: Todos os 5 padrões de fetch (`fetchHealth`, `fetchModels`, `fetchUsage`, `fetchGcp`, `fetchLogs`) migrados de `useState + useCallback + useEffect` para `useQuery`. Deduplicação automática entre renders, cache de 30 s, retry 1.
+- **Biome Linter**: Habilitado em `biome.json` com `recommended: true`; regras noisy (`noConsole`, `noExplicitAny`) desligadas; `useExhaustiveDependencies` em warn.
+- **Husky + lint-staged**: Pre-commit hook que executa `biome format --write` + `eslint --fix` nos arquivos staged de `src/**`.
+- **Knip**: Detecção de código morto adicionada (`knip.json` + script `npm run knip`).
+
+### Controle de versão
+- `admin-app`: APP v01.82.07 → APP v01.83.00
+
 ## [v01.82.07] - 2026-04-09
 ### Alterado
 - **MainSite — Reordenação de quadros**: O quadro "Resumos IA — Compartilhamento Social" foi movido para entre "Moderação de Avaliações" e "Janelas de Aviso (Disclaimers)" no `MainsiteModule`. Anteriormente aparecia após o quadro de Taxas dos Gateways de Pagamento. Arquivo: `src/modules/mainsite/MainsiteModule.tsx`.
