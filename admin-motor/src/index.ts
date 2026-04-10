@@ -51,6 +51,8 @@ import {
 import { toHeaders } from '../../functions/api/_lib/mainsite-admin';
 import { GoogleGenAI } from '@google/genai';
 import { validatePutAuth } from './handlers/routes/_lib/auth';
+import { Hono } from 'hono';
+import type { Context } from 'hono';
 // ── Novos handlers migrados de Pages Functions ──
 import { onRequestGet as handleAiStatusUsageGet, onRequestPost as handleAiStatusUsagePost } from './handlers/routes/ai-status/usage';
 import { onRequestPost as handleAstrologoExcluirPost } from './handlers/routes/astrologo/excluir';
@@ -371,12 +373,6 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
   }
 };
 
-const notFound = () =>
-  new Response(JSON.stringify({ ok: false, error: 'Rota não encontrada no admin-motor.' }), {
-    status: 404,
-    headers: { 'Content-Type': 'application/json' },
-  });
-
 const sanitizeErrorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 const logDebug = (message: string, context: Record<string, unknown> = {}) => {
@@ -395,394 +391,229 @@ const logError = (message: string, context: Record<string, unknown> = {}) => {
   console.error(`[admin-motor] ${message}`, context);
 };
 
-export default {
-  async fetch(request: Request, env: AdminMotorEnv, ctx: ExecutionContext): Promise<Response> {
-    const startedAt = Date.now();
-    const url = new URL(request.url);
-    const pathname = url.pathname;
-    const method = request.method.toUpperCase();
+// ========== HONO APP ==========
 
-    logDebug('request:start', { method, pathname });
-
-    try {
-      const runtimeEnv = await resolveRuntimeEnv(env);
-
-      // Global auth guard — all routes require CF Access or valid Bearer.
-      // Exempt OPTIONS (CORS preflight) so the browser can discover CORS headers.
-      if (method !== 'OPTIONS') {
-        const authCtx = await validatePutAuth(request, runtimeEnv.CLOUDFLARE_PW, {
-          teamDomain: runtimeEnv.CF_ACCESS_TEAM_DOMAIN,
-          enforcement: runtimeEnv.ENFORCE_JWT_VALIDATION,
-        });
-        if (!authCtx.isAuthenticated) {
-          return new Response(
-            JSON.stringify({ ok: false, error: 'Unauthorized.' }),
-            { status: 401, headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-      }
-
-      const routeContext = <T>() => ({ request, env: runtimeEnv, waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } as unknown as T);
-      if (method === 'GET' && pathname === '/api/ai-status/health') {
-        return handleAiStatusHealth(request, runtimeEnv, env);
-      }
-
-    if (method === 'GET' && pathname === '/api/ai-status/models') {
-      return handleAiStatusModelsGet({ request, env: runtimeEnv });
-    }
-
-    if (method === 'GET' && pathname === '/api/ai-status/gcp-monitoring') {
-      return handleAiStatusGcpMonitoringGet(routeContext<Parameters<typeof handleAiStatusGcpMonitoringGet>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/ai-status/gcp-logs') {
-      return handleAiStatusGcpLogsGet(routeContext<Parameters<typeof handleAiStatusGcpLogsGet>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/mainsite/modelos') {
-      return handleMainsiteModelos(request, runtimeEnv);
-    }
-
-    if (method === 'GET' && pathname === '/api/calculadora/modelos') {
-      return handleMainsiteModelos(request, runtimeEnv);
-    }
-
-    if (method === 'GET' && pathname === '/api/oraculo/modelos') {
-      return handleOraculoModelosGet({ request, env: runtimeEnv });
-    }
-
-    if (method === 'GET' && pathname === '/api/astrologo/modelos') {
-      return handleOraculoModelosGet({ request, env: runtimeEnv });
-    }
-
-    if (pathname === '/api/oraculo/cron') {
-      if (method === 'GET') return handleOraculoCronGet({ request, env: runtimeEnv });
-      if (method === 'PUT') return handleOraculoCronPut({ request, env: runtimeEnv });
-    }
-
-    if (method === 'POST' && pathname === '/api/astrologo/enviar-email') {
-      return handleAstrologoEnviarEmailPost({ request, env: runtimeEnv });
-    }
-
-    if (method === 'GET' && pathname === '/api/cfdns/zones') {
-      return handleCfdnsZonesGet({ request, env: runtimeEnv });
-    }
-
-    if (method === 'GET' && pathname === '/api/cfdns/records') {
-      return handleCfdnsRecordsGet(routeContext<Parameters<typeof handleCfdnsRecordsGet>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/cfpw/overview') {
-      return handleCfpwOverviewGet(routeContext<Parameters<typeof handleCfpwOverviewGet>[0]>());
-    }
-
-    if (method === 'POST' && pathname === '/api/cfpw/ops') {
-      return handleCfpwOpsPost(routeContext<Parameters<typeof handleCfpwOpsPost>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/cfpw/page-details') {
-      return handleCfpwPageDetailsGet(routeContext<Parameters<typeof handleCfpwPageDetailsGet>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/cfpw/worker-details') {
-      return handleCfpwWorkerDetailsGet(routeContext<Parameters<typeof handleCfpwWorkerDetailsGet>[0]>());
-    }
-
-    if (method === 'POST' && pathname === '/api/cfpw/delete-page') {
-      return handleCfpwDeletePagePost(routeContext<Parameters<typeof handleCfpwDeletePagePost>[0]>());
-    }
-
-    if (method === 'POST' && pathname === '/api/cfpw/delete-worker') {
-      return handleCfpwDeleteWorkerPost(routeContext<Parameters<typeof handleCfpwDeleteWorkerPost>[0]>());
-    }
-
-    if (method === 'POST' && pathname === '/api/cfpw/cleanup-cache-project') {
-      return handleCfpwCleanupCacheProjectPost(routeContext<Parameters<typeof handleCfpwCleanupCacheProjectPost>[0]>());
-    }
-
-    if (pathname === '/api/cfpw/observability') {
-      if (method === 'GET') return handleCfpwObservabilityGet(routeContext<Parameters<typeof handleCfpwObservabilityGet>[0]>());
-      if (method === 'POST') return handleCfpwObservabilityPost(routeContext<Parameters<typeof handleCfpwObservabilityPost>[0]>());
-    }
-
-    if (pathname === '/api/cfpw/cleanup-deployments') {
-      if (method === 'GET') return handleCleanupDeploymentsGet({ request, env: runtimeEnv });
-      if (method === 'POST') return handleCleanupDeploymentsPost({ request, env: runtimeEnv });
-    }
-
-    if (method === 'GET' && pathname === '/api/financeiro/insights') {
-      return handleFinanceiroInsightsGet({ request, env: runtimeEnv });
-    }
-
-    if (method === 'GET' && pathname === '/api/financeiro/mp-balance') {
-      return handleMpBalanceGet(routeContext<Parameters<typeof handleMpBalanceGet>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/financeiro/sumup-balance') {
-      return handleSumupBalanceGet(routeContext<Parameters<typeof handleSumupBalanceGet>[0]>());
-    }
-
-    if (method === 'POST' && pathname === '/api/financeiro/sumup-refund') {
-      return handleSumupRefundPost({ request, env: runtimeEnv });
-    }
-
-    if (method === 'POST' && pathname === '/api/financeiro/sumup-cancel') {
-      return handleSumupCancelPost({ request, env: runtimeEnv });
-    }
-
-    if (method === 'POST' && pathname === '/api/financeiro/mp-refund') {
-      return handleMpRefundPost({ request, env: runtimeEnv });
-    }
-
-    if (method === 'POST' && pathname === '/api/financeiro/mp-cancel') {
-      return handleMpCancelPost({ request, env: runtimeEnv });
-    }
-
-    if (pathname === '/api/mainsite/post-summaries') {
-      if (method === 'GET') return handlePostSummariesGet(routeContext<Parameters<typeof handlePostSummariesGet>[0]>());
-      if (method === 'POST') return handlePostSummariesPost(routeContext<Parameters<typeof handlePostSummariesPost>[0]>());
-    }
-
-    if (pathname === '/api/mainsite/gemini-import') {
-      if (method === 'POST') return handleGeminiImportPost(routeContext<Parameters<typeof handleGeminiImportPost>[0]>());
-      if (method === 'OPTIONS') return handleGeminiImportOptions(routeContext<Parameters<typeof handleGeminiImportOptions>[0]>());
-    }
-
-    if (method === 'POST' && pathname === '/api/mainsite/ai/transform') {
-      return handleMainsiteAiTransformPost(routeContext<Parameters<typeof handleMainsiteAiTransformPost>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/mtasts/zones') {
-      return handleMtastsZonesGet(routeContext<Parameters<typeof handleMtastsZonesGet>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/mtasts/policy') {
-      return handleMtastsPolicyGet(routeContext<Parameters<typeof handleMtastsPolicyGet>[0]>());
-    }
-
-    if (method === 'POST' && pathname === '/api/mtasts/orchestrate') {
-      return handleMtastsOrchestratePost(routeContext<Parameters<typeof handleMtastsOrchestratePost>[0]>());
-    }
-
-    if (method === 'GET' && pathname === '/api/news/discover') {
-      return handleNewsDiscoverGet(routeContext<Parameters<typeof handleNewsDiscoverGet>[0]>());
-    }
-
-    if (pathname === '/api/adminhub/config') {
-      if (method === 'GET') return handleAdminhubConfigGet(routeContext<Parameters<typeof handleAdminhubConfigGet>[0]>());
-      if (method === 'PUT') return handleAdminhubConfigPut(routeContext<Parameters<typeof handleAdminhubConfigPut>[0]>());
-    }
-
-      if (pathname === '/api/apphub/config') {
-        if (method === 'GET') return handleApphubConfigGet(routeContext<Parameters<typeof handleApphubConfigGet>[0]>());
-        if (method === 'PUT') return handleApphubConfigPut(routeContext<Parameters<typeof handleApphubConfigPut>[0]>());
-      }
-
-    // ── Rotas migradas de Pages Functions ──
-
-    // ai-status
-    if (pathname === '/api/ai-status/usage') {
-      if (method === 'GET') return handleAiStatusUsageGet(routeContext<Parameters<typeof handleAiStatusUsageGet>[0]>());
-      if (method === 'POST') return handleAiStatusUsagePost(routeContext<Parameters<typeof handleAiStatusUsagePost>[0]>());
-    }
-
-    // astrologo
-    if (method === 'POST' && pathname === '/api/astrologo/excluir') {
-      return handleAstrologoExcluirPost(routeContext<Parameters<typeof handleAstrologoExcluirPost>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/astrologo/ler') {
-      return handleAstrologoLerPost(routeContext<Parameters<typeof handleAstrologoLerPost>[0]>());
-    }
-    if (method === 'GET' && pathname === '/api/astrologo/listar') {
-      return handleAstrologoListarGet(routeContext<Parameters<typeof handleAstrologoListarGet>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/astrologo/sync') {
-      return handleAstrologoSyncPost(routeContext<Parameters<typeof handleAstrologoSyncPost>[0]>());
-    }
-    if (pathname === '/api/astrologo/userdata') {
-      if (method === 'GET') return handleAstrologoUserdataGet(routeContext<Parameters<typeof handleAstrologoUserdataGet>[0]>());
-      if (method === 'DELETE') return handleAstrologoUserdataDelete(routeContext<Parameters<typeof handleAstrologoUserdataDelete>[0]>());
-    }
-
-    // cfdns
-    if (method === 'DELETE' && pathname === '/api/cfdns/delete') {
-      return handleCfdnsDeleteDelete(routeContext<Parameters<typeof handleCfdnsDeleteDelete>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/cfdns/upsert') {
-      return handleCfdnsUpsertPost(routeContext<Parameters<typeof handleCfdnsUpsertPost>[0]>());
-    }
-
-    // config
-    if (pathname === '/api/config') {
-      return handleConfigRequest(routeContext<Parameters<typeof handleConfigRequest>[0]>());
-    }
-    if (pathname === '/api/config-store') {
-      if (method === 'GET') return handleConfigStoreGet(routeContext<Parameters<typeof handleConfigStoreGet>[0]>());
-      if (method === 'POST') return handleConfigStorePost(routeContext<Parameters<typeof handleConfigStorePost>[0]>());
-    }
-
-    // calculadora
-    if (method === 'GET' && pathname === '/api/calculadora/overview') {
-      return handleCalculadoraOverviewGet(routeContext<Parameters<typeof handleCalculadoraOverviewGet>[0]>());
-    }
-    if (pathname === '/api/calculadora/parametros') {
-      if (method === 'GET') return handleCalculadoraParametrosGet(routeContext<Parameters<typeof handleCalculadoraParametrosGet>[0]>());
-      if (method === 'POST') return handleCalculadoraParametrosPost(routeContext<Parameters<typeof handleCalculadoraParametrosPost>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/calculadora/sync') {
-      return handleCalculadoraSyncPost(routeContext<Parameters<typeof handleCalculadoraSyncPost>[0]>());
-    }
-
-    // mainsite
-    if (pathname === '/api/mainsite/fees') {
-      if (method === 'GET') return handleMainsiteFeesGet(routeContext<Parameters<typeof handleMainsiteFeesGet>[0]>());
-      if (method === 'POST') return handleMainsiteFeesPost(routeContext<Parameters<typeof handleMainsiteFeesPost>[0]>());
-    }
-    if (method === 'GET' && pathname === '/api/mainsite/overview') {
-      return handleMainsiteOverviewGet(routeContext<Parameters<typeof handleMainsiteOverviewGet>[0]>());
-    }
-    if (pathname === '/api/mainsite/posts') {
-      if (method === 'GET') return handleMainsitePostsGet(routeContext<Parameters<typeof handleMainsitePostsGet>[0]>());
-      if (method === 'POST') return handleMainsitePostsPost(routeContext<Parameters<typeof handleMainsitePostsPost>[0]>());
-      if (method === 'PUT') return handleMainsitePostsPut(routeContext<Parameters<typeof handleMainsitePostsPut>[0]>());
-      if (method === 'DELETE') return handleMainsitePostsDelete(routeContext<Parameters<typeof handleMainsitePostsDelete>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/posts-pin') {
-      return handleMainsitePostsPinPost(routeContext<Parameters<typeof handleMainsitePostsPinPost>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/posts-reorder') {
-      return handleMainsitePostsReorderPost(routeContext<Parameters<typeof handleMainsitePostsReorderPost>[0]>());
-    }
-    if (pathname === '/api/mainsite/settings') {
-      if (method === 'GET') return handleMainsiteSettingsGet(routeContext<Parameters<typeof handleMainsiteSettingsGet>[0]>());
-      if (method === 'PUT') return handleMainsiteSettingsPut(routeContext<Parameters<typeof handleMainsiteSettingsPut>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/sync') {
-      return handleMainsiteSyncPost(routeContext<Parameters<typeof handleMainsiteSyncPost>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/migrate-media-urls') {
-      return handleMainsiteMigrateMediaPost(routeContext<Parameters<typeof handleMainsiteMigrateMediaPost>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/upload') {
-      return handleMainsiteUploadPost(routeContext<Parameters<typeof handleMainsiteUploadPost>[0]>());
-    }
-    if (method === 'GET' && pathname.startsWith('/api/mainsite/media/')) {
-      const filename = decodeURIComponent(pathname.replace('/api/mainsite/media/', ''));
-      if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\') || filename.includes('\0')) {
-        return new Response('Invalid filename.', { status: 400 });
-      }
-      const mediaCtx = { request, env: runtimeEnv, params: { filename } };
-      return handleMainsiteMediaGet(mediaCtx as Parameters<typeof handleMainsiteMediaGet>[0]);
-    }
-
-    // mainsite workers-ai
-    if (method === 'POST' && pathname === '/api/mainsite/workers-ai/sentiment') {
-      return handleWorkersAiSentimentPost(routeContext<Parameters<typeof handleWorkersAiSentimentPost>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/workers-ai/tags') {
-      return handleWorkersAiTagsPost(routeContext<Parameters<typeof handleWorkersAiTagsPost>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/workers-ai/translate') {
-      return handleWorkersAiTranslatePost(routeContext<Parameters<typeof handleWorkersAiTranslatePost>[0]>());
-    }
-
-    // mainsite comments admin (moderation)
-    if (method === 'GET' && pathname === '/api/mainsite/comments/admin/all') {
-      return handleCommentsAdminAll({ request, env: runtimeEnv });
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/comments/admin/bulk') {
-      return handleCommentsAdminBulk({ request, env: runtimeEnv });
-    }
-    if (method === 'GET' && pathname === '/api/mainsite/comments/admin/settings') {
-      return handleCommentsAdminGetSettings({ request, env: runtimeEnv });
-    }
-    if (method === 'PUT' && pathname === '/api/mainsite/comments/admin/settings') {
-      return handleCommentsAdminPutSettings({ request, env: runtimeEnv });
-    }
-    if (pathname.startsWith('/api/mainsite/comments/admin/')) {
-      // Extract comment ID from path: /api/mainsite/comments/admin/:id[/reply]
-      const segments = pathname.replace('/api/mainsite/comments/admin/', '').split('/');
-      const commentId = parseInt(segments[0], 10);
-      if (!isNaN(commentId)) {
-        if (method === 'PATCH') return handleCommentsAdminModerate({ request, env: runtimeEnv }, commentId);
-        if (method === 'DELETE') return handleCommentsAdminDelete({ request, env: runtimeEnv }, commentId);
-        if (method === 'POST' && segments[1] === 'reply') return handleCommentsAdminReply({ request, env: runtimeEnv }, commentId);
-      }
-    }
-
-    // mainsite ratings admin (moderation)
-    if (method === 'GET' && pathname === '/api/mainsite/ratings/admin/all') {
-      return handleRatingsAdminAll({ request, env: runtimeEnv });
-    }
-    if (method === 'GET' && pathname === '/api/mainsite/ratings/admin/stats') {
-      return handleRatingsAdminStats({ request, env: runtimeEnv });
-    }
-    if (method === 'POST' && pathname === '/api/mainsite/ratings/admin/bulk') {
-      return handleRatingsAdminBulk({ request, env: runtimeEnv });
-    }
-    if (pathname.startsWith('/api/mainsite/ratings/admin/')) {
-      const ratingId = parseInt(pathname.replace('/api/mainsite/ratings/admin/', ''), 10);
-      if (!isNaN(ratingId)) {
-        if (method === 'PATCH') return handleRatingsAdminUpdate({ request, env: runtimeEnv }, ratingId);
-        if (method === 'DELETE') return handleRatingsAdminDelete({ request, env: runtimeEnv }, ratingId);
-      }
-    }
-
-    // mtasts
-    if (method === 'GET' && pathname === '/api/mtasts/overview') {
-      return handleMtastsOverviewGet(routeContext<Parameters<typeof handleMtastsOverviewGet>[0]>());
-    }
-    if (method === 'POST' && pathname === '/api/mtasts/sync') {
-      return handleMtastsSyncPost(routeContext<Parameters<typeof handleMtastsSyncPost>[0]>());
-    }
-
-    // news
-    if (method === 'GET' && pathname === '/api/news/feed') {
-      return handleNewsFeedGet(routeContext<Parameters<typeof handleNewsFeedGet>[0]>());
-    }
-
-    // oraculo
-    if (method === 'POST' && pathname === '/api/oraculo/excluir') {
-      return handleOraculoExcluirPost(routeContext<Parameters<typeof handleOraculoExcluirPost>[0]>());
-    }
-    if (method === 'GET' && pathname === '/api/oraculo/listar') {
-      return handleOraculoListarGet(routeContext<Parameters<typeof handleOraculoListarGet>[0]>());
-    }
-    if (method === 'GET' && pathname === '/api/oraculo/taxacache') {
-      return handleOraculoTaxacacheGet(routeContext<Parameters<typeof handleOraculoTaxacacheGet>[0]>());
-    }
-    if (pathname === '/api/oraculo/userdata') {
-      if (method === 'GET') return handleOraculoUserdataGet(routeContext<Parameters<typeof handleOraculoUserdataGet>[0]>());
-      if (method === 'DELETE') return handleOraculoUserdataDelete(routeContext<Parameters<typeof handleOraculoUserdataDelete>[0]>());
-    }
-
-    // overview
-    if (method === 'GET' && pathname === '/api/overview/operational') {
-      return handleOverviewOperationalGet(routeContext<Parameters<typeof handleOverviewOperationalGet>[0]>());
-    }
-
-    // telemetry
-    if (method === 'DELETE' && pathname === '/api/telemetry/delete') {
-      return handleTelemetryDeleteDelete(routeContext<Parameters<typeof handleTelemetryDeleteDelete>[0]>());
-    }
-    if (method === 'GET' && pathname === '/api/telemetry/telemetry') {
-      return handleTelemetryGet(routeContext<Parameters<typeof handleTelemetryGet>[0]>());
-    }
-
-      logWarn('request:not-found', { method, pathname });
-      return notFound();
-    } catch (error) {
-      const message = sanitizeErrorMessage(error);
-      logError('request:unhandled-exception', { method, pathname, error: message });
-      return new Response(
-        JSON.stringify({ ok: false, error: 'Erro interno no admin-motor.' }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
-    } finally {
-      logInfo('request:end', { method, pathname, latencyMs: Date.now() - startedAt });
-    }
-  },
+type HonoEnv = {
+  Bindings: AdminMotorEnv;
+  Variables: { runtimeEnv: ResolvedAdminMotorEnv };
 };
+
+const app = new Hono<HonoEnv>();
+
+// ── Timing + logging ──
+app.use('*', async (c, next) => {
+  const startedAt = Date.now();
+  const method = c.req.method.toUpperCase();
+  const pathname = new URL(c.req.url).pathname;
+  logDebug('request:start', { method, pathname });
+  try {
+    await next();
+  } finally {
+    logInfo('request:end', { method, pathname, latencyMs: Date.now() - startedAt });
+  }
+});
+
+// ── Resolve runtime secrets ──
+app.use('*', async (c, next) => {
+  c.set('runtimeEnv', await resolveRuntimeEnv(c.env));
+  await next();
+});
+
+// ── Global auth guard ──
+app.use('*', async (c, next) => {
+  if (c.req.method.toUpperCase() === 'OPTIONS') return next();
+  const env = c.get('runtimeEnv');
+  const authCtx = await validatePutAuth(c.req.raw, env.CLOUDFLARE_PW, {
+    teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
+    enforcement: env.ENFORCE_JWT_VALIDATION,
+  });
+  if (!authCtx.isAuthenticated) {
+    return c.json({ ok: false, error: 'Unauthorized.' }, 401);
+  }
+  return next();
+});
+
+// ── Route context helper ──
+// Casts the Hono context into the shape expected by all handler functions.
+const rc = <T>(c: Context<HonoEnv>) =>
+  ({ request: c.req.raw, env: c.get('runtimeEnv'), waitUntil: (p: Promise<unknown>) => c.executionCtx.waitUntil(p) } as unknown as T);
+const re = (c: Context<HonoEnv>) => ({ request: c.req.raw, env: c.get('runtimeEnv') });
+
+// ── ai-status ──
+app.get('/api/ai-status/health', (c) => handleAiStatusHealth(c.req.raw, c.get('runtimeEnv'), c.env));
+app.get('/api/ai-status/models', (c) => handleAiStatusModelsGet(re(c)));
+app.get('/api/ai-status/gcp-monitoring', (c) => handleAiStatusGcpMonitoringGet(rc(c)));
+app.get('/api/ai-status/gcp-logs', (c) => handleAiStatusGcpLogsGet(rc(c)));
+app.get('/api/ai-status/usage', (c) => handleAiStatusUsageGet(rc(c)));
+app.post('/api/ai-status/usage', (c) => handleAiStatusUsagePost(rc(c)));
+
+// ── modelos ──
+app.get('/api/mainsite/modelos', (c) => handleMainsiteModelos(c.req.raw, c.get('runtimeEnv')));
+app.get('/api/calculadora/modelos', (c) => handleMainsiteModelos(c.req.raw, c.get('runtimeEnv')));
+app.get('/api/oraculo/modelos', (c) => handleOraculoModelosGet(re(c)));
+app.get('/api/astrologo/modelos', (c) => handleOraculoModelosGet(re(c)));
+
+// ── oraculo ──
+app.get('/api/oraculo/cron', (c) => handleOraculoCronGet(re(c)));
+app.put('/api/oraculo/cron', (c) => handleOraculoCronPut(re(c)));
+app.post('/api/oraculo/excluir', (c) => handleOraculoExcluirPost(rc(c)));
+app.get('/api/oraculo/listar', (c) => handleOraculoListarGet(rc(c)));
+app.get('/api/oraculo/taxacache', (c) => handleOraculoTaxacacheGet(rc(c)));
+app.get('/api/oraculo/userdata', (c) => handleOraculoUserdataGet(rc(c)));
+app.delete('/api/oraculo/userdata', (c) => handleOraculoUserdataDelete(rc(c)));
+
+// ── astrologo ──
+app.post('/api/astrologo/enviar-email', (c) => handleAstrologoEnviarEmailPost(re(c)));
+app.post('/api/astrologo/excluir', (c) => handleAstrologoExcluirPost(rc(c)));
+app.post('/api/astrologo/ler', (c) => handleAstrologoLerPost(rc(c)));
+app.get('/api/astrologo/listar', (c) => handleAstrologoListarGet(rc(c)));
+app.post('/api/astrologo/sync', (c) => handleAstrologoSyncPost(rc(c)));
+app.get('/api/astrologo/userdata', (c) => handleAstrologoUserdataGet(rc(c)));
+app.delete('/api/astrologo/userdata', (c) => handleAstrologoUserdataDelete(rc(c)));
+
+// ── cfdns ──
+app.get('/api/cfdns/zones', (c) => handleCfdnsZonesGet(re(c)));
+app.get('/api/cfdns/records', (c) => handleCfdnsRecordsGet(rc(c)));
+app.delete('/api/cfdns/delete', (c) => handleCfdnsDeleteDelete(rc(c)));
+app.post('/api/cfdns/upsert', (c) => handleCfdnsUpsertPost(rc(c)));
+
+// ── cfpw ──
+app.get('/api/cfpw/overview', (c) => handleCfpwOverviewGet(rc(c)));
+app.post('/api/cfpw/ops', (c) => handleCfpwOpsPost(rc(c)));
+app.get('/api/cfpw/page-details', (c) => handleCfpwPageDetailsGet(rc(c)));
+app.get('/api/cfpw/worker-details', (c) => handleCfpwWorkerDetailsGet(rc(c)));
+app.post('/api/cfpw/delete-page', (c) => handleCfpwDeletePagePost(rc(c)));
+app.post('/api/cfpw/delete-worker', (c) => handleCfpwDeleteWorkerPost(rc(c)));
+app.post('/api/cfpw/cleanup-cache-project', (c) => handleCfpwCleanupCacheProjectPost(rc(c)));
+app.get('/api/cfpw/observability', (c) => handleCfpwObservabilityGet(rc(c)));
+app.post('/api/cfpw/observability', (c) => handleCfpwObservabilityPost(rc(c)));
+app.get('/api/cfpw/cleanup-deployments', (c) => handleCleanupDeploymentsGet(re(c)));
+app.post('/api/cfpw/cleanup-deployments', (c) => handleCleanupDeploymentsPost(re(c)));
+
+// ── config ──
+app.all('/api/config', (c) => handleConfigRequest(rc(c)));
+app.get('/api/config-store', (c) => handleConfigStoreGet(rc(c)));
+app.post('/api/config-store', (c) => handleConfigStorePost(rc(c)));
+
+// ── adminhub / apphub ──
+app.get('/api/adminhub/config', (c) => handleAdminhubConfigGet(rc(c)));
+app.put('/api/adminhub/config', (c) => handleAdminhubConfigPut(rc(c)));
+app.get('/api/apphub/config', (c) => handleApphubConfigGet(rc(c)));
+app.put('/api/apphub/config', (c) => handleApphubConfigPut(rc(c)));
+
+// ── financeiro ──
+app.get('/api/financeiro/insights', (c) => handleFinanceiroInsightsGet(re(c)));
+app.get('/api/financeiro/mp-balance', (c) => handleMpBalanceGet(rc(c)));
+app.get('/api/financeiro/sumup-balance', (c) => handleSumupBalanceGet(rc(c)));
+app.post('/api/financeiro/sumup-refund', (c) => handleSumupRefundPost(re(c)));
+app.post('/api/financeiro/sumup-cancel', (c) => handleSumupCancelPost(re(c)));
+app.post('/api/financeiro/mp-refund', (c) => handleMpRefundPost(re(c)));
+app.post('/api/financeiro/mp-cancel', (c) => handleMpCancelPost(re(c)));
+
+// ── calculadora ──
+app.get('/api/calculadora/overview', (c) => handleCalculadoraOverviewGet(rc(c)));
+app.get('/api/calculadora/parametros', (c) => handleCalculadoraParametrosGet(rc(c)));
+app.post('/api/calculadora/parametros', (c) => handleCalculadoraParametrosPost(rc(c)));
+app.post('/api/calculadora/sync', (c) => handleCalculadoraSyncPost(rc(c)));
+
+// ── mainsite ──
+app.get('/api/mainsite/fees', (c) => handleMainsiteFeesGet(rc(c)));
+app.post('/api/mainsite/fees', (c) => handleMainsiteFeesPost(rc(c)));
+app.get('/api/mainsite/overview', (c) => handleMainsiteOverviewGet(rc(c)));
+app.get('/api/mainsite/posts', (c) => handleMainsitePostsGet(rc(c)));
+app.post('/api/mainsite/posts', (c) => handleMainsitePostsPost(rc(c)));
+app.put('/api/mainsite/posts', (c) => handleMainsitePostsPut(rc(c)));
+app.delete('/api/mainsite/posts', (c) => handleMainsitePostsDelete(rc(c)));
+app.post('/api/mainsite/posts-pin', (c) => handleMainsitePostsPinPost(rc(c)));
+app.post('/api/mainsite/posts-reorder', (c) => handleMainsitePostsReorderPost(rc(c)));
+app.get('/api/mainsite/settings', (c) => handleMainsiteSettingsGet(rc(c)));
+app.put('/api/mainsite/settings', (c) => handleMainsiteSettingsPut(rc(c)));
+app.post('/api/mainsite/sync', (c) => handleMainsiteSyncPost(rc(c)));
+app.post('/api/mainsite/migrate-media-urls', (c) => handleMainsiteMigrateMediaPost(rc(c)));
+app.post('/api/mainsite/upload', (c) => handleMainsiteUploadPost(rc(c)));
+app.get('/api/mainsite/media/:filename', (c) => {
+  const filename = decodeURIComponent(c.req.param('filename'));
+  if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\') || filename.includes('\0')) {
+    return new Response('Invalid filename.', { status: 400 });
+  }
+  return handleMainsiteMediaGet({ ...re(c), params: { filename } } as Parameters<typeof handleMainsiteMediaGet>[0]);
+});
+app.get('/api/mainsite/post-summaries', (c) => handlePostSummariesGet(rc(c)));
+app.post('/api/mainsite/post-summaries', (c) => handlePostSummariesPost(rc(c)));
+app.post('/api/mainsite/gemini-import', (c) => handleGeminiImportPost(rc(c)));
+app.options('/api/mainsite/gemini-import', (c) => handleGeminiImportOptions(rc(c)));
+app.post('/api/mainsite/ai/transform', (c) => handleMainsiteAiTransformPost(rc(c)));
+
+// ── mainsite workers-ai ──
+app.post('/api/mainsite/workers-ai/sentiment', (c) => handleWorkersAiSentimentPost(rc(c)));
+app.post('/api/mainsite/workers-ai/tags', (c) => handleWorkersAiTagsPost(rc(c)));
+app.post('/api/mainsite/workers-ai/translate', (c) => handleWorkersAiTranslatePost(rc(c)));
+
+// ── mainsite comments admin ──
+app.get('/api/mainsite/comments/admin/all', (c) => handleCommentsAdminAll(re(c)));
+app.post('/api/mainsite/comments/admin/bulk', (c) => handleCommentsAdminBulk(re(c)));
+app.get('/api/mainsite/comments/admin/settings', (c) => handleCommentsAdminGetSettings(re(c)));
+app.put('/api/mainsite/comments/admin/settings', (c) => handleCommentsAdminPutSettings(re(c)));
+app.patch('/api/mainsite/comments/admin/:id', (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  if (isNaN(id)) return c.json({ ok: false, error: 'Invalid comment ID.' }, 400);
+  return handleCommentsAdminModerate(re(c), id);
+});
+app.delete('/api/mainsite/comments/admin/:id', (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  if (isNaN(id)) return c.json({ ok: false, error: 'Invalid comment ID.' }, 400);
+  return handleCommentsAdminDelete(re(c), id);
+});
+app.post('/api/mainsite/comments/admin/:id/reply', (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  if (isNaN(id)) return c.json({ ok: false, error: 'Invalid comment ID.' }, 400);
+  return handleCommentsAdminReply(re(c), id);
+});
+
+// ── mainsite ratings admin ──
+app.get('/api/mainsite/ratings/admin/all', (c) => handleRatingsAdminAll(re(c)));
+app.get('/api/mainsite/ratings/admin/stats', (c) => handleRatingsAdminStats(re(c)));
+app.post('/api/mainsite/ratings/admin/bulk', (c) => handleRatingsAdminBulk(re(c)));
+app.patch('/api/mainsite/ratings/admin/:id', (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  if (isNaN(id)) return c.json({ ok: false, error: 'Invalid rating ID.' }, 400);
+  return handleRatingsAdminUpdate(re(c), id);
+});
+app.delete('/api/mainsite/ratings/admin/:id', (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  if (isNaN(id)) return c.json({ ok: false, error: 'Invalid rating ID.' }, 400);
+  return handleRatingsAdminDelete(re(c), id);
+});
+
+// ── mtasts ──
+app.get('/api/mtasts/zones', (c) => handleMtastsZonesGet(rc(c)));
+app.get('/api/mtasts/policy', (c) => handleMtastsPolicyGet(rc(c)));
+app.post('/api/mtasts/orchestrate', (c) => handleMtastsOrchestratePost(rc(c)));
+app.get('/api/mtasts/overview', (c) => handleMtastsOverviewGet(rc(c)));
+app.post('/api/mtasts/sync', (c) => handleMtastsSyncPost(rc(c)));
+
+// ── news ──
+app.get('/api/news/discover', (c) => handleNewsDiscoverGet(rc(c)));
+app.get('/api/news/feed', (c) => handleNewsFeedGet(rc(c)));
+
+// ── overview ──
+app.get('/api/overview/operational', (c) => handleOverviewOperationalGet(rc(c)));
+
+// ── telemetry ──
+app.delete('/api/telemetry/delete', (c) => handleTelemetryDeleteDelete(rc(c)));
+app.get('/api/telemetry/telemetry', (c) => handleTelemetryGet(rc(c)));
+
+// ── 404 + error handler ──
+app.notFound((c) => {
+  logWarn('request:not-found', { method: c.req.method, pathname: new URL(c.req.url).pathname });
+  return c.json({ ok: false, error: 'Rota não encontrada no admin-motor.' }, 404);
+});
+
+app.onError((error, c) => {
+  const method = c.req.method.toUpperCase();
+  const pathname = new URL(c.req.url).pathname;
+  logError('request:unhandled-exception', { method, pathname, error: sanitizeErrorMessage(error) });
+  return c.json({ ok: false, error: 'Erro interno no admin-motor.' }, 500);
+});
+
+export default app;
