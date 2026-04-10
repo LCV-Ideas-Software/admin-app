@@ -86,7 +86,11 @@ export async function onRequestPut(context: Context) {
   const trace = createResponseTrace(context.request)
 
   // Validate authentication for PUT operations
-  const authContext = validatePutAuth(context.request, ((context as any).data?.env || context.env).ADMINHUB_BEARER_TOKEN)
+  const env = (context as any).data?.env || context.env;
+  const authContext = await validatePutAuth(context.request, env.ADMINHUB_BEARER_TOKEN, {
+    teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
+    enforcement: env.ENFORCE_JWT_VALIDATION,
+  });
   if (!authContext.isAuthenticated) {
     return unauthorizedResponse(authContext.error || 'No authentication provided')
   }

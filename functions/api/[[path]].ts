@@ -56,8 +56,7 @@ export async function onRequest(context: CatchAllContext): Promise<Response> {
     });
     return json(502, {
       ok: false,
-      error: message,
-      path: originalUrl.pathname,
+      error: 'Erro ao encaminhar requisição.',
     });
   }
 }

@@ -106,6 +106,18 @@ export async function onRequest(context: { request: Request; env: Record<string,
     console.warn(`[Env Resolver] Secrets críticos ausentes no runtime: ${missingCritical.join(', ')}`);
   }
 
+  // Se TODOS os secrets críticos estão ausentes, o ambiente está totalmente mal configurado.
+  // Bloqueia requisições de API para evitar erros confusos no cliente.
+  if (missingCritical.length >= CRITICAL_KEYS.length) {
+    const url = new URL(context.request.url);
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Serviço temporariamente indisponível.' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+  }
+
   // Inject clone directly to context.data, which is propagated correctly across handlers.
   const mutableContext = context as unknown as Record<string, unknown>;
   const mutableData = (mutableContext.data || {}) as Record<string, unknown>;

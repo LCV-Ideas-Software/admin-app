@@ -171,6 +171,19 @@ const cloudflareRequest = async <T>(
   return payload.result as T
 }
 
+/**
+ * Paths permitidos para o raw request de CF API.
+ * Restringe ao subconjunto de endpoints legitimamente necessários para operações de Workers e Pages.
+ */
+const ALLOWED_CF_PATH_PATTERNS: RegExp[] = [
+  /^\/accounts(\?|$)/,                                     // listar contas
+  /^\/accounts\/[^/]+\/workers\//,                         // Workers scripts, settings, deployments, schedules, secrets
+  /^\/accounts\/[^/]+\/pages\//,                           // Pages projects, deployments, domains
+  /^\/zones(\?|$)/,                                        // listar zones
+  /^\/zones\/[^/]+\/workers\/routes(\/|$|\?)/,             // rotas de Workers
+  /^\/zones\/[^/]+\/purge_cache(\/|$|\?)/,                 // purge de cache
+]
+
 const validateCloudflareApiPath = (path: string) => {
   const normalized = path.trim()
   if (!normalized.startsWith('/')) {
@@ -181,8 +194,9 @@ const validateCloudflareApiPath = (path: string) => {
     throw new Error('Path inválido para operação avançada: uso de ".." não é permitido.')
   }
 
-  if (!normalized.startsWith('/accounts/') && !normalized.startsWith('/zones/')) {
-    throw new Error('Path inválido: use endpoints iniciando com /accounts/... ou /zones/...')
+  const isAllowed = ALLOWED_CF_PATH_PATTERNS.some((re) => re.test(normalized))
+  if (!isAllowed) {
+    throw new Error('Path fora do escopo permitido para operações da API Cloudflare.')
   }
 
   return normalized

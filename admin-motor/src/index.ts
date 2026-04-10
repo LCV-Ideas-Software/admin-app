@@ -753,7 +753,7 @@ export default {
       const message = sanitizeErrorMessage(error);
       logError('request:unhandled-exception', { method, pathname, error: message });
       return new Response(
-        JSON.stringify({ ok: false, error: 'Erro interno no admin-motor.', detail: message.slice(0, 500) }),
+        JSON.stringify({ ok: false, error: 'Erro interno no admin-motor.' }),
         {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
