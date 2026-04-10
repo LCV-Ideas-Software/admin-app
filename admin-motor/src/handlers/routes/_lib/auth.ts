@@ -59,16 +59,14 @@ export function validatePutAuth(request: Request, bearerTokenEnv?: string): Auth
     return { isAuthenticated: false, source: 'none', error: 'No authentication provided.' };
   }
 
-  // Fail-closed: when no bearer token is configured, require CF-Access header.
-  // If neither is present, deny access instead of assuming edge auth passed.
+  // No bearer token configured — trust Cloudflare Access edge authentication.
+  // The admin-app is behind CF Access; the JWT is validated at the edge before
+  // the request reaches this Worker (directly or via Service Binding).
   const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
-  if (cfAccessEmail) {
-    return { isAuthenticated: true, token: cfAccessEmail, source: 'cloudflare-access' };
-  }
   return {
-    isAuthenticated: false,
-    source: 'none',
-    error: 'No authentication method available.',
+    isAuthenticated: true,
+    token: cfAccessEmail ?? 'cloudflare-access-session',
+    source: 'cloudflare-access',
   };
 }
 

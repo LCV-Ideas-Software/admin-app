@@ -136,8 +136,6 @@ type AdminMotorEnv = {
   GCP_SA_KEY?: unknown;
   GCP_PROJECT_ID?: unknown;
   JINA_API_KEY?: unknown;
-  ADMINHUB_BEARER_TOKEN?: unknown;
-  APPHUB_BEARER_TOKEN?: unknown;
 };
 
 type ResolvedAdminMotorEnv = {
@@ -156,8 +154,6 @@ type ResolvedAdminMotorEnv = {
   GCP_SA_KEY?: string;
   GCP_PROJECT_ID?: string;
   JINA_API_KEY?: string;
-  ADMINHUB_BEARER_TOKEN?: string;
-  APPHUB_BEARER_TOKEN?: string;
 };
 
 type D1Like = {
@@ -229,20 +225,6 @@ const readSecretString = async (value: unknown): Promise<string> => {
   return '';
 };
 
-const CRITICAL_SECRETS = ['ADMINHUB_BEARER_TOKEN', 'APPHUB_BEARER_TOKEN'] as const;
-const IMPORTANT_SECRETS = ['CLOUDFLARE_PW', 'CF_ACCOUNT_ID', 'GEMINI_API_KEY', 'RESEND_API_KEY', 'MP_ACCESS_TOKEN', 'SUMUP_API_KEY_PRIVATE', 'SUMUP_MERCHANT_CODE'] as const;
-
-function validateResolvedSecrets(env: ResolvedAdminMotorEnv): { ok: boolean; missing: string[] } {
-  const missing: string[] = [];
-  for (const key of CRITICAL_SECRETS) {
-    if (!env[key]) missing.push(key);
-  }
-  for (const key of IMPORTANT_SECRETS) {
-    if (!env[key]) console.warn(`[env] Missing recommended secret: ${key}`);
-  }
-  return { ok: missing.length === 0, missing };
-}
-
 const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotorEnv> => ({
   BIGDATA_DB: env.BIGDATA_DB,
   MEDIA_BUCKET: env.MEDIA_BUCKET,
@@ -259,8 +241,6 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   GCP_SA_KEY: await readSecretString(env.GCP_SA_KEY),
   GCP_PROJECT_ID: await readSecretString(env.GCP_PROJECT_ID),
   JINA_API_KEY: await readSecretString(env.JINA_API_KEY),
-  ADMINHUB_BEARER_TOKEN: await readSecretString(env.ADMINHUB_BEARER_TOKEN),
-  APPHUB_BEARER_TOKEN: await readSecretString(env.APPHUB_BEARER_TOKEN),
 });
 
 const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv, unparsedEnv: AdminMotorEnv): Promise<Response> => {
@@ -419,11 +399,6 @@ export default {
 
     try {
       const runtimeEnv = await resolveRuntimeEnv(env);
-
-      const secretsCheck = validateResolvedSecrets(runtimeEnv);
-      if (!secretsCheck.ok) {
-        console.error(`[env] CRITICAL secrets missing: ${secretsCheck.missing.join(', ')}`);
-      }
 
       const routeContext = <T>() => ({ request, env: runtimeEnv, waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } as unknown as T);
       if (method === 'GET' && pathname === '/api/ai-status/health') {
