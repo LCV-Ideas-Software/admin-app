@@ -1,4 +1,14 @@
 # Changelog — Admin App
+## [v01.86.00] - 2026-04-11
+### Removido
+- **Mercado Pago**: Integração removida completamente (rotas, SDK, tipos, env bindings, polyfill Headers.raw)
+- **Tabs Financeiro**: Removidas — agora single-view sem branding de provedor
+- **Subquadro MP em Taxas**: Removido do MainsiteModule
+
+### Alterado
+- **Financeiro**: Single-view, sem referências a nomes de provedor
+- **Taxas de Processamento**: Renomeado de "Gateways de Pagamento", sem MP
+
 ## [v01.85.01] - 2026-04-11
 ### Alterado
 - **tlsrpt-motor**: Prefixo `[tlsrpt-motor]` adicionado a todos os logs via `structuredLog()`.
