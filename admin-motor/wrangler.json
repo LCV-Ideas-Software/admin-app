@@ -51,11 +51,6 @@
       "secret_name": "sumup-merchant-code"
     },
     {
-      "binding": "MP_ACCESS_TOKEN",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "mp-access-token"
-    },
-    {
       "binding": "RESEND_API_KEY",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "resend-api-key"

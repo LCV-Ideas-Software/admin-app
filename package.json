@@ -66,7 +66,6 @@
     "lucide-react": "^1.8.0",
     "mammoth": "^1.12.0",
     "marked": "^18.0.0",
-    "mercadopago": "^2.12.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tiptap-markdown": "^0.9.0",

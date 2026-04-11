@@ -4,7 +4,7 @@
  */
 // admin-app/src/modules/financeiro/financeiro-helpers.ts
 // Tipos, constantes, status configs, payload parsers e utilitários do módulo financeiro.
-// Compliance: SumUp SDK v0.1.2+ / Mercado Pago REST API v1
+// Compliance: SumUp SDK v0.1.2+
 
 // ── Tipos ──
 
@@ -26,8 +26,6 @@ export type StatusConfig = {
   canRefund?: boolean
   canCancel?: boolean
 }
-
-export type ProviderTab = 'sumup' | 'mercadopago'
 
 export type AdvancedTx = {
   id: string | null
@@ -62,7 +60,6 @@ export type ModalAction = {
 
 export const FINANCIAL_CUTOFF_DATE = '2026-03-01'
 export const SUMUP_FILTERS_KEY = 'adminapp_sumup_filters_v1'
-export const MP_FILTERS_KEY = 'adminapp_mp_filters_v1'
 export const WEBHOOK_POLL_MS = 15_000
 export const AUTO_REFRESH_MS = 600_000
 
@@ -144,7 +141,7 @@ export const DATE_PRESETS = [
   { key: 'cutoff', label: 'Desde 01/03/2026', value: FINANCIAL_CUTOFF_DATE },
 ] as const
 
-// ── Status configs (SumUp SDK + MP REST API — compliance total) ──
+// ── Status configs (SumUp SDK — compliance total) ──
 
 /** Cores padrão da indústria financeira:
  * Verde (#10b981) — aprovado/sucesso
@@ -178,41 +175,7 @@ export const getSumupStatusConfig = (status: string): StatusConfig => {
   return { color: '#6b7280', bg: 'rgba(107,114,128,0.15)', label: s || '?', canRefund: false, canCancel: false }
 }
 
-export const getMPStatusConfig = (status: string, statusDetail?: string): StatusConfig => {
-  const s = (status || '').toLowerCase()
-  const d = (statusDetail || '').toLowerCase()
-  if (s === 'approved') {
-    if (d === 'partially_refunded')
-      return { color: '#8ab4f8', bg: 'rgba(167,139,250,0.15)', label: 'EST. PARCIAL', canRefund: true, canCancel: false }
-    return { color: '#10b981', bg: 'rgba(16,185,129,0.15)', label: 'APROVADO', canRefund: true, canCancel: false }
-  }
-  if (s === 'in_process')
-    return { color: '#4285f4', bg: 'rgba(59,130,246,0.15)', label: 'EM ANÁLISE', canRefund: false, canCancel: true }
-  if (s === 'pending')
-    return { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', label: 'PENDENTE', canRefund: false, canCancel: true }
-  if (s === 'rejected') {
-    if (d.includes('insufficient_amount'))
-      return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'SEM SALDO', canRefund: false, canCancel: false }
-    if (d.includes('call_for_authorize'))
-      return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'LIGUE AO BANCO', canRefund: false, canCancel: false }
-    if (d.includes('bad_filled') || d.includes('form_error'))
-      return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'DADOS INVÁLIDOS', canRefund: false, canCancel: false }
-    if (d.includes('duplicated'))
-      return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'DUPLICADO', canRefund: false, canCancel: false }
-    if (d.includes('max_attempts'))
-      return { color: '#dc2626', bg: 'rgba(220,38,38,0.15)', label: 'LIMITE ATINGIDO', canRefund: false, canCancel: false }
-    return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'RECUSADO', canRefund: false, canCancel: false }
-  }
-  if (s === 'refunded')
-    return { color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', label: 'ESTORNADO', canRefund: false, canCancel: false }
-  if (s === 'cancelled')
-    return { color: '#f9ab00', bg: 'rgba(249,171,0,0.15)', label: 'CANCELADO', canRefund: false, canCancel: false }
-  if (s === 'charged_back')
-    return { color: '#dc2626', bg: 'rgba(220,38,38,0.15)', label: 'CONTESTAÇÃO', canRefund: false, canCancel: false }
-  return { color: '#6b7280', bg: 'rgba(107,114,128,0.15)', label: (status || '?').toUpperCase(), canRefund: false, canCancel: false }
-}
-
-// ── Payload parsers — compliance SumUp SDK v0.1.2+ e MP REST API v1 ──
+// ── Payload parsers — compliance SumUp SDK v0.1.2+ ──
 
 export const parseSumupPayload = (raw: string | null) => {
   if (!raw) return {} as Record<string, unknown>
@@ -273,54 +236,9 @@ export const resolveEffectiveSumupStatus = (
   return row || 'UNKNOWN'
 }
 
-export const parseMPPayload = (raw: string | null) => {
-  if (!raw) return {} as Record<string, unknown>
-  try {
-    const p = JSON.parse(raw)
-    const card = p.card || {}
-    const td = p.transaction_details || {}
-    const fees = p.fee_details || []
-    const payer = p.payer || {}
-    const ident = payer.identification || {}
-    return {
-      statusDetail: p.status_detail,
-      paymentMethodId: p.payment_method_id,
-      paymentTypeId: p.payment_type_id,
-      installments: p.installments,
-      lastFour: card.last_four_digits,
-      firstSix: card.first_six_digits,
-      cardholderName: card.cardholder?.name,
-      netReceivedAmount: td.net_received_amount,
-      totalPaidAmount: td.total_paid_amount,
-      acquirerRef: td.acquirer_reference,
-      feeAmount: fees[0]?.amount,
-      dateApproved: p.date_approved,
-      moneyReleaseDate: p.money_release_date,
-      moneyReleaseStatus: p.money_release_status,
-      authCode: p.authorization_code,
-      externalRef: p.external_reference,
-      processingMode: p.processing_mode,
-      payerName: [payer.first_name, payer.last_name].filter(Boolean).join(' ') || null,
-      payerDoc: ident.number ? `${ident.type}: ${ident.number}` : null,
-    }
-  } catch { return {} as Record<string, unknown> }
-}
-
-// ── Detecção de provedor pelo campo method ──
-
-export const detectProvider = (log: FinancialLog): ProviderTab => {
-  const m = (log.method || '').trim().toLowerCase()
-  return m === 'sumup_card' ? 'sumup' : 'mercadopago'
-}
-
 // ── Resolução de status config ──
 
 export const resolveStatusConfig = (log: FinancialLog): StatusConfig => {
-  const provider = detectProvider(log)
-  if (provider === 'mercadopago') {
-    const p = parseMPPayload(log.raw_payload)
-    return getMPStatusConfig(log.status, String(p.statusDetail ?? ''))
-  }
   // O backend já resolve o status corretamente escaneando todas as transações.
   // O frontend re-analisa o raw_payload como fallback de segurança, usando
   // parseSumupPayload que agora também escaneia todo transactions[] para refunds.

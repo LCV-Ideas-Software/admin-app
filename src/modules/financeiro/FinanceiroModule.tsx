@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 // admin-app/src/modules/financeiro/FinanceiroModule.tsx
-// Painel Financeiro — Dados LIVE dos provedores (SumUp SDK + MP REST API)
+// Painel Financeiro — Dados LIVE do provedor (SumUp SDK)
 // Sem dependência D1 — source of truth é sempre o provedor externo
-// Compliance: SumUp SDK v0.1.2+ / Mercado Pago REST API v1
+// Compliance: SumUp SDK v0.1.2+
 // Acessibilidade: WCAG 2.1 AA + eMAG
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -16,13 +16,13 @@ import {
 } from 'lucide-react'
 import { useNotification } from '../../components/Notification'
 import {
-  type AdvancedTx, type StatusConfig, type ProviderTab,
+  type AdvancedTx, type StatusConfig,
   type ModalAction, type ProviderFilters,
-  FINANCIAL_CUTOFF_DATE, SUMUP_FILTERS_KEY, MP_FILTERS_KEY,
+  FINANCIAL_CUTOFF_DATE, SUMUP_FILTERS_KEY,
   AUTO_REFRESH_MS, DATE_PRESETS,
   defaultFilters, loadFilters, saveFilters, clampStartDate,
   formatDateTimeBR, formatDateBR, formatBRL,
-  getSumupStatusConfig, getMPStatusConfig, getFinancialToneClass,
+  getSumupStatusConfig, getFinancialToneClass,
 } from './financeiro-helpers'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,10 +43,6 @@ type SumupPagination = {
   nextCursor: AnyRecord | null; prevCursor: AnyRecord | null
   page: number; lastMove: string
 }
-type MpPagination = {
-  nextOffset: number | null; prevOffset: number | null
-  offset: number; page: number; lastMove: string
-}
 
 const emptyInsights = (): InsightsState => ({
   loading: false, error: '', paymentMethods: [],
@@ -55,10 +51,7 @@ const emptyInsights = (): InsightsState => ({
 
 // ── Status config para AdvancedTx ──
 
-const resolveAdvancedStatusConfig = (tx: AdvancedTx, provider: ProviderTab): StatusConfig => {
-  if (provider === 'mercadopago') {
-    return getMPStatusConfig(tx.status, tx.statusDetail ?? '')
-  }
+const resolveAdvancedStatusConfig = (tx: AdvancedTx): StatusConfig => {
   return getSumupStatusConfig(tx.status)
 }
 
@@ -67,43 +60,25 @@ const resolveAdvancedStatusConfig = (tx: AdvancedTx, provider: ProviderTab): Sta
 export function FinanceiroModule() {
   const { showNotification } = useNotification()
 
-  // Provider ativo
-  const [provider, setProvider] = useState<ProviderTab>('mercadopago')
-  const providerLabel = provider === 'sumup' ? 'SumUp' : 'Mercado Pago'
-
-  // Filtros por provedor (D1-persisted)
-  const [sumupFilters, setSumupFilters] = useState<ProviderFilters>(defaultFilters)
-  const [mpFilters, setMpFilters] = useState<ProviderFilters>(defaultFilters)
-  const activeFilters = provider === 'sumup' ? sumupFilters : mpFilters
-  const setActiveFilters = provider === 'sumup' ? setSumupFilters : setMpFilters
+  // Filtros (D1-persisted)
+  const [filters, setFilters] = useState<ProviderFilters>(defaultFilters)
 
   // Carregar filtros do D1 no mount
   useEffect(() => {
-    void loadFilters(SUMUP_FILTERS_KEY).then(setSumupFilters)
-    void loadFilters(MP_FILTERS_KEY).then(setMpFilters)
+    void loadFilters(SUMUP_FILTERS_KEY).then(setFilters)
   }, [])
 
   // Persistência de filtros no D1
-  const sumupFiltersRef = useRef(sumupFilters)
-  const mpFiltersRef = useRef(mpFilters)
+  const filtersRef = useRef(filters)
   useEffect(() => {
-    if (JSON.stringify(sumupFiltersRef.current) !== JSON.stringify(sumupFilters)) {
-      sumupFiltersRef.current = sumupFilters
-      void saveFilters(SUMUP_FILTERS_KEY, sumupFilters)
+    if (JSON.stringify(filtersRef.current) !== JSON.stringify(filters)) {
+      filtersRef.current = filters
+      void saveFilters(SUMUP_FILTERS_KEY, filters)
     }
-  }, [sumupFilters])
-  useEffect(() => {
-    if (JSON.stringify(mpFiltersRef.current) !== JSON.stringify(mpFilters)) {
-      mpFiltersRef.current = mpFilters
-      void saveFilters(MP_FILTERS_KEY, mpFilters)
-    }
-  }, [mpFilters])
+  }, [filters])
 
-  // Dates por provedor
-  const [sumupStartDate, setSumupStartDate] = useState(FINANCIAL_CUTOFF_DATE)
-  const [mpStartDate, setMpStartDate] = useState(FINANCIAL_CUTOFF_DATE)
-  const activeStartDate = provider === 'sumup' ? sumupStartDate : mpStartDate
-  const setActiveStartDate = provider === 'sumup' ? setSumupStartDate : setMpStartDate
+  // Date
+  const [startDate, setStartDate] = useState(FINANCIAL_CUTOFF_DATE)
 
   // Balance (SDK)
   const [balance, setBalance] = useState<Balance>({ available_balance: 0, unavailable_balance: 0 })
@@ -111,7 +86,6 @@ export function FinanceiroModule() {
   // Insights (SDK live data — fonte única de dados)
   const [insights, setInsights] = useState<InsightsState>(emptyInsights())
   const [sumupPag, setSumupPag] = useState<SumupPagination>({ nextCursor: null, prevCursor: null, page: 1, lastMove: 'initial' })
-  const [mpPag, setMpPag] = useState<MpPagination>({ nextOffset: null, prevOffset: null, offset: 0, page: 1, lastMove: 'initial' })
 
   // Expanded row + actions
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
@@ -123,60 +97,49 @@ export function FinanceiroModule() {
 
   const fetchBalance = useCallback(async () => {
     try {
-      const endpoint = provider === 'sumup' ? '/api/financeiro/sumup-balance' : '/api/financeiro/mp-balance'
-      const res = await fetch(`${endpoint}?start_date=${activeStartDate}`)
+      const res = await fetch(`/api/financeiro/sumup-balance?start_date=${startDate}`)
       const data = await res.json() as Balance
       setBalance(data)
     } catch { /* melhor esforço */ }
-  }, [provider, activeStartDate])
+  }, [startDate])
 
-  const fetchInsights = useCallback(async (filters: ProviderFilters, cursor?: AnyRecord | null, offset?: number, move = 'initial') => {
+  const fetchInsights = useCallback(async (f: ProviderFilters, cursor?: AnyRecord | null, _offset?: number, move = 'initial') => {
     setInsights(prev => ({ ...prev, loading: true, error: '' }))
     try {
-      const prov = provider === 'sumup' ? 'sumup' : 'mp'
       const qs = (type: string, extra: Record<string, string> = {}) => {
-        const p = new URLSearchParams({ provider: prov, type, start_date: activeStartDate, ...extra })
+        const p = new URLSearchParams({ provider: 'sumup', type, start_date: startDate, ...extra })
         return p.toString()
       }
 
       // Build advanced query
       const advQs = new URLSearchParams({
-        provider: prov, type: 'transactions-advanced',
-        limit: String(filters.limit || 50),
-        start_date: activeStartDate,
+        provider: 'sumup', type: 'transactions-advanced',
+        limit: String(f.limit || 50),
+        start_date: startDate,
       })
-      if (filters.statuses.length) advQs.set('statuses', filters.statuses.join(','))
-      if (filters.types.length) advQs.set('types', filters.types.join(','))
+      if (f.statuses.length) advQs.set('statuses', f.statuses.join(','))
+      if (f.types.length) advQs.set('types', f.types.join(','))
 
-      if (provider === 'sumup') {
-        advQs.set('changes_since', `${activeStartDate}T00:00:00-03:00`)
-        if (cursor?.newest_time) advQs.set('newest_time', cursor.newest_time)
-        if (cursor?.newest_ref) advQs.set('newest_ref', cursor.newest_ref)
-        if (cursor?.oldest_time) advQs.set('oldest_time', cursor.oldest_time)
-        if (cursor?.oldest_ref) advQs.set('oldest_ref', cursor.oldest_ref)
-      } else {
-        advQs.set('begin_date', `${activeStartDate}T00:00:00-03:00`)
-        advQs.set('offset', String(offset ?? 0))
-      }
+      advQs.set('changes_since', `${startDate}T00:00:00-03:00`)
+      if (cursor?.newest_time) advQs.set('newest_time', cursor.newest_time)
+      if (cursor?.newest_ref) advQs.set('newest_ref', cursor.newest_ref)
+      if (cursor?.oldest_time) advQs.set('oldest_time', cursor.oldest_time)
+      if (cursor?.oldest_ref) advQs.set('oldest_ref', cursor.oldest_ref)
 
-      // Parallel: methods + summary + advanced + payouts(SumUp only)
-      const fetches: Promise<Response>[] = [
+      // Parallel: methods + summary + advanced + payouts
+      const [methodsRes, summaryRes, advRes, payoutsRes] = await Promise.all([
         fetch(`/api/financeiro/insights?${qs('payment-methods')}`),
         fetch(`/api/financeiro/insights?${qs('transactions-summary')}`),
         fetch(`/api/financeiro/insights?${advQs}`),
-      ]
-      if (provider === 'sumup') {
-        fetches.push(fetch(`/api/financeiro/insights?${qs('payouts-summary')}`))
-      }
-
-      const responses = await Promise.all(fetches)
+        fetch(`/api/financeiro/insights?${qs('payouts-summary')}`),
+      ])
       const [methodsData, summaryData, advData, payoutsData] = await Promise.all(
-        responses.map(r => r.json() as Promise<AnyRecord>)
+        [methodsRes, summaryRes, advRes, payoutsRes].map(r => r.json() as Promise<AnyRecord>)
       )
 
-      if (!responses[0].ok) throw new Error(String(methodsData.error || 'Falha nos métodos'))
-      if (!responses[1].ok) throw new Error(String(summaryData.error || 'Falha no resumo'))
-      if (!responses[2].ok) throw new Error(String(advData.error || 'Falha nas transações'))
+      if (!methodsRes.ok) throw new Error(String(methodsData.error || 'Falha nos métodos'))
+      if (!summaryRes.ok) throw new Error(String(summaryData.error || 'Falha no resumo'))
+      if (!advRes.ok) throw new Error(String(advData.error || 'Falha nas transações'))
 
       setInsights({
         loading: false, error: '',
@@ -188,46 +151,33 @@ export function FinanceiroModule() {
       })
 
       // Atualizar paginação
-      if (provider === 'sumup') {
-        setSumupPag(prev => ({
-          nextCursor: advData?.cursors?.next || null,
-          prevCursor: advData?.cursors?.prev || null,
-          lastMove: move,
-          page: move === 'next' ? prev.page + 1 : move === 'prev' ? Math.max(1, prev.page - 1) : 1,
-        }))
-      } else {
-        const paging = advData?.paging || {}
-        const curOff = Number(paging.offset || 0)
-        const curLim = Number(paging.limit || filters.limit || 50)
-        setMpPag({
-          nextOffset: paging.hasNext ? Number(paging.nextOffset) : null,
-          prevOffset: paging.hasPrev ? Number(paging.prevOffset) : null,
-          offset: curOff,
-          page: Math.floor(curOff / Math.max(1, curLim)) + 1,
-          lastMove: move,
-        })
-      }
+      setSumupPag(prev => ({
+        nextCursor: advData?.cursors?.next || null,
+        prevCursor: advData?.cursors?.prev || null,
+        lastMove: move,
+        page: move === 'next' ? prev.page + 1 : move === 'prev' ? Math.max(1, prev.page - 1) : 1,
+      }))
     } catch (err) {
       setInsights(prev => ({ ...prev, loading: false, error: err instanceof Error ? err.message : 'Erro ao carregar dados.' }))
     }
-  }, [provider, activeStartDate])
+  }, [startDate])
 
-  // ── Auto-fetch no mount e ao trocar aba ──
+  // ── Auto-fetch no mount ──
 
   useEffect(() => {
-    void fetchInsights(activeFilters, null, 0, 'initial')
+    void fetchInsights(filters, null, 0, 'initial')
     void fetchBalance()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider])
+  }, [])
 
   // Auto-refresh periódico
   useEffect(() => {
     const id = setInterval(() => {
-      void fetchInsights(activeFilters, null, 0, 'initial')
+      void fetchInsights(filters, null, 0, 'initial')
       void fetchBalance()
     }, AUTO_REFRESH_MS)
     return () => clearInterval(id)
-  }, [fetchInsights, fetchBalance, activeFilters])
+  }, [fetchInsights, fetchBalance, filters])
 
   // ── Actions ──
 
@@ -240,24 +190,18 @@ export function FinanceiroModule() {
       if (type === 'refund') {
         const parsedAmount = refundAmount ? Number(refundAmount.replace(',', '.')) : null
         const body = (parsedAmount && parsedAmount > 0) ? JSON.stringify({ amount: parsedAmount }) : '{}'
-        const endpoint = provider === 'sumup'
-          ? `/api/financeiro/sumup-refund?id=${txId}`
-          : `/api/financeiro/mp-refund?id=${txId}`
-        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+        const res = await fetch(`/api/financeiro/sumup-refund?id=${txId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
         const data = await res.json() as { success?: boolean; error?: string }
         if (!data.success) throw new Error(data.error)
         showNotification(`Estorno processado para ${txId}.`, 'success')
       } else if (type === 'cancel') {
-        const endpoint = provider === 'sumup'
-          ? `/api/financeiro/sumup-cancel?id=${txId}`
-          : `/api/financeiro/mp-cancel?id=${txId}`
-        const res = await fetch(endpoint, { method: 'POST' })
+        const res = await fetch(`/api/financeiro/sumup-cancel?id=${txId}`, { method: 'POST' })
         const data = await res.json() as { success?: boolean; error?: string }
         if (!data.success) throw new Error(data.error)
         showNotification(`Pagamento ${txId} cancelado.`, 'success')
       }
       setModal(null); setRefundAmount(''); setExpandedRow(null)
-      void fetchInsights(activeFilters, null, 0, 'initial')
+      void fetchInsights(filters, null, 0, 'initial')
       void fetchBalance()
     } catch (err) {
       showNotification(err instanceof Error ? err.message : 'Erro na operação.', 'error')
@@ -274,72 +218,37 @@ export function FinanceiroModule() {
     const lines = [h.join(','), ...rows.map(tx => h.map(k => esc(String((tx as AnyRecord)[k] ?? ''))).join(','))]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-    a.download = `${provider}-transacoes-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
+    a.download = `transacoes-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
     showNotification('CSV exportado.', 'success')
-  }, [insights.advancedTx, provider, showNotification])
+  }, [insights.advancedTx, showNotification])
 
   // ── Status legend (badges com contagem + soma) ──
 
   const statusLegend = useMemo(() => {
     const counts: Record<string, { cfg: StatusConfig; n: number; sum: number }> = {}
     insights.advancedTx.forEach(tx => {
-      const cfg = resolveAdvancedStatusConfig(tx, provider)
+      const cfg = resolveAdvancedStatusConfig(tx)
       if (!counts[cfg.label]) counts[cfg.label] = { cfg, n: 0, sum: 0 }
       counts[cfg.label].n++
       counts[cfg.label].sum += tx.amount
     })
     return Object.entries(counts)
-  }, [insights.advancedTx, provider])
+  }, [insights.advancedTx])
 
   // ── Expanded details render ──
 
   const renderExpandedDetails = (tx: AdvancedTx) => {
-    const cfg = resolveAdvancedStatusConfig(tx, provider)
+    const cfg = resolveAdvancedStatusConfig(tx)
 
-    if (provider === 'sumup') {
-      const items = [
-        ['Transaction ID', tx.id], ['Código TX', tx.transactionCode],
-        ['Tipo de Pagamento', tx.paymentType], ['Entry Mode', tx.entryMode],
-        ['Status', tx.status?.toUpperCase()], ['Auth Code', tx.authCode],
-        ['Moeda', tx.currency], ['ID Interno', tx.internalId],
-        ['Valor Estornado', tx.refundedAmount > 0 ? formatBRL(tx.refundedAmount) : null],
-        ['Data (Brasília)', tx.timestamp ? formatDateTimeBR(tx.timestamp) : null],
-      ].filter(([, v]) => v != null && v !== '' && v !== '—')
-      return (
-        <>
-          <div className="fin-expanded-stack">
-            {items.map(([label, value], i) => (
-              <div key={i} className="fin-detail-group">
-                <span className="fin-detail-label">{label}</span>
-                <span className="fin-detail-value">{String(value ?? '—')}</span>
-              </div>
-            ))}
-          </div>
-          {cfg.canRefund && (
-            <div className="fin-expanded-note fin-expanded-note--sumup">
-              <AlertCircle size={13} /> Estornos SumUp só ficam disponíveis após a liquidação da transação (geralmente em até 24h).
-            </div>
-          )}
-        </>
-      )
-    }
-
-    // Mercado Pago
     const items = [
-      ['Payment ID', tx.id], ['Código TX', tx.transactionCode],
-      ['Método de Pgto.', tx.paymentType], ['Tipo de Pgto.', tx.type],
-      ['Detalhe do Status', tx.statusDetail],
-      ['Parcelas', tx.installments ? String(tx.installments) : null],
-      ['Cartão', tx.cardType],
-      ['E-mail Pagador', tx.payerEmail],
-      ['Cód. Autorização', tx.authCode],
-      ['Ref. Externa', tx.externalRef],
-      ['Valor Líquido Recebido', tx.netReceivedAmount != null && tx.netReceivedAmount > 0 ? formatBRL(tx.netReceivedAmount) : null],
-      ['Taxa', tx.feeAmount != null ? formatBRL(tx.feeAmount) : null],
+      ['Transaction ID', tx.id], ['Código TX', tx.transactionCode],
+      ['Tipo de Pagamento', tx.paymentType], ['Entry Mode', tx.entryMode],
+      ['Status', tx.status?.toUpperCase()], ['Auth Code', tx.authCode],
+      ['Moeda', tx.currency], ['ID Interno', tx.internalId],
       ['Valor Estornado', tx.refundedAmount > 0 ? formatBRL(tx.refundedAmount) : null],
-      ['Data de Aprovação', tx.dateApproved ? formatDateTimeBR(tx.dateApproved) : null],
-    ].filter(([, v]) => v != null && v !== '' && v !== '—' && v !== 'null')
+      ['Data (Brasília)', tx.timestamp ? formatDateTimeBR(tx.timestamp) : null],
+    ].filter(([, v]) => v != null && v !== '' && v !== '—')
     return (
       <>
         <div className="fin-expanded-stack">
@@ -351,27 +260,21 @@ export function FinanceiroModule() {
           ))}
         </div>
         {cfg.canRefund && (
-          <div className="fin-expanded-note fin-expanded-note--mp">
-            <AlertCircle size={13} /> O valor líquido recebido já desconta as taxas do Mercado Pago.
+          <div className="fin-expanded-note">
+            <AlertCircle size={13} /> Estornos só ficam disponíveis após a liquidação da transação (geralmente em até 24h).
           </div>
         )}
       </>
     )
   }
 
-  // Paginação unificada
-  const activePag = provider === 'sumup' ? sumupPag : mpPag
-  const canPrev = provider === 'sumup' ? !!sumupPag.prevCursor : mpPag.prevOffset !== null
-  const canNext = provider === 'sumup' ? !!sumupPag.nextCursor : mpPag.nextOffset !== null
+  // Paginação
+  const canPrev = !!sumupPag.prevCursor
+  const canNext = !!sumupPag.nextCursor
 
   const goPage = (dir: 'prev' | 'next' | 'first') => {
-    if (provider === 'sumup') {
-      const cursor = dir === 'next' ? sumupPag.nextCursor : dir === 'prev' ? sumupPag.prevCursor : null
-      void fetchInsights(activeFilters, cursor, undefined, dir === 'first' ? 'initial' : dir)
-    } else {
-      const off = dir === 'next' ? (mpPag.nextOffset ?? 0) : dir === 'prev' ? (mpPag.prevOffset ?? 0) : 0
-      void fetchInsights(activeFilters, null, off, dir === 'first' ? 'initial' : dir)
-    }
+    const cursor = dir === 'next' ? sumupPag.nextCursor : dir === 'prev' ? sumupPag.prevCursor : null
+    void fetchInsights(filters, cursor, undefined, dir === 'first' ? 'initial' : dir)
   }
 
   // ── Render ──
@@ -380,102 +283,71 @@ export function FinanceiroModule() {
     <section className="module-section" aria-label="Módulo Financeiro">
       <h2><DollarSign size={20} /> Financeiro</h2>
 
-      {/* ── Abas de provedor ── */}
-      <div className="fin-provider-tabs" role="tablist" aria-label="Seleção de provedor de pagamento">
-        <button type="button" role="tab" aria-selected={provider === 'mercadopago'}
-          className={`fin-provider-tab fin-provider-tab--mp ${provider === 'mercadopago' ? 'fin-provider-tab--active' : ''}`}
-          onClick={() => setProvider('mercadopago')}>
-          Mercado Pago
-        </button>
-        <button type="button" role="tab" aria-selected={provider === 'sumup'}
-          className={`fin-provider-tab fin-provider-tab--sumup ${provider === 'sumup' ? 'fin-provider-tab--active' : ''}`}
-          onClick={() => setProvider('sumup')}>
-          SumUp
-        </button>
-      </div>
-
       {/* ── Balance ── */}
-      <div className="fin-balance-row" role="region" aria-label={`Receita ${providerLabel}`}>
+      <div className="fin-balance-row" role="region" aria-label="Receita">
         <article className="result-card fin-balance-card">
-          <h4><Wallet size={16} /> Total Recebido Líquido ({providerLabel})</h4>
+          <h4><Wallet size={16} /> Total Recebido Líquido</h4>
           <div className="fin-balance-amount">{formatBRL(balance.available_balance)}</div>
         </article>
         <article className="result-card fin-balance-card">
-          <h4><RefreshCw size={16} /> Pendente ({providerLabel})</h4>
+          <h4><RefreshCw size={16} /> Pendente</h4>
           <div className="fin-balance-pending">{formatBRL(balance.unavailable_balance)}</div>
         </article>
       </div>
 
       {/* ── Painel de dados live (SDK) ── */}
-      <article className={`result-card fin-insights-panel fin-insights-panel--${provider}`}
-        role="region" aria-label={`Dados ${providerLabel}`}>
+      <article className="result-card fin-insights-panel"
+        role="region" aria-label="Dados de transações">
         <div className="fin-insights-header">
-          <h3>Transações {providerLabel} (Dados Live)</h3>
+          <h3>Transações (Dados Live)</h3>
           <button type="button" className="ghost-button" disabled={insights.loading}
-            onClick={() => void fetchInsights(activeFilters, null, 0, 'initial')} aria-label="Atualizar dados">
+            onClick={() => void fetchInsights(filters, null, 0, 'initial')} aria-label="Atualizar dados">
             <RefreshCw size={14} className={insights.loading ? 'spin' : ''} />
             {insights.loading ? 'Atualizando...' : 'Atualizar'}
           </button>
         </div>
-        <div className={`fin-insights-period fin-insights-period--${provider}`}>
-          Dados ao vivo das APIs {providerLabel} — desde {formatDateBR(`${activeStartDate}T00:00:00-03:00`)} (Brasília, UTC-3)
+        <div className="fin-insights-period">
+          Dados ao vivo — desde {formatDateBR(`${startDate}T00:00:00-03:00`)} (Brasília, UTC-3)
         </div>
 
         {/* Filtros */}
         <div className="fin-insight-filters">
-          <select aria-label="Filtrar por status" value={activeFilters.statuses[0] || ''}
-            onChange={e => setActiveFilters(prev => ({ ...prev, statuses: e.target.value ? [e.target.value] : [] }))}>
+          <select aria-label="Filtrar por status" value={filters.statuses[0] || ''}
+            onChange={e => setFilters(prev => ({ ...prev, statuses: e.target.value ? [e.target.value] : [] }))}>
             <option value="">Todos os status</option>
-            {provider === 'sumup' ? (
-              <>
-                <option value="pending">PENDENTE</option><option value="failed">FALHA</option>
-                <option value="cancelled">CANCELADO</option><option value="refunded">ESTORNADO</option>
-                <option value="charge_back">CONTESTAÇÃO</option>
-              </>
-            ) : (
-              <>
-                <option value="approved">APROVADO</option><option value="pending">PENDENTE</option>
-                <option value="in_process">EM ANÁLISE</option><option value="rejected">RECUSADO</option>
-                <option value="refunded">ESTORNADO</option><option value="cancelled">CANCELADO</option>
-                <option value="charged_back">CONTESTAÇÃO</option>
-              </>
-            )}
+            <option value="pending">PENDENTE</option><option value="failed">FALHA</option>
+            <option value="cancelled">CANCELADO</option><option value="refunded">ESTORNADO</option>
+            <option value="charge_back">CONTESTAÇÃO</option>
           </select>
-          <select aria-label="Filtrar por tipo" value={activeFilters.types[0] || ''}
-            onChange={e => setActiveFilters(prev => ({ ...prev, types: e.target.value ? [e.target.value] : [] }))}>
+          <select aria-label="Filtrar por tipo" value={filters.types[0] || ''}
+            onChange={e => setFilters(prev => ({ ...prev, types: e.target.value ? [e.target.value] : [] }))}>
             <option value="">Todos os tipos</option>
-            {provider === 'sumup' ? (
-              <><option value="refund">ESTORNO</option><option value="charge_back">CONTESTAÇÃO</option></>
-            ) : (
-              <><option value="credit_card">CRÉDITO</option><option value="debit_card">DÉBITO</option>
-              <option value="pix">PIX</option><option value="ticket">BOLETO</option>
-              <option value="account_money">SALDO MP</option></>
-            )}
+            <option value="refund">ESTORNO</option><option value="charge_back">CONTESTAÇÃO</option>
           </select>
-          <select aria-label="Limite de resultados" value={activeFilters.limit}
-            onChange={e => setActiveFilters(prev => ({ ...prev, limit: Number(e.target.value) || 50 }))}>
+          <select aria-label="Limite de resultados" value={filters.limit}
+            onChange={e => setFilters(prev => ({ ...prev, limit: Number(e.target.value) || 50 }))}>
             <option value={25}>25</option><option value={50}>50</option>
             <option value={75}>75</option><option value={100}>100</option>
           </select>
-          <input type="date" aria-label="Data inicial" value={activeStartDate}
+          <input type="date" aria-label="Data inicial" value={startDate}
             min={FINANCIAL_CUTOFF_DATE} max={new Date().toISOString().slice(0, 10)}
-            onChange={e => setActiveStartDate(clampStartDate(e.target.value || FINANCIAL_CUTOFF_DATE))} />
+            onChange={e => setStartDate(clampStartDate(e.target.value || FINANCIAL_CUTOFF_DATE))} />
           <div className="fin-date-presets">
             {DATE_PRESETS.map(p => (
-              <button key={p.key} type="button" className={`fin-preset-btn fin-preset-btn--${provider} ${activeStartDate === p.value ? 'fin-preset-active' : ''}`}
-                onClick={() => setActiveStartDate(p.value)}>{p.label}</button>
+              <button key={p.key} type="button" className={`fin-preset-btn ${startDate === p.value ? 'fin-preset-active' : ''}`}
+                onClick={() => setStartDate(p.value)}>{p.label}</button>
             ))}
           </div>
         </div>
 
         <div className="fin-insight-actions">
           <button type="button" className="ghost-button" disabled={insights.loading}
-            onClick={() => void fetchInsights(activeFilters, null, 0, 'initial')}>Aplicar Filtros</button>
+            onClick={() => void fetchInsights(filters, null, 0, 'initial')}>Aplicar Filtros</button>
           <button type="button" className="ghost-button" disabled={insights.loading || !canPrev}
             onClick={() => goPage('prev')}>Página Anterior</button>
           <button type="button" className="ghost-button" disabled={insights.loading || !canNext}
             onClick={() => goPage('next')}>Próxima Página</button>
-          <button type="button" className="ghost-button" disabled={insights.loading || activePag.page === 1}
+          <button type="button" className="ghost-button" disabled={insights.loading || sumupPag.page === 1}
             onClick={() => goPage('first')}>Voltar ao Início</button>
           <button type="button" className="ghost-button" disabled={insights.loading || !insights.advancedTx.length}
             onClick={exportCsv}><Download size={14} /> Exportar CSV</button>
@@ -515,28 +387,23 @@ export function FinanceiroModule() {
                   {status} <strong>{count}</strong>
                 </span>
               ))}
-              {provider === 'mercadopago' && Object.entries((insights.summary?.byType || {}) as Record<string, number>).map(([type, count]) => (
-                <span key={`ty-${type}`} className="fin-insight-count-badge fin-tone-info">
-                  TIPO {type} <strong>{count}</strong>
-                </span>
-              ))}
             </div>
 
             <div className="fin-insight-meta">
               <span>Última atualização: {formatDateTimeBR(insights.lastUpdated)}</span>
-              <span>Página: {activePag.page}</span>
+              <span>Página: {sumupPag.page}</span>
             </div>
           </>
         )}
       </article>
 
       {/* ── Tabela de Transações Live ── */}
-      <article className="result-card" role="region" aria-label={`Transações ${providerLabel}`}>
+      <article className="result-card" role="region" aria-label="Transações">
         <div className="fin-history-header">
-          <h3><DollarSign size={18} /> Transações ({providerLabel} — Live)</h3>
+          <h3><DollarSign size={18} /> Transações (Dados Live)</h3>
           <div className="fin-history-actions">
             <button type="button" className="ghost-button" disabled={insights.loading}
-              onClick={() => void fetchInsights(activeFilters, null, 0, 'initial')} aria-label="Atualizar dados">
+              onClick={() => void fetchInsights(filters, null, 0, 'initial')} aria-label="Atualizar dados">
               <RefreshCw size={14} className={insights.loading ? 'spin' : ''} /> Atualizar
             </button>
             <button type="button" className="ghost-button" onClick={exportCsv} disabled={insights.loading || insights.advancedTx.length === 0}>
@@ -545,7 +412,7 @@ export function FinanceiroModule() {
           </div>
         </div>
         <div className="fin-history-period">
-          Dados ao vivo desde {formatDateBR(`${activeStartDate}T00:00:00-03:00`)} (Brasília, UTC-3)
+          Dados ao vivo desde {formatDateBR(`${startDate}T00:00:00-03:00`)} (Brasília, UTC-3)
         </div>
 
         {/* Legenda de status */}
@@ -567,15 +434,13 @@ export function FinanceiroModule() {
           <p className="result-empty">Nenhuma transação encontrada com os filtros atuais.</p>
         ) : (
           <div className="fin-table-wrap">
-            <table className={`fin-table fin-table--${provider}`} aria-label={`Tabela de transações ${providerLabel}`}>
+            <table className="fin-table" aria-label="Tabela de transações">
               <thead>
                 <tr>
                   <th scope="col">Data</th>
                   <th scope="col">ID</th>
-                  {provider === 'sumup' && <th scope="col">Código TX</th>}
-                  {provider === 'sumup' && <th scope="col">Tipo</th>}
-                  {provider === 'mercadopago' && <th scope="col">Método</th>}
-                  {provider === 'mercadopago' && <th scope="col">Parcelas</th>}
+                  <th scope="col">Código TX</th>
+                  <th scope="col">Tipo</th>
                   <th scope="col">Status</th>
                   <th scope="col">Valor (R$)</th>
                   <th scope="col">E-mail / Ações</th>
@@ -585,7 +450,7 @@ export function FinanceiroModule() {
                 {insights.advancedTx.map((tx, idx) => {
                   const txKey = tx.id || tx.transactionCode || `tx-${idx}`
                   const isExp = expandedRow === txKey
-                  const cfg = resolveAdvancedStatusConfig(tx, provider)
+                  const cfg = resolveAdvancedStatusConfig(tx)
 
                   return (
                     <tr key={txKey} className={isExp ? 'fin-row-expanded' : ''}>
@@ -597,10 +462,8 @@ export function FinanceiroModule() {
                           <div className="fin-row-columns">
                             <span className="fin-col-date">{formatDateTimeBR(tx.timestamp)}</span>
                             <span className="fin-col-id" title={tx.id || '—'}>{tx.id ? String(tx.id).slice(0, 20) + (String(tx.id).length > 20 ? '…' : '') : '—'}</span>
-                            {provider === 'sumup' && <span className="fin-col-code">{tx.transactionCode || '—'}</span>}
-                            {provider === 'sumup' && <span className="fin-col-type">{tx.paymentType || '—'}</span>}
-                            {provider === 'mercadopago' && <span className="fin-col-method">{tx.paymentType || '—'}</span>}
-                            {provider === 'mercadopago' && <span className="fin-col-installments">{tx.installments ? `${tx.installments}×` : '—'}</span>}
+                            <span className="fin-col-code">{tx.transactionCode || '—'}</span>
+                            <span className="fin-col-type">{tx.paymentType || '—'}</span>
                             <span className="fin-col-status">
                               <span className={`fin-status-badge ${getFinancialToneClass(cfg.label)}`}>{cfg.label}</span>
                             </span>
@@ -610,13 +473,13 @@ export function FinanceiroModule() {
                         </button>
 
                         {isExp && (
-                          <div id={`fin-detail-${txKey}`} className={`fin-expanded-section ${provider === 'sumup' ? 'fin-expanded-section--sumup' : 'fin-expanded-section--mp'}`}>
+                          <div id={`fin-detail-${txKey}`} className="fin-expanded-section">
                             {renderExpandedDetails(tx)}
                             <div className="fin-expanded-actions">
                               {cfg.canRefund && (
                                 <button type="button" className="ghost-button fin-action-refund"
                                   onClick={e => { e.stopPropagation(); setModal({ type: 'refund', tx }) }}
-                                  title={provider === 'sumup' ? 'Pode levar até 24h para estar disponível após a liquidação' : ''}>
+                                  title="Pode levar até 24h para estar disponível após a liquidação">
                                   <RotateCcw size={14} /> Estornar
                                 </button>
                               )}
@@ -652,8 +515,8 @@ export function FinanceiroModule() {
             </h3>
             <p id="fin-modal-desc" className="fin-modal-text">
               {modal.type === 'cancel'
-                ? `Tem certeza de que deseja CANCELAR o pagamento ${modal.tx.id} no ${providerLabel}?`
-                : `Estorno do pagamento ${modal.tx.id} (${formatBRL(modal.tx.amount)}) no ${providerLabel}.`}
+                ? `Tem certeza de que deseja CANCELAR o pagamento ${modal.tx.id}?`
+                : `Estorno do pagamento ${modal.tx.id} (${formatBRL(modal.tx.amount)}).`}
             </p>
             {modal.type === 'refund' && (
               <div className="field-group field-group--mt">

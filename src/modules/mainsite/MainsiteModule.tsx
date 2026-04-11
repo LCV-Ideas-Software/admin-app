@@ -59,15 +59,11 @@ const DEFAULT_DISCLAIMERS: DisclaimersSettings = { enabled: true, items: [] }
 interface FeeConfig {
   sumupRate: number
   sumupFixed: number
-  mpRate: number
-  mpFixed: number
 }
 
 const DEFAULT_FEES: FeeConfig = {
   sumupRate: 0.0267,
   sumupFixed: 0,
-  mpRate: 0.0499,
-  mpFixed: 0.40,
 }
 
 // ── Resumos IA para compartilhamento social ──
@@ -1100,9 +1096,9 @@ export function MainsiteModule() {
       <div className="form-card" style={{ marginTop: '24px' }}>
         <div className="result-toolbar">
           <div>
-            <h4><DollarSign size={16} /> Taxas dos Gateways de Pagamento</h4>
+            <h4><DollarSign size={16} /> Taxas de Processamento</h4>
             <p className="field-hint">
-              Configure as taxas cobradas pela SumUp e Mercado Pago para cálculo automático de repasse ao valor da doação.
+              Configure as taxas de processamento para cálculo automático de repasse ao valor da doação.
             </p>
           </div>
           <div className="inline-actions">
@@ -1114,69 +1110,33 @@ export function MainsiteModule() {
         </div>
 
         <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          {/* SumUp */}
-          <fieldset className="settings-fieldset">
-            <legend>SumUp</legend>
-            <div className="field-group">
-              <label htmlFor="sumup-fee-rate">Taxa Percentual (%)</label>
-              <input
-                id="sumup-fee-rate"
-                name="sumupFeeRate"
-                type="number"
-                step="0.01"
-                min="0"
-                max="99.99"
-                value={parseFloat((fees.sumupRate * 100).toFixed(4))}
-                onChange={e => setFees(prev => ({ ...prev, sumupRate: Math.max(0, Math.min(0.9999, parseFloat(e.target.value) / 100 || 0)) }))}
-              />
-              <p className="field-hint">Ex: 2.67 = 2,67% por transação</p>
-            </div>
-            <div className="field-group">
-              <label htmlFor="sumup-fee-fixed">Taxa Fixa (R$)</label>
-              <input
-                id="sumup-fee-fixed"
-                name="sumupFeeFixed"
-                type="number"
-                step="0.01"
-                min="0"
-                value={fees.sumupFixed}
-                onChange={e => setFees(prev => ({ ...prev, sumupFixed: Math.max(0, parseFloat(e.target.value) || 0) }))}
-              />
-              <p className="field-hint">Valor fixo cobrado por transação (0 = desabilitado)</p>
-            </div>
-          </fieldset>
-
-          {/* Mercado Pago */}
-          <fieldset className="settings-fieldset">
-            <legend>Mercado Pago</legend>
-            <div className="field-group">
-              <label htmlFor="mp-fee-rate">Taxa Percentual (%)</label>
-              <input
-                id="mp-fee-rate"
-                name="mpFeeRate"
-                type="number"
-                step="0.01"
-                min="0"
-                max="99.99"
-                value={parseFloat((fees.mpRate * 100).toFixed(4))}
-                onChange={e => setFees(prev => ({ ...prev, mpRate: Math.max(0, Math.min(0.9999, parseFloat(e.target.value) / 100 || 0)) }))}
-              />
-              <p className="field-hint">Ex: 4.99 = 4,99% por transação</p>
-            </div>
-            <div className="field-group">
-              <label htmlFor="mp-fee-fixed">Taxa Fixa (R$)</label>
-              <input
-                id="mp-fee-fixed"
-                name="mpFeeFixed"
-                type="number"
-                step="0.01"
-                min="0"
-                value={fees.mpFixed}
-                onChange={e => setFees(prev => ({ ...prev, mpFixed: Math.max(0, parseFloat(e.target.value) || 0) }))}
-              />
-              <p className="field-hint">Valor fixo cobrado por transação (ex: R$ 0,40)</p>
-            </div>
-          </fieldset>
+          <div className="field-group">
+            <label htmlFor="sumup-fee-rate">Taxa Percentual (%)</label>
+            <input
+              id="sumup-fee-rate"
+              name="sumupFeeRate"
+              type="number"
+              step="0.01"
+              min="0"
+              max="99.99"
+              value={parseFloat((fees.sumupRate * 100).toFixed(4))}
+              onChange={e => setFees(prev => ({ ...prev, sumupRate: Math.max(0, Math.min(0.9999, parseFloat(e.target.value) / 100 || 0)) }))}
+            />
+            <p className="field-hint">Ex: 2.67 = 2,67% por transação</p>
+          </div>
+          <div className="field-group">
+            <label htmlFor="sumup-fee-fixed">Taxa Fixa (R$)</label>
+            <input
+              id="sumup-fee-fixed"
+              name="sumupFeeFixed"
+              type="number"
+              step="0.01"
+              min="0"
+              value={fees.sumupFixed}
+              onChange={e => setFees(prev => ({ ...prev, sumupFixed: Math.max(0, parseFloat(e.target.value) || 0) }))}
+            />
+            <p className="field-hint">Valor fixo cobrado por transação (0 = desabilitado)</p>
+          </div>
         </div>
 
         <div className="form-actions" style={{ marginTop: '16px' }}>

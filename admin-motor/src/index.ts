@@ -11,8 +11,6 @@ import { handleCfdnsZonesGet } from './handlers/cfdnsZones';
 import {
   handleSumupRefundPost,
   handleSumupCancelPost,
-  handleMpRefundPost,
-  handleMpCancelPost,
 } from './handlers/financeiroActions';
 import { onRequestGet as handleAiStatusGcpMonitoringGet } from './handlers/routes/ai-status/gcp-monitoring';
 import { onRequestGet as handleAiStatusGcpLogsGet } from './handlers/routes/ai-status/gcp-logs';
@@ -25,7 +23,6 @@ import { onRequestPost as handleCfpwDeletePagePost } from './handlers/routes/cfp
 import { onRequestPost as handleCfpwDeleteWorkerPost } from './handlers/routes/cfpw/delete-worker';
 import { onRequestPost as handleCfpwCleanupCacheProjectPost } from './handlers/routes/cfpw/cleanup-cache-project';
 import { onRequestGet as handleCfpwObservabilityGet, onRequestPost as handleCfpwObservabilityPost } from './handlers/routes/cfpw/observability';
-import { onRequestGet as handleMpBalanceGet } from './handlers/routes/financeiro/mp-balance';
 import { onRequestGet as handleSumupBalanceGet } from './handlers/routes/financeiro/sumup-balance';
 import {
   onRequestGet as handlePostSummariesGet,
@@ -107,21 +104,6 @@ import { onRequestGet as handleOverviewOperationalGet } from './handlers/routes/
 import { onRequestDelete as handleTelemetryDeleteDelete } from './handlers/routes/telemetry/delete';
 import { onRequestGet as handleTelemetryGet } from './handlers/routes/telemetry/telemetry';
 
-// ========== MERCADO PAGO SDK POLYFILL ==========
-// O SDK do Mercado Pago usa node-fetch internamente, o que exige
-// que objetos Headers tenham a função .raw()
-if (typeof Headers !== 'undefined' && !('raw' in Headers.prototype)) {
-  Object.defineProperty(Headers.prototype, 'raw', {
-    value: function (this: Headers) {
-      const raw: Record<string, string[]> = {};
-      this.forEach((value, key) => {
-        raw[key] = [value];
-      });
-      return raw;
-    },
-    configurable: true,
-  });
-}
 
 type AdminMotorEnv = {
   BIGDATA_DB?: D1Like;
@@ -132,7 +114,6 @@ type AdminMotorEnv = {
   CF_ACCOUNT_ID?: unknown;
   SUMUP_API_KEY_PRIVATE?: unknown;
   SUMUP_MERCHANT_CODE?: unknown;
-  MP_ACCESS_TOKEN?: unknown;
   RESEND_API_KEY?: unknown;
   CLOUDFLARE_DNS?: unknown;
   CLOUDFLARE_CACHE?: unknown;
@@ -152,7 +133,6 @@ type ResolvedAdminMotorEnv = {
   CF_ACCOUNT_ID?: string;
   SUMUP_API_KEY_PRIVATE?: string;
   SUMUP_MERCHANT_CODE?: string;
-  MP_ACCESS_TOKEN?: string;
   RESEND_API_KEY?: string;
   CLOUDFLARE_DNS?: string;
   CLOUDFLARE_CACHE?: string;
@@ -241,7 +221,6 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   CF_ACCOUNT_ID: await readSecretString(env.CF_ACCOUNT_ID),
   SUMUP_API_KEY_PRIVATE: await readSecretString(env.SUMUP_API_KEY_PRIVATE),
   SUMUP_MERCHANT_CODE: await readSecretString(env.SUMUP_MERCHANT_CODE),
-  MP_ACCESS_TOKEN: await readSecretString(env.MP_ACCESS_TOKEN),
   RESEND_API_KEY: await readSecretString(env.RESEND_API_KEY),
   CLOUDFLARE_DNS: await readSecretString(env.CLOUDFLARE_DNS),
   CLOUDFLARE_CACHE: await readSecretString(env.CLOUDFLARE_CACHE),
@@ -503,12 +482,9 @@ app.put('/api/apphub/config', (c) => handleApphubConfigPut(rc(c)));
 
 // ── financeiro ──
 app.get('/api/financeiro/insights', (c) => handleFinanceiroInsightsGet(re(c)));
-app.get('/api/financeiro/mp-balance', (c) => handleMpBalanceGet(rc(c)));
 app.get('/api/financeiro/sumup-balance', (c) => handleSumupBalanceGet(rc(c)));
 app.post('/api/financeiro/sumup-refund', (c) => handleSumupRefundPost(re(c)));
 app.post('/api/financeiro/sumup-cancel', (c) => handleSumupCancelPost(re(c)));
-app.post('/api/financeiro/mp-refund', (c) => handleMpRefundPost(re(c)));
-app.post('/api/financeiro/mp-cancel', (c) => handleMpCancelPost(re(c)));
 
 // ── calculadora ──
 app.get('/api/calculadora/overview', (c) => handleCalculadoraOverviewGet(rc(c)));

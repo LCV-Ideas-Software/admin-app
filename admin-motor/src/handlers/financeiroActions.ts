@@ -1,9 +1,7 @@
 import SumUp from '@sumup/sdk';
-import { MercadoPagoConfig, Payment, PaymentRefund } from 'mercadopago';
 
 type Env = {
   SUMUP_API_KEY_PRIVATE?: string;
-  MP_ACCESS_TOKEN?: string;
 };
 
 type Context = {
@@ -140,48 +138,3 @@ export const handleSumupCancelPost = async (context: Context) => {
   }
 };
 
-export const handleMpRefundPost = async (context: Context) => {
-  const url = new URL(context.request.url);
-  const id = url.searchParams.get('id');
-  if (!id) return json({ error: 'ID do pagamento ausente.' }, 400);
-
-  const token = context.env.MP_ACCESS_TOKEN;
-  if (!token) return json({ error: 'MP_ACCESS_TOKEN ausente.' }, 503);
-
-  try {
-    const client = new MercadoPagoConfig({ accessToken: token });
-    const refundApi = new PaymentRefund(client);
-
-    const refundBody: { payment_id: string; body?: { amount: number } } = { payment_id: id };
-    try {
-      const body = (await context.request.json()) as { amount?: number };
-      if (body.amount) refundBody.body = { amount: Number(body.amount) };
-    } catch {
-      // Estorno total sem body.
-    }
-
-    await refundApi.create(refundBody as { payment_id: string; body?: { amount: number } });
-
-    return json({ success: true, status: refundBody.body?.amount ? 'partially_refunded' : 'refunded' });
-  } catch (err) {
-    return json({ error: err instanceof Error ? err.message : 'Falha no estorno.' }, 500);
-  }
-};
-
-export const handleMpCancelPost = async (context: Context) => {
-  const url = new URL(context.request.url);
-  const id = url.searchParams.get('id');
-  if (!id) return json({ error: 'ID do pagamento ausente.' }, 400);
-
-  const token = context.env.MP_ACCESS_TOKEN;
-  if (!token) return json({ error: 'MP_ACCESS_TOKEN ausente.' }, 503);
-
-  try {
-    const client = new MercadoPagoConfig({ accessToken: token });
-    const paymentApi = new Payment(client);
-    await paymentApi.cancel({ id });
-    return json({ success: true });
-  } catch (err) {
-    return json({ error: err instanceof Error ? err.message : 'Falha ao cancelar.' }, 500);
-  }
-};
