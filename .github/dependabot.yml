@@ -41,6 +41,8 @@ updates:
           - "wrangler"
           - "@cloudflare/*"
           - "vite*"
+          - "@vitest/*"
+          - "@biomejs/*"
         update-types:
           - "major"
           - "minor"
@@ -49,6 +51,13 @@ updates:
         patterns:
           - "@tiptap/*"
           - "tiptap-*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+      tanstack:
+        patterns:
+          - "@tanstack/*"
         update-types:
           - "major"
           - "minor"
@@ -89,6 +98,8 @@ updates:
           - "wrangler"
           - "@cloudflare/*"
           - "vite*"
+          - "@vitest/*"
+          - "@biomejs/*"
         update-types:
           - "major"
           - "minor"
