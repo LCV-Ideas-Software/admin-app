@@ -127,37 +127,16 @@ async function verifyJwt(jwt: string, teamDomain: string): Promise<{ valid: bool
  * @param jwtConfig - Optional CF Access JWT validation config
  * @returns AuthContext with authentication status
  */
-export async function validatePutAuth(
+/**
+ * Validates CF-Access-JWT-Assertion if jwtConfig is configured.
+ * Returns an AuthContext rejection when enforcement=block and validation fails;
+ * returns null to indicate "proceed normally".
+ */
+async function validateCfAccessJwt(
   request: Request,
-  bearerTokenEnv?: string,
+  cfAccessEmail: string,
   jwtConfig?: JwtConfig,
-): Promise<AuthContext> {
-  // If a Bearer token is configured in the environment, validate strictly against it.
-  if (bearerTokenEnv) {
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      if (timingSafeEqual(token, bearerTokenEnv)) {
-        return { isAuthenticated: true, token, source: 'bearer' };
-      }
-      return { isAuthenticated: false, source: 'bearer', error: 'Invalid Bearer token' };
-    }
-
-    const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
-    if (cfAccessEmail) {
-      return { isAuthenticated: true, token: cfAccessEmail, source: 'cloudflare-access' };
-    }
-
-    return { isAuthenticated: false, source: 'none', error: 'No authentication provided.' };
-  }
-
-  // No bearer token — require Cloudflare Access authentication.
-  const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
-  if (!cfAccessEmail) {
-    return { isAuthenticated: false, source: 'none', error: 'CF Access authentication required.' };
-  }
-
-  // Optionally validate CF-Access-JWT-Assertion
+): Promise<AuthContext | null> {
   const teamDomain = jwtConfig?.teamDomain?.trim();
   const enforcement = jwtConfig?.enforcement?.trim()?.toLowerCase();
 
@@ -184,12 +163,53 @@ export async function validatePutAuth(
         if (enforcement === 'block') {
           return { isAuthenticated: false, source: 'cloudflare-access', error: msg };
         }
+      } else {
+        console.info(`[Auth] JWT válido para ${result.email || cfAccessEmail}.`);
       }
     }
   } else if (teamDomain) {
-    // teamDomain set but no valid enforcement value — just log that validation is not enforced
     console.info('[Auth] CF_ACCESS_TEAM_DOMAIN configurado mas ENFORCE_JWT_VALIDATION não definido. JWT não verificado.');
   }
+
+  return null; // no rejection — proceed
+}
+
+export async function validatePutAuth(
+  request: Request,
+  bearerTokenEnv?: string,
+  jwtConfig?: JwtConfig,
+): Promise<AuthContext> {
+  // If a Bearer token is configured in the environment, validate strictly against it.
+  if (bearerTokenEnv) {
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      if (timingSafeEqual(token, bearerTokenEnv)) {
+        return { isAuthenticated: true, token, source: 'bearer' };
+      }
+      return { isAuthenticated: false, source: 'bearer', error: 'Invalid Bearer token' };
+    }
+
+    const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
+    if (cfAccessEmail) {
+      // Validate JWT even when bearer token is configured — browser requests
+      // arrive via CF Access (no Bearer header) but JWT should still be checked.
+      const jwtRejection = await validateCfAccessJwt(request, cfAccessEmail, jwtConfig);
+      if (jwtRejection) return jwtRejection;
+      return { isAuthenticated: true, token: cfAccessEmail, source: 'cloudflare-access' };
+    }
+
+    return { isAuthenticated: false, source: 'none', error: 'No authentication provided.' };
+  }
+
+  // No bearer token — require Cloudflare Access authentication.
+  const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
+  if (!cfAccessEmail) {
+    return { isAuthenticated: false, source: 'none', error: 'CF Access authentication required.' };
+  }
+
+  const jwtRejection = await validateCfAccessJwt(request, cfAccessEmail, jwtConfig);
+  if (jwtRejection) return jwtRejection;
 
   return {
     isAuthenticated: true,
