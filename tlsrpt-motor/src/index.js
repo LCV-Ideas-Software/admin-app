@@ -56,7 +56,7 @@ function getCorsHeaders(env) {
  * @param {object} details
  */
 function structuredLog(level, action, details = {}) {
-	const entry = { timestamp: new Date().toISOString(), level, action, ...details };
+	const entry = { timestamp: new Date().toISOString(), level, action: `[tlsrpt-motor] ${action}`, ...details };
 	if (level === 'error') {
 		console.error(JSON.stringify(entry));
 	} else if (level === 'warn') {
