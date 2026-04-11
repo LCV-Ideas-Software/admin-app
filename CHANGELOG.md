@@ -1,4 +1,8 @@
 # Changelog — Admin App
+## [v01.85.01] - 2026-04-11
+### Alterado
+- **tlsrpt-motor**: Prefixo `[tlsrpt-motor]` adicionado a todos os logs via `structuredLog()`.
+
 ## [v01.85.00] - 2026-04-10
 ### Adicionado
 - **TanStack Router**: Navegação por URL (`/$moduleId`) substitui `useState`. Deep links, browser back/forward e F5 preserva módulo ativo.
