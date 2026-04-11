@@ -395,13 +395,13 @@ export function FinanceiroModule() {
       </div>
 
       {/* ── Balance ── */}
-      <div className="fin-balance-row" role="region" aria-label={`Saldo ${providerLabel}`}>
+      <div className="fin-balance-row" role="region" aria-label={`Receita ${providerLabel}`}>
         <article className="result-card fin-balance-card">
-          <h4><Wallet size={16} /> Saldo Disponível ({providerLabel})</h4>
+          <h4><Wallet size={16} /> Total Recebido Líquido ({providerLabel})</h4>
           <div className="fin-balance-amount">{formatBRL(balance.available_balance)}</div>
         </article>
         <article className="result-card fin-balance-card">
-          <h4><RefreshCw size={16} /> Saldo a Liberar ({providerLabel})</h4>
+          <h4><RefreshCw size={16} /> Pendente ({providerLabel})</h4>
           <div className="fin-balance-pending">{formatBRL(balance.unavailable_balance)}</div>
         </article>
       </div>

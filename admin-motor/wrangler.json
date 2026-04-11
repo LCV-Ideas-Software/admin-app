@@ -79,16 +79,6 @@
       "binding": "ENFORCE_JWT_VALIDATION",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "enforce-jwt-validation"
-    },
-    {
-      "binding": "MP_APP_ID",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "mp-app-id"
-    },
-    {
-      "binding": "MP_CLIENT_SECRET",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "mp-client-secret"
     }
   ],
   "d1_databases": [

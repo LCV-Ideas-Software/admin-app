@@ -26,7 +26,6 @@ import { onRequestPost as handleCfpwDeleteWorkerPost } from './handlers/routes/c
 import { onRequestPost as handleCfpwCleanupCacheProjectPost } from './handlers/routes/cfpw/cleanup-cache-project';
 import { onRequestGet as handleCfpwObservabilityGet, onRequestPost as handleCfpwObservabilityPost } from './handlers/routes/cfpw/observability';
 import { onRequestGet as handleMpBalanceGet } from './handlers/routes/financeiro/mp-balance';
-import { onRequestGetUrl as handleMpOAuthUrl, onRequestPostCallback as handleMpOAuthCallback } from './handlers/routes/financeiro/mp-oauth';
 import { onRequestGet as handleSumupBalanceGet } from './handlers/routes/financeiro/sumup-balance';
 import {
   onRequestGet as handlePostSummariesGet,
@@ -134,8 +133,6 @@ type AdminMotorEnv = {
   SUMUP_API_KEY_PRIVATE?: unknown;
   SUMUP_MERCHANT_CODE?: unknown;
   MP_ACCESS_TOKEN?: unknown;
-  MP_APP_ID?: unknown;
-  MP_CLIENT_SECRET?: unknown;
   RESEND_API_KEY?: unknown;
   CLOUDFLARE_DNS?: unknown;
   CLOUDFLARE_CACHE?: unknown;
@@ -156,8 +153,6 @@ type ResolvedAdminMotorEnv = {
   SUMUP_API_KEY_PRIVATE?: string;
   SUMUP_MERCHANT_CODE?: string;
   MP_ACCESS_TOKEN?: string;
-  MP_APP_ID?: string;
-  MP_CLIENT_SECRET?: string;
   RESEND_API_KEY?: string;
   CLOUDFLARE_DNS?: string;
   CLOUDFLARE_CACHE?: string;
@@ -247,8 +242,6 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   SUMUP_API_KEY_PRIVATE: await readSecretString(env.SUMUP_API_KEY_PRIVATE),
   SUMUP_MERCHANT_CODE: await readSecretString(env.SUMUP_MERCHANT_CODE),
   MP_ACCESS_TOKEN: await readSecretString(env.MP_ACCESS_TOKEN),
-  MP_APP_ID: await readSecretString(env.MP_APP_ID),
-  MP_CLIENT_SECRET: await readSecretString(env.MP_CLIENT_SECRET),
   RESEND_API_KEY: await readSecretString(env.RESEND_API_KEY),
   CLOUDFLARE_DNS: await readSecretString(env.CLOUDFLARE_DNS),
   CLOUDFLARE_CACHE: await readSecretString(env.CLOUDFLARE_CACHE),
@@ -516,8 +509,6 @@ app.post('/api/financeiro/sumup-refund', (c) => handleSumupRefundPost(re(c)));
 app.post('/api/financeiro/sumup-cancel', (c) => handleSumupCancelPost(re(c)));
 app.post('/api/financeiro/mp-refund', (c) => handleMpRefundPost(re(c)));
 app.post('/api/financeiro/mp-cancel', (c) => handleMpCancelPost(re(c)));
-app.get('/api/financeiro/mp-oauth-url', (c) => handleMpOAuthUrl(re(c)));
-app.post('/api/financeiro/mp-oauth-callback', (c) => handleMpOAuthCallback(re(c)));
 
 // ── calculadora ──
 app.get('/api/calculadora/overview', (c) => handleCalculadoraOverviewGet(rc(c)));
