@@ -1,5 +1,13 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-12 — MainSite/PostEditor: strip de assinatura no import de Markdown (v01.87.01)
+### Escopo
+Refinamento do importador de `.md` adicionado em v01.87.00.
+### Alterado
+- **`editor/markdownImport.ts`**: nova função `stripTrailingSignature` removendo silenciosamente a última linha não vazia quando ela é puramente uma assinatura em negrito (ex.: `**Leonardo — Abril de 2026**`). Regex: `^\s*\*\*[^*\n]+\*\*\s*$`. Aplicada entre `stripFrontmatter` e `extractFirstH1`.
+### Versão
+- APP v01.87.00 → APP v01.87.01
+
 ## 2026-04-12 — MainSite/PostEditor: Import de Markdown (Claude Chat) (v01.87.00)
 ### Escopo
 Adicionado importador de arquivos `.md` no PostEditor, espelhando a formatação editorial do importador Gemini, mas 100% client-side.

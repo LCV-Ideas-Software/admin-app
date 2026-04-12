@@ -12,6 +12,21 @@ function stripFrontmatter(md: string): string {
   return md.replace(FRONTMATTER_RE, '')
 }
 
+const TRAILING_SIGNATURE_RE = /^\s*\*\*[^*\n]+\*\*\s*$/
+
+function stripTrailingSignature(md: string): string {
+  const lines = md.split(/\r?\n/)
+  let i = lines.length - 1
+  while (i >= 0 && lines[i].trim() === '') i--
+  if (i < 0) return md
+  if (!TRAILING_SIGNATURE_RE.test(lines[i])) return md
+  lines.splice(i, lines.length - i)
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop()
+  }
+  return lines.join('\n')
+}
+
 function extractFirstH1(md: string): { title: string | null; body: string } {
   const lines = md.split(/\r?\n/)
   let i = 0
@@ -51,7 +66,8 @@ export function convertMarkdownToFormattedHtml(rawMd: string): MarkdownImportRes
   }
 
   const withoutFrontmatter = stripFrontmatter(rawMd)
-  const { title, body } = extractFirstH1(withoutFrontmatter)
+  const withoutSignature = stripTrailingSignature(withoutFrontmatter)
+  const { title, body } = extractFirstH1(withoutSignature)
   const prepared = preprocessMarkdown(body)
   const rawHtml = marked.parse(prepared, { async: false }) as string
   const formatted = postprocessHtml(rawHtml)

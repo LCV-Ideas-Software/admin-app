@@ -1,4 +1,8 @@
 # Changelog — Admin App
+## [v01.87.01] - 2026-04-12
+### Alterado
+- **MainSite/PostEditor (markdownImport)**: Última linha da `.md` importada agora é removida silenciosamente quando consiste em uma assinatura bold isolada (ex.: `**Leonardo — Abril de 2026**`). Regex `^\s*\*\*[^*\n]+\*\*\s*$`, aplicada após o strip de frontmatter e antes do parse marked.
+
 ## [v01.87.00] - 2026-04-12
 ### Adicionado
 - **MainSite/PostEditor**: Importação de arquivos `.md` (Claude Chat) com formatação editorial idêntica ao import do Gemini — títulos normalizados em H3 alinhados à esquerda, parágrafos justificados com recuo de 1.5rem, extração automática do título a partir do primeiro `# H1`. Processamento 100% client-side via `marked` + `DOMPurify` (zero backend, zero custo de IA).
