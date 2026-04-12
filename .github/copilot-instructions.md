@@ -9,6 +9,20 @@
 ## 🧠 MEMÓRIA DE CONTEXTO ISOLADO (ADMIN-APP)
 # AI Memory Log — Admin-App
 
+## 2026-04-12 — MainSite/PostEditor: Import de Markdown (Claude Chat) (v01.87.00)
+### Escopo
+Adicionado importador de arquivos `.md` no PostEditor, espelhando a formatação editorial do importador Gemini, mas 100% client-side.
+### Adicionado
+- **`editor/markdownImport.ts`**: novo módulo. Funções `stripFrontmatter`, `extractFirstH1`, `preprocessMarkdown`, `postprocessHtml` e `convertMarkdownToFormattedHtml`. Espelha as regras de `admin-motor/handlers/routes/mainsite/gemini-import.ts` (todos os títulos viram H3, parágrafos com `text-align: justify; text-indent: 1.5rem`, H3 com `text-align: left`, placeholder de imagens externas).
+- **`PostEditor.tsx`**: state `isProcessingMarkdown`, ref `markdownInputRef`, callback `handleMarkdownUpload`, hidden file input + botão na toolbar (ícone `FileText` da `lucide-react`). Título extraído do primeiro `# H1` é aplicado ao `postTitle` apenas se o campo estiver vazio (mesma regra do Gemini).
+- **Sanitização**: `DOMPurify.sanitize` com `ADD_ATTR: ['style']` para preservar os estilos inline aplicados pelo postprocess.
+### Decisões
+- **Sem novo endpoint backend**: o `.md` é arquivo local; rodar tudo no cliente elimina latência e custo de IA.
+- **Formatação determinística**: as duas funções regex foram duplicadas (não compartilhadas com o backend `admin-motor`) porque os ~30 linhas estáveis não justificam o custo de refator de tsconfig/build entre os dois projetos.
+- **`marked` + `dompurify` já presentes** no `package.json` do admin-app; zero novas dependências.
+### Versão
+- APP v01.86.00 → APP v01.87.00
+
 ## 2026-04-09 — Tier 4 Tech Upgrades (v01.84.00)
 ### Escopo
 Vitest UI, Biome organizeImports.

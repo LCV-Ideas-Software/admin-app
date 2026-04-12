@@ -10,7 +10,7 @@ import {
   Subscript as SubIcon, Superscript as SuperIcon,
   Table as TableIcon,
   Upload, Image as ImageIcon, ZoomIn, ZoomOut, MessageSquare,
-  Sparkles, Wand2, Send, Download, FileUp,
+  Sparkles, Wand2, Send, Download, FileUp, FileText,
   Undo2, Redo2, GripVertical, ArrowUpDown
 } from 'lucide-react'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -20,6 +20,7 @@ import {
   EDITORIAL_MENTION_BASE_ITEMS,
 } from './editor/extensions'
 import { clamp, formatImageUrl, isYoutubeUrl, migrateLegacyCaptions } from './editor/utils'
+import { convertMarkdownToFormattedHtml } from './editor/markdownImport'
 import { TIPTAP_SLASH_EVENTS } from './editor/SlashCommands'
 import { SearchReplacePanel } from './editor/SearchReplace'
 import { EditorBubbleMenu } from './editor/BubbleMenu'
@@ -82,6 +83,8 @@ export default function PostEditor({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const wordInputRef = useRef<HTMLInputElement>(null)
   const [isProcessingWord, setIsProcessingWord] = useState(false)
+  const markdownInputRef = useRef<HTMLInputElement>(null)
+  const [isProcessingMarkdown, setIsProcessingMarkdown] = useState(false)
   const [aiChatOpen, setAiChatOpen] = useState(false)
   const [aiChatInput, setAiChatInput] = useState('')
   const aiChatBtnRef = useRef<HTMLButtonElement>(null)
@@ -283,6 +286,30 @@ export default function PostEditor({
       if (wordInputRef.current) wordInputRef.current.value = ''
     }
   }, [editor, showNotification])
+
+  const handleMarkdownUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editor) return
+    const file = event.target.files?.[0]
+    if (!file) return
+    setIsProcessingMarkdown(true)
+    showNotification('Processando arquivo Markdown...', 'info')
+
+    try {
+      const rawMd = await file.text()
+      const { html, title } = convertMarkdownToFormattedHtml(rawMd)
+      if (!html) {
+        throw new Error('Arquivo Markdown vazio ou inválido.')
+      }
+      editor.chain().focus().insertContent(html).run()
+      if (title && !postTitle.trim()) setPostTitle(title)
+      showNotification('Arquivo Markdown importado com sucesso.', 'success')
+    } catch (err) {
+      showNotification(err instanceof Error ? err.message : 'Erro ao importar arquivo Markdown.', 'error')
+    } finally {
+      setIsProcessingMarkdown(false)
+      if (markdownInputRef.current) markdownInputRef.current.value = ''
+    }
+  }, [editor, showNotification, postTitle])
 
   const addImageUrl = useCallback(() => {
     if (!editor) return
@@ -768,6 +795,8 @@ export default function PostEditor({
             <button type="button" title="Upload de imagem (R2)" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>{isUploading ? <Loader2 size={15} className="spin" /> : <Upload size={15} />}</button>
             <input id="tiptap-word-upload" ref={wordInputRef} name="tiptapWordUpload" type="file" accept=".docx" title="Importar do Microsoft Word" className="tiptap-hidden-input" onChange={handleWordUpload} />
             <button type="button" title="Decodificar / Importar do Microsoft Word (.docx)" onClick={() => wordInputRef.current?.click()} disabled={isProcessingWord}>{isProcessingWord ? <Loader2 size={15} className="spin" /> : <FileUp size={15} />}</button>
+            <input id="tiptap-md-upload" ref={markdownInputRef} name="tiptapMdUpload" type="file" accept=".md,.markdown,text/markdown" title="Importar do Claude Chat (.md)" className="tiptap-hidden-input" onChange={handleMarkdownUpload} />
+            <button type="button" title="Importar do Claude Chat (.md)" onClick={() => markdownInputRef.current?.click()} disabled={isProcessingMarkdown}>{isProcessingMarkdown ? <Loader2 size={15} className="spin" /> : <FileText size={15} />}</button>
             <button type="button" title="Imagem por URL / Google Drive" onClick={addImageUrl}><ImageIcon size={15} /></button>
             <button type="button" title="Vídeo do YouTube" onClick={addYoutube}><span>YT</span></button>
             <button type="button" title="Reduzir mídia" onClick={() => adjustSelectedMediaSize(-1)} disabled={!editor.isActive('image') && !editor.isActive('youtube')}><ZoomOut size={15} /></button>

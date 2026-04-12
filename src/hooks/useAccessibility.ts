@@ -57,7 +57,6 @@ export function useAccessibility(): UseAccessibilityReturn {
   const liveRegionRef = useRef<HTMLDivElement | null>(null)
 
   // Keyboard event handler for common patterns
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleKeyDown = useCallback((_e: React.KeyboardEvent) => {
     // This is exposed for parent to use in their own handlers
     // Example: if (e.key === 'Escape') closeModal()

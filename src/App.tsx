@@ -27,7 +27,7 @@ import './App.css';
 import { FloatingScrollButtons } from './components/FloatingScrollButtons';
 import { ComplianceBanner } from './components/ComplianceBanner';
 
-const APP_VERSION = 'APP v01.86.00';
+const APP_VERSION = 'APP v01.87.00';
 
 export type ModuleId =
   | 'overview'
@@ -46,7 +46,7 @@ export type ModuleId =
   | 'tlsrpt'
   | 'compliance';
 
-export const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
+const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   'ai-status': 'AI Status',
   astrologo: 'Astrólogo',
   cardhub: 'Card Hub',
@@ -65,7 +65,7 @@ export const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
 
 // Regra do menu lateral: Visão Geral sempre primeiro, Configurações sempre último,
 // e todos os demais módulos em ordem alfabética.
-export const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
+const navItems: Array<{ id: ModuleId; label: string; icon: typeof PanelsTopLeft }> = [
   { id: 'overview', label: 'Visão Geral', icon: PanelsTopLeft },
   { id: 'ai-status', label: 'AI Status', icon: Brain },
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },

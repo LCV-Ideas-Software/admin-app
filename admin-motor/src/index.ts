@@ -231,7 +231,7 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   ENFORCE_JWT_VALIDATION: await readSecretString(env.ENFORCE_JWT_VALIDATION),
 });
 
-const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv, unparsedEnv: AdminMotorEnv): Promise<Response> => {
+const handleAiStatusHealth = async (request: Request, env: ResolvedAdminMotorEnv, _unparsedEnv: AdminMotorEnv): Promise<Response> => {
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) {
     return json({

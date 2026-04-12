@@ -59,7 +59,7 @@ const buildSuccessMessage = (moduleTitle: string, payload: SyncRunPayload) => {
   return `${moduleTitle}: sync concluído com ${payload.recordsUpserted} registro(s) aplicados.`
 }
 
-export const OPERATIONAL_QUERY_KEY = ['operational-overview'] as const
+const OPERATIONAL_QUERY_KEY = ['operational-overview'] as const
 
 async function fetchOperationalOverview(): Promise<OperationalOverviewPayload> {
   const response = await fetch('/api/overview/operational')

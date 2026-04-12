@@ -1,4 +1,10 @@
 # Changelog — Admin App
+## [v01.87.00] - 2026-04-12
+### Adicionado
+- **MainSite/PostEditor**: Importação de arquivos `.md` (Claude Chat) com formatação editorial idêntica ao import do Gemini — títulos normalizados em H3 alinhados à esquerda, parágrafos justificados com recuo de 1.5rem, extração automática do título a partir do primeiro `# H1`. Processamento 100% client-side via `marked` + `DOMPurify` (zero backend, zero custo de IA).
+- **PostEditor toolbar**: Botão "Importar do Claude Chat (.md)" ao lado do importador Word, com hidden file input aceitando `.md`/`.markdown`.
+- **Novo módulo**: `editor/markdownImport.ts` encapsulando frontmatter strip, extração de H1, pré/pós-processamento (espelha as regras do `gemini-import.ts` backend) e sanitização.
+
 ## [v01.86.00] - 2026-04-11
 ### Removido
 - **Mercado Pago**: Integração removida completamente (rotas, SDK, tipos, env bindings, polyfill Headers.raw)
