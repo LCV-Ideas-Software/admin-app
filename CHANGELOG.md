@@ -1,4 +1,13 @@
 # Changelog — Admin App
+## [v01.89.00] - 2026-04-16
+### Adicionado
+- **Radix UI Dialog**: `@radix-ui/react-dialog ^1.x` em dependencies. Criado wrapper `src/components/ui/Dialog.tsx` (Dialog, DialogTrigger, DialogClose, DialogContent, DialogTitle, DialogDescription) — API limpa, a11y nativa (ARIA, foco trap, Escape-to-close, restauração de foco no trigger), consumidor passa `className` para integrar com CSS existente.
+### Alterado
+- **DeploymentCleanupPanel**: modal de confirmação de expurgo migrado de `createPortal` manual para `<Dialog>` + `<DialogContent>`. Mesmo CSS (`deploy-cleanup__confirm-*` classes intocadas), ganho direto em a11y (antes: `onClick={e => e.stopPropagation()}` + fechar por clique fora manual; agora: foco trap, Escape-to-close nativo, aria-labelledby/describedby automáticos via DialogTitle/DialogDescription).
+- **Bundle**: `vendor-react` chunk passou de 292.57 KB para 324.20 KB (+31.6 KB, +10.3 KB gzipped) — trade-off aceitável pelo ganho em a11y.
+### Motivação
+- Piloto Radix no modal mais simples (confirm dialog). Se UX/a11y/bundle aceitáveis, A6.follow migra os demais modais. Plano v2 fase A6.
+
 ## [v01.88.03] - 2026-04-16
 ### Adicionado
 - **Testes unit**: `src/hooks/useForm.test.ts` (7 testes cobrindo initial values, dirty state, validate, submit, reset, setFieldError, useFormField). `src/hooks/useAccessibility.test.ts` (15 testes cobrindo keyboard navigation helpers, focus management, ARIA live region, id generation, KeyboardPattern helpers).
