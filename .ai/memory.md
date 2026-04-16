@@ -1,5 +1,18 @@
 # AI Memory Log — Admin-App
 
+## 2026-04-16 — Tiptap/Yjs peer deps são intencionais — NÃO REMOVER
+### Escopo
+Documentação defensiva: os pacotes `yjs`, `y-prosemirror`, `y-protocols`, `@tiptap/extension-collaboration`, `@tiptap/y-tiptap`, `@tiptap/suggestion`, `@tiptap/extension-node-range` são **dependências runtime obrigatórias**, mesmo que `src/` não os importe diretamente.
+### Cadeia de dependência
+`PostEditor.tsx` importa `@tiptap/extension-drag-handle-react`. Esse pacote depende de `@tiptap/extension-drag-handle`, cujo bundle (`node_modules/@tiptap/extension-drag-handle/dist/index.js:13`) contém `from "@tiptap/y-tiptap"`. `@tiptap/y-tiptap` por sua vez importa de `yjs`, `y-protocols` e `y-prosemirror`. Sem esses pacotes instalados, o resolver do Vite falha no build com `Failed to resolve module specifier`.
+### Regra
+- **Nunca** remover esses pacotes de `package.json/dependencies` baseando-se em grep de imports em `src/` — o grep não cobre imports transitivos bundlados.
+- **Nunca** voltar a usar `rollupOptions.external` em `vite.config.ts` para mascarar peer deps de Tiptap/ProseMirror — regride o bug v01.82.02 (bare module specifiers no bundle final de produção).
+- Se for inevitável reduzir esses pacotes, validar com build real + carregamento do PostEditor em navegador (bundle success ≠ runtime success).
+### Precedente
+- v01.82.02 (2026-04-09): teve incidente de `TypeError: Failed to resolve module specifier` em produção por causa desse mesmo pattern; a correção foi instalar os 7 peer deps como dependências declaradas.
+- Plano de upgrade v1 (2026-04-15) propunha remover 5 desses pacotes; plano v2 (2026-04-16) cancelou essa fase após confirmação empírica.
+
 ## 2026-04-12 — MainSite/PostEditor: strip de assinatura no import de Markdown (v01.87.01)
 ### Escopo
 Refinamento do importador de `.md` adicionado em v01.87.00.
