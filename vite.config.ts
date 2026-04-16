@@ -47,7 +47,7 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     setupFiles: ['./src/test-setup.ts'],
-    exclude: ['node_modules', 'dist', 'admin-motor'],
+    exclude: ['**/node_modules/**', '**/dist/**', 'admin-motor/**', 'tlsrpt-motor/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
