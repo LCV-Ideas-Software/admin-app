@@ -1,4 +1,13 @@
 # Changelog — Admin App
+## [v01.88.01] - 2026-04-16
+### Alterado
+- **hono**: exact pin `4.12.12` → caret `^4.12.14`. A versão 4.12.14 fixa a vulnerabilidade `GHSA-...` (HTML Injection em `hono/jsx` SSR; medium severity; nosso admin-motor usa apenas REST routes Hono, não JSX — impacto real zero, mas fecha o alerta Dependabot #22/#23).
+- **dompurify**: lockfile refreshed; caret `^3.3.3` agora resolve para 3.4.0, que fixa o bypass de `FORBID_TAGS` quando `ADD_TAGS` é função (alerta Dependabot #24; medium).
+- **Lockfile**: `package-lock.json` regenerado do zero (`rm -rf node_modules package-lock.json && npm install`).
+### Motivação
+- Resolver 3 alertas medium do Dependabot + adotar patches recentes em dependências transitivas.
+- Parte do plano de upgrade v2 (fase A2).
+
 ## [v01.88.00] - 2026-04-16
 ### Alterado
 - **Tiptap/homogeneização**: Todas as 27 dependências `@tiptap/*` em `^3.21.0` promovidas para `^3.22.3`, alinhando com os peer deps declarados por `@tiptap/extension-drag-handle@3.22.3`, `@tiptap/extension-collaboration@3.22.3`, `@tiptap/extension-node-range@3.22.3` e `@tiptap/suggestion@3.22.3` (todos em 3.22.3 desde antes deste commit). Mantidos intocados: `@tiptap/extension-drag-handle-react@^3.22.0` e `@tiptap/y-tiptap@^3.0.3` (não têm equivalente 3.22.3 publicado).
