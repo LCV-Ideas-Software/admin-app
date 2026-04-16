@@ -1,4 +1,14 @@
 # Changelog — Admin App
+## [v01.88.02] - 2026-04-16
+### Alterado
+- **biome.json**: removida a regra `correctness.useExhaustiveDependencies: "warn"` — era config morta (Biome não roda no CI nem em `npm run lint`; apenas `biome format` é ativo). ESLint via `eslint-plugin-react-hooks` permanece como único enforcer de hook deps.
+### Motivação
+- Plano v2 fase A3 previa consolidar (remover eslint-plugin-react-hooks, adotar Biome). Análise empírica: Biome detecta 25 warnings (vs 5 do ESLint) porque não honra `// eslint-disable-next-line`. Custo de migração (biome-ignore comments em todas as ocorrências + adicionar `biome lint` ao CI) não se paga vs ganho (~70KB devDep + eliminar `.npmrc`). A consolidação direcional vai ser ESLint-only — Biome fica só como formatter.
+- Remover a regra morta elimina confusão sobre qual ferramenta policia o quê.
+### Não alterado
+- `eslint-plugin-react-hooks@^7.0.1` permanece em devDependencies
+- `.npmrc` com `legacy-peer-deps=true` permanece (ainda necessário para o conflito ESLint 10 ↔ react-hooks@7)
+
 ## [v01.88.01] - 2026-04-16
 ### Alterado
 - **hono**: exact pin `4.12.12` → caret `^4.12.14`. A versão 4.12.14 fixa a vulnerabilidade `GHSA-...` (HTML Injection em `hono/jsx` SSR; medium severity; nosso admin-motor usa apenas REST routes Hono, não JSX — impacto real zero, mas fecha o alerta Dependabot #22/#23).

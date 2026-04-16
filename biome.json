@@ -10,7 +10,6 @@
         "noExplicitAny": "off"
       },
       "correctness": {
-        "useExhaustiveDependencies": "warn",
         "noUndeclaredVariables": "off"
       }
     }
