@@ -13,6 +13,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ts7-compat:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: TypeScript@next type-check (non-blocking)
+        run: npx -p typescript@next tsc -b --noEmit
+
   deploy:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
