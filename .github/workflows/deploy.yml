@@ -72,6 +72,18 @@ jobs:
         run: npm audit --audit-level=high
         working-directory: ./
 
+      - name: Lint Admin App
+        run: npm run lint
+        working-directory: ./
+
+      - name: Test Admin App UI
+        run: npm test
+        working-directory: ./
+
+      - name: Test Admin Motor
+        run: npm run test:admin-motor
+        working-directory: ./
+
       - name: Deploy Admin Motor
         run: npx wrangler@${WRANGLER_VERSION} deploy --config admin-motor/wrangler.json
         working-directory: ./

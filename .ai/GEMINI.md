@@ -9,6 +9,19 @@
 ## 🧠 MEMÓRIA DE CONTEXTO ISOLADO (ADMIN-APP)
 # AI Memory Log — Admin-App
 
+## 2026-04-17 — Admin-App v01.90.00 (auditoria corretiva: ator administrativo + CI)
+### Escopo
+Fechamento corretivo do `admin-app` após a rodada de auditoria técnica de 2026-04-17, priorizando integridade do ator administrativo, restauração explícita do gate de exclusão no `oraculo` e promoção dos testes do `admin-motor` ao gate de deploy.
+### Alterado
+- **`admin-motor/src/handlers/routes/_lib/admin-actor.ts` + `functions/api/_lib/admin-actor.ts`**: `CF-Access-Authenticated-User-Email` deixou de ser considerado fonte autoritativa quando a requisição entra por bearer; `DEFAULT_ADMIN_ACTOR` passou a ser constante exportada/compartilhada para evitar drift por magic string.
+- **`admin-motor/src/handlers/routes/oraculo/excluir.ts`**: tipagem explícita de contexto/D1, recusa explícita quando o ator não é resolvido e uso da constante canônica do ator padrão.
+- **Testes**: `admin-actor.test.ts` cobre spoofing de header em caminho bearer; `oraculo/excluir.test.ts` cobre o `400` de ator não resolvido.
+- **CI**: `admin-app/.github/workflows/deploy.yml` agora executa `npm run lint`, `npm test` e `npm run test:admin-motor` antes do deploy.
+### Motivação
+- Responder ao parecer corretivo do Claude Code sem regredir o comportamento do `admin-app`, fortalecendo o audit trail e impedindo que regressões futuras escapem do pipeline.
+### Versão
+- APP v01.89.02 → APP v01.90.00
+
 ## 2026-04-16 — Admin-Motor: remoção do `/api/config` legado (v01.89.02)
 ### Escopo
 Encerramento do endpoint global fake de configuração do `admin-motor`, mantendo `config-store` como superfície única de persistência real no `admin-app`.

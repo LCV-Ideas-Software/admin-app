@@ -1,4 +1,4 @@
-const DEFAULT_ADMIN_ACTOR = 'admin-app';
+export const DEFAULT_ADMIN_ACTOR = 'admin-app';
 
 const normalizeAdminActor = (value: unknown): string | null => {
   const actor = String(value ?? '').trim();
@@ -10,7 +10,10 @@ const normalizeAdminActor = (value: unknown): string | null => {
 };
 
 export const resolveAdminActorFromRequest = (request: Request, body?: Record<string, unknown>): string => {
-  const fromCfAccess = normalizeAdminActor(request.headers.get('CF-Access-Authenticated-User-Email'));
+  const hasBearerAuth = request.headers.get('Authorization')?.startsWith('Bearer ') ?? false;
+  const fromCfAccess = !hasBearerAuth
+    ? normalizeAdminActor(request.headers.get('CF-Access-Authenticated-User-Email'))
+    : null;
   if (fromCfAccess) {
     return fromCfAccess;
   }

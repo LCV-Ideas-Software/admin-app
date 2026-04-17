@@ -62,4 +62,25 @@ describe('oraculo/excluir', () => {
     expect(payload.ok).toBe(true);
     expect(payload.admin_actor).toBe('real-admin@lcv.app.br');
   });
+
+  it('rejects the request when no admin actor can be resolved', async () => {
+    const response = await onRequestPost({
+      request: new Request('https://admin.lcv.app.br/api/oraculo/excluir', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: 'registro-1', tipo: 'lci-lca' }),
+      }),
+      env: {
+        BIGDATA_DB: createDb(),
+      },
+    });
+
+    const payload = (await response.json()) as { ok: boolean; error?: string };
+
+    expect(response.status).toBe(400);
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toBe('Admin actor não resolvido.');
+  });
 });

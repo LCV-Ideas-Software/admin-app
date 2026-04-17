@@ -1,4 +1,15 @@
 # Changelog — Admin App
+## [v01.90.00] - 2026-04-17
+### Alterado
+- **Integridade do ator administrativo**: `resolveAdminActorFromRequest` deixou de tratar `CF-Access-Authenticated-User-Email` como fonte autoritativa quando a requisição entra por `Authorization: Bearer ...`, preservando a fidelidade do audit trail no caminho service-to-service.
+- **`oraculo/excluir.ts` endurecido**: a rota recebeu tipagem explícita de contexto/D1 e passou a rejeitar a exclusão quando nenhum `admin actor` confiável é resolvido, em vez de cair silenciosamente para `admin-app`.
+- **Constante canônica do ator padrão**: `DEFAULT_ADMIN_ACTOR` passou a ser compartilhado entre o resolvedor e `oraculo/excluir.ts`, eliminando o acoplamento por magic string apontado no parecer corretivo.
+- **CI com testes reais**: o workflow de deploy do `admin-app` agora executa `npm run lint`, `npm test` e `npm run test:admin-motor` antes do deploy.
+### Corrigido
+- **Cabeçalhos de CF Access em chamadas bearer**: clientes autenticados por bearer não conseguem mais fazer o audit trail registrar um e-mail de Cloudflare Access arbitrário como ator primário.
+### Motivação
+- **Origem da rodada**: fechamento corretivo da auditoria técnica de 2026-04-17, com foco em integridade do ator administrativo, defense-in-depth do `admin-motor` e gate de CI antes de deploy.
+
 ## [v01.89.02] - 2026-04-16
 ### Removido
 - **Endpoint legado `/api/config`**: o `admin-motor` deixou de publicar a rota fake de configuração global que devolvia defaults e simulava persistência sem gravar nada no D1. O handler `admin-motor/src/handlers/routes/config/config.ts` foi removido do runtime.

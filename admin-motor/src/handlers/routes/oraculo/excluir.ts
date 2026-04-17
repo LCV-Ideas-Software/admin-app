@@ -1,14 +1,50 @@
 // Env: { BIGDATA_DB } — via context.data?.env || context.env
 
-import { resolveAdminActorFromRequest } from '../_lib/admin-actor';
+import { DEFAULT_ADMIN_ACTOR, resolveAdminActorFromRequest } from '../_lib/admin-actor';
 
-export const onRequestPost = async (context: any) => {
+interface DeleteBody {
+  id?: string;
+  tipo?: string;
+  adminActor?: string;
+  adminEmail?: string;
+}
+
+interface D1RunResult {
+  meta?: {
+    changes?: number;
+  };
+}
+
+interface D1Prepared {
+  bind(...values: unknown[]): {
+    run(): Promise<D1RunResult>;
+  };
+  all(): Promise<{ results?: Array<{ id: string; dados_json: string }> }>;
+}
+
+interface D1DatabaseLike {
+  prepare(query: string): D1Prepared;
+}
+
+interface HandlerContext {
+  request: Request;
+  env?: {
+    BIGDATA_DB?: D1DatabaseLike;
+  };
+  data?: {
+    env?: {
+      BIGDATA_DB?: D1DatabaseLike;
+    };
+  };
+}
+
+export const onRequestPost = async (context: HandlerContext) => {
   const { request } = context;
   const env = context.data?.env || context.env;
 
-  let body: { id?: string; tipo?: string };
+  let body: DeleteBody;
   try {
-    body = (await request.json()) as { id?: string; tipo?: string };
+    body = (await request.json()) as DeleteBody;
   } catch {
     return new Response(JSON.stringify({ ok: false, error: 'Payload JSON inválido.' }), {
       status: 400,
@@ -17,6 +53,13 @@ export const onRequestPost = async (context: any) => {
   }
 
   const adminActor = resolveAdminActorFromRequest(request, body);
+  if (adminActor === DEFAULT_ADMIN_ACTOR) {
+    return new Response(JSON.stringify({ ok: false, error: 'Admin actor não resolvido.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const { id, tipo } = body;
   if (!id || !tipo || !['lci-lca', 'tesouro-ipca'].includes(tipo)) {
     return new Response(JSON.stringify({ ok: false, error: 'ID e tipo válidos são obrigatórios.' }), {
@@ -51,7 +94,7 @@ export const onRequestPost = async (context: any) => {
     try {
       const { results } = await db.prepare('SELECT id, dados_json FROM oraculo_user_data').all();
 
-      for (const row of (results ?? []) as Array<{ id: string; dados_json: string }>) {
+      for (const row of results ?? []) {
         try {
           const dados = JSON.parse(row.dados_json);
           const arr = dados[jsonField] as Array<{ id?: string }> | undefined;

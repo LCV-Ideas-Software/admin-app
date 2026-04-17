@@ -31,4 +31,18 @@ describe('resolveAdminActorFromRequest', () => {
 
     expect(resolved).toBe('admin@app.lcv');
   });
+
+  it('ignores the Cloudflare Access header when the request is authenticated by bearer token', () => {
+    const request = new Request('https://admin.lcv.app.br/api/test', {
+      headers: {
+        Authorization: 'Bearer service-secret',
+        'CF-Access-Authenticated-User-Email': 'spoofed-access@lcv.app.br',
+        'X-Admin-Actor': 'service-automation@app.lcv',
+      },
+    });
+
+    const resolved = resolveAdminActorFromRequest(request);
+
+    expect(resolved).toBe('service-automation@app.lcv');
+  });
 });
