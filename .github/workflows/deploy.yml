@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            ./package-lock.json
+            ./tlsrpt-motor/package-lock.json
       - run: npm ci
       - name: TypeScript@next type-check (non-blocking)
         run: npx -p typescript@next tsc -b --noEmit
@@ -42,10 +45,13 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            ./package-lock.json
+            ./tlsrpt-motor/package-lock.json
 
       - name: Install TLS-RPT Motor
         working-directory: ./tlsrpt-motor
-        run: npm install
+        run: npm ci
 
       - name: Audit TLS-RPT Motor
         working-directory: ./tlsrpt-motor
@@ -59,7 +65,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
 
       - name: Install Admin App
-        run: npm install
+        run: npm ci
         working-directory: ./
 
       - name: Security Audit — Admin App
