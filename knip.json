@@ -1,7 +1,14 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/main.tsx"],
-  "project": ["src/**/*.{ts,tsx}"],
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "admin-motor/src/index.ts",
+    "functions/**/*.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "admin-motor/src/**/*.ts",
+    "functions/**/*.{ts,tsx}"
+  ],
   "ignore": ["src/test-setup.ts", "**/*.test.{ts,tsx}"],
   "ignoreDependencies": ["@cloudflare/workers-types"]
 }

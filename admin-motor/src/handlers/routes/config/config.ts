@@ -8,6 +8,7 @@
  */
 
 import { jsonResponse, errorResponse, successResponse } from '../../../../../functions/api/_lib/http-common'
+import { summarizeConfigPayload } from '../_lib/log-safety'
 
 const DEFAULT_CONFIG = {
   theme: {
@@ -127,7 +128,7 @@ async function handlePost(request: Request): Promise<Response> {
     //   'INSERT OR REPLACE INTO global_config (id, config) VALUES (1, ?)'
     // ).bind(JSON.stringify(sanitized)).run()
 
-    console.log('Configuration updated:', sanitized)
+    console.log('[config] update:accepted', summarizeConfigPayload(sanitized))
 
     return successResponse(
       {
@@ -152,7 +153,7 @@ async function handleDelete(_request: Request, _env: any): Promise<Response> {
     // const db = env.BIGDATA_DB
     // await db.prepare('DELETE FROM global_config WHERE id = 1').run()
 
-    console.log('Configuration reset to defaults')
+    console.log('[config] reset:defaults')
 
     return successResponse(
       {

@@ -6,7 +6,7 @@ interface D1RunResult { meta?: { changes?: number } }
 
 // Env: { BIGDATA_DB } — via context.data?.env || context.env
 
-
+import { maskEmail } from '../_lib/log-safety'
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -150,7 +150,11 @@ export const onRequestDelete = async (context: any) => {
     await db.prepare('DELETE FROM oraculo_user_data WHERE id = ?').bind(id).run()
     deletedCounts.userdata = 1
 
-    console.log(`[oraculo/userdata DELETE] Cascata completa para ${email}:`, JSON.stringify(deletedCounts))
+    console.log('[oraculo/userdata DELETE] cascata:complete', {
+      userId: id,
+      email: maskEmail(email),
+      deleted: deletedCounts,
+    })
 
     return jsonResponse({
       ok: true,
@@ -165,4 +169,3 @@ export const onRequestDelete = async (context: any) => {
     }, 500)
   }
 }
-

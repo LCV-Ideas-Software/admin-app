@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Leonardo Cardozo Vargas
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
@@ -58,20 +58,19 @@ describe('SyncStatusCard', () => {
     expect(screen.getByText('Carregando status operacional do sync...')).toBeInTheDocument();
   });
 
-  it.skip('disables sync button while loading', () => {
-    // TODO: selector returns multiple buttons (UI evolveu desde que o teste foi escrito).
-    // Precisa especificidade: getAllByRole or getByTestId. Follow-up separado.
+  it('disables sync button while loading', () => {
     mockFetch.mockImplementation(() => new Promise(() => {}));
     render(<SyncStatusCard {...defaultProps} />, { wrapper: makeWrapper() });
-    expect(screen.getByRole('button', { name: /sincronizar/i })).toBeDisabled();
+    const button = screen.getAllByTestId('sync-trigger-mainsite').at(-1)!;
+    expect(button).toBeDisabled();
   });
 
-  it.skip('renders title and description', () => {
-    // TODO: título/descrição renderizados em múltiplos locais; seletor ambíguo. Follow-up.
+  it('renders title and description', () => {
     mockFetch.mockImplementation(() => new Promise(() => {}));
     render(<SyncStatusCard {...defaultProps} />, { wrapper: makeWrapper() });
-    expect(screen.getByText('MainSite Sync')).toBeInTheDocument();
-    expect(screen.getByText('Sincroniza dados do MainSite')).toBeInTheDocument();
+    const card = screen.getAllByTestId('sync-card-mainsite').at(-1)!;
+    expect(within(card).getByText('MainSite Sync')).toBeInTheDocument();
+    expect(within(card).getByText('Sincroniza dados do MainSite')).toBeInTheDocument();
   });
 
   it('displays sync stats after successful fetch', async () => {
@@ -86,18 +85,16 @@ describe('SyncStatusCard', () => {
     expect(screen.getByText('último sync OK')).toBeInTheDocument();
   });
 
-  it.skip('enables sync button after data loads', async () => {
-    // TODO: mesmo problema de seletor ambíguo. Follow-up.
+  it('enables sync button after data loads', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => mockOverviewResponse,
     });
     render(<SyncStatusCard {...defaultProps} />, { wrapper: makeWrapper() });
-    await waitFor(() => expect(screen.getByRole('button', { name: /sincronizar/i })).toBeEnabled());
+    await waitFor(() => expect(screen.getAllByTestId('sync-trigger-mainsite').at(-1)!).toBeEnabled());
   });
 
-  it.skip('calls the sync endpoint when button is clicked', async () => {
-    // TODO: depende de enables sync button (skipped). Follow-up.
+  it('calls the sync endpoint when button is clicked', async () => {
     mockFetch
       .mockResolvedValueOnce({ ok: true, json: async () => mockOverviewResponse })
       .mockResolvedValueOnce({
@@ -108,9 +105,9 @@ describe('SyncStatusCard', () => {
 
     const user = userEvent.setup();
     render(<SyncStatusCard {...defaultProps} />, { wrapper: makeWrapper() });
-    await waitFor(() => expect(screen.getByRole('button', { name: /sincronizar/i })).toBeEnabled());
+    await waitFor(() => expect(screen.getAllByTestId('sync-trigger-mainsite').at(-1)!).toBeEnabled());
 
-    await user.click(screen.getByRole('button', { name: /sincronizar/i }));
+    await user.click(screen.getAllByTestId('sync-trigger-mainsite').at(-1)!);
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith('/api/mainsite/sync', { method: 'POST' }));
   });
