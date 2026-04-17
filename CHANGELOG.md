@@ -1,4 +1,13 @@
 # Changelog — Admin App
+
+## [v01.90.01] - 2026-04-17
+### Alterado
+- `wrangler.json`, `admin-motor/wrangler.json` e `tlsrpt-motor/wrangler.json` agora garantem `observability.logs.enabled = true`, `observability.logs.invocation_logs = true` e `observability.traces.enabled = true`.
+- Campos preexistentes de observability, como `head_sampling_rate`, foram preservados durante o merge do baseline.
+- `tlsrpt-motor/vitest.config.mjs` foi realinhado à integração atual `cloudflareTest(...)`, e `tlsrpt-motor/test/index.spec.js` passou a usar um stub local de D1 para manter os testes de rota determinísticos no runtime de Workers.
+### Motivação
+- Padronizar logs de invocação e traces do Cloudflare em todo o runtime versionado do `admin-app`.
+
 ## [v01.90.00] - 2026-04-17
 ### Alterado
 - **Integridade do ator administrativo**: `resolveAdminActorFromRequest` deixou de tratar `CF-Access-Authenticated-User-Email` como fonte autoritativa quando a requisição entra por `Authorization: Bearer ...`, preservando a fidelidade do audit trail no caminho service-to-service.

@@ -9,6 +9,19 @@
 ## 🧠 MEMÓRIA DE CONTEXTO ISOLADO (ADMIN-APP)
 # AI Memory Log — Admin-App
 
+## 2026-04-17 — Admin-App v01.90.01 (wrangler observability + traces)
+### Escopo
+Alinhamento do baseline de observabilidade Cloudflare no `admin-app`, cobrindo o app principal e os workers `admin-motor` e `tlsrpt-motor`.
+### Alterado
+- `wrangler.json`, `admin-motor/wrangler.json` e `tlsrpt-motor/wrangler.json` agora garantem `observability.logs.enabled = true`, `observability.logs.invocation_logs = true` e `observability.traces.enabled = true`.
+- Campos existentes de observability, como `head_sampling_rate`, foram preservados durante o merge do config.
+- `tlsrpt-motor/vitest.config.mjs` foi realinhado à integração atual `cloudflareTest(...)`, e `tlsrpt-motor/test/index.spec.js` passou a usar um stub local de D1 para manter os testes de rota determinísticos.
+### Motivação
+- Fechar a padronização de telemetria do workspace sem regressão de configuração.
+### Versão
+- APP v01.90.00 → APP v01.90.01
+
+
 ## 2026-04-17 — Admin-App v01.90.00 (auditoria corretiva: ator administrativo + CI)
 ### Escopo
 Fechamento corretivo do `admin-app` após a rodada de auditoria técnica de 2026-04-17, priorizando integridade do ator administrativo, restauração explícita do gate de exclusão no `oraculo` e promoção dos testes do `admin-motor` ao gate de deploy.
