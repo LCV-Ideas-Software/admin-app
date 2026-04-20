@@ -123,6 +123,14 @@ export function NewsPanel() {
     }
   }, []);
 
+  // Chave memoizada para fetch — só muda quando fontes/max mudam, não em keystroke de keywords
+  const fetchKey = useMemo(
+    () =>
+      `${settings.enabledSources.join(',')}_${settings.maxItems}_${JSON.stringify(settings.sources?.map((s) => s.id))}`,
+    [settings.enabledSources, settings.maxItems, settings.sources],
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intencional — re-fetch apenas quando fetchKey (fontes/max) ou refreshMinutes mudam, não a cada mudança em `settings` (que inclui `localKeywords`)
   useEffect(() => {
     setLoading(true);
     void fetchNews(settings);
@@ -133,7 +141,8 @@ export function NewsPanel() {
     return () => {
       if (refreshRef.current) clearInterval(refreshRef.current);
     };
-  }, [fetchNews, settings.refreshMinutes, settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchNews, fetchKey, settings.refreshMinutes]);
 
   const handleRefresh = () => {
     setLoading(true);

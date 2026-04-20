@@ -374,9 +374,11 @@ export function MtastsModule() {
   );
 
   // Auto-load overview (histórico permanente) na montagem do módulo
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intencional — carregar overview apenas na montagem, não a cada keystroke em `domain`/`limit` (deps de loadOverview)
   useEffect(() => {
     void loadOverview();
-  }, [loadOverview]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!hasUnsavedPolicyDraft) {

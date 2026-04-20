@@ -1,3 +1,14 @@
+## 2026-04-20 — Admin-App v01.91.01 (hotfix: regressão crítica em PopupPortal pós-auditoria)
+### Escopo
+Fix emergencial após v01.91.00. Auto-fix `--unsafe` do Biome substituiu `}, [isOpen, title])` + `// eslint-disable-next-line react-hooks/exhaustive-deps` por `}, [isOpen, title, onClose, containerEl])` no `useEffect` do `PopupPortal`. Resultado operacional: clicar em "Novo Post" ou "Editar Post" no `MainsiteModule` spawnava milhares de `window.open()` até travar o navegador, porque (a) `onClose=resetPostEditor` é recriado a cada render do parent e (b) `containerEl` é setado PELO próprio efeito (`setContainerEl(div)` via `queueMicrotask`), criando ciclo cleanup → reabrir.
+### Corrigido
+- **`src/components/PopupPortal.tsx`**: revertido `useEffect` deps para `[isOpen, title]` com `// biome-ignore lint/correctness/useExhaustiveDependencies` (comentário antes do `useEffect`) + `// eslint-disable-next-line react-hooks/exhaustive-deps` (imediatamente antes do array) documentando a intenção — efeito deve disparar apenas quando janela for solicitada/fechada ou título mudar, nunca por recriação de callback do parent nem por re-entrada via `setContainerEl`.
+- **`src/modules/mtasts/MtastsModule.tsx`** + **`src/modules/news/NewsPanel.tsx`**: regressões de UX não-críticas mas reais descobertas na auditoria de 7 arquivos onde o unsafe removeu `eslint-disable exhaustive-deps`. MtastsModule re-fetchava `/api/mtasts/overview` a cada keystroke do campo `domain`/`limit`. NewsPanel re-carregava o feed a cada tecla no filtro de keywords (porque `fetchKey` useMemo foi substituído por `settings` direto nas deps). Restauradas as semânticas originais com `fetchKey` reintroduzido e supressões documentadas. Os outros 5 arquivos afetados (`useModuleConfig`, `FinanceiroModule`, `CalculadoraModule`, `SearchReplace`, `TlsrptModule`) ficaram seguros por coincidência — suas deps são todas stable references.
+### Lição
+- Auto-fix `biome check --write --unsafe` para `useExhaustiveDependencies` é **perigoso** em efeitos que: (1) têm callbacks-as-props (`onClose` etc.) não garantidamente memoizadas no parent; (2) manipulam estado próprio (`setContainerEl`) cuja inclusão como dep cria loop cleanup→reopen. A próxima auditoria deve inspecionar manualmente toda remoção de `eslint-disable react-hooks/exhaustive-deps` feita pelo auto-fix antes de confiar.
+### Versão
+- APP v01.91.00 → APP v01.91.01
+
 ## 2026-04-20 — Admin-App v01.91.00 (auditoria de qualidade: zerar biome/eslint/tsc)
 ### Escopo
 Auditoria completa dos gates do `admin-app` a pedido do usuário em 2026-04-20. Baseline: 346 errors / 116 warnings / 54 infos no Biome (incluindo débito acumulado de a11y, React hooks, keys de lista, segurança, imports, formatação). Meta: todos os gates verdes.
