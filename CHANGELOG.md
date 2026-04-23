@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [Publication Hygiene Followup] - 2026-04-23
+### Segurança
+- `tlsrpt-motor/AGENTS.md` removido do índice Git via `git rm --cached`, preservado no disco local. A regra `AGENTS.md` já presente no `.gitignore` raiz cobre o caminho (confirmado via `git check-ignore --no-index` → `.gitignore:40:AGENTS.md`); o arquivo permanecia rastreado apenas porque havia sido adicionado antes da regra entrar em vigor.
+### Validação
+- `git ls-files | grep -iE '(agents|gemini|copilot)\.md$'` não retorna entradas.
+- `npm pack --dry-run --json --ignore-scripts` em root e em `tlsrpt-motor/` não incluiu `AGENTS.md`.
+
 ## [Workflow Hygiene] - 2026-04-23
 ### Alterado
 - Removido o job `ts7-compat` de `.github/workflows/deploy.yml`, mantendo apenas o job principal `deploy` no workflow `Deploy`.
