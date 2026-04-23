@@ -1,5 +1,12 @@
 # Changelog — Admin App
 
+## [Security Publication Hardening] - 2026-04-23
+### Segurança
+- Memórias e contexto de agentes passaram a ser locais apenas: `.ai/`, `.aiexclude`, `.copilotignore` e `.github/copilot-instructions.md` foram adicionados ao ignore e removidos do índice Git com `git rm --cached`, preservando os arquivos no disco local.
+- Regras de publicação foram endurecidas para impedir envio de `.env*`, `.dev.vars*`, `.wrangler/`, `.tmp/`, logs, bancos locais e artefatos de teste para GitHub/npm.
+### Validação
+- `git ls-files` confirmou ausência de memórias/artefatos locais rastreados; `npm pack --dry-run --json --ignore-scripts` não incluiu arquivos proibidos.
+
 ## [v01.93.01] - 2026-04-23
 ### Corrigido
 - **Security audit falhou no deploy do v01.93.00**: GitHub Actions `Security Audit — Admin App` step rejeitou o deploy com 4 advisories high-severity em `@xmldom/xmldom <=0.8.12` (transitive via `mammoth@1.12.0`). Advisories: [GHSA-2v35-w6hq-6mfw](https://github.com/advisories/GHSA-2v35-w6hq-6mfw) (DoS via uncontrolled recursion), [GHSA-f6ww-3ggp-fr8h](https://github.com/advisories/GHSA-f6ww-3ggp-fr8h) (XML injection via DocumentType), [GHSA-x6wf-f3px-wcqx](https://github.com/advisories/GHSA-x6wf-f3px-wcqx) (injection via processing instruction), [GHSA-j759-j44w-7fr8](https://github.com/advisories/GHSA-j759-j44w-7fr8) (injection via comment). Publicadas/atualizadas entre deploy anterior (v01.92.02, 2026-04-21, verde) e este (v01.93.00, 2026-04-23, vermelho) — `npm audit` antes não detectava. `mammoth@1.12.0` (latest) pina `^0.8.6` então `npm audit fix` sem `--force` não resolve o pinning. Fix: adicionado `"@xmldom/xmldom": "^0.9.10"` ao bloco `overrides` existente em `package.json`, mecanismo documentado do npm (≥8.3) para forçar versão de dep transitiva de forma declarativa. Lock regenerado (`package-lock.json`), `npm ls @xmldom/xmldom` confirma `0.9.10` em vez de `0.8.12`. Gates locais verdes: `npm run build`, `npm run lint`, `npm test 26/26`, `npm audit --audit-level=high` = `found 0 vulnerabilities`.
