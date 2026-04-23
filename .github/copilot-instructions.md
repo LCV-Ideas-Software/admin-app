@@ -7,10 +7,118 @@
 
 
 ## 🧠 MEMÓRIA DE CONTEXTO ISOLADO (ADMIN-APP)
-# AI Memory Log — Admin-App
+## 2026-04-23 — Admin-App v01.93.01 (security hotfix: override @xmldom/xmldom para 0.9.10)
+### Escopo
+Deploy do v01.93.00 em 2026-04-23 falhou no step `Security Audit — Admin App` do workflow `Deploy`. Causa: 4 advisories high-severity em `@xmldom/xmldom <=0.8.12` (transitive via `mammoth@1.12.0`) publicadas/atualizadas entre 2026-04-21 e 2026-04-23 — `npm audit --audit-level=high` passou a retornar exit 1 onde antes passava.
 
-## 2026-04-21 — Admin-App v01.92.00 (Mecanismo de Publicação do MainSite)
-Kill switch global (chave `mainsite/publishing` em `mainsite_settings`, modes `normal|hidden`, `notice_title`+`notice_message` em texto plano sanitizado server-side) + visibilidade individual (coluna `mainsite_posts.is_published INTEGER DEFAULT 1`). Regra: texto público ⇔ `mode='normal'` AND `is_published=1`. Novo endpoint `POST /api/mainsite/posts-visibility`. Novo card "Publicação do Site" em `MainsiteModule` entre Arquivo e Moderação. Toggle olho (EyeOff/Eye) na lista. Checkbox "Visível no site" no `PostEditor`. `sanitizePublishingPayload` em `mainsite-admin.ts` remove HTML antes de persistir. `bumpContentVersion` dispara propagação imediata ao frontend via polling de fingerprint. Migration 012 aplicada via Cloudflare D1 API (31 posts existentes ficam todos visíveis). APP v01.91.01 → v01.92.00.
+### Corrigido
+- Adicionado `"@xmldom/xmldom": "^0.9.10"` ao bloco `overrides` existente em [`package.json`](../admin-app/package.json). Mecanismo npm (≥8.3) para forçar versão de dep transitiva declarativamente. `mammoth@1.12.0` (latest) pinou `^0.8.6`, então `npm audit fix` sem `--force` não resolveria.
+- `npm install` regenerou o lockfile. `npm ls @xmldom/xmldom` agora mostra `0.9.10`.
+- Gates locais verdes: `npm run build`, `npm run lint`, `npm test 26/26`, `npm audit --audit-level=high` = `found 0 vulnerabilities`.
+
+### Advisories cobertas
+- GHSA-2v35-w6hq-6mfw — DoS via uncontrolled recursion
+- GHSA-f6ww-3ggp-fr8h — XML injection via DocumentType
+- GHSA-x6wf-f3px-wcqx — XML injection via processing instruction
+- GHSA-j759-j44w-7fr8 — XML injection via comment
+
+### Uso real do mammoth
+- [`src/modules/mainsite/PostEditor.tsx:327`](../admin-app/src/modules/mainsite/PostEditor.tsx): import dinâmico de `mammoth` para converter .docx em HTML no editor do admin. xmldom 0.9.x mantém API backward-compatible para esse caso de uso.
+
+### Versão
+- APP v01.93.00 → APP v01.93.01 (patch: security)
+
+## 2026-04-22 — Admin-App v01.93.00 (disclaimers — ativação individual soft-disable)
+### Escopo
+Nova camada de controle editorial para "Janelas de Aviso (Disclaimers)" no `MainsiteModule.tsx`. Fechou a lacuna entre os dois extremos pré-existentes: toggle global "Exibir Janelas de Aviso" (afeta todos) e botão "Remover" individual (destrutivo). Agora cada disclaimer aceita flag `enabled?: boolean` que permite ocultá-lo no público sem excluí-lo do D1.
+### Adicionado
+- **UI de ativação individual** no card de cada disclaimer: novo botão `Ativo`/`Inativo` (ícones `Eye`/`EyeOff` do lucide-react) ao lado do botão "Remover". Tooltip (`title`) explícito em cada estado; `aria-pressed` reflete o estado. Quando desativado: card ganha classe `disclaimer-card--disabled` (opacity 0.55 + background esmaecido) e o rótulo "AVISO N" ganha badge "INATIVO" em amarelo/âmbar. Clicar em "Remover" permanece irreversível — o novo toggle é explicitamente apresentado como alternativa reversível.
+- **Estilos CSS** em `App.css`: `.disclaimer-card--disabled`, `.disclaimer-card__badge`, `.disclaimer-card__actions` (wrapper flex para agrupar Toggle + Remover), `.disclaimer-card__toggle--off`.
+- **Tipo `DisclaimerItem` local** estendido com `enabled?: boolean` (opcional, ausência = ativo).
+- **Nova disclaimer via "Adicionar Novo Aviso"** inicializa `enabled: true` explicitamente.
+### Não alterado (retrocompat)
+- Schema do D1 permanece idêntico (JSON opaco em `mainsite_settings.payload`). Handler `PUT /api/mainsite/settings` no `admin-motor` já faz `JSON.stringify` pass-through — flag atravessa transparentemente.
+- Handler `GET /api/mainsite/settings` do admin-motor usa `safeParseObject` que preserva payload bruto — admin continua vendo todos os itens (ativos e inativos) para edição.
+### Versão
+- APP v01.92.02 → APP v01.93.00 (minor: nova funcionalidade)
+
+## 2026-04-21 — Admin-App v01.92.02 (hotfix2: guard uniforme em todos os campos preservados)
+### Escopo
+Segundo parecer externo sobre v01.92.01 apontou que o endurecimento ficou incompleto: `aiModels` continuou com fallback `?? {}` e `disclaimers` continuou caindo para estado local em `handleSavePublishing`. Risco de sobrescrita foi mitigado, não eliminado.
+### Corrigido
+- `handleSavePublishing` agora aborta se qualquer de `appearance`, `rotation`, `disclaimers`, `aiModels` não for record válido no GET.
+- `handleSaveSettings` (disclaimers) agora aborta se qualquer de `appearance`, `rotation`, `aiModels` não for record válido (disclaimers é o campo sendo editado, usa estado local normalmente).
+- Todos os fallbacks silenciosos (`?? {}`, `isRecord(...) ? ... : {}`, `?? disclaimers`) removidos do body do PUT — valores vêm diretamente do `currentPayload.settings.*` já validado.
+### Lição
+- "Merge-save" (GET para preservar + PUT total) exige validação estrita de TODOS os campos preservados. Fallback para `{}` é destrutivo porque o PUT completo sobrescreve tudo — o `admin-motor` `readPublicSettings` garante defaults hard-coded, logo ausência de campo no GET sinaliza backend degradado, não estado legítimo.
+### Versão
+- APP v01.92.01 → APP v01.92.02
+
+## 2026-04-21 — Admin-App v01.92.01 (hotfix: sobrescrita de settings no merge-save)
+### Escopo
+Parecer técnico externo sobre v01.92.00 apontou risco de sobrescrita silenciosa do `mainsite_settings` nos handlers `handleSavePublishing` (novo em v01.92.00) e `handleSaveSettings` (pré-existente) de `MainsiteModule.tsx`.
+### Corrigido
+- Ambos os handlers passam a validar `currentRes.ok`, `currentPayload.ok` e shape (`isRecord`) de `appearance` e `rotation` do GET intermediário antes de executar o PUT completo. Sem esse guard, um `{}` de fallback em `currentPayload.settings?.appearance ?? {}` seria persistido sobre a configuração real quando o GET degradasse (HTTP error / `ok:false` / JSON parcial).
+### Lição
+- O padrão "merge-save" (GET para preservar, PUT completo para sobrescrever) exige validação estrita do payload intermediário — fallback para objeto vazio em saves totais é destrutivo em cenários degradados. Alinhado com `feedback_fix_preexisting_errors`.
+### Versão
+- APP v01.92.00 → APP v01.92.01
+
+## 2026-04-21 — Admin-App v01.92.00 (mecanismo de Publicação do MainSite — kill switch + visibilidade individual)
+### Escopo
+Novo sistema de controle editorial de exibição dos textos do mainsite com duas camadas independentes (kill switch global via chave `mainsite/publishing`, visibilidade individual via coluna `mainsite_posts.is_published`). Regra combinada: texto público ⇔ `mode='normal'` AND `is_published=1`. Implementado simultaneamente em admin-app (v01.92.00), mainsite-worker (v02.13.00) e mainsite-frontend (v03.18.00).
+### Banco de dados
+- Migration 012 ([`db/migrations/012_bigdata_mainsite_publishing.sql`](../db/migrations/012_bigdata_mainsite_publishing.sql)) aplicada direto via Cloudflare D1 API na `bigdata_db` (00000000-0000-0000-0000-000000000000): `ALTER TABLE mainsite_posts ADD COLUMN is_published INTEGER NOT NULL DEFAULT 1` + seed `INSERT OR IGNORE mainsite_settings('mainsite/publishing','{"mode":"normal","notice_title":"","notice_message":""}')`. 31 posts existentes ficam todos visíveis por default.
+### Adicionado
+- **Endpoint `POST /api/mainsite/posts-visibility`** ([`admin-motor/src/handlers/routes/mainsite/posts-visibility.ts`](../admin-motor/src/handlers/routes/mainsite/posts-visibility.ts)): toggle ou set explícito de `is_published` (body `{ id, is_published?: boolean|0|1 }`). Padrão idêntico ao `posts-pin` existente. Chama `bumpContentVersion` para propagação imediata ao frontend.
+- **Card "Publicação do Site" em `MainsiteModule`** entre Arquivo de Posts e Moderação de Comentários: radio `Normal`/`Oculto`, campos livres `notice_title` (máx 200) e `notice_message` (máx 4000, texto plano), botão Salvar. Handler `handleSavePublishing` preserva appearance/rotation/disclaimers/aiModels ao upsertar apenas `publishing`.
+- **Botão de toggle de visibilidade na lista de posts** (ícone `EyeOff`/`Eye`) ao lado de Fixar/Excluir; badge "oculto" ao lado de "fixado/normal".
+- **Checkbox "Visível no site" no `PostEditor`**: novo state `postIsPublished` + prop `initialIsPublished`; `onSave` assinatura estendida para `(title, author, html, isPublished)`.
+- **`sanitizePublishingPayload`** ([`functions/api/_lib/mainsite-admin.ts`](../functions/api/_lib/mainsite-admin.ts)): strip iterativo de HTML em notice_title/notice_message antes de persistir (política de texto plano, elimina XSS armazenado). Tipos novos `MainsitePublishingMode`, `MainsitePublishingSettings`, constante `DEFAULT_PUBLISHING`.
+### Alterado
+- **`posts.ts`** ([admin-motor handler](../admin-motor/src/handlers/routes/mainsite/posts.ts)): `ensureAuthorColumn` renomeada para `ensurePostColumns`, garante também `is_published`. SELECTs retornam `is_published`. POST aceita o campo (default 1); PUT aceita opcional (só atualiza se vier no body, preserva retrocompat).
+- **`settings.ts`** ([admin-motor handler](../admin-motor/src/handlers/routes/mainsite/settings.ts)): lê `mainsite/publishing` via helper `readPublishing`; PUT aceita bloco `publishing` opcional com validação + sanitização + bump de `mainsite/content-version` para kill switch efetivo sem esperar próximo page load.
+- **`MainsitePublicSettings`**: tipo ganhou campo `publishing`. `upsertPublicSettingsIntoBigdata` e `readLegacyPublicSettings` atualizados.
+### Motivação
+- **Exigência do proprietário em 2026-04-21**: mecanismo local de "tirar tudo do ar" preservando identidade visual do site (logo/tema/contato/doação/rodapé), em contraste com a manutenção no edge da Cloudflare (que usa mensagens padronizadas e quebra branding). Texto da mensagem 100% sob controle editorial — se em branco, folha fica vazia, nenhum texto hardcoded. Visibilidade individual permite retirar um texto específico sem excluir.
+- **Metáfora "folha em branco"**: PostReader = folha; com texto, folha escrita; sem texto, folha em branco. Estrutura visual do componente nunca muda — só o conteúdo.
+### Versão
+- APP v01.91.01 → APP v01.92.00
+
+## 2026-04-20 — Admin-App v01.91.01 (hotfix: regressão crítica em PopupPortal pós-auditoria)
+### Escopo
+Fix emergencial após v01.91.00. Auto-fix `--unsafe` do Biome substituiu `}, [isOpen, title])` + `// eslint-disable-next-line react-hooks/exhaustive-deps` por `}, [isOpen, title, onClose, containerEl])` no `useEffect` do `PopupPortal`. Resultado operacional: clicar em "Novo Post" ou "Editar Post" no `MainsiteModule` spawnava milhares de `window.open()` até travar o navegador, porque (a) `onClose=resetPostEditor` é recriado a cada render do parent e (b) `containerEl` é setado PELO próprio efeito (`setContainerEl(div)` via `queueMicrotask`), criando ciclo cleanup → reabrir.
+### Corrigido
+- **`src/components/PopupPortal.tsx`**: revertido `useEffect` deps para `[isOpen, title]` com `// biome-ignore lint/correctness/useExhaustiveDependencies` (comentário antes do `useEffect`) + `// eslint-disable-next-line react-hooks/exhaustive-deps` (imediatamente antes do array) documentando a intenção — efeito deve disparar apenas quando janela for solicitada/fechada ou título mudar, nunca por recriação de callback do parent nem por re-entrada via `setContainerEl`.
+- **`src/modules/mtasts/MtastsModule.tsx`** + **`src/modules/news/NewsPanel.tsx`**: regressões de UX não-críticas mas reais descobertas na auditoria de 7 arquivos onde o unsafe removeu `eslint-disable exhaustive-deps`. MtastsModule re-fetchava `/api/mtasts/overview` a cada keystroke do campo `domain`/`limit`. NewsPanel re-carregava o feed a cada tecla no filtro de keywords (porque `fetchKey` useMemo foi substituído por `settings` direto nas deps). Restauradas as semânticas originais com `fetchKey` reintroduzido e supressões documentadas. Os outros 5 arquivos afetados (`useModuleConfig`, `FinanceiroModule`, `CalculadoraModule`, `SearchReplace`, `TlsrptModule`) ficaram seguros por coincidência — suas deps são todas stable references.
+### Lição
+- Auto-fix `biome check --write --unsafe` para `useExhaustiveDependencies` é **perigoso** em efeitos que: (1) têm callbacks-as-props (`onClose` etc.) não garantidamente memoizadas no parent; (2) manipulam estado próprio (`setContainerEl`) cuja inclusão como dep cria loop cleanup→reopen. A próxima auditoria deve inspecionar manualmente toda remoção de `eslint-disable react-hooks/exhaustive-deps` feita pelo auto-fix antes de confiar.
+### Versão
+- APP v01.91.00 → APP v01.91.01
+
+## 2026-04-20 — Admin-App v01.91.00 (auditoria de qualidade: zerar biome/eslint/tsc)
+### Escopo
+Auditoria completa dos gates do `admin-app` a pedido do usuário em 2026-04-20. Baseline: 346 errors / 116 warnings / 54 infos no Biome (incluindo débito acumulado de a11y, React hooks, keys de lista, segurança, imports, formatação). Meta: todos os gates verdes.
+### Alterado
+- **`biome.json`**: `files.includes` exclui `dist/`, `_cf_functions_build/`, `out/`, `functions/`, `public/`, `docs/`, `db/`, `scripts/`, `e2e/`, `tlsrpt-motor/`, `.tmp/`, `.wrangler/`, `admin-motor/.wrangler/`; schema migrado para 2.4.12 via `biome migrate`; rule `style/noDescendingSpecificity` desabilitada (falsos positivos em CSS com propriedades disjuntas).
+- **a11y — interatividade**: 17 `noStaticElementInteractions` + 14 `useKeyWithClickEvents` resolvidos via `role="button" tabIndex={0} onKeyDown` em linhas clicáveis, cards, backdrops de modal; conversão para `<button>` onde estruturalmente seguro (`ModerationPanel`/`RatingsPanel` "Selecionar todos").
+- **a11y — labels**: 32 `noLabelWithoutControl` tratados — `htmlFor`+`id` em labels reais de form (10 em `CfPwModule`, 5 em `ObservabilityBlock`, 2 em `MainsiteModule`, 1 em `CfPwModule` delete confirmation), `biome-ignore` documentado em labels de display (6 em `Astrologo`, 5 em `Oraculo`, `HubCardsModule`, `ModerationPanel`, `RatingsPanel`).
+- **a11y — semântica**: `<section>` no lugar de `<article role="region">`/`<div role="region">` (`FinanceiroModule`, `NewsPanel`); `<ul>`/`<li>` no lugar de `role="list"`/`role="listitem"`; `role="contentinfo"` em `ComplianceBanner`; 8 `useButtonType` com `type="button"`; 3 `noAutofocus` removidos.
+- **React — stabilidade de callbacks**: `useCallback` aplicado a `carregarModelos`, `carregarTaxas`, `withTrace` (×2), `updateOpsState`, `fetchCloudReports` — zerou 7 `useExhaustiveDependencies` biome + 8 `react-hooks/exhaustive-deps` eslint.
+- **React — chaves de lista**: 25 `noArrayIndexKey` resolvidos com identidade natural (`a.astro`, `u.orixa`-`u.posicao`, `item.link`, `alert.code`, `p.policy['policy-domain']`) ou `biome-ignore` documentado.
+- **TipTap editor — eslint-disable drift**: 9 diretivas `@typescript-eslint/no-explicit-any` reposicionadas em `PostEditor.tsx` e `editor/extensions.ts` após reflow do Biome (ancoradas na linha com `as any` real).
+### Corrigido
+- **Segurança — `noDangerouslySetInnerHtml` em `AstrologoModule`**: `DOMPurify.sanitize` teve `ALLOWED_ATTR: ['style']` reduzido para `ALLOWED_ATTR: []`, eliminando vetor de exfiltração via `background-image: url(...)`; `biome-ignore` documentando a mitigação.
+- **Correctness / types**: `matchAll` no lugar de `while(match = regex.exec(...))` (`discover.ts`, `news/feed.ts`, `searchReplaceCore.ts`); `flatMap` no lugar de `filter(...).map(p => p.X!)` em `AiStatusModule`; type guard `Required<...>` em `discover.ts`; null-check explícito em `main.tsx` (`getElementById('root')!`); `req ?? {}`/`res ?? {}` no lugar de `!` em `AiStatusModule`; `let entry = map.get(); if (!entry) { ... }` em `ObservabilityBlock`.
+- **Build TS em modo estrito**: narrowing de `popup` no TipTap mention popup (alias `popupEl` após early-return); remoção de `_fetchKey` ocioso em `NewsPanel`; `noImplicitAnyLet` em `post-summaries.ts`.
+- **Misc**: `useIterableCallbackReturn` em `Notification.tsx` (`.forEach` com body block), `noDuplicateFontNames` em `App.css`, `useAriaPropsSupportedByRole` em `ComplianceBanner`, `noAccumulatingSpread` em `useForm.ts`.
+### Gates (pós-auditoria)
+- `npx tsc --noEmit`: ✅ 0 erros
+- `npm run lint`: ✅ 0 problems
+- `npm run build` (`tsc -b && vite build`): ✅ build completa
+- `npx biome check .`: ✅ **0 errors, 0 warnings, 0 infos**
+### Versão
+- APP v01.90.02 → APP v01.91.00
 
 ## 2026-04-17 — Admin-App v01.90.02 (Pages observability rollback after GHA failure)
 ### Escopo
@@ -34,7 +142,7 @@ Alinhamento do baseline de observabilidade Cloudflare no `admin-app`, cobrindo o
 - Fechar a padronização de telemetria do workspace sem regressão de configuração.
 ### Versão
 - APP v01.90.00 → APP v01.90.01
-
+# AI Memory Log — Admin-App
 
 ## 2026-04-17 — Admin-App v01.90.00 (auditoria corretiva: ator administrativo + CI)
 ### Escopo
@@ -48,6 +156,27 @@ Fechamento corretivo do `admin-app` após a rodada de auditoria técnica de 2026
 - Responder ao parecer corretivo do Claude Code sem regredir o comportamento do `admin-app`, fortalecendo o audit trail e impedindo que regressões futuras escapem do pipeline.
 ### Versão
 - APP v01.89.02 → APP v01.90.00
+
+## 2026-04-17 — Plano do `admin-motor` revisado contra Email Service atual
+### Escopo
+Atualização do plano de migração futura do envio de e-mail do `admin-app` após revalidação na documentação oficial da Cloudflare.
+### Refinamentos consolidados
+- **Target técnico mantido**: `admin-motor/src/handlers/astrologoEmail.ts` continua elegível para migração direta de `fetch('https://api.resend.com/emails')` para binding `send_email` com `env.EMAIL.send(...)`.
+- **Resposta esperada no runtime novo**: o Workers API retorna `messageId`; ao migrar, o contrato de retorno do handler deve deixar de depender da forma antiga do Resend.
+- **Binding recomendado**: usar `allowed_sender_addresses` para restringir os remetentes oficiais do `admin-app` em `@lcv.app.br`.
+- **Pré-requisitos confirmados**: Email Service exige Cloudflare DNS e a documentação atual posiciona Email Sending como recurso de Workers Paid.
+
+## 2026-04-16 — Plano futuro de migração de e-mail do `admin-motor`
+### Escopo
+Registro do plano de migração futura do envio de e-mail do `admin-app`, hoje via Resend, para Cloudflare Email Service nativo em Worker.
+### Fluxo impactado
+- **`admin-motor/src/handlers/astrologoEmail.ts`**: `POST /api/astrologo/enviar-email` deixará de usar `fetch('https://api.resend.com/emails')` e deverá migrar para binding `send_email` com `env.EMAIL.send(...)`.
+### Estratégia consolidada
+- **Remetente do admin-app permanece em `@lcv.app.br`**.
+- O caso do Astrólogo foi classificado como **migração direta**, sem dependência de domínio secundário do mainsite.
+- O binding futuro deve restringir remetentes oficiais com `allowed_sender_addresses`, evitando superfície aberta de spoofing no Worker.
+### Pré-requisito operacional
+- O domínio de envio efetivo do `admin-app` deve estar onboarded no Cloudflare Email Service antes da troca do provider.
 
 ## 2026-04-16 — Admin-Motor: remoção do `/api/config` legado (v01.89.02)
 ### Escopo
@@ -74,6 +203,19 @@ Hardening do `admin-motor` para validar JWTs do Cloudflare Access com issuer e a
 - A produção precisa do secret `cf-access-aud` vinculado ao worker. O valor foi validado pela borda do Access de `admin.lcv.app.br` na própria sessão de deploy.
 ### Versão
 - APP v01.89.00 → APP v01.89.01
+
+## 2026-04-16 — Tiptap/Yjs peer deps são intencionais — NÃO REMOVER
+### Escopo
+Documentação defensiva: os pacotes `yjs`, `y-prosemirror`, `y-protocols`, `@tiptap/extension-collaboration`, `@tiptap/y-tiptap`, `@tiptap/suggestion`, `@tiptap/extension-node-range` são **dependências runtime obrigatórias**, mesmo que `src/` não os importe diretamente.
+### Cadeia de dependência
+`PostEditor.tsx` importa `@tiptap/extension-drag-handle-react`. Esse pacote depende de `@tiptap/extension-drag-handle`, cujo bundle (`node_modules/@tiptap/extension-drag-handle/dist/index.js:13`) contém `from "@tiptap/y-tiptap"`. `@tiptap/y-tiptap` por sua vez importa de `yjs`, `y-protocols` e `y-prosemirror`. Sem esses pacotes instalados, o resolver do Vite falha no build com `Failed to resolve module specifier`.
+### Regra
+- **Nunca** remover esses pacotes de `package.json/dependencies` baseando-se em grep de imports em `src/` — o grep não cobre imports transitivos bundlados.
+- **Nunca** voltar a usar `rollupOptions.external` em `vite.config.ts` para mascarar peer deps de Tiptap/ProseMirror — regride o bug v01.82.02 (bare module specifiers no bundle final de produção).
+- Se for inevitável reduzir esses pacotes, validar com build real + carregamento do PostEditor em navegador (bundle success ≠ runtime success).
+### Precedente
+- v01.82.02 (2026-04-09): teve incidente de `TypeError: Failed to resolve module specifier` em produção por causa desse mesmo pattern; a correção foi instalar os 7 peer deps como dependências declaradas.
+- Plano de upgrade v1 (2026-04-15) propunha remover 5 desses pacotes; plano v2 (2026-04-16) cancelou essa fase após confirmação empírica.
 
 ## 2026-04-12 — MainSite/PostEditor: strip de assinatura no import de Markdown (v01.87.01)
 ### Escopo
@@ -602,8 +744,6 @@ Resolução imediata de anomalia de middleware (em dmin-app/_middleware.ts) que
 
 ## 2026-04-03 — Enforcing Canonical Domain Security & TypeScript Audit
 ## 2026-04-03 — AI Models Selection Parity & Hardcoding Eradication
-
-
 
 
 > **DIRETIVA DE SEGURANÇA:** Ao sugerir código ou responder perguntas, leia rigorosamente o contexto e as memórias históricas acima para não divergir das decisões já tomadas pelo outro agente.
