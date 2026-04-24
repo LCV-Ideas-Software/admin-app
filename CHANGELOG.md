@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.95.02] - 2026-04-24
+### Alterado
+- **Deploy TLS-RPT Motor condicional**: o workflow `Deploy` foi dividido em detecção, deploy do `tlsrpt-motor` e deploy do admin. Em pushes para `main`, `tlsrpt-motor` só roda `npm ci`, `npm audit` e `wrangler deploy` quando arquivos sob `tlsrpt-motor/` mudam; mudanças exclusivas do admin seguem direto pelo pipeline do admin.
+- `workflow_dispatch` agora permite acionar manualmente o deploy do `tlsrpt-motor` sem redeployar o admin.
+- O cache npm do admin voltou a depender apenas de `package-lock.json`; o cache do motor usa exclusivamente `tlsrpt-motor/package-lock.json` quando o job condicional roda.
+### Validação
+- `npx --no-install js-yaml .github/workflows/deploy.yml` — `deploy-yaml-ok`.
+- Simulação Node da detecção: push admin-only não deploya TLS-RPT; push com `tlsrpt-motor/**` deploya; `workflow_dispatch` deploya manualmente.
+
 ## [v01.95.01] - 2026-04-24
 ### Segurança
 - **Dependabot alert #25 resolvido no `tlsrpt-motor`**: `postcss < 8.5.10` (`GHSA-qx2v-qp2m-jg93` / `CVE-2026-41305`) vinha transitivamente por `vitest` → `vite`. O `tlsrpt-motor/package.json` ganhou override explícito `postcss: 8.5.10`, mantendo o `vite` pinado em `8.0.7` e regenerando `tlsrpt-motor/package-lock.json`.

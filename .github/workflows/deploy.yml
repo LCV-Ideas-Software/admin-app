@@ -3,6 +3,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_tlsrpt:
+        description: Deploy TLS-RPT Motor
+        required: true
+        default: true
+        type: boolean
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_OPTIONS: "--no-deprecation"
@@ -13,8 +20,61 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    if: github.event_name == 'push'
+  detect_tlsrpt:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_tlsrpt: ${{ steps.detect.outputs.deploy_tlsrpt }}
+      reason: ${{ steps.detect.outputs.reason }}
+    steps:
+      - name: Detect TLS-RPT Motor Changes
+        id: detect
+        env:
+          DEPLOY_TLSRPT_INPUT: ${{ inputs.deploy_tlsrpt }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const eventName = process.env.GITHUB_EVENT_NAME;
+          const eventPath = process.env.GITHUB_EVENT_PATH;
+          const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+          const isTlsrptPath = (filePath) =>
+            filePath === 'tlsrpt-motor' || filePath.startsWith('tlsrpt-motor/');
+
+          let deployTlsrpt = false;
+          let reason = 'TLS-RPT Motor unchanged';
+
+          if (eventName === 'workflow_dispatch') {
+            deployTlsrpt = process.env.DEPLOY_TLSRPT_INPUT !== 'false';
+            reason = deployTlsrpt
+              ? 'manual workflow_dispatch requested TLS-RPT Motor deploy'
+              : 'manual workflow_dispatch skipped TLS-RPT Motor deploy';
+          } else if (eventName === 'push') {
+            const commits = Array.isArray(payload.commits) ? payload.commits : [];
+
+            if (commits.length === 0) {
+              deployTlsrpt = true;
+              reason = 'push payload had no commit list; deploying TLS-RPT Motor defensively';
+            } else {
+              deployTlsrpt = commits.some((commit) =>
+                ['added', 'modified', 'removed'].some((key) =>
+                  Array.isArray(commit[key]) && commit[key].some(isTlsrptPath),
+                ),
+              );
+
+              reason = deployTlsrpt
+                ? 'push changed files under tlsrpt-motor/'
+                : 'push did not change tlsrpt-motor/';
+            }
+          }
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy_tlsrpt=${deployTlsrpt}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason=${reason}\n`);
+          console.log(reason);
+          NODE
+
+  deploy_tlsrpt:
+    needs: detect_tlsrpt
+    if: needs.detect_tlsrpt.outputs.deploy_tlsrpt == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,9 +86,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: |
-            ./package-lock.json
-            ./tlsrpt-motor/package-lock.json
+          cache-dependency-path: ./tlsrpt-motor/package-lock.json
 
       - name: Install TLS-RPT Motor
         working-directory: ./tlsrpt-motor
@@ -44,6 +102,26 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
+
+  deploy_admin:
+    needs: [detect_tlsrpt, deploy_tlsrpt]
+    if: >
+      always() &&
+      github.event_name == 'push' &&
+      needs.detect_tlsrpt.result == 'success' &&
+      (needs.detect_tlsrpt.outputs.deploy_tlsrpt != 'true' || needs.deploy_tlsrpt.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ./package-lock.json
 
       - name: Install Admin App
         run: npm ci

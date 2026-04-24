@@ -28,7 +28,7 @@ import './App.css';
 import { ComplianceBanner } from './components/ComplianceBanner';
 import { FloatingScrollButtons } from './components/FloatingScrollButtons';
 
-const APP_VERSION = 'APP v01.95.01';
+const APP_VERSION = 'APP v01.95.02';
 
 export type ModuleId =
   | 'overview'
