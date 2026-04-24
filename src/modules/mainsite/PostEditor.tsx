@@ -62,7 +62,7 @@ import { SearchReplacePanel } from './editor/SearchReplace';
 import { TIPTAP_SLASH_EVENTS } from './editor/SlashCommands';
 import { clamp, formatImageUrl, isYoutubeUrl, migrateLegacyCaptions } from './editor/utils';
 
-type SaveFeedback = { message: string; type: 'success' | 'error' } | null;
+type SaveFeedback = { message: string; type: 'success' | 'error' | 'info' } | null;
 
 type GeminiImportProgress = {
   active: boolean;
@@ -84,9 +84,19 @@ export type PostEditorProps = {
   initialAuthor: string;
   initialContent: string;
   initialIsPublished?: boolean;
+  initialIsAboutSite?: boolean;
+  aboutMode?: boolean;
+  requiresAboutConversionConfirmation?: boolean;
   savingPost: boolean;
   showNotification: (msg: string, type: 'info' | 'success' | 'error') => void;
-  onSave: (title: string, author: string, htmlContent: string, isPublished: boolean) => Promise<boolean>;
+  onSave: (
+    title: string,
+    author: string,
+    htmlContent: string,
+    isPublished: boolean,
+    isAboutSite: boolean,
+    confirmedAboutConversion?: boolean,
+  ) => Promise<boolean>;
   onClose: () => void;
 };
 
@@ -96,6 +106,9 @@ export default function PostEditor({
   initialAuthor,
   initialContent,
   initialIsPublished = true,
+  initialIsAboutSite = false,
+  aboutMode = false,
+  requiresAboutConversionConfirmation = false,
   savingPost,
   showNotification,
   onSave,
@@ -104,6 +117,8 @@ export default function PostEditor({
   const [postTitle, setPostTitle] = useState(initialTitle);
   const [postAuthor, setPostAuthor] = useState(initialAuthor);
   const [postIsPublished, setPostIsPublished] = useState(initialIsPublished);
+  const [postIsAboutSite, setPostIsAboutSite] = useState(aboutMode || initialIsAboutSite);
+  const [showAboutConversionConfirm, setShowAboutConversionConfirm] = useState(false);
   const [promptModal, setPromptModal] = useState<PromptModalState>(PROMPT_MODAL_INITIAL);
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -621,7 +636,7 @@ export default function PostEditor({
   }, [editor, showNotification, insertCaptionBlock, openPromptModal]);
 
   // ── Local feedback helper (visible in popup window) ─────────
-  const flashFeedback = useCallback((message: string, type: 'success' | 'error') => {
+  const flashFeedback = useCallback((message: string, type: NonNullable<SaveFeedback>['type']) => {
     if (saveFeedbackTimer.current) clearTimeout(saveFeedbackTimer.current);
     setSaveFeedback({ message, type });
     saveFeedbackTimer.current = setTimeout(() => setSaveFeedback(null), 5000);
@@ -668,30 +683,57 @@ export default function PostEditor({
   };
 
   // ── Form submission ─────────────────────────────────────────
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const submitPost = async (confirmedAboutConversion = false) => {
     const title = postTitle.trim();
     const author = postAuthor.trim();
     const rawContent = editor?.getHTML()?.trim() ?? '';
     if (!title || !rawContent || rawContent === '<p></p>') {
-      flashFeedback('Título e conteúdo são obrigatórios para salvar o post.', 'error');
-      showNotification('Título e conteúdo são obrigatórios para salvar o post.', 'error');
+      const label = aboutMode || postIsAboutSite ? 'Sobre Este Site' : 'post';
+      flashFeedback(`Título e conteúdo são obrigatórios para salvar ${label}.`, 'error');
+      showNotification(`Título e conteúdo são obrigatórios para salvar ${label}.`, 'error');
       return;
     }
     // Enforce target="_blank" on all non-YouTube links before persisting
     const content = sanitizeLinksTargetBlank(rawContent);
-    const success = await onSave(title, author, content, postIsPublished);
-    if (success) {
-      flashFeedback(editingPostId ? 'Post atualizado com sucesso ✓' : 'Post criado com sucesso ✓', 'success');
-    } else {
-      flashFeedback('Falha ao salvar o post. Verifique e tente novamente.', 'error');
+
+    if (requiresAboutConversionConfirmation && postIsAboutSite && !confirmedAboutConversion) {
+      setShowAboutConversionConfirm(true);
+      flashFeedback('Confirme a conversão deste post em Sobre Este Site.', 'info');
+      showNotification('Confirme a conversão deste post em Sobre Este Site.', 'info');
+      return;
     }
+
+    const success = await onSave(
+      title,
+      author,
+      content,
+      postIsPublished,
+      aboutMode || postIsAboutSite,
+      confirmedAboutConversion,
+    );
+    if (success) {
+      setShowAboutConversionConfirm(false);
+      if (aboutMode || postIsAboutSite) {
+        flashFeedback('Sobre Este Site salvo com sucesso ✓', 'success');
+      } else {
+        flashFeedback(editingPostId ? 'Post atualizado com sucesso ✓' : 'Post criado com sucesso ✓', 'success');
+      }
+    } else {
+      flashFeedback('Falha ao salvar. Verifique e tente novamente.', 'error');
+    }
+  };
+
+  // ── Form submission ─────────────────────────────────────────
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    void submitPost(false);
   };
 
   const handleClear = () => {
     setPostTitle('');
     setPostAuthor('');
     editor?.commands.clearContent();
+    setShowAboutConversionConfirm(false);
   };
 
   const handleGeminiImport = useCallback(
@@ -786,8 +828,18 @@ export default function PostEditor({
     <form className="form-card" onSubmit={handleSubmit}>
       <div className="result-toolbar">
         <div>
-          <h4>{editingPostId ? `Editar post #${editingPostId}` : 'Novo post (NOVO)'}</h4>
-          <p className="field-hint">Crie e edite posts com salvamento imediato.</p>
+          <h4>
+            {aboutMode
+              ? 'Editar Sobre Este Site'
+              : editingPostId
+                ? `Editar post #${editingPostId}`
+                : 'Novo post (NOVO)'}
+          </h4>
+          <p className="field-hint">
+            {aboutMode
+              ? 'Edite o texto institucional publicado em /sobre-este-site.'
+              : 'Crie e edite posts com salvamento imediato.'}
+          </p>
         </div>
         <div className="inline-actions">
           <button type="submit" className="primary-button" disabled={savingPost}>
@@ -798,7 +850,7 @@ export default function PostEditor({
             ) : (
               <FilePlus2 size={16} />
             )}
-            {editingPostId ? 'Salvar alterações' : 'Criar post'}
+            {aboutMode || postIsAboutSite ? 'Salvar Sobre' : editingPostId ? 'Salvar alterações' : 'Criar post'}
           </button>
           <button type="button" className="ghost-button" onClick={handleClear} disabled={savingPost}>
             <X size={16} />
@@ -818,7 +870,13 @@ export default function PostEditor({
           role="status"
           aria-live="polite"
         >
-          {saveFeedback.type === 'success' ? <CheckSquare size={16} /> : <X size={16} />}
+          {saveFeedback.type === 'success' ? (
+            <CheckSquare size={16} />
+          ) : saveFeedback.type === 'info' ? (
+            <FileText size={16} />
+          ) : (
+            <X size={16} />
+          )}
           <span>{saveFeedback.message}</span>
           <button
             type="button"
@@ -855,16 +913,62 @@ export default function PostEditor({
       </div>
 
       <div className="field-group">
-        <label style={{ display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={postIsPublished}
-            onChange={(event) => setPostIsPublished(event.target.checked)}
-            disabled={savingPost}
-          />
-          <span>Visível no site (quando desmarcado, o post fica oculto para visitantes)</span>
-        </label>
+        <div style={{ display: 'flex', gap: '18px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={postIsPublished}
+              onChange={(event) => setPostIsPublished(event.target.checked)}
+              disabled={savingPost || aboutMode}
+            />
+            <span>Visível no site (quando desmarcado, o post fica oculto para visitantes)</span>
+          </label>
+          <label
+            style={{ display: 'flex', gap: '8px', alignItems: 'center', cursor: aboutMode ? 'default' : 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              checked={aboutMode || postIsAboutSite}
+              onChange={(event) => {
+                setPostIsAboutSite(event.target.checked);
+                if (!event.target.checked) setShowAboutConversionConfirm(false);
+              }}
+              disabled={savingPost || aboutMode}
+            />
+            <span>Sobre Este Site</span>
+          </label>
+        </div>
       </div>
+
+      {showAboutConversionConfirm && (
+        <div className="post-editor-about-confirm" role="alert">
+          <div>
+            <strong>Converter este post em Sobre Este Site?</strong>
+            <p>
+              O conteúdo será salvo na tabela institucional e o post original sairá da lista pública se não houver
+              comentários ou avaliações vinculados.
+            </p>
+          </div>
+          <div className="inline-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setShowAboutConversionConfirm(false)}
+              disabled={savingPost}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => void submitPost(true)}
+              disabled={savingPost}
+            >
+              Confirmar conversão
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── TipTap Editor ────────────────────────────────────────────── */}
       <div className="tiptap-container">

@@ -2612,6 +2612,30 @@ input[type="color"]:focus-visible {
   color: #c5221f;
 }
 
+.post-editor-feedback--info {
+  background: rgba(26, 115, 232, 0.12);
+  border: 1px solid rgba(26, 115, 232, 0.28);
+  color: #1a73e8;
+}
+
+.post-editor-about-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(26, 115, 232, 0.22);
+  border-radius: 12px;
+  background: rgba(26, 115, 232, 0.08);
+  color: var(--color-text, #202124);
+}
+
+.post-editor-about-confirm p {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
 .post-editor-feedback span {
   flex: 1;
 }

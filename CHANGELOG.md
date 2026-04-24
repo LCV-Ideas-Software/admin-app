@@ -1,5 +1,21 @@
 # Changelog — Admin App
 
+## [v01.94.00] - 2026-04-24
+### Adicionado
+- **"Sobre Este Site" no fluxo editorial do MainSite**: o [`PostEditor`](src/modules/mainsite/PostEditor.tsx) ganhou a flag "Sobre Este Site" ao lado de "Visível no site". A mesma superfície de criação/edição de posts agora pode salvar o conteúdo institucional do site, preservando a experiência autoral existente do editor TipTap.
+- **Endpoint admin `GET/PUT /api/mainsite/about`** em [`admin-motor/src/handlers/routes/mainsite/about.ts`](admin-motor/src/handlers/routes/mainsite/about.ts): leitura e upsert do singleton institucional em `mainsite_about`, com sanitização HTML server-side, auditoria operacional e bump de `mainsite/content-version`.
+- **Migration 013** ([`db/migrations/013_bigdata_mainsite_about.sql`](db/migrations/013_bigdata_mainsite_about.sql)): cria a tabela singleton `mainsite_about`, separada de `mainsite_posts`.
+### Alterado
+- Ao marcar "Sobre Este Site" em um post comum, o admin exige confirmação antes de converter. Se o post já possui comentários ou avaliações, a conversão é bloqueada para não apagar engajamento público. Se não houver engajamento, o conteúdo é movido para `mainsite_about` e o post-fonte é removido de `mainsite_posts` para não duplicar a publicação.
+- A sanitização do HTML institucional foi centralizada em helper parser-based local do `admin-motor`, alinhado ao padrão já usado no worker público.
+### Validação
+- `npm run test:admin-motor` — 7 arquivos / 14 testes passando.
+- `npm run lint` — sem problemas.
+- `npm run build` — build Vite/TypeScript concluído.
+- `npm audit --audit-level=high` — `found 0 vulnerabilities`.
+### Motivação
+- Atender à exigência editorial de manter o "Sobre Este Site" como conteúdo persistido em D1, editado pelos mesmos mecanismos dos posts, mas publicado e armazenado em tabela dedicada para não contaminar listagens, rotação, busca social ou métricas de posts.
+
 ## [Publication Hygiene Followup] - 2026-04-23
 ### Segurança
 - `tlsrpt-motor/AGENTS.md` removido do índice Git via `git rm --cached`, preservado no disco local. A regra `AGENTS.md` já presente no `.gitignore` raiz cobre o caminho (confirmado via `git check-ignore --no-index` → `.gitignore:40:AGENTS.md`); o arquivo permanecia rastreado apenas porque havia sido adicionado antes da regra entrar em vigor.
@@ -2079,6 +2095,4 @@
 
 ### Adicionado
 - `AGENTS.md` na raiz do workspace com política obrigatória de integração interna Cloudflare e defesa em profundidade (Access + CSP).
-
-
 

@@ -61,6 +61,10 @@ import {
 import { onRequestPost as handleCalculadoraSyncPost } from './handlers/routes/calculadora/sync';
 import { onRequestPost as handleMainsiteAiTransformPost } from './handlers/routes/mainsite/ai/transform';
 import {
+  onRequestGet as handleMainsiteAboutGet,
+  onRequestPut as handleMainsiteAboutPut,
+} from './handlers/routes/mainsite/about';
+import {
   handleCommentsAdminAll,
   handleCommentsAdminBulk,
   handleCommentsAdminDelete,
@@ -525,6 +529,8 @@ app.post('/api/calculadora/parametros', (c) => handleCalculadoraParametrosPost(r
 app.post('/api/calculadora/sync', (c) => handleCalculadoraSyncPost(rc(c)));
 
 // ── mainsite ──
+app.get('/api/mainsite/about', (c) => handleMainsiteAboutGet(rc(c)));
+app.put('/api/mainsite/about', (c) => handleMainsiteAboutPut(rc(c)));
 app.get('/api/mainsite/fees', (c) => handleMainsiteFeesGet(rc(c)));
 app.post('/api/mainsite/fees', (c) => handleMainsiteFeesPost(rc(c)));
 app.get('/api/mainsite/overview', (c) => handleMainsiteOverviewGet(rc(c)));

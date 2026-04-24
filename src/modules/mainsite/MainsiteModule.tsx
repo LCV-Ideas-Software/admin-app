@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   FilePlus2,
+  FileText,
   Globe,
   GripVertical,
   Loader2,
@@ -47,6 +48,18 @@ type ManagedPost = {
   is_published?: number | boolean;
   display_order?: number;
 };
+
+type MainsiteAbout = {
+  id: number;
+  title: string;
+  content: string;
+  author?: string;
+  source_post_id?: number | null;
+  created_at?: string;
+  updated_at?: string | null;
+};
+
+type PostEditorMode = 'post' | 'about';
 
 type ArchiveSort = 'default' | 'id-asc' | 'id-desc' | 'created-asc' | 'created-desc';
 
@@ -205,7 +218,10 @@ export function MainsiteModule() {
   const [adminActor] = useState('admin@app.lcv');
   const [managedPosts, setManagedPosts] = useState<ManagedPost[]>([]);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
+  const [editingPostTitle, setEditingPostTitle] = useState('');
+  const [editingPostAuthor, setEditingPostAuthor] = useState('');
   const [showPostEditor, setShowPostEditor] = useState(false);
+  const [postEditorMode, setPostEditorMode] = useState<PostEditorMode>('post');
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   const [editingPostContent, setEditingPostContent] = useState('');
   // Structured settings state — only disclaimers (appearance+rotation moved to ConfigModule)
@@ -568,8 +584,20 @@ export function MainsiteModule() {
 
   const resetPostEditor = () => {
     setEditingPostId(null);
+    setEditingPostTitle('');
+    setEditingPostAuthor('');
     setEditingPostContent('');
+    setPostEditorMode('post');
     setShowPostEditor(false);
+  };
+
+  const openNewPostEditor = () => {
+    setEditingPostId(null);
+    setEditingPostTitle('');
+    setEditingPostAuthor('');
+    setEditingPostContent('');
+    setPostEditorMode('post');
+    setShowPostEditor(true);
   };
 
   /** Load post content for editing and open the editor */
@@ -587,12 +615,43 @@ export function MainsiteModule() {
         throw new Error(nextPayload.error ?? 'Falha ao carregar o post para edição.');
       }
 
+      setPostEditorMode('post');
       setEditingPostId(nextPayload.post.id);
+      setEditingPostTitle(nextPayload.post.title);
+      setEditingPostAuthor(nextPayload.post.author ?? '');
       setEditingPostContent(nextPayload.post.content);
       setShowPostEditor(true);
       showNotification(`Post #${nextPayload.post.id} carregado para edição.`, 'info');
     } catch {
       showNotification('Não foi possível carregar o post selecionado.', 'error');
+    } finally {
+      setActionPostId(null);
+    }
+  };
+
+  const handleEditAbout = async () => {
+    setActionPostId(0);
+    try {
+      const response = await fetch('/api/mainsite/about', {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      });
+      const nextPayload = (await response.json()) as { ok: boolean; error?: string; about?: MainsiteAbout | null };
+
+      if (!response.ok || !nextPayload.ok) {
+        throw new Error(nextPayload.error ?? 'Falha ao carregar Sobre Este Site.');
+      }
+
+      setPostEditorMode('about');
+      setEditingPostId(null);
+      setEditingPostTitle(nextPayload.about?.title || 'Sobre Este Site');
+      setEditingPostAuthor(nextPayload.about?.author ?? '');
+      setEditingPostContent(nextPayload.about?.content ?? '');
+      setShowPostEditor(true);
+      showNotification('Sobre Este Site carregado para edição.', 'info');
+    } catch {
+      showNotification('Não foi possível carregar Sobre Este Site.', 'error');
     } finally {
       setActionPostId(null);
     }
@@ -604,9 +663,71 @@ export function MainsiteModule() {
     author: string,
     htmlContent: string,
     isPublished: boolean,
+    isAboutSite: boolean,
+    confirmedAboutConversion = false,
   ): Promise<boolean> => {
     setSavingPost(true);
     try {
+      const isAboutSave = postEditorMode === 'about' || isAboutSite;
+      const isPostToAboutConversion = postEditorMode === 'post' && editingPostId !== null && isAboutSite;
+
+      if (isAboutSave) {
+        if (isPostToAboutConversion && !confirmedAboutConversion) {
+          showNotification('Confirme a conversão antes de salvar Sobre Este Site.', 'info');
+          return false;
+        }
+
+        const response = await fetch('/api/mainsite/about', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Actor': adminActor,
+          },
+          body: JSON.stringify({
+            title,
+            author,
+            content: htmlContent,
+            source_post_id: isPostToAboutConversion ? editingPostId : null,
+            convert_source_post: isPostToAboutConversion,
+            adminActor,
+          }),
+        });
+
+        const nextPayload = (await response.json()) as {
+          ok: boolean;
+          error?: string;
+          request_id?: string;
+          engagement?: { comments?: number; ratings?: number };
+        };
+
+        if (!response.ok || !nextPayload.ok) {
+          const engagement = nextPayload.engagement;
+          const suffix =
+            engagement && (engagement.comments || engagement.ratings)
+              ? ` Comentários: ${engagement.comments ?? 0}; avaliações: ${engagement.ratings ?? 0}.`
+              : '';
+          throw new Error(`${nextPayload.error ?? 'Falha ao salvar Sobre Este Site.'}${suffix}`);
+        }
+
+        await loadManagedPosts();
+        if (isPostToAboutConversion) {
+          await loadSummaries();
+          resetPostEditor();
+        }
+
+        showNotification(
+          withTrace(
+            isPostToAboutConversion
+              ? 'Post convertido em Sobre Este Site com sucesso.'
+              : 'Sobre Este Site salvo com sucesso.',
+            nextPayload,
+          ),
+          'success',
+        );
+
+        return true;
+      }
+
       const isEditing = editingPostId !== null;
       const response = await fetch('/api/mainsite/posts', {
         method: isEditing ? 'PUT' : 'POST',
@@ -657,8 +778,9 @@ export function MainsiteModule() {
       }
 
       return true;
-    } catch {
-      showNotification('Não foi possível salvar o post do MainSite.', 'error');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível salvar o post do MainSite.';
+      showNotification(message, 'error');
       return false;
     } finally {
       setSavingPost(false);
@@ -999,7 +1121,13 @@ export function MainsiteModule() {
       <PopupPortal
         isOpen={showPostEditor || editingPostId !== null}
         onClose={resetPostEditor}
-        title={editingPostId ? `Editar post #${editingPostId} — LCV Admin` : 'Novo Post — LCV Admin'}
+        title={
+          postEditorMode === 'about'
+            ? 'Sobre Este Site — LCV Admin'
+            : editingPostId
+              ? `Editar post #${editingPostId} — LCV Admin`
+              : 'Novo Post — LCV Admin'
+        }
       >
         <PopupNotificationBridge>
           {(popupNotify) => (
@@ -1012,8 +1140,8 @@ export function MainsiteModule() {
             >
               <PostEditor
                 editingPostId={editingPostId}
-                initialTitle={editingPostId ? (managedPosts.find((p) => p.id === editingPostId)?.title ?? '') : ''}
-                initialAuthor={editingPostId ? (managedPosts.find((p) => p.id === editingPostId)?.author ?? '') : ''}
+                initialTitle={editingPostTitle}
+                initialAuthor={editingPostAuthor}
                 initialContent={editingPostContent}
                 initialIsPublished={
                   editingPostId
@@ -1024,9 +1152,14 @@ export function MainsiteModule() {
                       })()
                     : true
                 }
+                initialIsAboutSite={postEditorMode === 'about'}
+                aboutMode={postEditorMode === 'about'}
+                requiresAboutConversionConfirmation={postEditorMode === 'post' && editingPostId !== null}
                 savingPost={savingPost}
                 showNotification={popupNotify}
-                onSave={(title, author, html, isPublished) => handleSavePost(title, author, html, isPublished)}
+                onSave={(title, author, html, isPublished, isAboutSite, confirmedAboutConversion) =>
+                  handleSavePost(title, author, html, isPublished, isAboutSite, confirmedAboutConversion)
+                }
                 onClose={resetPostEditor}
               />
             </Suspense>
@@ -1034,10 +1167,16 @@ export function MainsiteModule() {
         </PopupNotificationBridge>
       </PopupPortal>
 
-      <button type="button" className="primary-button" onClick={() => setShowPostEditor(true)}>
-        <FilePlus2 size={18} />
-        Novo Post
-      </button>
+      <div className="inline-actions">
+        <button type="button" className="primary-button" onClick={openNewPostEditor}>
+          <FilePlus2 size={18} />
+          Novo Post
+        </button>
+        <button type="button" className="ghost-button" onClick={() => void handleEditAbout()}>
+          <FileText size={18} />
+          Sobre Este Site
+        </button>
+      </div>
 
       {/* ── Faixa de Status da Rotação ── */}
       {rotationInfo && (
