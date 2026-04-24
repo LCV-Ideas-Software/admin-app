@@ -25,7 +25,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NotificationProvider, useNotification } from '../../components/Notification';
 import { PopupPortal } from '../../components/PopupPortal';
@@ -47,6 +47,27 @@ type ManagedPost = {
   is_published?: number | boolean;
   display_order?: number;
 };
+
+type ArchiveSort = 'default' | 'id-asc' | 'id-desc' | 'created-asc' | 'created-desc';
+
+const ARCHIVE_SORT_STORAGE_KEY = 'admin:mainsite:archive-sort';
+const ARCHIVE_SORT_VALUES: readonly ArchiveSort[] = ['default', 'id-asc', 'id-desc', 'created-asc', 'created-desc'];
+
+function isArchiveSort(value: unknown): value is ArchiveSort {
+  return typeof value === 'string' && (ARCHIVE_SORT_VALUES as readonly string[]).includes(value);
+}
+
+// Timestamp parser tolerante a "YYYY-MM-DD HH:MM:SS" (SQLite DATETIME) e ISO
+// com qualquer offset (Z, +HH:MM, -HH:MM). Quando raw nao traz timezone,
+// assume UTC — paridade com o default do SQLite CURRENT_TIMESTAMP.
+const TZ_SUFFIX_REGEX = /(?:Z|[+-]\d{2}:?\d{2})$/;
+function parsePostTimestamp(raw?: string): number {
+  if (!raw) return 0;
+  const trimmed = raw.trim().replace(' ', 'T');
+  const normalized = TZ_SUFFIX_REGEX.test(trimmed) ? trimmed : `${trimmed}Z`;
+  const t = Date.parse(normalized);
+  return Number.isNaN(t) ? 0 : t;
+}
 
 type PublishingMode = 'normal' | 'hidden';
 
@@ -193,6 +214,23 @@ export function MainsiteModule() {
   const [savingPublishing, setSavingPublishing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>({ show: false, id: null, title: '' });
   const [draggedPostIndex, setDraggedPostIndex] = useState<number | null>(null);
+  const [archiveSort, setArchiveSort] = useState<ArchiveSort>(() => {
+    try {
+      const saved = localStorage.getItem(ARCHIVE_SORT_STORAGE_KEY);
+      if (isArchiveSort(saved)) return saved;
+    } catch {
+      /* storage indisponivel (SSR, modo privado): fallback silencioso */
+    }
+    return 'default';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ARCHIVE_SORT_STORAGE_KEY, archiveSort);
+    } catch {
+      /* noop */
+    }
+  }, [archiveSort]);
 
   // ── Taxas state ──
   const [fees, setFees] = useState<FeeConfig>(DEFAULT_FEES);
@@ -460,6 +498,32 @@ export function MainsiteModule() {
 
   // ── Derived: post fixado impede rotação ──
   const hasPinnedPost = managedPosts.some((p) => Number(p.is_pinned) === 1 || p.is_pinned === true);
+
+  const displayPosts = useMemo<ManagedPost[]>(() => {
+    if (archiveSort === 'default') return managedPosts;
+    const sorted = [...managedPosts];
+    sorted.sort((a, b) => {
+      switch (archiveSort) {
+        case 'id-asc':
+          return a.id - b.id;
+        case 'id-desc':
+          return b.id - a.id;
+        case 'created-asc': {
+          const diff = parsePostTimestamp(a.created_at) - parsePostTimestamp(b.created_at);
+          return diff !== 0 ? diff : a.id - b.id;
+        }
+        case 'created-desc': {
+          const diff = parsePostTimestamp(b.created_at) - parsePostTimestamp(a.created_at);
+          return diff !== 0 ? diff : b.id - a.id;
+        }
+        default:
+          return 0;
+      }
+    });
+    return sorted;
+  }, [managedPosts, archiveSort]);
+
+  const archiveDragEnabled = archiveSort === 'default';
 
   // ── Countdown timer para próxima rotação ──
   const imminentRefetchedRef = useRef(false);
@@ -1056,7 +1120,25 @@ export function MainsiteModule() {
             </h4>
             <p className="field-hint">Gerencie, edite, fixe e exclua posts diretamente por aqui.</p>
           </div>
-          <div className="inline-actions">
+          <div className="inline-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <label
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+              title="Ordenar lista do arquivo de posts"
+            >
+              <span>Ordenar:</span>
+              <select
+                value={archiveSort}
+                onChange={(e) => setArchiveSort(e.target.value as ArchiveSort)}
+                disabled={postsLoading}
+                style={{ padding: '4px 8px' }}
+              >
+                <option value="default">Padrão (fixados + ordem manual)</option>
+                <option value="id-asc">ID (crescente)</option>
+                <option value="id-desc">ID (decrescente)</option>
+                <option value="created-asc">Publicação (mais antiga primeiro)</option>
+                <option value="created-desc">Publicação (mais recente primeiro)</option>
+              </select>
+            </label>
             <button
               type="button"
               className="ghost-button"
@@ -1069,11 +1151,18 @@ export function MainsiteModule() {
           </div>
         </div>
 
-        {managedPosts.length === 0 ? (
+        {!archiveDragEnabled && (
+          <p className="field-hint" style={{ margin: '0 0 8px' }}>
+            Reordenação manual (arrastar) desativada enquanto uma ordenação alternativa está ativa. Volte para{' '}
+            <strong>Padrão</strong> para reativar.
+          </p>
+        )}
+
+        {displayPosts.length === 0 ? (
           <p className="result-empty">Nenhum post encontrado.</p>
         ) : (
           <ul className="result-list astro-akashico-scroll">
-            {managedPosts.map((post, index) => {
+            {displayPosts.map((post, index) => {
               const isPinned = Number(post.is_pinned) === 1 || post.is_pinned === true;
               const isPublished =
                 post.is_published === undefined ? true : Number(post.is_published) === 1 || post.is_published === true;
@@ -1083,15 +1172,19 @@ export function MainsiteModule() {
                 <li
                   key={post.id}
                   className={`post-row post-draggable${draggedPostIndex === index ? ' post-draggable--dragging' : ''}${isSelected ? ' post-row--selected' : ''}`}
-                  draggable
-                  onDragStart={() => handlePostDragStart(index)}
-                  onDragEnd={handlePostDragEnd}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => void handlePostDrop(index)}
+                  draggable={archiveDragEnabled}
+                  onDragStart={archiveDragEnabled ? () => handlePostDragStart(index) : undefined}
+                  onDragEnd={archiveDragEnabled ? handlePostDragEnd : undefined}
+                  onDragOver={archiveDragEnabled ? (e) => e.preventDefault() : undefined}
+                  onDrop={archiveDragEnabled ? () => void handlePostDrop(index) : undefined}
                 >
                   <div className="post-row-main">
                     <div className="flex-row-center">
-                      <GripVertical size={14} className="grip-icon" />
+                      <GripVertical
+                        size={14}
+                        className="grip-icon"
+                        style={archiveDragEnabled ? undefined : { opacity: 0.35 }}
+                      />
                       <strong>{post.title}</strong>
                     </div>
 
