@@ -66,7 +66,6 @@ const toDbRoute = (route: string) => route.startsWith('astrologo/') ? route : `a
 
 export const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 })
 
 const toInt = (value: unknown, fallback: number) => {

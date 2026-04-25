@@ -10,7 +10,7 @@ import { createResponseTrace } from '../../../../../functions/api/_lib/request-t
 type Env = { BIGDATA_DB?: D1Database };
 type Context = { request: Request; env: Env };
 
-const headers = () => ({ 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+const headers = () => ({ 'Content-Type': 'application/json' });
 
 export async function onRequestGet(context: Context) {
   const env = context.env;

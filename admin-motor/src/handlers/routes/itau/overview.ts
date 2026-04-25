@@ -44,7 +44,6 @@ type CalculadoraOverviewPayload = {
 
 const toResponseHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const normalizeMoeda = (rawValue: string) => rawValue.trim().toUpperCase();

@@ -24,7 +24,6 @@ type Context = {
 
 const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const normalizeDomain = (value: unknown) =>

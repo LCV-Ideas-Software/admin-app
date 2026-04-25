@@ -20,7 +20,7 @@
     "nodejs_compat"
   ],
   "vars": {
-    "ALLOWED_ORIGIN": "*"
+    "ALLOWED_ORIGIN": "https://admin.lcv.app.br"
   },
   "d1_databases": [
     {

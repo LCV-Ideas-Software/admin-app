@@ -1,5 +1,20 @@
 # Changelog — Admin App
 
+## [v01.96.00] - 2026-04-25
+### Segurança
+- Auditoria rigorosa de segurança em conjunto com `mainsite-app`: endurecido o `admin-motor` para rejeitar requisições browser-like com `Authorization: Bearer` sem identidade Cloudflare Access, fechando o bypass operacional de Access por token em contexto de navegador.
+- Comparação de bearer token no `admin-motor` trocada para implementação constante e portável, sem depender de APIs não padronizadas do runtime Workers.
+- `tlsrpt-motor` deixou de aceitar CORS wildcard e passou a publicar `ALLOWED_ORIGIN=https://admin.lcv.app.br`.
+- Removidas definições próprias de `Cache-Control` de rotas do admin e do `admin-motor`, mantendo cache sob controle nativo da Cloudflare conforme diretiva do workspace.
+### Alterado
+- Dependências do app principal e do `tlsrpt-motor` atualizadas para as versões resolvidas mais recentes; `npm audit --audit-level=moderate` e `npm outdated --json` ficaram limpos.
+- Workflow de deploy preserva `WRANGLER_VERSION: "latest"` por requisito operacional explícito do workspace.
+### Validação
+- `npm run lint`, `npm test`, `npm run test:admin-motor`, `npm run build`.
+- `npx --no-install wrangler deploy --dry-run --config admin-motor/wrangler.json`.
+- `tlsrpt-motor`: `npm test`, `npx --no-install wrangler deploy --dry-run`, `npm audit --audit-level=moderate`, `npm outdated --json`.
+- Cross-review MCP sessão `74c77006-3948-4b53-91cc-efe9f2c084c8`: Claude e Gemini retornaram `READY` para o pacote técnico.
+
 ## [v01.95.02] - 2026-04-24
 ### Alterado
 - **Deploy TLS-RPT Motor condicional**: o workflow `Deploy` foi dividido em detecção, deploy do `tlsrpt-motor` e deploy do admin. Em pushes para `main`, `tlsrpt-motor` só roda `npm ci`, `npm audit` e `wrangler deploy` quando arquivos sob `tlsrpt-motor/` mudam; mudanças exclusivas do admin seguem direto pelo pipeline do admin.

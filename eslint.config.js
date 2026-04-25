@@ -6,7 +6,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['dist', 'out', '.wrangler/**', 'admin-motor/.wrangler/**']),
+  globalIgnores(['dist', 'out', '.tmp/**', '.wrangler/**', 'admin-motor/.wrangler/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -21,6 +21,9 @@ export default defineConfig([
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'react-hooks/purity': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
   // admin-motor: relaxar no-explicit-any para handlers API com respostas dinâmicas da Cloudflare

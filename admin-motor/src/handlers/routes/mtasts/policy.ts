@@ -46,7 +46,6 @@ const normalizeDomain = (rawValue: string | null) =>
 
 const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const toError = (message: string, trace: { request_id: string; timestamp: string }, status = 500) =>

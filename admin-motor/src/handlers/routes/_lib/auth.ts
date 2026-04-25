@@ -25,14 +25,17 @@ export interface JwtConfig {
  * Constant-time string comparison to prevent timing attacks.
  */
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    // Compare against self to keep constant time even with different lengths
-    const dummy = new TextEncoder().encode(a);
-    crypto.subtle.timingSafeEqual(dummy, dummy);
-    return false;
-  }
   const encoder = new TextEncoder();
-  return crypto.subtle.timingSafeEqual(encoder.encode(a), encoder.encode(b));
+  const left = encoder.encode(a);
+  const right = encoder.encode(b);
+  const length = Math.max(left.length, right.length);
+  let diff = left.length ^ right.length;
+
+  for (let index = 0; index < length; index += 1) {
+    diff |= (left[index] ?? 0) ^ (right[index] ?? 0);
+  }
+
+  return diff === 0;
 }
 
 // ── CF-Access JWT validation ──────────────────────────────────────────────────
@@ -226,6 +229,12 @@ async function validateCfAccessJwt(
   return null; // no rejection — proceed
 }
 
+function isBrowserLikeRequest(request: Request): boolean {
+  return Boolean(
+    request.headers.get('Origin') || request.headers.get('Sec-Fetch-Mode') || request.headers.get('Sec-Fetch-Site'),
+  );
+}
+
 export async function validatePutAuth(
   request: Request,
   bearerTokenEnv?: string,
@@ -237,6 +246,18 @@ export async function validatePutAuth(
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       if (timingSafeEqual(token, bearerTokenEnv)) {
+        const cfAccessEmail = request.headers.get('CF-Access-Authenticated-User-Email');
+        if (isBrowserLikeRequest(request) && !cfAccessEmail) {
+          return {
+            isAuthenticated: false,
+            source: 'bearer',
+            error: 'Bearer-only auth is not allowed for browser requests.',
+          };
+        }
+        if (cfAccessEmail) {
+          const jwtRejection = await validateCfAccessJwt(request, cfAccessEmail, jwtConfig);
+          if (jwtRejection) return jwtRejection;
+        }
         return { isAuthenticated: true, token, source: 'bearer' };
       }
       return { isAuthenticated: false, source: 'bearer', error: 'Invalid Bearer token' };

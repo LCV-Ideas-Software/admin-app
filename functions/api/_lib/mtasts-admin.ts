@@ -28,7 +28,6 @@ const DEFAULT_MTASTS_ADMIN_URL = 'https://mtasts-admin.lcv.app.br'
 
 export const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 })
 
 const normalizeBaseUrl = (value: string) => value.endsWith('/') ? value.slice(0, -1) : value

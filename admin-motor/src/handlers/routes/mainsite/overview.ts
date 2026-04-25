@@ -41,7 +41,6 @@ type MainsiteOverviewResponse = {
 
 const toResponseHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const parseLimit = (rawValue: string | null) => {

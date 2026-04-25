@@ -26,7 +26,6 @@ const parseLimit = (rawValue: string | null) => {
 
 const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const toSyncRow = (mapa: LegacyMapa) => {

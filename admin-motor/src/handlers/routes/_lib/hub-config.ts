@@ -1,4 +1,4 @@
-﻿import { type D1Database, logModuleOperationalEvent } from './operational';
+import { type D1Database, logModuleOperationalEvent } from './operational';
 
 export type HubModule = 'apphub' | 'adminhub';
 
@@ -105,7 +105,6 @@ const ADMINHUB_DEFAULT_CARDS: HubCard[] = [
 
 export const toHubHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const toTable = (module: HubModule): HubTable => (module === 'apphub' ? 'apphub_cards' : 'adminhub_cards');

@@ -25,7 +25,6 @@ type PolicyRow = {
 
 const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 export async function onRequestPost(context: Context) {

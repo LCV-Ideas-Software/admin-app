@@ -63,7 +63,6 @@ const parseLimit = (rawValue: string | null) => {
 
 const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const parseObservabilidadeRows = (sourceRows: CalculadoraObservabilidadeSourceRow[], limit: number): ObservabilidadeRow[] => {

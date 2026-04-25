@@ -69,7 +69,6 @@ export const SUPPORTED_ROUTES = ['oraculo_ia', 'enviar_email', 'contato'] as con
 
 export const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const toInt = (value: unknown, fallback: number) => {

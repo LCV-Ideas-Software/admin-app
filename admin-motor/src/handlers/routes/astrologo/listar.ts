@@ -37,7 +37,6 @@ type BigdataMapa = {
 
 const toResponseHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const toItem = (mapa: LegacyMapa): Item | null => {

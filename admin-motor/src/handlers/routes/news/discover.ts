@@ -1554,7 +1554,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'public, max-age=300',
       },
     },
   );

@@ -19,7 +19,6 @@ type SettingRow = {
 
 const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const DEFAULT_SETTINGS: Array<{ id: string; payload: Record<string, unknown> }> = [

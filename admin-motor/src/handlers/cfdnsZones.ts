@@ -12,7 +12,6 @@ type Context = {
 
 const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 export const handleCfdnsZonesGet = async (context: Context) => {

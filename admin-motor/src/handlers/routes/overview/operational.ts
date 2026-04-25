@@ -31,7 +31,6 @@ type SyncAggRow = {
 
 const toResponseHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 export async function onRequestGet(context: Context) {

@@ -32,7 +32,6 @@ const DEFAULT_MAINSITE_WORKER_URL = '';
 
 export const toHeaders = () => ({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
 });
 
 const normalizeBaseUrl = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value);

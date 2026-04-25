@@ -22,7 +22,6 @@ export const STANDARD_JSON_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'X-XSS-Protection': '1; mode=block',
-  'Cache-Control': 'no-store, max-age=0, must-revalidate',
 };
 
 /**
@@ -47,11 +46,11 @@ export const SECURE_HEADERS: Record<string, string> = {
 };
 
 /**
- * Headers for cacheable responses (static assets, non-sensitive data)
+ * Headers for non-sensitive responses.
+ * Cache policy is managed by Cloudflare, not by application code.
  */
 export const CACHEABLE_HEADERS: Record<string, string> = {
   ...STANDARD_JSON_HEADERS,
-  'Cache-Control': 'public, max-age=3600, s-maxage=86400',
   // Note: ETag is set dynamically per response - not included as a static header
 };
 
@@ -253,18 +252,15 @@ export function handleCorsPreflight(request: Request): Response {
 // ============================================================================
 
 /**
- * Adds cache headers to a response
+ * Deprecated no-op kept for backward compatibility.
+ * Cache policy is managed by Cloudflare, not by application code.
  * @param response Response object
  * @param maxAge Cache duration in seconds
  * @param sMaxAge Server cache duration in seconds
  * @returns Modified response
  */
-export function addCacheHeaders(response: Response, maxAge: number, sMaxAge?: number): Response {
-  const cacheControl = sMaxAge ? `public, max-age=${maxAge}, s-maxage=${sMaxAge}` : `public, max-age=${maxAge}`;
-
-  const newResponse = new Response(response.body, response);
-  newResponse.headers.set('Cache-Control', cacheControl);
-  return newResponse;
+export function addCacheHeaders(response: Response, _maxAge: number, _sMaxAge?: number): Response {
+  return response;
 }
 
 /**

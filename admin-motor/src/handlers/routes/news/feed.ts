@@ -2,7 +2,7 @@
  * /api/news/feed — Pages Function
  * Busca RSS de múltiplas fontes, faz parse XML → JSON,
  * retorna headlines unificadas ordenadas por data.
- * Cache via Cloudflare Cache API (TTL 10 min).
+ * Cache via Cloudflare Cache API.
  *
  * Fix de encoding: usa ArrayBuffer + TextDecoder com charset
  * extraído do Content-Type ou prólogo XML para suportar
@@ -31,7 +31,6 @@ const RSS_SOURCES: Array<{ id: string; name: string; url: string; category: stri
 ];
 
 const DEFAULT_MAX_ITEMS = 30;
-const CACHE_TTL_SECONDS = 600; // 10 minutos
 
 /**
  * Detecta o charset a partir do Content-Type header ou do prólogo XML.
@@ -274,7 +273,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const response = new Response(body, {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}`,
       'Access-Control-Allow-Origin': '*',
     },
   });
