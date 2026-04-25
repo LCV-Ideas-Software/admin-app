@@ -75,3 +75,28 @@ _cf_functions_build/
 coverage/
 playwright-report/
 test-results/
+
+# Phase 1 audit additions
+# SQL schema dumps banned (migrations under db/migrations/ kept as essential)
+**/schema.sql
+schema.sql
+
+# Internal one-off scripts (not essential for install/run)
+clean-types.cjs
+fix-env.cjs
+tmp-test.cjs
+tmp-*.cjs
+
+# Internal docs: handoffs, audit reports, migration reports, internal checklists, infrastructure-revealing docs
+docs/handoff-*.md
+docs/migration-*-report.md
+docs/*-migration-*.md
+docs/*-audit-*.md
+docs/sync-*.md
+docs/*-checklist.md
+docs/bigdata-*.md
+docs/wrangler-popular-*.md
+docs/cloudflare-internal-*.md
+docs/paridade-*.md
+docs/csp-report-only-*.md
+docs/bearer-token-*.md
