@@ -100,3 +100,10 @@ docs/cloudflare-internal-*.md
 docs/paridade-*.md
 docs/csp-report-only-*.md
 docs/bearer-token-*.md
+
+# Operator-specific scripts (not referenced from package.json scripts; not essential for install/run)
+scripts/popular-*
+scripts/sync-*-bigdata.*
+scripts/sync-*.ps1
+scripts/refund-*
+scripts/apply-headers.*
