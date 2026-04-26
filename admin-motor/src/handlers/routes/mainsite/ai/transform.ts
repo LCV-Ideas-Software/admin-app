@@ -6,6 +6,7 @@
  */
 
 import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
+import { logAiUsage } from '../../_lib/ai-telemetry';
 
 export interface Env {
   GEMINI_API_KEY: string;
@@ -289,52 +290,3 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 };
 
-/* ── Helper de telemetria (fire-and-forget, nunca bloqueia o fluxo) ── */
-interface TelemetryPayload {
-  module: string;
-  model: string;
-  input_tokens: number;
-  output_tokens: number;
-  latency_ms: number;
-  status: string;
-  error_detail?: string;
-}
-function logAiUsage(db: D1Database | undefined, payload: TelemetryPayload) {
-  if (!db) return;
-  (async () => {
-    try {
-      await db
-        .prepare(`
-        CREATE TABLE IF NOT EXISTS ai_usage_logs (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          timestamp TEXT NOT NULL DEFAULT (datetime('now')),
-          module TEXT NOT NULL,
-          model TEXT NOT NULL,
-          input_tokens INTEGER DEFAULT 0,
-          output_tokens INTEGER DEFAULT 0,
-          latency_ms INTEGER DEFAULT 0,
-          status TEXT DEFAULT 'ok',
-          error_detail TEXT
-        )
-      `)
-        .run();
-      await db
-        .prepare(`
-        INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `)
-        .bind(
-          payload.module,
-          payload.model,
-          payload.input_tokens,
-          payload.output_tokens,
-          payload.latency_ms,
-          payload.status,
-          payload.error_detail || null,
-        )
-        .run();
-    } catch (err) {
-      console.warn('[telemetry] ai_usage_logs INSERT failed:', err instanceof Error ? err.message : err);
-    }
-  })();
-}

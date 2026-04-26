@@ -1,5 +1,14 @@
 # Changelog — Admin App
 
+## [v01.98.02] - 2026-04-26
+### Phase 1 sweep — telemetry helper unification (audit MEDIUM #11)
+- Novo `admin-motor/src/handlers/routes/_lib/ai-telemetry.ts` exporta `logAiUsage()` + `AiUsageLog` interface.
+- 3 cópias locais (gemini-import.ts, ai/transform.ts, post-summaries.ts) substituídas por importação do helper compartilhado. Comportamento runtime preservado: fire-and-forget, idempotent CREATE TABLE, never throws.
+### Não alterado
+- `X-Admin-Actor` header e `adminActor` body field permanecem por enquanto (operator decision 2026-04-26: preservar funcionalidade até cleanup mais cuidadoso). `_lib/admin-actor.ts` no admin-motor faz fallback opcional para esse header em audit logging — drop unilateral foi revertido.
+### Validação
+- `npm run lint`, `npm run test:admin-motor` (23/23 green), `npm run build`.
+
 ## [v01.98.01] - 2026-04-26
 ### Phase 1 sweep — CF_AI_GATEWAY purge (audit MEDIUM #17)
 - **`functions/_middleware.ts`**: removidas referências a `CF_AI_GATEWAY` em `SECRET_ALIASES` (linha 5) E em `CRITICAL_KEYS` (linha 30). Sem isso, middleware emitiria log infinito `[Env Resolver] Secrets críticos ausentes no runtime: CF_AI_GATEWAY`.

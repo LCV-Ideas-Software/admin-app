@@ -7,6 +7,7 @@
  */
 
 import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
+import { logAiUsage } from '../_lib/ai-telemetry';
 import { toHeaders } from '../_lib/mainsite-admin';
 import { logModuleOperationalEvent } from '../_lib/operational';
 import { createResponseTrace } from '../_lib/request-trace';
@@ -130,57 +131,6 @@ async function estimateTokenCount(ai: GoogleGenAI, prompt: string, model: string
   } catch (err) {
     structuredLog('WARN', 'Erro ao contar tokens', { error: String(err) });
     return -1;
-  }
-}
-
-// ── Telemetria: registra uso de AI no BIGDATA_DB ──
-async function logAiUsage(
-  db: D1Database | undefined,
-  entry: {
-    module: string;
-    model: string;
-    input_tokens: number;
-    output_tokens: number;
-    latency_ms: number;
-    status: string;
-    error_detail?: string;
-  },
-) {
-  if (!db) return;
-  try {
-    // Ensure table exists (idempotent)
-    await db
-      .prepare(`
-      CREATE TABLE IF NOT EXISTS ai_usage_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT NOT NULL DEFAULT (datetime('now')),
-        module TEXT NOT NULL,
-        model TEXT NOT NULL,
-        input_tokens INTEGER DEFAULT 0,
-        output_tokens INTEGER DEFAULT 0,
-        latency_ms INTEGER DEFAULT 0,
-        status TEXT DEFAULT 'ok',
-        error_detail TEXT
-      )
-    `)
-      .run();
-    await db
-      .prepare(`
-      INSERT INTO ai_usage_logs (module, model, input_tokens, output_tokens, latency_ms, status, error_detail)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `)
-      .bind(
-        entry.module,
-        entry.model,
-        entry.input_tokens,
-        entry.output_tokens,
-        entry.latency_ms,
-        entry.status,
-        entry.error_detail || null,
-      )
-      .run();
-  } catch (err) {
-    console.warn('[telemetry] ai_usage_logs INSERT failed:', err instanceof Error ? err.message : err);
   }
 }
 
