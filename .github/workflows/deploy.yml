@@ -96,6 +96,23 @@ jobs:
         working-directory: ./tlsrpt-motor
         run: npm audit --audit-level=high
 
+      - name: Inject D1 database_id from secret (tlsrpt-motor)
+        run: |
+          if [ -z "${D1_DATABASE_ID:-}" ]; then
+            echo "::error::D1_DATABASE_ID secret is not set" >&2
+            exit 1
+          fi
+          CFG=tlsrpt-motor/wrangler.json
+          jq --arg id "$D1_DATABASE_ID" '.d1_databases[0].database_id = $id' "$CFG" > "$CFG.tmp"
+          mv "$CFG.tmp" "$CFG"
+          grep -q "$D1_DATABASE_ID" "$CFG" || { echo "::error::Substitution failed in $CFG" >&2; exit 1; }
+          if grep -q "00000000-0000-0000-0000-000000000000" "$CFG"; then
+            echo "::error::Placeholder still present in $CFG" >&2
+            exit 1
+          fi
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+
       - name: Deploy TLS-RPT Motor
         working-directory: ./tlsrpt-motor
         run: npx wrangler@${WRANGLER_VERSION} deploy
@@ -142,6 +159,24 @@ jobs:
       - name: Test Admin Motor
         run: npm run test:admin-motor
         working-directory: ./
+
+      - name: Inject D1 database_id from secret (root + admin-motor)
+        run: |
+          if [ -z "${D1_DATABASE_ID:-}" ]; then
+            echo "::error::D1_DATABASE_ID secret is not set" >&2
+            exit 1
+          fi
+          for CFG in wrangler.json admin-motor/wrangler.json; do
+            jq --arg id "$D1_DATABASE_ID" '.d1_databases[0].database_id = $id' "$CFG" > "$CFG.tmp"
+            mv "$CFG.tmp" "$CFG"
+            grep -q "$D1_DATABASE_ID" "$CFG" || { echo "::error::Substitution failed in $CFG" >&2; exit 1; }
+            if grep -q "00000000-0000-0000-0000-000000000000" "$CFG"; then
+              echo "::error::Placeholder still present in $CFG" >&2
+              exit 1
+            fi
+          done
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
 
       - name: Deploy Admin Motor
         run: npx wrangler@${WRANGLER_VERSION} deploy --config admin-motor/wrangler.json

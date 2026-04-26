@@ -1,5 +1,9 @@
 # Changelog — Admin App
 
+## [v01.97.01] - 2026-04-25
+### Public-flip prep (Auditoria Fase 0)
+- **D1 nil-UUID + GHA secret-injection**: `wrangler.json` (root), `admin-motor/wrangler.json` e `tlsrpt-motor/wrangler.json` substituem o `database_id` real por placeholder nil-UUID (`00000000-0000-0000-0000-000000000000`); o ID real é injetado em deploy via `D1_DATABASE_ID` (GitHub Secret) com substituição `jq` em ambos os jobs (`deploy_tlsrpt` e `deploy_admin`). Replica padrão do oraculo-financeiro v01.10.01. Achado BLOCKING #4 da auditoria 2026-04-25.
+
 ## [v01.97.00] - 2026-04-25
 ### Hardening (Auditoria trilateral cross-review — Fase 0)
 - **`admin-motor/.../mainsite/posts.ts`**: POST e PUT agora aplicam `sanitizePostHtml` (parser-based, allowlist) em `body.content` antes de persistir em `mainsite_posts.content`. Defesa-em-profundidade vs. única dependência do sanitizer no momento de render no `mainsite-worker`. Achado BLOCKING #1 da auditoria 2026-04-25.
