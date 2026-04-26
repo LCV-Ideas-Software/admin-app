@@ -1,0 +1,5 @@
+# AI-SYNC: managed by C:\Scripts\ai-sync.js
+node_modules/
+.env
+secrets/
+*.pem
