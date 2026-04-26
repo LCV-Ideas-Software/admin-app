@@ -1,5 +1,15 @@
 # Changelog — Admin App
 
+## [v01.97.00] - 2026-04-25
+### Hardening (Auditoria trilateral cross-review — Fase 0)
+- **`admin-motor/.../mainsite/posts.ts`**: POST e PUT agora aplicam `sanitizePostHtml` (parser-based, allowlist) em `body.content` antes de persistir em `mainsite_posts.content`. Defesa-em-profundidade vs. única dependência do sanitizer no momento de render no `mainsite-worker`. Achado BLOCKING #1 da auditoria 2026-04-25.
+- **`admin-motor/.../mainsite/upload.ts`**: cap de 10 MB, allowlist de extensão (jpg/jpeg/png/gif/webp/avif/pdf), allowlist de content-type, contentType derivado server-side em vez de confiar em `file.type` cliente, SVG bloqueado, sanitização de filename (path traversal). Replica padrão do `mainsite-worker/uploads.ts`. Achado BLOCKING #2.
+- **`/api/health` migrado para auth-gate**: `admin-app/functions/api/health.ts` (versão stale `APP v01.78.04` retornada sem auth) deletado; novo handler em `admin-motor/src/index.ts` retorna `{ ok: true, app: 'admin-motor' }` sob o middleware global de CF Access JWT. Achado HIGH #15.
+### Validação
+- `npm run test:admin-motor`.
+- `npm run lint`.
+- `npm run build`.
+
 ## [v01.96.01] - 2026-04-25
 ### Corrigido
 - **MainSite/PostEditor — Editar ID com resumos IA**: a renumeração de posts deixou de usar `UPDATE mainsite_posts SET id = ?`, que falhava no D1 quando `mainsite_post_ai_summaries.post_id` referenciava o post com FK `ON UPDATE NO ACTION`.

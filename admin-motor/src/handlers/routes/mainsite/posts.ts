@@ -2,6 +2,7 @@ import { resolveAdminActorFromRequest } from '../../../../../functions/api/_lib/
 import { bumpMainsiteContentVersion, type Context, toHeaders } from '../../../../../functions/api/_lib/mainsite-admin';
 import { logModuleOperationalEvent } from '../../../../../functions/api/_lib/operational';
 import { createResponseTrace, type ResponseTrace } from '../../../../../functions/api/_lib/request-trace';
+import { sanitizePostHtml } from './_lib/sanitize-post-html';
 
 type D1PreparedStatement = {
   bind: (...values: Array<string | number | null>) => D1PreparedStatement;
@@ -285,7 +286,7 @@ export async function onRequestPost(context: MainsiteContext) {
     };
     const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>);
     const title = parseText(body.title);
-    const content = parseText(body.content);
+    const content = sanitizePostHtml(parseText(body.content));
     const author = parseText(body.author) || DEFAULT_AUTHOR;
     const isPublished = parseFlag(body.is_published, 1);
     const requestedId = parseOptionalId(body.requested_id);
@@ -412,7 +413,7 @@ export async function onRequestPut(context: MainsiteContext) {
     const adminActor = resolveAdminActorFromRequest(context.request, body as Record<string, unknown>);
     const id = parseId(body.id);
     const title = parseText(body.title);
-    const content = parseText(body.content);
+    const content = sanitizePostHtml(parseText(body.content));
     const author = parseText(body.author) || DEFAULT_AUTHOR;
     const hasVisibilityFlag = body.is_published !== undefined;
     const isPublished = parseFlag(body.is_published, 1);

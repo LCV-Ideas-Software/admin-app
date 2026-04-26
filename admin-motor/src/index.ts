@@ -455,6 +455,9 @@ const rc = <T>(c: Context<HonoEnv>) =>
   }) as unknown as T;
 const re = (c: Context<HonoEnv>) => ({ request: c.req.raw, env: c.get('runtimeEnv') });
 
+// ── health (auth-gated via global middleware; replaces standalone Pages Function) ──
+app.get('/api/health', (c) => c.json({ ok: true, app: 'admin-motor' }));
+
 // ── ai-status ──
 app.get('/api/ai-status/health', (c) => handleAiStatusHealth(c.req.raw, c.get('runtimeEnv'), c.env));
 app.get('/api/ai-status/models', (c) => handleAiStatusModelsGet(re(c)));
