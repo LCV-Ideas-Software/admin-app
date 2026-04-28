@@ -1,0 +1,26 @@
+<svg width="1280" height="360" viewBox="0 0 1280 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">LCV Ideas &amp; Software logo</title>
+  <desc id="desc">Horizontal logo for LCV Ideas &amp; Software with a modular LCV monogram and wordmark.</desc>
+  <rect width="1280" height="360" rx="0" fill="#F7F9FC"/>
+  <g transform="translate(72 56)">
+    <rect x="0" y="0" width="248" height="248" rx="56" fill="#101827"/>
+    <path d="M62 66v116h74" stroke="#7DD3FC" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M176 66c-42 0-72 29-72 58s30 58 72 58" stroke="#34D399" stroke-width="22" stroke-linecap="round"/>
+    <path d="M150 70l40 112 40-112" stroke="#F59E0B" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="62" cy="66" r="9" fill="#7DD3FC"/>
+    <circle cx="136" cy="182" r="9" fill="#7DD3FC"/>
+    <circle cx="176" cy="66" r="9" fill="#34D399"/>
+    <circle cx="176" cy="182" r="9" fill="#34D399"/>
+    <circle cx="190" cy="182" r="9" fill="#F59E0B"/>
+    <path d="M64 213h120" stroke="#334155" stroke-width="10" stroke-linecap="round"/>
+    <path d="M64 35h120" stroke="#334155" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(380 92)">
+    <text x="0" y="104" fill="#101827" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="66" font-weight="760" letter-spacing="0">LCV Ideas &amp; Software</text>
+    <g transform="translate(0 156)">
+      <rect x="0" y="0" width="86" height="8" rx="4" fill="#2563EB"/>
+      <rect x="100" y="0" width="86" height="8" rx="4" fill="#0F766E"/>
+      <rect x="200" y="0" width="86" height="8" rx="4" fill="#F59E0B"/>
+    </g>
+  </g>
+</svg>

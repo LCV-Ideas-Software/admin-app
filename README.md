@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/assets/lcv-ideas-software-logo.svg" alt="LCV Ideas &amp; Software" width="220">
+</p>
+
 # admin-app
 
 [![status: stable](https://img.shields.io/badge/status-stable-brightgreen.svg)](#status)

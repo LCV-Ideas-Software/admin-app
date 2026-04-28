@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">LCV Ideas &amp; Software mark</title>
+  <desc id="desc">Square LCV monogram for organization avatar and app icons.</desc>
+  <rect width="512" height="512" rx="116" fill="#101827"/>
+  <path d="M132 136v240h154" stroke="#7DD3FC" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M366 136c-88 0-150 60-150 120s62 120 150 120" stroke="#34D399" stroke-width="44" stroke-linecap="round"/>
+  <path d="M310 144l82 232 82-232" stroke="#F59E0B" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="132" cy="136" r="18" fill="#7DD3FC"/>
+  <circle cx="286" cy="376" r="18" fill="#7DD3FC"/>
+  <circle cx="366" cy="136" r="18" fill="#34D399"/>
+  <circle cx="366" cy="376" r="18" fill="#34D399"/>
+  <circle cx="392" cy="376" r="18" fill="#F59E0B"/>
+  <path d="M134 438h246" stroke="#334155" stroke-width="18" stroke-linecap="round"/>
+  <path d="M134 74h246" stroke="#334155" stroke-width="18" stroke-linecap="round"/>
+</svg>

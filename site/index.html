@@ -53,19 +53,18 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
+    gap: 14px;
     margin-bottom: 22px;
+    text-align: center;
   }
-  .mark {
-    width: 46px;
-    height: 46px;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-    color: white;
-    font-weight: 800;
-    letter-spacing: 0;
+  .brand-mark {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    object-fit: contain;
+    flex: 0 0 auto;
+    box-shadow: 0 10px 24px var(--shadow);
   }
   h1 {
     font-size: clamp(24px, 4vw, 34px);
@@ -92,6 +91,24 @@
     gap: 22px;
     align-items: start;
   }
+  .layout:has(.widget-shell[hidden]) {
+    grid-template-columns: minmax(0, 520px);
+    justify-content: center;
+  }
+  .support-copy {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+  }
+  .payment-logo {
+    display: block;
+    width: min(260px, 100%);
+    height: auto;
+    margin: 0 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #f7f9fc;
+  }
   h2 {
     font-size: 18px;
     margin: 0 0 8px;
@@ -103,7 +120,9 @@
   form {
     display: grid;
     gap: 14px;
-    margin-top: 18px;
+    width: min(420px, 100%);
+    margin: 18px auto 0;
+    text-align: left;
   }
   label {
     display: grid;
@@ -160,8 +179,7 @@
     opacity: 0.72;
     transform: none;
   }
-  .note, .status {
-    margin-top: 16px;
+  .note, .status, .thank-you {
     padding: 13px 14px;
     border-radius: 10px;
     background: var(--soft);
@@ -169,7 +187,33 @@
     border: 1px solid var(--border);
     font-size: 14px;
   }
-  .status[hidden], .widget-shell[hidden] { display: none; }
+  .note, .status {
+    width: min(420px, 100%);
+    margin: 16px auto 0;
+  }
+  .note {
+    text-align: center;
+  }
+  .thank-you {
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+    width: min(520px, 100%);
+    margin: 20px auto 0;
+    padding: 24px;
+    text-align: center;
+  }
+  .thank-you h2 {
+    color: var(--fg);
+    margin: 0;
+  }
+  .thank-you p {
+    margin: 0;
+  }
+  .thank-you .primary {
+    width: min(220px, 100%);
+  }
+  .status[hidden], .widget-shell[hidden], .thank-you[hidden], .layout[hidden] { display: none; }
   .status.error { color: var(--danger); }
   .status.success { color: var(--ok); }
   .widget-shell {
@@ -182,6 +226,7 @@
   #sumup-card { min-height: 260px; }
   .repo-link {
     display: inline-flex;
+    justify-self: center;
     margin-top: 16px;
     color: var(--accent);
     text-decoration: none;
@@ -194,6 +239,7 @@
     text-align: center;
   }
   @media (max-width: 760px) {
+    .brand { flex-direction: column; }
     .layout { grid-template-columns: 1fr; }
     .panel { padding: 20px; }
     .amounts { grid-template-columns: repeat(2, 1fr); }
@@ -203,7 +249,7 @@
 <body>
 <main>
   <header class="brand">
-    <div class="mark" aria-hidden="true">LCV</div>
+    <img class="brand-mark" src="assets/lcv-ideas-software-mark.svg" alt="" aria-hidden="true" />
     <div>
       <h1>Apoie Admin App</h1>
       <p class="lede">Apoio direto aos projetos open-source da LCV Ideas &amp; Software.</p>
@@ -212,9 +258,10 @@
 
   <section class="panel" aria-labelledby="payment-title">
     <div class="layout">
-      <div>
-        <h2 id="payment-title">Pagamento seguro com SumUp</h2>
-        <p class="muted">Informe o valor, gere o checkout e conclua o apoio no widget seguro abaixo.</p>
+      <div class="support-copy">
+        <img class="payment-logo" src="assets/lcv-ideas-software-logo.svg" alt="LCV Ideas &amp; Software" />
+        <h2 id="payment-title">Doação Segura com SumUp</h2>
+        <p class="muted">Informe o valor, clique em "Apoiar Projetos (Doar)" e conclua o apoio a meus projetos de forma segura com SumUp.</p>
 
         <form id="support-form">
           <label>
@@ -235,7 +282,7 @@
             E-mail
             <input id="email" name="email" type="email" autocomplete="email" placeholder="voce@email.com" required />
           </label>
-          <button id="start-payment" class="primary" type="submit">Gerar pagamento</button>
+          <button id="start-payment" class="primary" type="submit">Apoiar Projetos (Doar)</button>
         </form>
 
         <div id="status" class="status" role="status" aria-live="polite" hidden></div>
@@ -245,6 +292,12 @@
       <div id="widget-shell" class="widget-shell" hidden>
         <div id="sumup-card"></div>
       </div>
+    </div>
+
+    <div id="thank-you" class="thank-you" role="status" aria-live="polite" hidden>
+      <h2>Obrigado pelo apoio!</h2>
+      <p id="thank-you-message">Sua contribuição foi registrada pela SumUp. Seu apoio ajuda a manter os projetos em evolução.</p>
+      <button id="thank-you-ok" class="primary" type="button">OK</button>
     </div>
 
     <div class="note">
@@ -271,6 +324,11 @@
   var startButton = document.getElementById('start-payment');
   var statusBox = document.getElementById('status');
   var widgetShell = document.getElementById('widget-shell');
+  var layout = document.querySelector('.layout');
+  var thankYouPanel = document.getElementById('thank-you');
+  var thankYouMessage = document.getElementById('thank-you-message');
+  var thankYouButton = document.getElementById('thank-you-ok');
+  var checkoutStorageKey = 'lcv-support-checkout:' + PROJECT_NAME;
   var amountButtons = Array.prototype.slice.call(document.querySelectorAll('.amount-btn'));
   var widgetInstance = null;
   var sdkPromise = null;
@@ -284,7 +342,83 @@
 
   function setBusy(isBusy) {
     startButton.disabled = isBusy;
-    startButton.textContent = isBusy ? 'Preparando...' : 'Gerar pagamento';
+    startButton.textContent = isBusy ? 'Preparando...' : 'Apoiar Projetos (Doar)';
+  }
+
+  function readStoredCheckoutId() {
+    try { return window.sessionStorage.getItem(checkoutStorageKey); } catch (error) { return null; }
+  }
+
+  function storeCheckoutId(checkoutId) {
+    try { window.sessionStorage.setItem(checkoutStorageKey, checkoutId); } catch (error) {}
+  }
+
+  function clearStoredCheckoutId() {
+    try { window.sessionStorage.removeItem(checkoutStorageKey); } catch (error) {}
+  }
+
+  function cleanReturnUrl() {
+    if (!window.history || !window.history.replaceState) return;
+    var url = new URL(window.location.href);
+    ['support', 'checkout_id', 'checkoutId', 'sumup_checkout_id', 'status', 'transaction_code'].forEach(function (key) {
+      url.searchParams.delete(key);
+    });
+    window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
+  }
+
+  function showThankYou(message) {
+    if (pollingTimer) {
+      window.clearInterval(pollingTimer);
+      pollingTimer = null;
+    }
+    if (widgetInstance && typeof widgetInstance.unmount === 'function') {
+      widgetInstance.unmount();
+    }
+    widgetInstance = null;
+    clearStoredCheckoutId();
+    cleanReturnUrl();
+    if (message && thankYouMessage) thankYouMessage.textContent = message;
+    if (layout) layout.hidden = true;
+    widgetShell.hidden = true;
+    statusBox.hidden = true;
+    thankYouPanel.hidden = false;
+    thankYouPanel.focus && thankYouPanel.focus();
+  }
+
+  function resetSupportForm() {
+    if (pollingTimer) {
+      window.clearInterval(pollingTimer);
+      pollingTimer = null;
+    }
+    if (widgetInstance && typeof widgetInstance.unmount === 'function') {
+      widgetInstance.unmount();
+    }
+    widgetInstance = null;
+    clearStoredCheckoutId();
+    if (layout) layout.hidden = false;
+    thankYouPanel.hidden = true;
+    widgetShell.hidden = true;
+    statusBox.hidden = true;
+    form.hidden = false;
+    form.reset();
+    amountButtons.forEach(function (btn) { btn.setAttribute('aria-pressed', 'false'); });
+    setBusy(false);
+  }
+
+  function buildRedirectUrl() {
+    var url = new URL(window.location.href.split('#')[0]);
+    url.searchParams.set('support', 'return');
+    return url.toString();
+  }
+
+  function isReturnFromSumUp() {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('support') === 'return' || params.has('checkout_id') || params.has('checkoutId') || params.has('sumup_checkout_id') || params.has('transaction_code');
+  }
+
+  function returnedCheckoutId() {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('checkout_id') || params.get('checkoutId') || params.get('sumup_checkout_id') || readStoredCheckoutId();
   }
 
   function parseAmount(value) {
@@ -342,7 +476,7 @@
           if (status === 'SUCCESSFUL' || status === 'PAID') {
             window.clearInterval(pollingTimer);
             pollingTimer = null;
-            setStatus('Pagamento confirmado. Obrigado pelo apoio!', 'success');
+            showThankYou('Pagamento confirmado pela SumUp. Obrigado pelo apoio!');
           } else if (status === 'FAILED' || status === 'EXPIRED' || status === 'CANCELLED') {
             window.clearInterval(pollingTimer);
             pollingTimer = null;
@@ -362,6 +496,33 @@
     };
     check();
     pollingTimer = window.setInterval(check, 4000);
+  }
+
+  function handlePaymentReturn() {
+    if (!isReturnFromSumUp()) return;
+    var checkoutId = returnedCheckoutId();
+    if (!checkoutId) {
+      showThankYou('Recebemos o retorno da SumUp. Obrigado pelo apoio; a confirmação pode levar alguns instantes.');
+      return;
+    }
+    setStatus('Confirmando retorno da SumUp...');
+    fetch(API_BASE_URL + '/sumup/checkout/' + encodeURIComponent(checkoutId) + '/status', { credentials: 'omit' })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        var status = data && data.status ? String(data.status).toUpperCase() : '';
+        if (status === 'SUCCESSFUL' || status === 'PAID') {
+          showThankYou('Pagamento confirmado pela SumUp. Obrigado pelo apoio!');
+        } else if (status === 'FAILED' || status === 'EXPIRED' || status === 'CANCELLED') {
+          cleanReturnUrl();
+          clearStoredCheckoutId();
+          setStatus('Pagamento não concluído. Você pode tentar novamente.', 'error');
+        } else {
+          showThankYou('Recebemos o retorno da SumUp. Obrigado pelo apoio; a confirmação pode levar alguns instantes.');
+        }
+      })
+      .catch(function () {
+        showThankYou('Recebemos o retorno da SumUp. Obrigado pelo apoio; a confirmação pode levar alguns instantes.');
+      });
   }
 
   function mountWidget(checkoutId, amount, email) {
@@ -408,8 +569,7 @@
           return;
         }
         if (type === 'success') {
-          setStatus('Pagamento enviado. Confirmando com a SumUp...');
-          startPolling(checkoutId);
+          showThankYou('Pagamento confirmado pela SumUp. Obrigado pelo apoio!');
           return;
         }
         if (type === 'fail' || type === 'error') {
@@ -419,6 +579,12 @@
       }
     });
   }
+
+  if (thankYouButton) {
+    thankYouButton.addEventListener('click', resetSupportForm);
+  }
+
+  handlePaymentReturn();
 
   amountButtons.forEach(function (button) {
     button.setAttribute('aria-pressed', 'false');
@@ -461,7 +627,7 @@
         firstName: name.firstName,
         lastName: name.lastName,
         email: email,
-        redirectUrl: window.location.href.split('#')[0],
+        redirectUrl: buildRedirectUrl(),
         sourceProject: PROJECT_NAME
       })
     })
@@ -473,6 +639,7 @@
       })
       .then(function (data) {
         if (!data.checkoutId) throw new Error('A SumUp não retornou um checkout válido.');
+        storeCheckoutId(data.checkoutId);
         return loadSdk().then(function () {
           mountWidget(data.checkoutId, amount, email);
         });
