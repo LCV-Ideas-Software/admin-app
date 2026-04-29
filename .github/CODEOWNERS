@@ -1,2 +1,25 @@
-# Default code owner for the entire repository.
-* @lcv-leo
+# Targeted code owners for sensitive and source changes.
+# Avoid a repository-wide wildcard so routine Dependabot manifest updates do
+# not request review automatically.
+
+# Agent and repository governance
+/AGENTS.md @lcv-leo
+/CLAUDE.md @lcv-leo
+/GEMINI.md @lcv-leo
+/.ai/ @lcv-leo
+/.agents/ @lcv-leo
+/.gemini/ @lcv-leo
+/.github/CODEOWNERS @lcv-leo
+/.github/copilot-instructions.md @lcv-leo
+/.github/dependabot.yml @lcv-leo
+/.github/workflows/ @lcv-leo
+
+# Application and infra surfaces
+/src/ @lcv-leo
+/functions/ @lcv-leo
+/admin-motor/ @lcv-leo
+/tlsrpt-motor/src/ @lcv-leo
+/wrangler.json @lcv-leo
+/**/wrangler.json @lcv-leo
+/wrangler.toml @lcv-leo
+/**/wrangler.toml @lcv-leo
