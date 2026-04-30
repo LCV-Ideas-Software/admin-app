@@ -1,5 +1,10 @@
 # Changelog — Admin App
 
+## [v01.99.07] - 2026-04-30
+### Alterado — padronização organizacional do README
+- `README.md` passou a seguir o novo padrão organizacional de abertura: logo harmonizado, bloco curto de status e tabela `The version history at a glance` no topo.
+- A documentação pública inicial ficou alinhada à família `cross-review-v1` / `cross-review-v2`, preservando o conteúdo técnico específico do `admin-app`.
+
 ## [v01.99.06] - 2026-04-27
 ### Alterado — migração GitHub org + Pages/Sponsors custom domain
 - Repositório transferido para `LCV-Ideas-Software/admin-app`; README e rodapé de compliance apontam para o repositório público da organização.
