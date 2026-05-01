@@ -1,5 +1,24 @@
 # Changelog — Admin App
 
+## [v02.00.00] - 2026-05-01
+### Adicionado — auditoria rigorosa de segurança + UX (paridade com mainsite-app v02.18.00 / v03.22.00)
+- **Magic-byte upload validation** (`admin-motor/src/handlers/routes/mainsite/upload.ts`): novas helpers `inferExtensionFromMagicBytes` (JPG `FF D8 FF`, PNG `89 50 4E 47`, GIF `47 49 46 38`, WebP `RIFF…WEBP`, AVIF `ftyp+avif/avis`, PDF `%PDF`) e `magicMatchesExtension` (com equivalência `jpg ↔ jpeg`). Lê os primeiros 16 bytes do `ArrayBuffer` ANTES do `MEDIA_BUCKET.put`; o buffer é reusado para o R2 put (não relê o stream). Bloqueia o caso `arquivo.exe` renomeado para `.png` que passaria por extensão + content-type (ambos vindos do cliente). Mesmo padrão do `mainsite-worker v02.18.00`.
+- **Top-level Error Boundary** (`src/components/ErrorBoundary.tsx`): novo class component (React 19 ainda exige class para `componentDidCatch`). Pre-fix, somente `LazyModuleErrorBoundary` cobria falhas de chunk import; qualquer exceção de render no router outlet, modal ou query consumer resultava em página em branco. Wired em `main.tsx` ao redor de `QueryClientProvider+NotificationProvider+RouterProvider`. Loga em `console` + `window.dataLayer`; fallback UI com botão "Recarregar".
+- **`useEscapeKey` hook** (`src/hooks/useEscapeKey.ts`): handler ESC centralizado para diálogos `createPortal` que não usam Radix (Radix `Dialog.Root` cobre ESC nativamente). Wired em `modules/mainsite/editor/PromptModal.tsx` — pré-fix, o modal de input universal do PostEditor (URL, imagem, YouTube, caption, Gemini import) só fechava via botão Close; ESC não dismissava (gap WCAG 2.1 AA). O hook é chamado ANTES do early return `if (!modal.show) return null` para satisfazer Rules of Hooks; `enabled = modal.show` mantém o listener desligado quando o modal está oculto.
+### Não adicionado (calibração de advisor — risco de regressão > benefício)
+- ~~`Promise.race` timeout em superfícies AI do admin~~: `mainsite/ai/transform.ts` admite 120k tokens + 2 retries × 800ms; `gemini-import.ts` tem budget de 85s. Um timeout curto regrediria o caso real "operador esperando transformação longa". Diferente do mainsite (sentiment best-effort 2s).
+- ~~`EnvSecretsSchema` Zod no boot~~: `readSecretString` hand-rolled é funcional. Adicionar Zod é preferência, não fix. Diferido.
+- ~~Hash IP/UA em logs~~: admin-motor já loga email do CF Access server-side. Hash de IP em cima é teatro quando o usuário está identificado por email.
+- ~~Migração `fetch()` → `apiFetch` em todos os módulos~~: surface alta, risco de regressão. Migrar somente sites com bug concreto de timeout, não por higiene.
+- ~~Global React Query `onError`~~: risco de double-handling de erros que módulos já capturam.
+### Versão (ceiling format-induced major bump)
+- v01.99.07 → **v02.00.00**: o formato `vXX.XX.XX` (2-digit zero-pad) impede `v01.100.00`; bump major escolhido pelo operator. Não é mudança estrutural / breaking change — é hardening incremental.
+### Validação
+- `npm run lint` clean.
+- `npm test` — 4 arquivos / 31 testes (frontend).
+- `npm run test:admin-motor` — 9 arquivos / 51 testes.
+- `npm run build` — clean, 1.98s, chunks dentro do baseline esperado.
+
 ## [v01.99.07] - 2026-04-30
 ### Alterado — padronização organizacional do README
 - `README.md` passou a seguir o novo padrão organizacional de abertura: logo harmonizado, bloco curto de status e tabela `The version history at a glance` no topo.

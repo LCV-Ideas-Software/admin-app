@@ -32,7 +32,7 @@ import type { ModuleId } from './moduleId';
 
 export type { ModuleId };
 
-const APP_VERSION = 'APP v01.99.07';
+const APP_VERSION = 'APP v02.00.00';
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   'ai-status': 'AI Status',

@@ -5,7 +5,9 @@
  */
 
 import { Image as ImageIcon, Link as LinkIcon, Type, X } from 'lucide-react';
+import { useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useEscapeKey } from '../../../hooks/useEscapeKey';
 import { PROMPT_MODAL_INITIAL, type PromptModalState, type PromptModalSubmit } from './promptModalState';
 
 // ── Types ─────────────────────────────────────────────────────
@@ -19,6 +21,16 @@ interface PromptModalProps {
 }
 
 export function PromptModal({ modal, setModal, targetNode }: PromptModalProps) {
+  // v02.00.00 / audit closure (MEDIUM): ESC dismissal on the custom portal
+  // overlay (Radix-based dialogs elsewhere already cover ESC natively). The
+  // hook is called BEFORE the early return so the order is stable across
+  // renders; `enabled = modal.show` keeps the window listener detached
+  // while the modal is hidden.
+  const handleEscape = useCallback(() => {
+    setModal(PROMPT_MODAL_INITIAL);
+  }, [setModal]);
+  useEscapeKey(handleEscape, modal.show);
+
   if (!modal.show) return null;
 
   const close = () => setModal(PROMPT_MODAL_INITIAL);
