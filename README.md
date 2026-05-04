@@ -16,13 +16,13 @@
 
 The version history at a glance:
 
-| Release | Scope |
-|---|---|
+| Release         | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`v02.00.00`** | **Rigorous security + UX audit.** Magic-byte upload validation in `admin-motor` (matches the renamed-binary fix shipped in `mainsite-worker v02.18.00`). Top-level Error Boundary in `main.tsx` so render-phase exceptions no longer crash the admin into a blank page. ESC dismissal on the PostEditor `PromptModal` (WCAG 2.1 AA gap closure for the only non-Radix dialog in the app). Major bump forced by the `vXX.XX.XX` 2-digit ceiling at v01.99 — not a structural change. |
-| **`v01.99.07`** | **README organizational standardization.** Adopted the shared repository README opening pattern: harmonized visual identity, added a concise status block, and introduced the top-level version-history table. |
-| **`v01.99.06`** | **GitHub organization migration and publication alignment.** Moved the public repository surface to `LCV-Ideas-Software/admin-app`, aligned Sponsor/Page custom-domain references, and hardened Dependabot automerge behavior. |
-| **`v01.99.05`** | **MainSite PostEditor sanitizer regression fix.** Restored Tiptap HTML roundtrip fidelity for headings, lists, media, tables, spacing, and text formatting without dropping the XSS hardening baseline. |
-| **`v01.99.04`** | **Editorial formatting parity round.** Continued the MainSite formatting/parity work that prepared the app for the later sanitizer and publishing fixes. |
+| **`v01.99.07`** | **README organizational standardization.** Adopted the shared repository README opening pattern: harmonized visual identity, added a concise status block, and introduced the top-level version-history table.                                                                                                                                                                                                                                                                      |
+| **`v01.99.06`** | **GitHub organization migration and publication alignment.** Moved the public repository surface to `LCV-Ideas-Software/admin-app`, aligned Sponsor/Page custom-domain references, and hardened Dependabot automerge behavior.                                                                                                                                                                                                                                                      |
+| **`v01.99.05`** | **MainSite PostEditor sanitizer regression fix.** Restored Tiptap HTML roundtrip fidelity for headings, lists, media, tables, spacing, and text formatting without dropping the XSS hardening baseline.                                                                                                                                                                                                                                                                             |
+| **`v01.99.04`** | **Editorial formatting parity round.** Continued the MainSite formatting/parity work that prepared the app for the later sanitizer and publishing fixes.                                                                                                                                                                                                                                                                                                                            |
 
 ## What it does
 
@@ -62,6 +62,7 @@ Three independent compute surfaces, one shared D1 database (`bigdata_db`), one s
 ## Deploy your own fork
 
 You will need:
+
 - A Cloudflare account ([free tier](https://www.cloudflare.com/plans/)) with Pages + Workers + D1 + R2 enabled.
 - A Cloudflare Zero Trust account (free for ≤50 users) for Access JWT auth.
 - The Cloudflare CLI [`wrangler`](https://developers.cloudflare.com/workers/wrangler/).
@@ -90,6 +91,7 @@ npx wrangler r2 bucket create mainsite-media
 ### 3. Wire `database_id` into all three `wrangler.json`
 
 Replace `00000000-0000-0000-0000-000000000000` in:
+
 - `wrangler.json` (root, Pages app)
 - `admin-motor/wrangler.json`
 - `tlsrpt-motor/wrangler.json`
@@ -100,9 +102,9 @@ Replace `00000000-0000-0000-0000-000000000000` in:
     {
       "binding": "BIGDATA_DB",
       "database_name": "bigdata_db",
-      "database_id": "<your-d1-id-from-step-2>"
-    }
-  ]
+      "database_id": "<your-d1-id-from-step-2>",
+    },
+  ],
 }
 ```
 
@@ -185,4 +187,4 @@ If you only deploy this app for your own infrastructure (no external users), §1
 
 ---
 
-<p align="center"><sub>© LCV Ideas &amp; Software<br>LEONARDO CARDOZO VARGAS TECNOLOGIA DA INFORMACAO LTDA<br>Rua Pais Leme, 215 Conj 1713  - Pinheiros<br>São Paulo - SP<br>CEP 05.424-150<br>CNPJ: 66.584.678/0001-77<br>IM 05.424-150</sub></p>
+<p align="center"><span style="font-size: 1.5em;"><strong>© LCV Ideas &amp; Software</strong></span><br><sub>LEONARDO CARDOZO VARGAS TECNOLOGIA DA INFORMACAO LTDA<br>Rua Pais Leme, 215 Conj 1713&nbsp;&nbsp;- Pinheiros<br>São Paulo - SP<br>CEP 05.424-150<br>CNPJ: 66.584.678/0001-77<br>IM 05.424-150</sub></p>

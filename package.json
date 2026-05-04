@@ -16,7 +16,9 @@
     "format": "biome format --write src",
     "stats": "ANALYZE=true vite build",
     "knip": "knip",
-    "prepare": "husky"
+    "prepare": "husky",
+    "format:public": "prettier --write \"**/README.md\" \"**/index.html\"",
+    "format:public:check": "prettier --check \"**/README.md\" \"**/index.html\""
   },
   "dependencies": {
     "@google/genai": "^1.51.0",
@@ -103,7 +105,8 @@
     "typescript-eslint": "^8.59.1",
     "vite": "^8.0.10",
     "vitest": "^4.1.5",
-    "wrangler": "^4.87.0"
+    "wrangler": "^4.87.0",
+    "prettier": "^3.8.3"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
