@@ -182,3 +182,7 @@ If you operate a modified copy of this app as a publicly-accessible network serv
 - A `GET /source` route in `admin-motor` returning your fork's URL as `text/plain`.
 
 If you only deploy this app for your own infrastructure (no external users), §13 does not apply.
+
+---
+
+<p align="center"><sub>© LCV Ideas &amp; Software<br>LEONARDO CARDOZO VARGAS TECNOLOGIA DA INFORMACAO LTDA<br>Rua Pais Leme, 215 Conj 1713  - Pinheiros<br>São Paulo - SP<br>CEP 05.424-150<br>CNPJ: 66.584.678/0001-77<br>IM 05.424-150</sub></p>
