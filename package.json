@@ -63,7 +63,7 @@
     "lowlight": "^3.3.0",
     "lucide-react": "^1.14.0",
     "mammoth": "^1.12.0",
-    "marked": "^18.0.2",
+    "marked": "^18.0.3",
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",
     "prosemirror-view": "^1.41.8",
