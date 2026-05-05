@@ -21,7 +21,7 @@
     "format:public:check": "prettier --check \"**/index.html\""
   },
   "dependencies": {
-    "@google/genai": "^1.51.0",
+    "@google/genai": "^1.52.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@sumup/sdk": "^0.1.5",
     "@tanstack/react-query": "^5.100.9",
