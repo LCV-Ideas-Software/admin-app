@@ -6,3 +6,6 @@ coverage
 .wrangler
 .next
 .cache
+# README release-history tables are hand-wrapped and contain long code spans.
+README.md
+**/README.md
