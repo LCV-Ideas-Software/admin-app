@@ -5,7 +5,6 @@
 | @cloudflare/vitest-pool-workers | ^0.14.0 | MIT | Não | https://registry.npmjs.org/@cloudflare/vitest-pool-workers/-/vitest-pool-workers-0.14.0.tgz |
 | @cloudflare/workers-types | ^4.20260331.1 | MIT OR Apache-2.0 | Não | https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-4.20260331.1.tgz |
 | @eslint/js | ^9.39.4 | MIT | Não | https://registry.npmjs.org/@eslint/js/-/js-9.39.4.tgz |
-| @sumup/sdk | ^0.1.4 | Apache-2.0 | Não | https://registry.npmjs.org/@sumup/sdk/-/sdk-0.1.4.tgz |
 | @tiptap/extension-bubble-menu | ^3.21.0 | MIT | Não | https://registry.npmjs.org/@tiptap/extension-bubble-menu/-/extension-bubble-menu-3.21.0.tgz |
 | @tiptap/extension-character-count | ^3.21.0 | MIT | Não | https://registry.npmjs.org/@tiptap/extension-character-count/-/extension-character-count-3.21.0.tgz |
 | @tiptap/extension-code-block-lowlight | ^3.21.0 | MIT | Não | https://registry.npmjs.org/@tiptap/extension-code-block-lowlight/-/extension-code-block-lowlight-3.21.0.tgz |
@@ -49,7 +48,6 @@
 | eslint-plugin-react-refresh | ^0.5.2 | MIT | Não | https://registry.npmjs.org/eslint-plugin-react-refresh/-/eslint-plugin-react-refresh-0.5.2.tgz |
 | globals | ^17.4.0 | MIT | Não | https://registry.npmjs.org/globals/-/globals-17.4.0.tgz |
 | lucide-react | ^1.7.0 | ISC | Não | https://registry.npmjs.org/lucide-react/-/lucide-react-1.7.0.tgz |
-| mercadopago | ^2.12.0 | Não identificado | Não | https://registry.npmjs.org/mercadopago/-/mercadopago-2.12.0.tgz |
 | postal-mime | ^2.7.4 | MIT-0 | Não | https://registry.npmjs.org/postal-mime/-/postal-mime-2.7.4.tgz |
 | react | ^19.2.4 | MIT | Não | https://registry.npmjs.org/react/-/react-19.2.4.tgz |
 | react-dom | ^19.2.4 | MIT | Não | https://registry.npmjs.org/react-dom/-/react-dom-19.2.4.tgz |

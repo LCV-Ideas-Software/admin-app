@@ -16,7 +16,6 @@ const modules = [
   { id: 'cfdns', heading: 'CF DNS' },
   { id: 'cfpw', heading: 'CF P&W' },
   { id: 'config', heading: 'Configurações' },
-  { id: 'financeiro', heading: 'Financeiro' },
   { id: 'calculadora', heading: 'Calculadora' },
   { id: 'mainsite', heading: 'MainSite' },
   { id: 'mtasts', heading: 'MTA-STS' },

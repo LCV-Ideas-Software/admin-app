@@ -10,14 +10,15 @@
 [![backend: Hono on Workers](https://img.shields.io/badge/backend-Hono%20on%20Workers-f97316.svg)](https://hono.dev/)
 [![license: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
 
-**Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, financial reports, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
+**Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release: **v02.00.00**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
+**Status.** Stable. Current release: **v02.01.00**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
 
 The version history at a glance:
 
 | Release | Scope |
 |---|---|
+| **`v02.01.00`** | **Financeiro removed + dependency/workflow hygiene.** Removed the Financeiro module, admin-motor finance/SumUp/fees routes, SumUp/MP/PIX runtime bindings, MainSite fee/donation-trigger controls, and the SumUp SDK; updated direct dependencies and confirmed Dependabot/GitHub Actions coverage. |
 | **`v02.00.00`** | **Rigorous security + UX audit.** Magic-byte upload validation in `admin-motor` (matches the renamed-binary fix shipped in `mainsite-worker v02.18.00`). Top-level Error Boundary in `main.tsx` so render-phase exceptions no longer crash the admin into a blank page. ESC dismissal on the PostEditor `PromptModal` (WCAG 2.1 AA gap closure for the only non-Radix dialog in the app). Major bump forced by the `vXX.XX.XX` 2-digit ceiling at v01.99 — not a structural change. |
 | **`v01.99.07`** | **README organizational standardization.** Adopted the shared repository README opening pattern: harmonized visual identity, added a concise status block, and introduced the top-level version-history table. |
 | **`v01.99.06`** | **GitHub organization migration and publication alignment.** Moved the public repository surface to `LCV-Ideas-Software/admin-app`, aligned Sponsor/Page custom-domain references, and hardened Dependabot automerge behavior. |
@@ -32,15 +33,14 @@ Operator-only Cloudflare Access-protected dashboard with these modules:
 2. **Astrólogo** — astrology consultation viewer + Gemini synthesis, e-mail report dispatch.
 3. **Calculadora** — admin parameters and observability for a financial calculator app (PTAX/IPCA cache, rate-limit policies, backtest spot vs. PTAX, audit log).
 4. **Oráculo** — financial oracle records (LCI/CDB IPCA+ + Tesouro Direto) with cascade delete + per-user data lookup.
-5. **Financeiro** — SumUp transactions, refunds, payouts, fees and AI-driven insights.
-6. **CF DNS / CF P&W** — Cloudflare DNS records CRUD + Pages/Workers project lifecycle (create, settings, observability, deployments cleanup) directly via Cloudflare API.
-7. **MTA-STS** — MTA-STS policy publishing + sync.
-8. **TLS-RPT** — TLS-RPT report viewer ingested by an internal Worker via SMTP.
-9. **AI Status** — multi-provider AI catalog (Gemini, Workers AI), GCP Cloud Logging integration, rate-limit configuration.
-10. **News** — RSS discovery + feed publication (operator content curation).
-11. **Telemetria** — operational events, sync runs, AI usage logs aggregation.
-12. **Configurações** — global app config + AI model selectors with D1 persistence.
-13. **Conformidade e Licenças** — AGPLv3 license display + third-party inventory.
+5. **CF DNS / CF P&W** — Cloudflare DNS records CRUD + Pages/Workers project lifecycle (create, settings, observability, deployments cleanup) directly via Cloudflare API.
+6. **MTA-STS** — MTA-STS policy publishing + sync.
+7. **TLS-RPT** — TLS-RPT report viewer ingested by an internal Worker via SMTP.
+8. **AI Status** — multi-provider AI catalog (Gemini, Workers AI), GCP Cloud Logging integration, rate-limit configuration.
+9. **News** — RSS discovery + feed publication (operator content curation).
+10. **Telemetria** — operational events, sync runs, AI usage logs aggregation.
+11. **Configurações** — global app config + AI model selectors with D1 persistence.
+12. **Conformidade e Licenças** — AGPLv3 license display + third-party inventory.
 
 ## Architecture
 
@@ -67,7 +67,6 @@ You will need:
 - The Cloudflare CLI [`wrangler`](https://developers.cloudflare.com/workers/wrangler/).
 - Node.js 24+.
 - A Google AI Studio API key for Gemini integration.
-- A SumUp Business account API key (only if running the Financeiro module).
 - A Resend API key (only if running e-mail dispatch features).
 
 ### 1. Clone + install
@@ -128,7 +127,7 @@ npx wrangler secret put ENFORCE_JWT_VALIDATION --config admin-motor/wrangler.jso
 
 ### 6. Configure additional secrets
 
-Per `admin-motor/wrangler.json`'s `secrets_store_secrets` list, set values for the keys you intend to use (Gemini, Resend, SumUp, GCP, JINA, Cloudflare DNS/Cache/Account-ID tokens, etc.). `GCP_SA_KEY` (Service Account JSON, >1024 chars) cannot live in Secrets Store and must be a native Worker secret:
+Per `admin-motor/wrangler.json`'s `secrets_store_secrets` list, set values for the keys you intend to use (Gemini, Resend, GCP, JINA, Cloudflare DNS/Cache/Account-ID tokens, etc.). `GCP_SA_KEY` (Service Account JSON, >1024 chars) cannot live in Secrets Store and must be a native Worker secret:
 
 ```bash
 npx wrangler secret put GCP_SA_KEY --config admin-motor/wrangler.json

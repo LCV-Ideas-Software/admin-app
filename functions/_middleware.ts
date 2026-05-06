@@ -4,13 +4,6 @@ const SECRET_ALIASES = {
   GEMINI_API_KEY: ['gemini-api-key'],
   RESEND_API_KEY: ['resend-api-key'],
   RESEND_APPKEY: ['resend-appkey', 'resend-app-key'],
-  SUMUP_API_KEY_PRIVATE: ['sumup-api-key-private', 'sumup_api_key_private'],
-  SUMUP_MERCHANT_CODE: ['sumup-merchant-code', 'sumup-merchant', 'merchant-code', 'MERCHANT_CODE'],
-  MP_ACCESS_TOKEN: ['mp-access-token'],
-  MERCADO_PAGO_WEBHOOK_SECRET: ['mercado-pago-webhook-secret'],
-  PIX_KEY: ['pix-key'],
-  PIX_NAME: ['pix-name'],
-  PIX_CITY: ['pix-city'],
   GCP_SA_KEY: ['gcp-sa-key'],
   JINA_API_KEY: ['jina-api-key'],
   CLOUDFLARE_DNS: ['cloudflare-dns'],
@@ -26,9 +19,6 @@ const SECRET_ALIASES = {
 const CRITICAL_KEYS = [
   'CLOUDFLARE_PW',
   'GEMINI_API_KEY',
-  'SUMUP_API_KEY_PRIVATE',
-  'SUMUP_MERCHANT_CODE',
-  'MP_ACCESS_TOKEN',
 ] as const;
 
 const toOptionalString = async (raw: unknown): Promise<string | undefined> => {

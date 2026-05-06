@@ -43,16 +43,6 @@
       "secret_name": "cloudflare-cache"
     },
     {
-      "binding": "SUMUP_API_KEY_PRIVATE",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "sumup-api-key-private"
-    },
-    {
-      "binding": "SUMUP_MERCHANT_CODE",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "sumup-merchant-code"
-    },
-    {
       "binding": "RESEND_API_KEY",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "resend-api-key"

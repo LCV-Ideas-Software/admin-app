@@ -110,9 +110,6 @@ const CardHubModule = lazyWithAccessRecovery(() =>
 const TelemetriaModule = lazyWithAccessRecovery(() =>
   import('./modules/telemetria/TelemetriaModule').then((m) => ({ default: m.TelemetriaModule })),
 );
-const FinanceiroModule = lazyWithAccessRecovery(() =>
-  import('./modules/financeiro/FinanceiroModule').then((m) => ({ default: m.FinanceiroModule })),
-);
 const CfDnsModule = lazyWithAccessRecovery(() =>
   import('./modules/cfdns/CfDnsModule').then((m) => ({ default: m.CfDnsModule })),
 );
@@ -142,7 +139,6 @@ const MODULE_COMPONENTS: Record<ModuleId, ComponentType<Record<string, never>>> 
   cfdns: CfDnsModule as ComponentType<Record<string, never>>,
   cfpw: CfPwModule as ComponentType<Record<string, never>>,
   config: ConfigModule as ComponentType<Record<string, never>>,
-  financeiro: FinanceiroModule as ComponentType<Record<string, never>>,
   calculadora: CalculadoraModule as ComponentType<Record<string, never>>,
   mainsite: MainsiteModule as ComponentType<Record<string, never>>,
   mtasts: MtastsModule as ComponentType<Record<string, never>>,

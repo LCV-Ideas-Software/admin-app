@@ -146,7 +146,6 @@ export async function onRequestPost(context: Context) {
         action: 'sync',
         pulledFrom: 'bigdata_db',
         postsLidos: Number(postsCountRow?.total ?? 0),
-        financeirosLidos: 0,
         settingsLidos: settingsRows.length,
         settingsInseridos: settingsInserted,
         settingsCorrigidos: settingsFixed,
@@ -161,9 +160,6 @@ export async function onRequestPost(context: Context) {
         recordsUpserted,
         posts: {
           lidos: Number(postsCountRow?.total ?? 0),
-        },
-        financialLogs: {
-          lidos: 0,
         },
         settings: {
           lidos: settingsRows.length,

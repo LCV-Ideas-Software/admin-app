@@ -17,7 +17,6 @@ export type ModuleId =
   | 'cfdns'
   | 'cfpw'
   | 'config'
-  | 'financeiro'
   | 'oraculo'
   | 'calculadora'
   | 'mainsite'

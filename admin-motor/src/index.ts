@@ -6,8 +6,6 @@ import { handleAiStatusModelsGet } from './handlers/aiStatusModels';
 import { handleAstrologoEnviarEmailPost } from './handlers/astrologoEmail';
 import { handleCfdnsZonesGet } from './handlers/cfdnsZones';
 import { handleCleanupDeploymentsGet, handleCleanupDeploymentsPost } from './handlers/cfpwCleanup';
-import { handleSumupCancelPost, handleSumupRefundPost } from './handlers/financeiroActions';
-import { handleFinanceiroInsightsGet } from './handlers/financeiroInsights';
 import { handleOraculoCronGet, handleOraculoCronPut } from './handlers/oraculoCron';
 import { handleOraculoModelosGet } from './handlers/oraculoModelos';
 import { validatePutAuth } from './handlers/routes/_lib/auth';
@@ -52,7 +50,6 @@ import {
   onRequestGet as handleConfigStoreGet,
   onRequestPost as handleConfigStorePost,
 } from './handlers/routes/config/config-store';
-import { onRequestGet as handleSumupBalanceGet } from './handlers/routes/financeiro/sumup-balance';
 import { onRequestGet as handleCalculadoraOverviewGet } from './handlers/routes/calculadora/overview';
 import {
   onRequestGet as handleCalculadoraParametrosGet,
@@ -73,10 +70,6 @@ import {
   handleCommentsAdminPutSettings,
   handleCommentsAdminReply,
 } from './handlers/routes/mainsite/comments-admin';
-import {
-  onRequestGet as handleMainsiteFeesGet,
-  onRequestPost as handleMainsiteFeesPost,
-} from './handlers/routes/mainsite/fees';
 import {
   onRequestOptions as handleGeminiImportOptions,
   onRequestPost as handleGeminiImportPost,
@@ -138,8 +131,6 @@ type AdminMotorEnv = {
   GEMINI_API_KEY?: unknown;
   CLOUDFLARE_PW?: unknown;
   CF_ACCOUNT_ID?: unknown;
-  SUMUP_API_KEY_PRIVATE?: unknown;
-  SUMUP_MERCHANT_CODE?: unknown;
   RESEND_API_KEY?: unknown;
   CLOUDFLARE_DNS?: unknown;
   CLOUDFLARE_CACHE?: unknown;
@@ -158,8 +149,6 @@ type ResolvedAdminMotorEnv = {
   GEMINI_API_KEY?: string;
   CLOUDFLARE_PW?: string;
   CF_ACCOUNT_ID?: string;
-  SUMUP_API_KEY_PRIVATE?: string;
-  SUMUP_MERCHANT_CODE?: string;
   RESEND_API_KEY?: string;
   CLOUDFLARE_DNS?: string;
   CLOUDFLARE_CACHE?: string;
@@ -246,8 +235,6 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   GEMINI_API_KEY: await readSecretString(env.GEMINI_API_KEY),
   CLOUDFLARE_PW: await readSecretString(env.CLOUDFLARE_PW),
   CF_ACCOUNT_ID: await readSecretString(env.CF_ACCOUNT_ID),
-  SUMUP_API_KEY_PRIVATE: await readSecretString(env.SUMUP_API_KEY_PRIVATE),
-  SUMUP_MERCHANT_CODE: await readSecretString(env.SUMUP_MERCHANT_CODE),
   RESEND_API_KEY: await readSecretString(env.RESEND_API_KEY),
   CLOUDFLARE_DNS: await readSecretString(env.CLOUDFLARE_DNS),
   CLOUDFLARE_CACHE: await readSecretString(env.CLOUDFLARE_CACHE),
@@ -519,12 +506,6 @@ app.put('/api/adminhub/config', (c) => handleAdminhubConfigPut(rc(c)));
 app.get('/api/apphub/config', (c) => handleApphubConfigGet(rc(c)));
 app.put('/api/apphub/config', (c) => handleApphubConfigPut(rc(c)));
 
-// ── financeiro ──
-app.get('/api/financeiro/insights', (c) => handleFinanceiroInsightsGet(re(c)));
-app.get('/api/financeiro/sumup-balance', (c) => handleSumupBalanceGet(rc(c)));
-app.post('/api/financeiro/sumup-refund', (c) => handleSumupRefundPost(re(c)));
-app.post('/api/financeiro/sumup-cancel', (c) => handleSumupCancelPost(re(c)));
-
 // ── calculadora ──
 app.get('/api/calculadora/overview', (c) => handleCalculadoraOverviewGet(rc(c)));
 app.get('/api/calculadora/parametros', (c) => handleCalculadoraParametrosGet(rc(c)));
@@ -534,8 +515,6 @@ app.post('/api/calculadora/sync', (c) => handleCalculadoraSyncPost(rc(c)));
 // ── mainsite ──
 app.get('/api/mainsite/about', (c) => handleMainsiteAboutGet(rc(c)));
 app.put('/api/mainsite/about', (c) => handleMainsiteAboutPut(rc(c)));
-app.get('/api/mainsite/fees', (c) => handleMainsiteFeesGet(rc(c)));
-app.post('/api/mainsite/fees', (c) => handleMainsiteFeesPost(rc(c)));
 app.get('/api/mainsite/overview', (c) => handleMainsiteOverviewGet(rc(c)));
 app.get('/api/mainsite/posts', (c) => handleMainsitePostsGet(rc(c)));
 app.post('/api/mainsite/posts', (c) => handleMainsitePostsPost(rc(c)));

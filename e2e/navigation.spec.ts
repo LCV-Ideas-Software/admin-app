@@ -31,14 +31,14 @@ test.describe('Module navigation (TanStack Router)', () => {
 
   test('browser back/forward works', async ({ page }) => {
     await page.goto('/overview');
-    await page.click('button[title="Financeiro"]');
-    await expect(page).toHaveURL('/financeiro');
+    await page.click('button[title="MainSite"]');
+    await expect(page).toHaveURL('/mainsite');
 
     await page.goBack();
     await expect(page).toHaveURL('/overview');
 
     await page.goForward();
-    await expect(page).toHaveURL('/financeiro');
+    await expect(page).toHaveURL('/mainsite');
   });
 
   test('sidebar highlights active module', async ({ page }) => {

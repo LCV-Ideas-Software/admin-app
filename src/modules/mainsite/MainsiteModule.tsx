@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign,
   Eye,
   EyeOff,
   FilePlus2,
@@ -110,7 +109,6 @@ type DisclaimerItem = {
   title: string;
   text: string;
   buttonText: string;
-  isDonationTrigger: boolean;
   /**
    * Flag de ativação individual (soft-disable). `false` oculta o item no site
    * público sem excluí-lo do D1. Opcional: ausência / `undefined` = `true`.
@@ -124,16 +122,6 @@ type DisclaimersSettings = {
 };
 
 const DEFAULT_DISCLAIMERS: DisclaimersSettings = { enabled: true, items: [] };
-
-interface FeeConfig {
-  sumupRate: number;
-  sumupFixed: number;
-}
-
-const DEFAULT_FEES: FeeConfig = {
-  sumupRate: 0.0267,
-  sumupFixed: 0,
-};
 
 // ── Resumos IA para compartilhamento social ──
 type AiSummary = {
@@ -248,11 +236,6 @@ export function MainsiteModule() {
     }
   }, [archiveSort]);
 
-  // ── Taxas state ──
-  const [fees, setFees] = useState<FeeConfig>(DEFAULT_FEES);
-  const [feesLoading, setFeesLoading] = useState(false);
-  const [feesSaving, setFeesSaving] = useState(false);
-
   // ── Resumos IA state ──
   const [summaries, setSummaries] = useState<AiSummary[]>([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
@@ -359,38 +342,6 @@ export function MainsiteModule() {
     },
     [adminActor, showNotification],
   );
-
-  const carregarTaxas = useCallback(async () => {
-    setFeesLoading(true);
-    try {
-      const res = await fetch('/api/mainsite/fees');
-      const data = (await res.json()) as { ok: boolean; fees?: FeeConfig };
-      if (data.ok && data.fees) setFees(data.fees);
-    } catch {
-      // usa defaults
-    } finally {
-      setFeesLoading(false);
-    }
-  }, []);
-
-  const salvarTaxas = async () => {
-    setFeesSaving(true);
-    try {
-      const res = await fetch('/api/mainsite/fees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fees),
-      });
-      const data = (await res.json()) as { ok: boolean; fees?: FeeConfig; error?: string };
-      if (!data.ok) throw new Error(data.error ?? 'Erro desconhecido.');
-      if (data.fees) setFees(data.fees);
-      showNotification('Taxas salvas com sucesso. O worker usará os novos valores no próximo checkout.', 'success');
-    } catch (err) {
-      showNotification(`Falha ao salvar taxas: ${err instanceof Error ? err.message : 'Erro desconhecido.'}`, 'error');
-    } finally {
-      setFeesSaving(false);
-    }
-  };
 
   // ── Resumos IA handlers ──
   const loadSummaries = useCallback(
@@ -578,9 +529,8 @@ export function MainsiteModule() {
   useEffect(() => {
     void loadManagedPosts();
     void loadPublicSettings();
-    void carregarTaxas();
     void loadSummaries();
-  }, [loadManagedPosts, loadPublicSettings, loadSummaries, carregarTaxas]);
+  }, [loadManagedPosts, loadPublicSettings, loadSummaries]);
 
   const resetPostEditor = () => {
     setEditingPostId(null);
@@ -1975,20 +1925,6 @@ export function MainsiteModule() {
                         }}
                       />
                     </div>
-                    <label className="toggle-row donation-trigger">
-                      <input
-                        id={`disc-trigger-${idx}`}
-                        name={`discTrigger_${idx}`}
-                        type="checkbox"
-                        checked={item.isDonationTrigger}
-                        onChange={(e) => {
-                          const next = [...disclaimers.items];
-                          next[idx] = { ...next[idx], isDonationTrigger: e.target.checked };
-                          setDisclaimers({ ...disclaimers, items: next });
-                        }}
-                      />
-                      Gatilho de Doação
-                    </label>
                   </div>
                 );
               })}
@@ -2005,7 +1941,6 @@ export function MainsiteModule() {
                         title: '',
                         text: '',
                         buttonText: 'Concordo',
-                        isDonationTrigger: false,
                         enabled: true,
                       },
                     ],
@@ -2025,85 +1960,6 @@ export function MainsiteModule() {
           </button>
         </div>
       </form>
-
-      {/* ── Taxas dos Gateways de Pagamento ── */}
-      <div className="form-card" style={{ marginTop: '24px' }}>
-        <div className="result-toolbar">
-          <div>
-            <h4>
-              <DollarSign size={16} /> Taxas de Processamento
-            </h4>
-            <p className="field-hint">
-              Configure as taxas de processamento para cálculo automático de repasse ao valor da doação.
-            </p>
-          </div>
-          <div className="inline-actions">
-            <button type="button" className="ghost-button" onClick={() => void carregarTaxas()} disabled={feesLoading}>
-              {feesLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-              Recarregar
-            </button>
-          </div>
-        </div>
-
-        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          <div className="field-group">
-            <label htmlFor="sumup-fee-rate">Taxa Percentual (%)</label>
-            <input
-              id="sumup-fee-rate"
-              name="sumupFeeRate"
-              type="number"
-              step="0.01"
-              min="0"
-              max="99.99"
-              value={parseFloat((fees.sumupRate * 100).toFixed(4))}
-              onChange={(e) =>
-                setFees((prev) => ({
-                  ...prev,
-                  sumupRate: Math.max(0, Math.min(0.9999, parseFloat(e.target.value) / 100 || 0)),
-                }))
-              }
-            />
-            <p className="field-hint">Ex: 2.67 = 2,67% por transação</p>
-          </div>
-          <div className="field-group">
-            <label htmlFor="sumup-fee-fixed">Taxa Fixa (R$)</label>
-            <input
-              id="sumup-fee-fixed"
-              name="sumupFeeFixed"
-              type="number"
-              step="0.01"
-              min="0"
-              value={fees.sumupFixed}
-              onChange={(e) =>
-                setFees((prev) => ({ ...prev, sumupFixed: Math.max(0, parseFloat(e.target.value) || 0) }))
-              }
-            />
-            <p className="field-hint">Valor fixo cobrado por transação (0 = desabilitado)</p>
-          </div>
-        </div>
-
-        <div className="form-actions" style={{ marginTop: '16px' }}>
-          <button type="button" className="primary-button" onClick={() => void salvarTaxas()} disabled={feesSaving}>
-            {feesSaving ? <Loader2 size={18} className="spin" /> : <Save size={18} />}
-            Salvar Taxas
-          </button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => {
-              setFees(DEFAULT_FEES);
-              showNotification('Taxas restauradas para os valores padrão. Salve para confirmar.', 'info');
-            }}
-          >
-            Restaurar Padrão
-          </button>
-        </div>
-
-        <p className="field-hint" style={{ marginTop: '12px', fontStyle: 'italic', opacity: 0.7 }}>
-          Estas taxas são lidas pelo worker em cada checkout para calcular o valor final com repasse. Alterações
-          refletem imediatamente após salvar.
-        </p>
-      </div>
     </section>
   );
 }

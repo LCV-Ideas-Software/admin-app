@@ -24,16 +24,9 @@ type IconRule = {
  * o match mais longo (mais específico) independentemente da posição na lista.
  */
 const ICON_RULES: IconRule[] = [
-  // ── Pagamentos & Financeiro ──────────────────────────────────────────────
-  { keywords: ['mercado pago', 'mercadopago'], icon: '💳' },
-  { keywords: ['sumup', 'maquininha', 'point of sale', 'pos terminal'], icon: '💳' },
-  { keywords: ['boleto', 'boleto bancario', 'cobranca', 'billing'], icon: '🧾' },
+  // ── Fiscal, Financeiro & Bancário ───────────────────────────────────────
   { keywords: ['nota fiscal', 'nfe', 'nfce', 'danfe', 'xml fiscal'], icon: '🧾' },
   { keywords: ['recibo', 'receipt', 'comprovante', 'voucher'], icon: '🧾' },
-  { keywords: ['transferencia', 'transfer', 'remessa', 'remittance', 'ted', 'doc', 'pix'], icon: '💸' },
-  { keywords: ['pagamento', 'payment', 'pagar', 'checkout', 'pay'], icon: '💳' },
-  { keywords: ['cartao', 'card', 'credito', 'debito', 'credit card', 'debit card'], icon: '💳' },
-  { keywords: ['wallet', 'carteira', 'carteira digital'], icon: '👛' },
   {
     keywords: [
       'investimento',

@@ -9,7 +9,6 @@ import {
   Brain,
   BrainCircuit,
   Database,
-  DollarSign,
   Globe,
   Home,
   LayoutGrid,
@@ -32,7 +31,7 @@ import type { ModuleId } from './moduleId';
 
 export type { ModuleId };
 
-const APP_VERSION = 'APP v02.00.00';
+const APP_VERSION = 'APP v02.01.00';
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   'ai-status': 'AI Status',
@@ -40,7 +39,6 @@ const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   cardhub: 'Card Hub',
   cfdns: 'CF DNS',
   cfpw: 'CF P&W',
-  financeiro: 'Financeiro',
   oraculo: 'Oráculo',
   calculadora: 'Calculadora',
   mainsite: 'MainSite',
@@ -68,7 +66,6 @@ const RAW_NAV_ITEMS: NavItem[] = [
   { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
   { id: 'cfdns', label: 'CF DNS', icon: Globe },
   { id: 'cfpw', label: 'CF P&W', icon: Globe },
-  { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
   { id: 'oraculo', label: 'Oráculo', icon: BrainCircuit },

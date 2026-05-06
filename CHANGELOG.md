@@ -1,5 +1,22 @@
 # Changelog — Admin App
 
+## [v02.01.00] - 2026-05-06
+### Removido — painel Financeiro e superfícies de pagamento
+- Removido integralmente o módulo `Financeiro` do menu, roteamento lazy, union `ModuleId`, testes E2E e CSS dedicado.
+- Removidas rotas/handlers do `admin-motor` para `/api/financeiro/*`, SumUp balance, cancel/refund/insights e configuração de taxas `mainsite/fees`.
+- Removidos bindings/aliases críticos de SumUp, Mercado Pago e PIX do runtime do admin; `@sumup/sdk` e entradas de terceiros correspondentes saíram do pacote.
+- O módulo MainSite do admin deixou de expor gatilho de doação em disclaimers e painel de taxas de processamento.
+### Alterado — dependências, workflows e Dependabot
+- Dependências diretas atualizadas para as versões correntes verificadas em 2026-05-06, incluindo React 19.2.6, Hono 4.12.18, Wrangler 4.88.0, Workers Types 4.20260506.1, Google GenAI 1.52.0 e lint-staged 17.0.2.
+- Dependabot e GitHub Actions auditados: `github-actions`, `/` e `/tlsrpt-motor` cobertos; actions SHA-pinned já estavam nos releases mais recentes.
+### Validação
+- `npm outdated --long` sem pendências.
+- `npm audit --audit-level=high` sem vulnerabilidades.
+- `npm run lint`; `npm run test:admin-motor`; `npm test`; `npm run build`; `npm run format:public:check`.
+- YAML dos workflows/dependabot parseado via `js-yaml`; `git diff --check`.
+### Versão
+- APP v02.00.00 → APP v02.01.00
+
 ## [v02.00.00] - 2026-05-01
 ### Adicionado — auditoria rigorosa de segurança + UX (paridade com mainsite-app v02.18.00 / v03.22.00)
 - **Magic-byte upload validation** (`admin-motor/src/handlers/routes/mainsite/upload.ts`): novas helpers `inferExtensionFromMagicBytes` (JPG `FF D8 FF`, PNG `89 50 4E 47`, GIF `47 49 46 38`, WebP `RIFF…WEBP`, AVIF `ftyp+avif/avis`, PDF `%PDF`) e `magicMatchesExtension` (com equivalência `jpg ↔ jpeg`). Lê os primeiros 16 bytes do `ArrayBuffer` ANTES do `MEDIA_BUCKET.put`; o buffer é reusado para o R2 put (não relê o stream). Bloqueia o caso `arquivo.exe` renomeado para `.png` que passaria por extensão + content-type (ambos vindos do cliente). Mesmo padrão do `mainsite-worker v02.18.00`.
