@@ -92,6 +92,18 @@
         margin: 18px auto 0;
         max-width: 580px;
       }
+      .github-sponsor-card {
+        width: min(600px, 100%);
+        margin: 24px auto;
+        overflow: hidden;
+        border-radius: 18px;
+        background: var(--card);
+      }
+      .github-sponsor-card iframe {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+      }
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -148,15 +160,30 @@
         />
         <h1 id="title">Apoie Admin App</h1>
         <p>
-          O checkout de apoio agora é centralizado em
-          <strong>www.lcv.dev/sponsor</strong>, com pagamento seguro pelo
-          Mercado Pago e backend dedicado <code>sponsor-motor</code>.
+          Apoie nossos projetos open-source de forma segura pelo<br />
+          Mercado Pago, indo até
+          <a href="https://www.lcv.dev/sponsor">lcv.dev/sponsor</a>, ou clicando
+          em<br />
+          <strong>&quot;Apoiar este Projeto&quot;</strong>, ou pelo GitHub
+          Sponsors:
         </p>
+        <div
+          class="github-sponsor-card"
+          aria-label="GitHub Sponsors LCV-Ideas-Software"
+        >
+          <iframe
+            src="https://github.com/sponsors/LCV-Ideas-Software/card"
+            title="Sponsor LCV-Ideas-Software"
+            height="225"
+            width="600"
+            style="border: 0"
+          ></iframe>
+        </div>
         <div class="actions">
           <a
             class="button primary"
             href="https://www.lcv.dev/sponsor?project=admin-app"
-            >Apoiar este projeto</a
+            >Apoiar este Projeto</a
           >
           <a
             class="button"
@@ -165,7 +192,8 @@
           >
         </div>
         <div class="note">
-          Esta página não carrega SDK de pagamento nem coleta dados de cartão.
+          Esta página não processa dados de pagamento nem coleta dados de
+          cartão.
         </div>
       </section>
       <footer>
