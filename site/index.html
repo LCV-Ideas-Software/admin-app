@@ -15,24 +15,37 @@
     />
     <style>
       :root {
-        --bg: #f6f8fb;
-        --card: #ffffff;
-        --fg: #0f172a;
-        --muted: #475569;
-        --border: #d8e0ea;
-        --accent: #2563eb;
-        --shadow: rgba(15, 23, 42, 0.1);
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #0b1220;
-          --card: #111827;
-          --fg: #e7edf5;
-          --muted: #9aa8ba;
-          --border: #253246;
-          --accent: #60a5fa;
-          --shadow: rgba(0, 0, 0, 0.32);
-        }
+        --bg: #050b18;
+        --bg-elev: #0d1a2e;
+        --fg: #f1f5fb;
+        --fg-soft: #c5d3e6;
+        --muted: #8aa0bd;
+        --border: #1e3a5f;
+        --border-strong: #2d5180;
+        --accent: #38bdf8;
+        --accent-cool: #2563eb;
+        --accent-emerald: #34d399;
+        --shadow: rgba(2, 6, 18, 0.6);
+        --glow-cyan: rgba(56, 189, 248, 0.35);
+        --glow-blue: rgba(37, 99, 235, 0.32);
+        --grad-bg:
+          radial-gradient(
+            circle at 14% -8%,
+            rgba(37, 99, 235, 0.55),
+            transparent 52%
+          ),
+          radial-gradient(
+            circle at 92% 18%,
+            rgba(6, 182, 212, 0.42),
+            transparent 56%
+          ),
+          radial-gradient(
+            circle at 50% 110%,
+            rgba(15, 118, 110, 0.25),
+            transparent 60%
+          );
+        --grad-card: linear-gradient(160deg, #0f1f3d 0%, #081428 100%);
+        --grad-cta: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
       }
       * {
         box-sizing: border-box;
@@ -47,13 +60,8 @@
         display: grid;
         place-items: center;
         padding: 32px 18px;
-        background:
-          radial-gradient(
-            circle at top,
-            color-mix(in srgb, var(--accent) 18%, transparent),
-            transparent 34rem
-          ),
-          var(--bg);
+        background: var(--grad-bg), var(--bg);
+        background-attachment: fixed;
         color: var(--fg);
         font:
           16px/1.55 -apple-system,
@@ -63,6 +71,15 @@
           "Helvetica Neue",
           Arial,
           sans-serif;
+        font-feature-settings: "ss01", "cv11";
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        color: #7dd3fc;
+        text-decoration: underline;
       }
       main {
         width: min(760px, 100%);
@@ -71,33 +88,52 @@
       .card {
         border: 1px solid var(--border);
         border-radius: 28px;
-        background: color-mix(in srgb, var(--card) 94%, transparent);
-        box-shadow: 0 18px 50px var(--shadow);
+        background: var(--grad-card);
+        box-shadow:
+          0 28px 64px var(--shadow),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
         padding: clamp(28px, 6vw, 56px);
       }
       .brand-mark {
         width: 86px;
         height: 86px;
         margin-bottom: 18px;
+        filter: drop-shadow(0 0 24px var(--glow-cyan))
+          drop-shadow(0 0 36px var(--glow-blue));
       }
       h1 {
         margin: 0;
         font-size: clamp(34px, 7vw, 58px);
         line-height: 0.98;
         letter-spacing: -0.05em;
+        font-weight: 900;
+        background: linear-gradient(
+          135deg,
+          #f1f5fb 0%,
+          #7dd3fc 50%,
+          #34d399 100%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        text-wrap: balance;
       }
       p {
-        color: var(--muted);
+        color: var(--fg-soft);
         font-size: clamp(16px, 2.2vw, 19px);
         margin: 18px auto 0;
         max-width: 580px;
+        line-height: 1.6;
       }
       .github-sponsor-card {
         width: min(600px, 100%);
         margin: 24px auto;
         overflow: hidden;
         border-radius: 18px;
-        background: var(--card);
+        background: rgba(255, 255, 255, 0.96);
+        padding: 6px;
+        box-shadow: 0 12px 28px var(--shadow);
       }
       .github-sponsor-card iframe {
         display: block;
@@ -116,20 +152,40 @@
         align-items: center;
         justify-content: center;
         min-height: 44px;
-        padding: 11px 18px;
+        padding: 11px 20px;
         border-radius: 999px;
-        border: 1px solid var(--border);
+        border: 1px solid var(--border-strong);
+        background: rgba(13, 26, 46, 0.7);
         color: var(--fg);
         text-decoration: none;
-        font-weight: 750;
-      }
-      a.button.primary {
-        color: #ffffff;
-        background: var(--accent);
-        border-color: var(--accent);
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        transition:
+          transform 160ms ease,
+          border-color 160ms ease,
+          box-shadow 160ms ease,
+          background 160ms ease;
       }
       a.button:hover {
         transform: translateY(-1px);
+        border-color: var(--accent);
+        background: rgba(13, 26, 46, 0.92);
+        box-shadow: 0 8px 24px var(--glow-cyan);
+        text-decoration: none;
+      }
+      a.button.primary {
+        color: #fff;
+        background: var(--grad-cta);
+        border-color: transparent;
+        box-shadow:
+          0 12px 32px var(--glow-blue),
+          inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      }
+      a.button.primary:hover {
+        filter: brightness(1.08);
+        box-shadow:
+          0 16px 40px var(--glow-blue),
+          inset 0 1px 0 rgba(255, 255, 255, 0.22);
       }
       .note {
         margin-top: 24px;
@@ -140,12 +196,19 @@
         margin-top: 28px;
         color: var(--muted);
         font-size: 13px;
+        line-height: 1.65;
       }
       footer .footer-brand {
         display: block;
         font-size: 1.5em;
         line-height: 1.1;
-        margin-bottom: 0.125em;
+        margin-bottom: 0.25em;
+        font-weight: 800;
+        background: linear-gradient(135deg, #f1f5fb 0%, #7dd3fc 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.02em;
       }
     </style>
   </head>
