@@ -12,12 +12,13 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release: **v02.01.01**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
+**Status.** Stable. Current release: **v02.01.02**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
 
 The version history at a glance:
 
 | Release | Scope |
 |---|---|
+| **`v02.01.02`** | **Site sponsor card iteration.** `site/index.html` GitHub Sponsors iframe (caixa branca cross-origin) substituído por link card dark navy com ❤ pink + meta cyan + seta animada; card movido para DEPOIS dos botões (lcv.dev/sponsor primário, GitHub Sponsors alternativa). Companion ship Phase 3 (12 repos). |
 | **`v02.01.01`** | **Site visual identity refresh.** `site/index.html` (GitHub Pages) reskinneada para a nova identidade dark-first navy/cyan da org LCV (`#050b18`/`#38bdf8`/`#34d399`, gradientes radiais, glow shadows, gradient text no h1). Coordinated Phase 2 companion ship (calculadora, oraculo, astrologo, admin, mainsite, maestro, mtasts). Sem mudança no app runtime. |
 | **`v02.01.00`** | **Financeiro removed + dependency/workflow hygiene.** Removed the Financeiro module, admin-motor finance/SumUp/fees routes, SumUp/MP/PIX runtime bindings, MainSite fee/donation-trigger controls, and the SumUp SDK; updated direct dependencies and confirmed Dependabot/GitHub Actions coverage. |
 | **`v02.00.00`** | **Rigorous security + UX audit.** Magic-byte upload validation in `admin-motor` (matches the renamed-binary fix shipped in `mainsite-worker v02.18.00`). Top-level Error Boundary in `main.tsx` so render-phase exceptions no longer crash the admin into a blank page. ESC dismissal on the PostEditor `PromptModal` (WCAG 2.1 AA gap closure for the only non-Radix dialog in the app). Major bump forced by the `vXX.XX.XX` 2-digit ceiling at v01.99 — not a structural change. |
