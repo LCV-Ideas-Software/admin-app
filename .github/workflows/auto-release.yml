@@ -1,5 +1,4 @@
 name: Auto-release on version bump
-
 # Universal tag convention (operator directive 2026-04-28): vXX.XX.XX with
 # two-digit zero-padded segments. APP_VERSION (in src/App.tsx) is
 # the source of truth; the tag is derived as `v${digits-only-from-APP_VERSION}`
@@ -15,34 +14,27 @@ name: Auto-release on version bump
 # Inspired by maestro-app's release.yml (Codex 2026-04-26) and
 # cross-review-mcp's auto-tag.yml. Adapted for the 8 LCV-Ideas-Software
 # repos that ship APP_VERSION'd Node/Vite/Worker applications.
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 concurrency:
   group: auto-release-${{ github.ref }}
   cancel-in-progress: false
-
 env:
   # Path of the file containing `const APP_VERSION = 'APP vXX.YY.ZZ';`.
   VERSION_FILE: src/App.tsx
-
 jobs:
   auto-release:
     name: Create universal-format tag + GitHub Release if APP_VERSION was bumped
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout main with full history
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-
       - name: Extract APP_VERSION + compute tags
         id: version
         run: |
@@ -67,7 +59,6 @@ jobs:
           echo "tag=$PAD" >> "$GITHUB_OUTPUT"
           echo "legacy_tag=$LEGACY" >> "$GITHUB_OUTPUT"
           echo "APP_VERSION='APP v${DIGITS}' → universal: $PAD, legacy: $LEGACY"
-
       - name: Check if either tag already exists on origin
         id: check
         env:
@@ -85,7 +76,6 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "Neither ${TAG} nor ${LEGACY_TAG} exists; will create universal-format tag ${TAG}."
           fi
-
       - name: Extract release notes from CHANGELOG.md
         id: notes
         if: steps.check.outputs.exists == 'false'
@@ -117,7 +107,6 @@ jobs:
             echo "$NOTES"
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
-
       - name: Create tag + GitHub Release
         if: steps.check.outputs.exists == 'false'
         env:
@@ -133,3 +122,4 @@ jobs:
             --notes "$NOTES" \
             --latest
           echo "Created release ${TAG} at ${GITHUB_SHA}."
+    timeout-minutes: 60

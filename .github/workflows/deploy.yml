@@ -1,5 +1,4 @@
 name: Deploy
-
 on:
   push:
     branches: [main]
@@ -14,14 +13,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_OPTIONS: "--no-deprecation"
   WRANGLER_VERSION: "latest"
-
 concurrency:
   group: deploy-main
   cancel-in-progress: true
-
 permissions:
   contents: read
-
 jobs:
   detect_tlsrpt:
     runs-on: ubuntu-latest
@@ -76,7 +72,7 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason=${reason}\n`);
           console.log(reason);
           NODE
-
+    timeout-minutes: 30
   deploy_tlsrpt:
     needs: detect_tlsrpt
     if: needs.detect_tlsrpt.outputs.deploy_tlsrpt == 'true'
@@ -86,21 +82,17 @@ jobs:
       deployments: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: ./tlsrpt-motor/package-lock.json
-
       - name: Install TLS-RPT Motor
         working-directory: ./tlsrpt-motor
         run: npm ci
-
       - name: Audit TLS-RPT Motor
         working-directory: ./tlsrpt-motor
         run: npm audit --audit-level=high
-
       - name: Inject D1 database_id from secret (tlsrpt-motor)
         run: |
           if [ -z "${D1_DATABASE_ID:-}" ]; then
@@ -117,54 +109,44 @@ jobs:
           fi
         env:
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-
       - name: Deploy TLS-RPT Motor
         working-directory: ./tlsrpt-motor
         run: npx wrangler@${WRANGLER_VERSION} deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
-
+    timeout-minutes: 30
   deploy_admin:
     needs: [detect_tlsrpt, deploy_tlsrpt]
     if: >
-      always() &&
-      github.event_name == 'push' &&
-      needs.detect_tlsrpt.result == 'success' &&
-      (needs.detect_tlsrpt.outputs.deploy_tlsrpt != 'true' || needs.deploy_tlsrpt.result == 'success')
+      always() && github.event_name == 'push' && needs.detect_tlsrpt.result == 'success' && (needs.detect_tlsrpt.outputs.deploy_tlsrpt != 'true' || needs.deploy_tlsrpt.result == 'success')
+
     runs-on: ubuntu-latest
     permissions:
       contents: read
       deployments: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: ./package-lock.json
-
       - name: Install Admin App
         run: npm ci
         working-directory: ./
-
       - name: Security Audit — Admin App
         run: npm audit --audit-level=high
         working-directory: ./
-
       - name: Lint Admin App
         run: npm run lint
         working-directory: ./
-
       - name: Test Admin App UI
         run: npm test
         working-directory: ./
-
       - name: Test Admin Motor
         run: npm run test:admin-motor
         working-directory: ./
-
       - name: Inject D1 database_id from secret (root + admin-motor)
         run: |
           if [ -z "${D1_DATABASE_ID:-}" ]; then
@@ -182,20 +164,18 @@ jobs:
           done
         env:
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-
       - name: Deploy Admin Motor
         run: npx wrangler@${WRANGLER_VERSION} deploy --config admin-motor/wrangler.json
         working-directory: ./
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
-
       - run: npm run build
         working-directory: ./
-
       - name: Deploy Admin App
         run: npx wrangler@${WRANGLER_VERSION} pages deploy dist --project-name=admin-app --branch=main --commit-dirty=true
         working-directory: ./
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
+    timeout-minutes: 30

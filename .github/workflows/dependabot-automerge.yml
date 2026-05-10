@@ -1,5 +1,4 @@
 name: Dependabot Automerge
-
 on:
   pull_request_target:
     types:
@@ -7,11 +6,9 @@ on:
       - reopened
       - synchronize
       - ready_for_review
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
   enable-automerge:
     if: github.actor == 'dependabot[bot]'
@@ -25,4 +22,8 @@ jobs:
           if [ "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
             exit 0
           fi
-          gh pr merge "$PR_URL" --auto --merge
+          gh pr merge "$PR_URL" --auto --squash --delete-branch
+    timeout-minutes: 15
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

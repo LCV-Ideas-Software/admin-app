@@ -1,0 +1,26 @@
+name: OpenSSF Scorecard
+on:
+  schedule:
+    - cron: "37 8 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+concurrency:
+  group: scorecard-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2 # v2.4.3
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          publish_results: true
