@@ -24,3 +24,13 @@ jobs:
           results_file: scorecard-results.sarif
           results_format: sarif
           publish_results: true
+      - name: Upload SARIF artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-results
+          path: scorecard-results.sarif
+          retention-days: 5
+      - name: Upload SARIF to code-scanning
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: scorecard-results.sarif
