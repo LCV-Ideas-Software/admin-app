@@ -1,4 +1,14 @@
 version: 2
+
+# StepSecurity Secure Registry auth (matches project .npmrc).
+# Dependabot uses its own secret namespace; Actions secrets do not
+# propagate to Dependabot jobs.
+registries:
+  stepsecurity-javascript:
+    type: npm-registry
+    url: https://registry.stepsecurity.io/javascript
+    token: ${{ secrets.DEPENDABOT_STEPSECURITY_NPM_TOKEN }}
+
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -16,6 +26,8 @@ updates:
 
   - package-ecosystem: "npm"
     directory: "/"
+    registries:
+      - stepsecurity-javascript
     schedule:
       interval: "daily"
       time: "03:00"
@@ -71,6 +83,8 @@ updates:
 
   - package-ecosystem: "npm"
     directory: "/tlsrpt-motor"
+    registries:
+      - stepsecurity-javascript
     schedule:
       interval: "daily"
       time: "03:00"
