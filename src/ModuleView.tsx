@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { useParams } from '@tanstack/react-router';
 import { Loader2 } from 'lucide-react';
 import { Component, type ComponentType, type ErrorInfo, lazy, type ReactNode, Suspense } from 'react';
 import type { ModuleId } from './App';
+import { useParams } from './router-context';
 
 /* ─── Lazy-load recovery infrastructure ─── */
 

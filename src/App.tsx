@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { Outlet, useNavigate, useParams } from '@tanstack/react-router';
 import {
   BarChart3,
   Brain,
@@ -27,7 +26,9 @@ import './App.css';
 import { ComplianceBanner } from './components/ComplianceBanner';
 import { FloatingScrollButtons } from './components/FloatingScrollButtons';
 import { type NavItem, sortNavItems } from './lib/navItems';
+import { ModuleView } from './ModuleView';
 import type { ModuleId } from './moduleId';
+import { useNavigate, useParams } from './router-context';
 
 export type { ModuleId };
 
@@ -219,7 +220,7 @@ function App() {
           </div>
         </header>
 
-        <Outlet />
+        <ModuleView />
 
         <ComplianceBanner onViewLicenses={() => navigate({ to: '/$moduleId', params: { moduleId: 'compliance' } })} />
         <FloatingScrollButtons />
