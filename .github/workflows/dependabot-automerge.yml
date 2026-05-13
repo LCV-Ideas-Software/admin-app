@@ -10,9 +10,10 @@ permissions:
   contents: read
 jobs:
   enable-automerge:
-    if: github.actor == 'dependabot[bot]'
+    if: github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
+      checks: read
       contents: write
       pull-requests: write
     steps:
@@ -21,16 +22,77 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Wait for PR checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..90}; do
+            state="$(gh pr view "$PR_URL" --json statusCheckRollup --jq '
+              [
+                .statusCheckRollup[]
+                | select(.workflowName != "Dependabot Automerge")
+                | select(.name != "StepSecurity Optional Checks")
+              ] as $checks
+              | if ($checks | length) == 0 then "pending"
+                elif any($checks[]; .status != "COMPLETED") then "pending"
+                elif all($checks[]; (.conclusion == "SUCCESS" or .conclusion == "SKIPPED" or .conclusion == "NEUTRAL")) then "success"
+                else "failure"
+                end
+            ')"
+
+            case "$state" in
+              success)
+                echo "PR checks are green for $PR_URL."
+                exit 0
+                ;;
+              failure)
+                echo "::error::One or more PR checks failed for $PR_URL; refusing automerge."
+                gh pr view "$PR_URL" --json statusCheckRollup --jq '
+                  .statusCheckRollup[]
+                  | select(.workflowName != "Dependabot Automerge")
+                  | select(.name != "StepSecurity Optional Checks")
+                  | [.workflowName, .name, .status, .conclusion]
+                  | @tsv
+                '
+                exit 1
+                ;;
+              pending)
+                echo "Waiting for PR checks, attempt ${attempt}/90."
+                sleep 10
+                ;;
+              *)
+                echo "::error::Unexpected PR check state: $state"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "::error::Timed out waiting for PR checks."
+          exit 1
+
+      - name: Auto-approve Dependabot PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr review "$PR_URL" --approve --body "Auto-approved Dependabot dependency update after the configured PR checks passed."
+
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
+          state="$(gh pr view "$PR_URL" --json state --jq '.state')"
+          if [ "$state" != "OPEN" ]; then
+            exit 0
+          fi
           if [ "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
             exit 0
           fi
           gh pr merge "$PR_URL" --auto --squash --delete-branch
-    timeout-minutes: 15
+    timeout-minutes: 30
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
