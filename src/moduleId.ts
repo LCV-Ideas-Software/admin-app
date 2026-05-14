@@ -19,6 +19,7 @@ export type ModuleId =
   | 'config'
   | 'oraculo'
   | 'calculadora'
+  | 'maestro-ai'
   | 'mainsite'
   | 'mtasts'
   | 'telemetria'

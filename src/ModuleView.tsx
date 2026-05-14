@@ -101,6 +101,9 @@ const CalculadoraModule = lazyWithAccessRecovery(() =>
 const MainsiteModule = lazyWithAccessRecovery(() =>
   import('./modules/mainsite/MainsiteModule').then((m) => ({ default: m.MainsiteModule })),
 );
+const MaestroAiModule = lazyWithAccessRecovery(() =>
+  import('./modules/maestro-ai/MaestroAiModule').then((m) => ({ default: m.MaestroAiModule })),
+);
 const MtastsModule = lazyWithAccessRecovery(() =>
   import('./modules/mtasts/MtastsModule').then((m) => ({ default: m.MtastsModule })),
 );
@@ -140,6 +143,7 @@ const MODULE_COMPONENTS: Record<ModuleId, ComponentType<Record<string, never>>> 
   cfpw: CfPwModule as ComponentType<Record<string, never>>,
   config: ConfigModule as ComponentType<Record<string, never>>,
   calculadora: CalculadoraModule as ComponentType<Record<string, never>>,
+  'maestro-ai': MaestroAiModule as ComponentType<Record<string, never>>,
   mainsite: MainsiteModule as ComponentType<Record<string, never>>,
   mtasts: MtastsModule as ComponentType<Record<string, never>>,
   oraculo: OraculoModule as ComponentType<Record<string, never>>,

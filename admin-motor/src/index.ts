@@ -58,6 +58,15 @@ import {
 import { onRequestPost as handleCalculadoraSyncPost } from './handlers/routes/calculadora/sync';
 import { onRequestPost as handleMainsiteAiTransformPost } from './handlers/routes/mainsite/ai/transform';
 import {
+  handleMaestroAiArtifactsGet,
+  handleMaestroAiSessionContentPut,
+  handleMaestroAiSettingsGet,
+  handleMaestroAiSettingsPut,
+  handleMaestroAiSettingsTestPost,
+  handleMaestroAiSessionsGet,
+  handleMaestroAiSessionsPost,
+} from './handlers/routes/maestro-ai/sessions';
+import {
   onRequestGet as handleMainsiteAboutGet,
   onRequestPut as handleMainsiteAboutPut,
 } from './handlers/routes/mainsite/about';
@@ -128,6 +137,13 @@ type AdminMotorEnv = {
   BIGDATA_DB?: D1Like;
   MEDIA_BUCKET?: unknown;
   AI?: unknown;
+  MAESTRO_OPENAI_API_KEY?: unknown;
+  MAESTRO_SECRET_STORE_ID?: unknown;
+  MAESTRO_ANTHROPIC_API_KEY?: unknown;
+  MAESTRO_GEMINI_API_KEY?: unknown;
+  MAESTRO_DEEPSEEK_API_KEY?: unknown;
+  MAESTRO_GROK_API_KEY?: unknown;
+  MAESTRO_PERPLEXITY_API_KEY?: unknown;
   GEMINI_API_KEY?: unknown;
   CLOUDFLARE_PW?: unknown;
   CF_ACCOUNT_ID?: unknown;
@@ -146,6 +162,13 @@ type ResolvedAdminMotorEnv = {
   BIGDATA_DB?: D1Like;
   MEDIA_BUCKET?: unknown;
   AI?: unknown;
+  MAESTRO_OPENAI_API_KEY?: string;
+  MAESTRO_SECRET_STORE_ID?: string;
+  MAESTRO_ANTHROPIC_API_KEY?: string;
+  MAESTRO_GEMINI_API_KEY?: string;
+  MAESTRO_DEEPSEEK_API_KEY?: string;
+  MAESTRO_GROK_API_KEY?: string;
+  MAESTRO_PERPLEXITY_API_KEY?: string;
   GEMINI_API_KEY?: string;
   CLOUDFLARE_PW?: string;
   CF_ACCOUNT_ID?: string;
@@ -232,6 +255,13 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   BIGDATA_DB: env.BIGDATA_DB,
   MEDIA_BUCKET: env.MEDIA_BUCKET,
   AI: env.AI,
+  MAESTRO_OPENAI_API_KEY: await readSecretString(env.MAESTRO_OPENAI_API_KEY),
+  MAESTRO_SECRET_STORE_ID: await readSecretString(env.MAESTRO_SECRET_STORE_ID),
+  MAESTRO_ANTHROPIC_API_KEY: await readSecretString(env.MAESTRO_ANTHROPIC_API_KEY),
+  MAESTRO_GEMINI_API_KEY: await readSecretString(env.MAESTRO_GEMINI_API_KEY),
+  MAESTRO_DEEPSEEK_API_KEY: await readSecretString(env.MAESTRO_DEEPSEEK_API_KEY),
+  MAESTRO_GROK_API_KEY: await readSecretString(env.MAESTRO_GROK_API_KEY),
+  MAESTRO_PERPLEXITY_API_KEY: await readSecretString(env.MAESTRO_PERPLEXITY_API_KEY),
   GEMINI_API_KEY: await readSecretString(env.GEMINI_API_KEY),
   CLOUDFLARE_PW: await readSecretString(env.CLOUDFLARE_PW),
   CF_ACCOUNT_ID: await readSecretString(env.CF_ACCOUNT_ID),
@@ -546,6 +576,23 @@ app.post('/api/mainsite/post-summaries', (c) => handlePostSummariesPost(rc(c)));
 app.post('/api/mainsite/gemini-import', (c) => handleGeminiImportPost(rc(c)));
 app.options('/api/mainsite/gemini-import', (c) => handleGeminiImportOptions(rc(c)));
 app.post('/api/mainsite/ai/transform', (c) => handleMainsiteAiTransformPost(rc(c)));
+
+// ── maestro ai ──
+app.get('/api/maestro-ai/settings', (c) => handleMaestroAiSettingsGet(rc(c)));
+app.put('/api/maestro-ai/settings', (c) => handleMaestroAiSettingsPut(rc(c)));
+app.post('/api/maestro-ai/settings/test', (c) => handleMaestroAiSettingsTestPost(rc(c)));
+app.get('/api/maestro-ai/sessions', (c) => handleMaestroAiSessionsGet(rc(c)));
+app.post('/api/maestro-ai/sessions', (c) => handleMaestroAiSessionsPost(rc(c)));
+app.get('/api/maestro-ai/sessions/:id', (c) => handleMaestroAiSessionsGet(rc(c), c.req.param('id')));
+app.get('/api/maestro-ai/sessions/:id/artifacts', (c) =>
+  handleMaestroAiArtifactsGet(rc(c), c.req.param('id')),
+);
+app.get('/api/maestro-ai/sessions/:id/artifacts/:artifactId', (c) =>
+  handleMaestroAiArtifactsGet(rc(c), c.req.param('id'), c.req.param('artifactId')),
+);
+app.put('/api/maestro-ai/sessions/:id/content', (c) =>
+  handleMaestroAiSessionContentPut(rc(c), c.req.param('id')),
+);
 
 // ── mainsite workers-ai ──
 app.post('/api/mainsite/workers-ai/sentiment', (c) => handleWorkersAiSentimentPost(rc(c)));

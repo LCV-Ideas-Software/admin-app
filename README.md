@@ -12,12 +12,14 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release: **v02.01.02**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
+**Status.** Stable. Current release: **v02.02.01**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
 
 The version history at a glance:
 
 | Release | Scope |
 |---|---|
+| **`v02.02.01`** | **Maestro AI web polish.** Refined the web module into one continuous screen with two complete sections, `Sessão` and `Configurações`. Settings now persist the editorial protocol, provider token rates, required max cost, optional time limit, max cycles, provider models, and provider API key updates; raw provider keys are written through to Cloudflare Secret Store and are never returned to the browser. Session autos are append-only artifacts in D1 with text, diff context, revision report, link audit and metadata per turn; when unanimity produces a final text, `Criar Post` opens the existing MainSite `PostEditor` already populated with the Maestro output. |
+| **`v02.02.00`** | **Maestro AI web/API module.** Added a new `Maestro AI` module inside the admin dashboard, reusing the existing MainSite `PostEditor` and running the editorial circular review flow through provider APIs only. Provider API keys are read exclusively from Cloudflare Secret Store bindings (`MAESTRO_*`), and financial ceilings/rate cards must be configured before paid calls run. |
 | **`v02.01.02`** | **Site sponsor card iteration.** `site/index.html` GitHub Sponsors iframe (caixa branca cross-origin) substituído por link card dark navy com ❤ pink + meta cyan + seta animada; card movido para DEPOIS dos botões (lcv.dev/sponsor primário, GitHub Sponsors alternativa). Companion ship Phase 3 (12 repos). |
 | **`v02.01.01`** | **Site visual identity refresh.** `site/index.html` (GitHub Pages) reskinneada para a nova identidade dark-first navy/cyan da org LCV (`#050b18`/`#38bdf8`/`#34d399`, gradientes radiais, glow shadows, gradient text no h1). Coordinated Phase 2 companion ship (calculadora, oraculo, astrologo, admin, mainsite, maestro, mtasts). Sem mudança no app runtime. |
 | **`v02.01.00`** | **Financeiro removed + dependency/workflow hygiene.** Removed the Financeiro module, admin-motor finance/SumUp/fees routes, SumUp/MP/PIX runtime bindings, MainSite fee/donation-trigger controls, and the SumUp SDK; updated direct dependencies and confirmed Dependabot/GitHub Actions coverage. |
@@ -31,18 +33,59 @@ The version history at a glance:
 
 Operator-only Cloudflare Access-protected dashboard with these modules:
 
-1. **MainSite** — post editor (Tiptap) with Gemini-assisted import + AI summaries (OG/JSON-LD), comments + ratings moderation, settings, theme/disclaimer panels.
-2. **Astrólogo** — astrology consultation viewer + Gemini synthesis, e-mail report dispatch.
-3. **Calculadora** — admin parameters and observability for a financial calculator app (PTAX/IPCA cache, rate-limit policies, backtest spot vs. PTAX, audit log).
-4. **Oráculo** — financial oracle records (LCI/CDB IPCA+ + Tesouro Direto) with cascade delete + per-user data lookup.
-5. **CF DNS / CF P&W** — Cloudflare DNS records CRUD + Pages/Workers project lifecycle (create, settings, observability, deployments cleanup) directly via Cloudflare API.
-6. **MTA-STS** — MTA-STS policy publishing + sync.
-7. **TLS-RPT** — TLS-RPT report viewer ingested by an internal Worker via SMTP.
-8. **AI Status** — multi-provider AI catalog (Gemini, Workers AI), GCP Cloud Logging integration, rate-limit configuration.
-9. **News** — RSS discovery + feed publication (operator content curation).
-10. **Telemetria** — operational events, sync runs, AI usage logs aggregation.
-11. **Configurações** — global app config + AI model selectors with D1 persistence.
-12. **Conformidade e Licenças** — AGPLv3 license display + third-party inventory.
+1. **Maestro AI** — web editorial orchestration module with one continuous screen made of two complete sections (`Sessão` and `Configurações`), reusing the MainSite PostEditor and storing provider credentials only through Cloudflare Secret Store.
+2. **MainSite** — post editor (Tiptap) with Gemini-assisted import + AI summaries (OG/JSON-LD), comments + ratings moderation, settings, theme/disclaimer panels.
+3. **Astrólogo** — astrology consultation viewer + Gemini synthesis, e-mail report dispatch.
+4. **Calculadora** — admin parameters and observability for a financial calculator app (PTAX/IPCA cache, rate-limit policies, backtest spot vs. PTAX, audit log).
+5. **Oráculo** — financial oracle records (LCI/CDB IPCA+ + Tesouro Direto) with cascade delete + per-user data lookup.
+6. **CF DNS / CF P&W** — Cloudflare DNS records CRUD + Pages/Workers project lifecycle (create, settings, observability, deployments cleanup) directly via Cloudflare API.
+7. **MTA-STS** — MTA-STS policy publishing + sync.
+8. **TLS-RPT** — TLS-RPT report viewer ingested by an internal Worker via SMTP.
+9. **AI Status** — multi-provider AI catalog (Gemini, Workers AI), GCP Cloud Logging integration, rate-limit configuration.
+10. **News** — RSS discovery + feed publication (operator content curation).
+11. **Telemetria** — operational events, sync runs, AI usage logs aggregation.
+12. **Configurações** — global app config + AI model selectors with D1 persistence.
+13. **Conformidade e Licenças** — AGPLv3 license display + third-party inventory.
+
+### Maestro AI settings and credentials
+
+The web Maestro AI module runs through provider APIs. Its UI is intentionally smaller than the Windows desktop app, but the remaining sections are complete:
+
+- `Sessão` starts and tracks the circular editorial workflow, including the initial drafter, selected panel, current agent holding the work, live session autos, and final `Criar Post` handoff into the MainSite PostEditor.
+- `Configurações` stores provider API keys, tests provider responsiveness, stores token rates, required max cost, optional time limit, max cycles, provider models, and the full editorial protocol.
+- There is no separate agents screen, setup screen, evidence screen, or Cloudflare settings screen.
+
+Provider API keys can be entered in `Configurações`, but raw values are used only once by the backend to write to Cloudflare Secret Store. Saved key values are never returned to the browser. Provider credentials are exposed to the Worker through these `admin-motor/wrangler.json` Secret Store bindings:
+
+| Binding | Secret Store name |
+|---|---|
+| `MAESTRO_OPENAI_API_KEY` | `MAESTRO_OPENAI_API_KEY` |
+| `MAESTRO_ANTHROPIC_API_KEY` | `MAESTRO_ANTHROPIC_API_KEY` |
+| `MAESTRO_GEMINI_API_KEY` | `MAESTRO_GEMINI_API_KEY` |
+| `MAESTRO_DEEPSEEK_API_KEY` | `MAESTRO_DEEPSEEK_API_KEY` |
+| `MAESTRO_GROK_API_KEY` | `MAESTRO_GROK_API_KEY` |
+| `MAESTRO_PERPLEXITY_API_KEY` | `MAESTRO_PERPLEXITY_API_KEY` |
+
+The Worker also uses infrastructure-only bindings/vars to write provider keys into the same Secret Store:
+
+| Runtime item | Purpose |
+|---|---|
+| `CLOUDFLARE_PW` | Cloudflare API token used by `admin-motor` to upsert Secret Store values. |
+| `CF_ACCOUNT_ID` | Cloudflare account id. |
+| `MAESTRO_SECRET_STORE_ID` | Secret Store id used by Maestro AI. |
+
+These Cloudflare values are not user-facing Maestro AI settings. They are deployment infrastructure for the Worker.
+
+Execution controls are explicit: every Maestro AI session requires a positive max cost and positive per-provider input/output rates before any paid provider call is made; an optional time limit can also be configured. The editable default rate card is seeded from the current provider list prices for Claude Opus 4.7, GPT-5.5, Gemini 2.5 Pro, DeepSeek V4 Pro, Grok 4.20 Multi-Agent and Perplexity Sonar Reasoning Pro; Perplexity also carries its search request fee. The editorial protocol is persisted in the shared Cloudflare D1 database `bigdata_db` through the `BIGDATA_DB` binding (`maestro_ai_settings`) and loaded automatically by every session. Link/evidence checks run inside the engine and are reported through session events.
+
+The desktop app writes session folders and Markdown files. The web module stores the same operational idea as D1-backed autos:
+
+- `maestro_ai_sessions` keeps session state, cost, active panel, current/final text and event log.
+- `maestro_ai_artifacts` stores one append-only artifact for every draft/revision turn, with the Markdown artifact body, revision report, link audit, model, cost, previous-artifact pointer and byte size.
+- The UI exposes these autos inside `Sessão` as a live timeline. Selecting a turn shows the full text, simple diff against the previous artifact, revision report, link audit and metadata.
+- The engine also enforces a programmatic revision-contract guard: a `READY` reviewer cannot alter custody text, text-changing revisions require a substantive report, and material shortening is blocked as anti-impoverishment defense.
+
+Worker logs for the web engine use the fixed `MAESTRO_AI_WEB` prefix so Cloudflare Observability searches can isolate Maestro traffic quickly.
 
 ## Architecture
 

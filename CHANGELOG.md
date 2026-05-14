@@ -4,6 +4,39 @@
 ### Alterado
 - Sync inicial do MainSite grava `mainsite/ratelimit` apenas como toggles (`chatbot`, `email`, `comments`), alinhado ao rate limit nativo da Cloudflare; limites numericos nao sao mais semeados em D1.
 
+## [v02.02.01] - 2026-05-14
+### Alterado
+- **Maestro AI web polido**: o módulo web passa a operar em uma tela contínua com duas seções completas, `Sessão` e `Configurações`, em vez de importar telas desktop redundantes. Não há tela separada de agentes, setup, evidências ou protocolo.
+- **Configurações centralizadas**: a seção `Configurações` concentra chaves dos agentes, teste de responsividade das APIs, valores dos tokens, teto financeiro, limite de tempo opcional, ciclos máximos, modelos por agente e consulta/atualização do protocolo editorial.
+- **Seleção operacional preservada**: a seção `Sessão` mantém escolha do redator inicial e do colegiado participante, com validação para usar apenas agentes prontos.
+- **Modelos default alinhados**: os padrões internos seguem os modelos API atuais para Claude (`claude-opus-4-7`), Codex (`gpt-5.5`), Gemini (`gemini-2.5-pro`), DeepSeek (`deepseek-v4-pro`), Grok (`grok-4.20-multi-agent-0309`) e Perplexity (`sonar-reasoning-pro`).
+- **Rate card inicial populado**: configurações financeiras começam com valores editáveis de lista para tokens dos seis provedores; DeepSeek usa preço cheio conservador, e Perplexity inclui também o custo de busca por 1k requisições.
+- **Controles de execução**: custo máximo segue obrigatório; limite de tempo por sessão foi adicionado como configuração opcional.
+- **Autos vivos da sessão**: cada draft/revisão gera um artefato append-only em D1 (`maestro_ai_artifacts`) com texto Markdown, relatório de revisão, auditoria de links, modelo, custo, ponteiro para o artefato anterior e metadados de ciclo/turno/agente.
+- **UI de autos/evidências útil**: a seção `Sessão` exibe timeline navegável dos autos, com detalhe por artefato, texto completo, diff simples contra o anterior, relatório, links e metadados.
+- **Guarda programática do contrato editorial**: além das instruções de prompt, o motor bloqueia revisão que tente alterar texto com status `READY`, revisão sem relatório substantivo, ou redução material do texto anterior, preservando o bloqueio de autoempobrecimento.
+- **Handoff para PostEditor**: quando há unanimidade e `final_text`, a ação `Criar Post` abre o PostEditor existente do MainSite já preenchido com o texto final do Maestro; salvar usa a rota normal de criação de posts do MainSite.
+- **Protocolo automático**: o protocolo editorial agora fica salvo em D1 (`maestro_ai_settings`) e é carregado automaticamente pelo motor em toda sessão; a tela `Sessão` não solicita o protocolo ao usuário.
+- **Secret Store write-through**: novas chaves informadas na UI são enviadas ao backend apenas para gravação no Cloudflare Secret Store. O frontend nunca recebe valores salvos; exibe somente estado `pendente`, `salva` ou `ativa`.
+- **Checagem automática de links**: o motor web extrai e valida links por turno, registra o resultado nos eventos da sessão e bloqueia drafts/revisões com links inválidos, sem criar tela de evidências.
+- **Observability prefixado**: logs do motor Maestro AI web emitidos pelo Worker usam prefixo fixo `MAESTRO_AI_WEB`, facilitando busca no Cloudflare Observability.
+
+### Segurança
+- `CLOUDFLARE_PW`, `CF_ACCOUNT_ID` e `MAESTRO_SECRET_STORE_ID` permanecem infraestrutura do Worker para escrita no Secret Store; não há tela de configuração Cloudflare no Maestro AI web.
+
+## [v02.02.00] - 2026-05-13
+### Adicionado
+- **Maestro AI web/API-only**: novo módulo `Maestro AI` no painel do `admin-app`, com fluxo editorial circular seriado inspirado no `maestro-app` e operando exclusivamente por APIs de provedores.
+- **Reuso do editor existente**: o módulo reutiliza [`src/modules/mainsite/PostEditor.tsx`](src/modules/mainsite/PostEditor.tsx), evitando um segundo editor de texto e mantendo paridade com a experiência editorial já madura do MainSite.
+- **Backend `admin-motor`**: novas rotas `/api/maestro-ai/sessions`, `/api/maestro-ai/sessions/:id` e `/api/maestro-ai/sessions/:id/content`, com persistência em D1, rastreamento de eventos, indicação do agente em posse do trabalho e teto financeiro obrigatório.
+- **Cloudflare Secret Store only**: chaves de provedores do Maestro AI são lidas somente por bindings `MAESTRO_OPENAI_API_KEY`, `MAESTRO_ANTHROPIC_API_KEY`, `MAESTRO_GEMINI_API_KEY`, `MAESTRO_DEEPSEEK_API_KEY`, `MAESTRO_GROK_API_KEY` e `MAESTRO_PERPLEXITY_API_KEY` em `admin-motor/wrangler.json`; nenhuma API key entra na UI, em payloads do frontend ou em fallback local hardcoded.
+- **Gates de execução**: o backend bloqueia sessões sem ao menos dois agentes, sem teto financeiro positivo, sem rate card positivo por agente, sem Secret Store binding por provedor ou com `max_cycles` fora do intervalo 1-5.
+- **Provider wiring testável**: a construção dos requests HTTP de provedores foi extraída para cobertura de teste, validando URLs/payloads de OpenAI Responses, xAI Responses e Perplexity Sonar sem executar chamadas pagas.
+
+### Alterado
+- O menu lateral passou a expor `Maestro AI` como módulo administrativo próprio.
+- A configuração financeira do Maestro AI bloqueia chamadas pagas sem teto de custo positivo, mas o rate card inicial passou a ser populado em v02.02.01 com os preços de lista editáveis dos provedores.
+
 ## [v02.01.02] - 2026-05-09
 ### Alterado
 - **`site/index.html`** — iframe `github.com/sponsors/.../card` (caixa branca cross-origin) substituído por link card dark navy com ❤ pink + meta cyan + seta animada; card movido para DEPOIS dos botões (lcv.dev/sponsor primário, GitHub Sponsors alternativa). Companion ship Phase 3 (12 repos).

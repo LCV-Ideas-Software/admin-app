@@ -795,6 +795,65 @@ input[type="color"]:focus-visible {
   --module-accent-border: rgba(26, 115, 232, 0.18);
 }
 
+.module-shell-maestro-ai {
+  --module-accent: #1a73e8;
+  --module-accent-rgb: 26, 115, 232;
+  --module-accent-soft: rgba(26, 115, 232, 0.08);
+  --module-accent-border: rgba(26, 115, 232, 0.18);
+}
+
+.module-shell-maestro-ai .maestro-cost-field input {
+  width: min(100%, 180px);
+  max-width: 180px;
+  box-sizing: border-box;
+}
+
+.module-shell-maestro-ai .maestro-rate-list {
+  display: grid;
+  gap: 10px;
+}
+
+.module-shell-maestro-ai .maestro-rate-row {
+  display: grid;
+  grid-template-columns: 90px repeat(2, minmax(0, 118px));
+  justify-content: start;
+  gap: 10px;
+  align-items: center;
+}
+
+.module-shell-maestro-ai .maestro-rate-row > strong,
+.module-shell-maestro-ai .maestro-rate-input {
+  min-width: 0;
+}
+
+.module-shell-maestro-ai .maestro-rate-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.module-shell-maestro-ai .maestro-request-rate {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: max-content 118px;
+  align-items: center;
+  justify-content: start;
+  gap: 8px;
+  min-width: 0;
+  color: #5f6368;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .module-shell-maestro-ai .maestro-rate-row {
+    grid-template-columns: 86px repeat(2, minmax(0, 1fr));
+  }
+
+  .module-shell-maestro-ai .maestro-request-rate {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  }
+}
+
 .module-shell-mtasts {
   --module-accent: #1a73e8;
   --module-accent-rgb: 26, 115, 232;

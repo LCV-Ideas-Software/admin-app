@@ -7,6 +7,7 @@ import {
   BarChart3,
   Brain,
   BrainCircuit,
+  Bot,
   Database,
   Globe,
   Home,
@@ -32,7 +33,7 @@ import { useNavigate, useParams } from './router-context';
 
 export type { ModuleId };
 
-const APP_VERSION = 'APP v02.01.02';
+const APP_VERSION = 'APP v02.02.01';
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   'ai-status': 'AI Status',
@@ -42,6 +43,7 @@ const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   cfpw: 'CF P&W',
   oraculo: 'Oráculo',
   calculadora: 'Calculadora',
+  'maestro-ai': 'Maestro AI',
   mainsite: 'MainSite',
   mtasts: 'MTA-STS',
   telemetria: 'Telemetria',
@@ -67,6 +69,7 @@ const RAW_NAV_ITEMS: NavItem[] = [
   { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
   { id: 'cfdns', label: 'CF DNS', icon: Globe },
   { id: 'cfpw', label: 'CF P&W', icon: Globe },
+  { id: 'maestro-ai', label: 'Maestro AI', icon: Bot },
   { id: 'mainsite', label: 'MainSite', icon: Globe },
   { id: 'mtasts', label: 'MTA-STS', icon: ShieldCheck },
   { id: 'oraculo', label: 'Oráculo', icon: BrainCircuit },

@@ -16,11 +16,44 @@
       "enabled": true
     }
   },
+  "vars": {
+    "MAESTRO_SECRET_STORE_ID": "df90c0935ba1460899c3c2c457548a90"
+  },
   "secrets_store_secrets": [
+    {
+      "binding": "MAESTRO_OPENAI_API_KEY",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "MAESTRO_OPENAI_API_KEY"
+    },
+    {
+      "binding": "MAESTRO_ANTHROPIC_API_KEY",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "MAESTRO_ANTHROPIC_API_KEY"
+    },
+    {
+      "binding": "MAESTRO_GEMINI_API_KEY",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "MAESTRO_GEMINI_API_KEY"
+    },
     {
       "binding": "GEMINI_API_KEY",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "gemini-api-key"
+    },
+    {
+      "binding": "MAESTRO_DEEPSEEK_API_KEY",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "MAESTRO_DEEPSEEK_API_KEY"
+    },
+    {
+      "binding": "MAESTRO_GROK_API_KEY",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "MAESTRO_GROK_API_KEY"
+    },
+    {
+      "binding": "MAESTRO_PERPLEXITY_API_KEY",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "MAESTRO_PERPLEXITY_API_KEY"
     },
     {
       "binding": "CLOUDFLARE_PW",
