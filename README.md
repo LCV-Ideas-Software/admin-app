@@ -12,12 +12,13 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release: **v02.02.01**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
+**Status.** Stable. Current release: **v02.02.02**. See [CHANGELOG.md](./CHANGELOG.md) for the release history and validation notes.
 
 The version history at a glance:
 
 | Release | Scope |
 |---|---|
+| **`v02.02.02`** | **Maestro AI cost-field sizing.** Reduced the Maestro AI web cost and token-rate inputs so the `Custos` card no longer clips numeric fields in the admin layout while preserving the existing configuration model. |
 | **`v02.02.01`** | **Maestro AI web polish.** Refined the web module into one continuous screen with two complete sections, `Sessão` and `Configurações`. Settings now persist the editorial protocol, provider token rates, required max cost, optional time limit, max cycles, provider models, and provider API key updates; raw provider keys are written through to Cloudflare Secret Store and are never returned to the browser. Session autos are append-only artifacts in D1 with text, diff context, revision report, link audit and metadata per turn; when unanimity produces a final text, `Criar Post` opens the existing MainSite `PostEditor` already populated with the Maestro output. |
 | **`v02.02.00`** | **Maestro AI web/API module.** Added a new `Maestro AI` module inside the admin dashboard, reusing the existing MainSite `PostEditor` and running the editorial circular review flow through provider APIs only. Provider API keys are read exclusively from Cloudflare Secret Store bindings (`MAESTRO_*`), and financial ceilings/rate cards must be configured before paid calls run. |
 | **`v02.01.02`** | **Site sponsor card iteration.** `site/index.html` GitHub Sponsors iframe (caixa branca cross-origin) substituído por link card dark navy com ❤ pink + meta cyan + seta animada; card movido para DEPOIS dos botões (lcv.dev/sponsor primário, GitHub Sponsors alternativa). Companion ship Phase 3 (12 repos). |

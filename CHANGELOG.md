@@ -4,6 +4,10 @@
 ### Alterado
 - Sync inicial do MainSite grava `mainsite/ratelimit` apenas como toggles (`chatbot`, `email`, `comments`), alinhado ao rate limit nativo da Cloudflare; limites numericos nao sao mais semeados em D1.
 
+## [v02.02.02] - 2026-05-14
+### Alterado
+- **Maestro AI web**: campos numericos do card `Custos` reduzidos pela metade para evitar corte lateral dos inputs de teto financeiro, ciclos, limite de tempo e valores de tokens.
+
 ## [v02.02.01] - 2026-05-14
 ### Alterado
 - **Maestro AI web polido**: o módulo web passa a operar em uma tela contínua com duas seções completas, `Sessão` e `Configurações`, em vez de importar telas desktop redundantes. Não há tela separada de agentes, setup, evidências ou protocolo.
