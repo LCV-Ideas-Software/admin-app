@@ -158,6 +158,9 @@ jobs:
       - name: Lint Admin App
         run: npm run lint
         working-directory: ./
+      - name: Biome (lint + format) Admin App
+        run: npm run biome
+        working-directory: ./
       - name: Test Admin App UI
         run: npm test
         working-directory: ./

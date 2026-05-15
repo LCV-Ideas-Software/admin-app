@@ -49,8 +49,7 @@ const parseId = (rawValue: unknown) => {
   return parsed;
 };
 
-const isMissingTableError = (error: unknown) =>
-  error instanceof Error && /no such table/i.test(error.message);
+const isMissingTableError = (error: unknown) => error instanceof Error && /no such table/i.test(error.message);
 
 const buildErrorResponse = (message: string, trace: ResponseTrace, status = 500, extra?: Record<string, unknown>) =>
   new Response(
@@ -167,7 +166,10 @@ const readAbout = async (db: D1Database) =>
       .first<AboutRow>(),
   );
 
-const upsertAbout = async (db: D1Database, input: { title: string; content: string; author: string; sourcePostId: number | null }) => {
+const upsertAbout = async (
+  db: D1Database,
+  input: { title: string; content: string; author: string; sourcePostId: number | null },
+) => {
   await db
     .prepare(`
       INSERT INTO mainsite_about (id, title, content, author, source_post_id, created_at, updated_at)
@@ -220,8 +222,10 @@ export async function onRequestPut(context: MainsiteContext) {
     const content = sanitizePostHtml(String(body.content ?? ''));
     const author = sanitizePlainText(body.author, 200) || DEFAULT_AUTHOR;
     const sourcePostId = parseId(body.source_post_id);
-    const shouldConvertSource = body.convert_source_post === true || body.convert_source_post === 1 || body.convert_source_post === '1';
-    const shouldRestoreAsPost = body.restore_as_post === true || body.restore_as_post === 1 || body.restore_as_post === '1';
+    const shouldConvertSource =
+      body.convert_source_post === true || body.convert_source_post === 1 || body.convert_source_post === '1';
+    const shouldRestoreAsPost =
+      body.restore_as_post === true || body.restore_as_post === 1 || body.restore_as_post === '1';
     const isPublished = body.is_published === false || body.is_published === 0 || body.is_published === '0' ? 0 : 1;
 
     if (!title || !content) {
@@ -234,7 +238,11 @@ export async function onRequestPut(context: MainsiteContext) {
 
     if (shouldConvertSource) {
       if (!sourcePostId) {
-        return buildErrorResponse('source_post_id válido é obrigatório para converter post em Sobre Este Site.', trace, 400);
+        return buildErrorResponse(
+          'source_post_id válido é obrigatório para converter post em Sobre Este Site.',
+          trace,
+          400,
+        );
       }
 
       const sourcePost = await db

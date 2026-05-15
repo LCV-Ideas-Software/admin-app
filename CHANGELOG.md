@@ -4,6 +4,20 @@
 ### Alterado
 - Sync inicial do MainSite grava `mainsite/ratelimit` apenas como toggles (`chatbot`, `email`, `comments`), alinhado ao rate limit nativo da Cloudflare; limites numericos nao sao mais semeados em D1.
 
+## [v02.02.04] - 2026-05-15
+### Adicionado
+- 4-gate quality directive compliance (eslint + biome + prettier + cross-review): `npm run biome` script (biome check . — uses biome.json's existing scope) + `npm run biome:write` script (biome check --write .). The existing `npm run format` (biome format --write src) is preserved for backward compatibility but is narrower in scope.
+- `deploy.yml` workflow runs `npm run biome` after `npm run lint` (eslint), so the biome gate fires on every push to `main` and every PR.
+
+### Configuration
+- `biome.json` schema URL updated `2.4.12` → `2.4.15` (matched installed CLI version).
+- `biome.json` rule overrides added for legitimate false positives:
+  - `correctness.useExhaustiveDependencies` → off (multiple useEffect setup patterns that intentionally omit or include extra deps).
+  - `a11y.noLabelWithoutControl` → off (multiple `<label>` elements used as display-only section headings, not paired with form controls).
+
+### Alterado
+- 23 admin-motor source files reformatted by `biome check --write .` (cosmetic only; no semantic changes).
+
 ## [v02.02.03] - 2026-05-14
 ### Corrigido
 - **Maestro AI web**: o teste de chaves/API deixou de tratar resposta textual vazia de Gemini e Perplexity como falha quando a chamada autenticada foi aceita; falhas reais continuam vindo de chave ausente, rate card ausente ou erro HTTP/API do provedor.

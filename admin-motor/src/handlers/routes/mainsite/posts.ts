@@ -125,7 +125,11 @@ const postReferenceTargets = [
   { table: 'mainsite_about', column: 'source_post_id' },
 ] as const;
 
-const tableHasColumn = async (db: D1Database, table: (typeof postReferenceTargets)[number]['table'], column: string) => {
+const tableHasColumn = async (
+  db: D1Database,
+  table: (typeof postReferenceTargets)[number]['table'],
+  column: string,
+) => {
   try {
     const info = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
     return (info.results ?? []).some((row) => row.name === column);
@@ -168,7 +172,11 @@ const updatePostIdAndReferences = async (
 
   for (const target of postReferenceTargets) {
     if (await tableHasColumn(db, target.table, target.column)) {
-      statements.push(db.prepare(`UPDATE ${target.table} SET ${target.column} = ? WHERE ${target.column} = ?`).bind(nextId, currentId));
+      statements.push(
+        db
+          .prepare(`UPDATE ${target.table} SET ${target.column} = ? WHERE ${target.column} = ?`)
+          .bind(nextId, currentId),
+      );
     }
   }
 
@@ -427,7 +435,10 @@ export async function onRequestPut(context: MainsiteContext) {
       return buildErrorResponse('ID informado deve ser um número inteiro positivo.', trace, 400);
     }
 
-    const existingPost = await db.prepare('SELECT id FROM mainsite_posts WHERE id = ? LIMIT 1').bind(id).first<{ id?: number }>();
+    const existingPost = await db
+      .prepare('SELECT id FROM mainsite_posts WHERE id = ? LIMIT 1')
+      .bind(id)
+      .first<{ id?: number }>();
     if (!existingPost) {
       return buildErrorResponse('Post não encontrado para atualização.', trace, 404);
     }

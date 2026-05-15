@@ -57,22 +57,12 @@ function inferExtensionFromMagicBytes(bytes: Uint8Array): string | null {
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpg';
 
   // PNG: 89 50 4E 47 0D 0A 1A 0A
-  if (
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47
-  ) {
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
     return 'png';
   }
 
   // GIF: 47 49 46 38 (GIF8)
-  if (
-    bytes[0] === 0x47 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x38
-  ) {
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
     return 'gif';
   }
 
@@ -92,24 +82,13 @@ function inferExtensionFromMagicBytes(bytes: Uint8Array): string | null {
   }
 
   // AVIF: bytes 4..7 = "ftyp", bytes 8..11 in {"avif", "avis", "heic"}
-  if (
-    bytes.length >= 12 &&
-    bytes[4] === 0x66 &&
-    bytes[5] === 0x74 &&
-    bytes[6] === 0x79 &&
-    bytes[7] === 0x70
-  ) {
+  if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
     const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
     if (brand === 'avif' || brand === 'avis') return 'avif';
   }
 
   // PDF: %PDF (25 50 44 46)
-  if (
-    bytes[0] === 0x25 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x44 &&
-    bytes[3] === 0x46
-  ) {
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
     return 'pdf';
   }
 
@@ -182,10 +161,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const headBytes = new Uint8Array(fileBuffer.slice(0, 16));
     const detectedExt = inferExtensionFromMagicBytes(headBytes);
     if (!magicMatchesExtension(detectedExt, ext)) {
-      return Response.json(
-        { error: 'Conteúdo do arquivo não corresponde à extensão declarada.' },
-        { status: 400 },
-      );
+      return Response.json({ error: 'Conteúdo do arquivo não corresponde à extensão declarada.' }, { status: 400 });
     }
 
     const env = ((context as unknown as { data?: { env?: Env } }).data?.env || context.env) as Env;

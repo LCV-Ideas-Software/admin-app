@@ -368,7 +368,10 @@ describe('Maestro AI autos/artifacts', () => {
   it('lists session autos without exposing full markdown payloads in the summary', async () => {
     const db = createMaestroDb({ sessions: [session], artifacts });
     const response = await handleMaestroAiArtifactsGet(createContext({}, {}, db), 'web-session-1');
-    const payload = (await response.json()) as { ok: boolean; artifacts: Array<{ id: string; invalid_links: number; content_md?: string }> };
+    const payload = (await response.json()) as {
+      ok: boolean;
+      artifacts: Array<{ id: string; invalid_links: number; content_md?: string }>;
+    };
 
     expect(response.status).toBe(200);
     expect(payload.ok).toBe(true);
@@ -410,7 +413,13 @@ describe('maestro provider request construction', () => {
   });
 
   it('uses the Anthropic Messages API for Claude requests', () => {
-    const request = maestroAiTestHooks.buildProviderHttpRequest('claude', 'anthropic-secret', 'claude-opus-4-7', system, prompt);
+    const request = maestroAiTestHooks.buildProviderHttpRequest(
+      'claude',
+      'anthropic-secret',
+      'claude-opus-4-7',
+      system,
+      prompt,
+    );
     const body = JSON.parse(String(request.init.body)) as {
       model: string;
       system: Array<{ text: string; cache_control?: { type: string } }>;
@@ -428,7 +437,13 @@ describe('maestro provider request construction', () => {
   });
 
   it('uses the xAI Responses API for Grok requests', () => {
-    const request = maestroAiTestHooks.buildProviderHttpRequest('grok', 'xai-secret', 'grok-4.20-multi-agent-0309', system, prompt);
+    const request = maestroAiTestHooks.buildProviderHttpRequest(
+      'grok',
+      'xai-secret',
+      'grok-4.20-multi-agent-0309',
+      system,
+      prompt,
+    );
     const body = JSON.parse(String(request.init.body)) as { model: string; input: unknown };
 
     expect(request.endpoint).toBe('https://api.x.ai/v1/responses');
@@ -438,7 +453,13 @@ describe('maestro provider request construction', () => {
   });
 
   it('uses the DeepSeek chat completions endpoint for DeepSeek requests', () => {
-    const request = maestroAiTestHooks.buildProviderHttpRequest('deepseek', 'deepseek-secret', 'deepseek-v4-pro', system, prompt);
+    const request = maestroAiTestHooks.buildProviderHttpRequest(
+      'deepseek',
+      'deepseek-secret',
+      'deepseek-v4-pro',
+      system,
+      prompt,
+    );
     const body = JSON.parse(String(request.init.body)) as {
       model: string;
       messages: Array<{ role: string; content: string }>;

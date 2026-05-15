@@ -164,5 +164,7 @@ export function sanitizePostHtml(html: string): string {
 }
 
 export function sanitizePlainText(raw: unknown, maxLength: number): string {
-  return sanitizeHtml(String(raw ?? ''), { allowedTags: [], allowedAttributes: {} }).trim().slice(0, maxLength);
+  return sanitizeHtml(String(raw ?? ''), { allowedTags: [], allowedAttributes: {} })
+    .trim()
+    .slice(0, maxLength);
 }

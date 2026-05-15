@@ -737,7 +737,7 @@ export function CfDnsModule() {
   ]);
 
   const statusTone = useMemo(() => {
-    if (zonesLoading || recordsLoading || saving || Boolean(deletingId)) {
+    if (zonesLoading || recordsLoading || saving || deletingId) {
       return 'warning';
     }
     if (!selectedZoneId) {
@@ -750,7 +750,7 @@ export function CfDnsModule() {
   }, [deletingId, operationalAlerts.length, recordsLoading, saving, selectedZoneId, zonesLoading]);
 
   const statusLabel = useMemo(() => {
-    if (zonesLoading || recordsLoading || saving || Boolean(deletingId)) {
+    if (zonesLoading || recordsLoading || saving || deletingId) {
       return 'Processando...';
     }
     if (!selectedZoneId) {

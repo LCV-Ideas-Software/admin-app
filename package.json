@@ -8,6 +8,8 @@
     "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "biome": "biome check .",
+    "biome:write": "biome check --write .",
     "test": "vitest run",
     "test:admin-motor": "vitest run --config vitest.admin-motor.config.ts",
     "test:ui": "vitest --ui",

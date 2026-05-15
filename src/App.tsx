@@ -5,9 +5,9 @@
 
 import {
   BarChart3,
+  Bot,
   Brain,
   BrainCircuit,
-  Bot,
   Database,
   Globe,
   Home,
@@ -33,7 +33,7 @@ import { useNavigate, useParams } from './router-context';
 
 export type { ModuleId };
 
-const APP_VERSION = 'APP v02.02.03';
+const APP_VERSION = 'APP v02.02.04';
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   'ai-status': 'AI Status',

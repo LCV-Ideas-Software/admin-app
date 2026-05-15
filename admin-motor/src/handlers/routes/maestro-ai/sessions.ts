@@ -213,8 +213,7 @@ const PROVIDER_KEYS: ProviderKey[] = ['claude', 'codex', 'gemini', 'deepseek', '
 const MAX_OUTPUT_TOKENS = 20_000;
 const SETTINGS_ID = 'default';
 const SECRET_STORE_SCOPES = ['workers', 'ai_gateway'] as const;
-const API_TEST_SYSTEM =
-  'You are an API health-check endpoint. Return a short plain-text acknowledgement only.';
+const API_TEST_SYSTEM = 'You are an API health-check endpoint. Return a short plain-text acknowledgement only.';
 const API_TEST_PROMPT = 'Reply with exactly: OK';
 
 const SECRET_NAMES: Record<ProviderKey, string> = {
@@ -289,7 +288,10 @@ function sanitizeAgents(values: unknown, initial: ProviderKey): ProviderKey[] {
 }
 
 function defaultRates(): Record<ProviderKey, ProviderRates> {
-  return Object.fromEntries(PROVIDER_KEYS.map((agent) => [agent, { ...DEFAULT_RATES[agent] }])) as Record<ProviderKey, ProviderRates>;
+  return Object.fromEntries(PROVIDER_KEYS.map((agent) => [agent, { ...DEFAULT_RATES[agent] }])) as Record<
+    ProviderKey,
+    ProviderRates
+  >;
 }
 
 function sanitizeRates(value: unknown): Record<ProviderKey, ProviderRates> {
@@ -303,8 +305,10 @@ function sanitizeRates(value: unknown): Record<ProviderKey, ProviderRates> {
     const requestRate = Number(rates.request_usd_per_1k);
     next[agent] = {
       input_usd_per_million: Number.isFinite(inputRate) && inputRate > 0 ? inputRate : defaults.input_usd_per_million,
-      output_usd_per_million: Number.isFinite(outputRate) && outputRate > 0 ? outputRate : defaults.output_usd_per_million,
-      request_usd_per_1k: Number.isFinite(requestRate) && requestRate > 0 ? requestRate : (defaults.request_usd_per_1k ?? 0),
+      output_usd_per_million:
+        Number.isFinite(outputRate) && outputRate > 0 ? outputRate : defaults.output_usd_per_million,
+      request_usd_per_1k:
+        Number.isFinite(requestRate) && requestRate > 0 ? requestRate : (defaults.request_usd_per_1k ?? 0),
     };
   }
   return next;
@@ -365,7 +369,17 @@ async function ensureSchema(db: D1Database): Promise<void> {
         id, protocol_text, max_cost_usd, max_runtime_minutes, max_cycles, configured_secrets_json, rates_json, models_json, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(SETTINGS_ID, DEFAULT_PROTOCOL, 0, null, 2, '{}', JSON.stringify(defaultRates()), JSON.stringify(DEFAULT_MODELS), nowIso())
+    .bind(
+      SETTINGS_ID,
+      DEFAULT_PROTOCOL,
+      0,
+      null,
+      2,
+      '{}',
+      JSON.stringify(defaultRates()),
+      JSON.stringify(DEFAULT_MODELS),
+      nowIso(),
+    )
     .run();
   await db
     .prepare(
@@ -390,7 +404,11 @@ async function ensureSchema(db: D1Database): Promise<void> {
       )`,
     )
     .run();
-  await db.prepare('CREATE INDEX IF NOT EXISTS idx_maestro_ai_artifacts_session_turn ON maestro_ai_artifacts(session_id, cycle, turn)').run();
+  await db
+    .prepare(
+      'CREATE INDEX IF NOT EXISTS idx_maestro_ai_artifacts_session_turn ON maestro_ai_artifacts(session_id, cycle, turn)',
+    )
+    .run();
   try {
     await db.prepare('ALTER TABLE maestro_ai_sessions ADD COLUMN max_runtime_minutes REAL').run();
   } catch (error) {
@@ -408,7 +426,9 @@ async function ensureSchema(db: D1Database): Promise<void> {
     }
   }
   try {
-    await db.prepare("ALTER TABLE maestro_ai_settings ADD COLUMN configured_secrets_json TEXT NOT NULL DEFAULT '{}'").run();
+    await db
+      .prepare("ALTER TABLE maestro_ai_settings ADD COLUMN configured_secrets_json TEXT NOT NULL DEFAULT '{}'")
+      .run();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/duplicate column|already exists/i.test(message)) {
@@ -441,7 +461,9 @@ function parseJson<T>(value: string | null | undefined, fallback: T): T {
 
 async function loadSettings(db: D1Database): Promise<MaestroSettingsRow> {
   const row = await db
-    .prepare('SELECT id, protocol_text, max_cost_usd, max_runtime_minutes, max_cycles, configured_secrets_json, rates_json, models_json, updated_at FROM maestro_ai_settings WHERE id = ? LIMIT 1')
+    .prepare(
+      'SELECT id, protocol_text, max_cost_usd, max_runtime_minutes, max_cycles, configured_secrets_json, rates_json, models_json, updated_at FROM maestro_ai_settings WHERE id = ? LIMIT 1',
+    )
     .bind(SETTINGS_ID)
     .first<MaestroSettingsRow>();
   if (!row) {
@@ -680,16 +702,14 @@ function requireSecretStoreConfig(env: MaestroAiEnv): { token: string; accountId
   const accountId = env.CF_ACCOUNT_ID?.trim();
   const storeId = env.MAESTRO_SECRET_STORE_ID?.trim();
   if (!token || !accountId || !storeId) {
-    throw new Error('CLOUDFLARE_PW, CF_ACCOUNT_ID e MAESTRO_SECRET_STORE_ID sao obrigatorios para salvar chaves no Cloudflare Secret Store.');
+    throw new Error(
+      'CLOUDFLARE_PW, CF_ACCOUNT_ID e MAESTRO_SECRET_STORE_ID sao obrigatorios para salvar chaves no Cloudflare Secret Store.',
+    );
   }
   return { token, accountId, storeId };
 }
 
-async function cloudflareRequest<T>(
-  env: MaestroAiEnv,
-  path: string,
-  init: RequestInit = {},
-): Promise<T> {
+async function cloudflareRequest<T>(env: MaestroAiEnv, path: string, init: RequestInit = {}): Promise<T> {
   const { token } = requireSecretStoreConfig(env);
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     ...init,
@@ -708,7 +728,13 @@ async function cloudflareRequest<T>(
     throw new Error(`Cloudflare API retornou resposta invalida (${response.status}).`);
   }
   if (!response.ok || parsed.success === false) {
-    const message = parsed.errors?.map((error) => error.message).filter(Boolean).join('; ') || text || `HTTP ${response.status}`;
+    const message =
+      parsed.errors
+        ?.map((error) => error.message)
+        .filter(Boolean)
+        .join('; ') ||
+      text ||
+      `HTTP ${response.status}`;
     throw new Error(`Cloudflare Secret Store falhou: ${sanitizeText(message, 600)}`);
   }
   return parsed.result as T;
@@ -727,7 +753,9 @@ async function upsertSecretStoreSecret(env: MaestroAiEnv, agent: ProviderKey, va
   if (!secretValue) return;
   const { accountId, storeId } = requireSecretStoreConfig(env);
   const name = SECRET_NAMES[agent];
-  const existing = (await listSecretStoreSecrets(env)).find((secret) => secret.name === name && secret.status !== 'deleted');
+  const existing = (await listSecretStoreSecrets(env)).find(
+    (secret) => secret.name === name && secret.status !== 'deleted',
+  );
   const body = {
     value: secretValue,
     scopes: [...SECRET_STORE_SCOPES],
@@ -772,7 +800,12 @@ function calculateObservedCost(result: ProviderCallResult, fallbackPrompt: strin
   return (inputTokens / 1_000_000) * inputRate + (outputTokens / 1_000_000) * outputRate + requestRate / 1000;
 }
 
-function validateRevisionGuard(previousText: string, candidateText: string, status: string, revisionReport: string): string | null {
+function validateRevisionGuard(
+  previousText: string,
+  candidateText: string,
+  status: string,
+  revisionReport: string,
+): string | null {
   const previous = previousText.trim();
   const candidate = candidateText.trim();
   if (!candidate || candidate === previous) return null;
@@ -1022,7 +1055,9 @@ async function callProvider(
 
   const text = parsed.choices?.[0]?.message?.content ?? '';
   return {
-    text: String(text).replace(/^\s*<think>[\s\S]*?<\/think>\s*/i, '').trim(),
+    text: String(text)
+      .replace(/^\s*<think>[\s\S]*?<\/think>\s*/i, '')
+      .trim(),
     inputTokens: parsed.usage?.prompt_tokens ?? parsed.usage?.input_tokens,
     outputTokens: parsed.usage?.completion_tokens ?? parsed.usage?.output_tokens,
     model,
@@ -1041,18 +1076,18 @@ function buildProviderHttpRequest(
     return {
       endpoint: 'https://api.anthropic.com/v1/messages',
       init: {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxOutputTokens,
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
-      }),
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: maxOutputTokens,
+          system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+        }),
       },
     };
   }
@@ -1062,18 +1097,18 @@ function buildProviderHttpRequest(
     return {
       endpoint,
       init: {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        instructions: system,
-        input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }],
-        max_output_tokens: maxOutputTokens,
-        store: false,
-      }),
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          instructions: system,
+          input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }],
+          max_output_tokens: maxOutputTokens,
+          store: false,
+        }),
       },
     };
   }
@@ -1083,31 +1118,31 @@ function buildProviderHttpRequest(
   return {
     endpoint,
     init: {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: prompt },
-      ],
-      stream: false,
-      max_tokens: maxOutputTokens,
-      temperature: 0.2,
-      top_p: 0.9,
-      ...(agent === 'perplexity'
-        ? {
-            search_mode: 'web',
-            reasoning_effort: 'high',
-            web_search_options: { search_context_size: 'high' },
-            return_images: false,
-            return_related_questions: false,
-          }
-        : {}),
-    }),
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: prompt },
+        ],
+        stream: false,
+        max_tokens: maxOutputTokens,
+        temperature: 0.2,
+        top_p: 0.9,
+        ...(agent === 'perplexity'
+          ? {
+              search_mode: 'web',
+              reasoning_effort: 'high',
+              web_search_options: { search_context_size: 'high' },
+              return_images: false,
+              return_related_questions: false,
+            }
+          : {}),
+      }),
     },
   };
 }
@@ -1152,7 +1187,12 @@ async function loadSession(db: D1Database, id: string): Promise<MaestroSessionRo
 async function persistSession(
   db: D1Database,
   id: string,
-  patch: Partial<Pick<MaestroSessionRow, 'status' | 'current_author' | 'current_text' | 'final_text' | 'observed_cost_usd' | 'events_json' | 'error'>>,
+  patch: Partial<
+    Pick<
+      MaestroSessionRow,
+      'status' | 'current_author' | 'current_text' | 'final_text' | 'observed_cost_usd' | 'events_json' | 'error'
+    >
+  >,
 ): Promise<void> {
   const row = await loadSession(db, id);
   if (!row) return;
@@ -1217,7 +1257,13 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
 
   try {
     logMaestro('info', 'session_started', { session_id: id, initial_agent: initialAgent, active_agents: activeAgents });
-    await pushEvent({ at: nowIso(), agent: initialAgent, role: 'draft', status: 'running', message: 'Draft call started.' });
+    await pushEvent({
+      at: nowIso(),
+      agent: initialAgent,
+      role: 'draft',
+      status: 'running',
+      message: 'Draft call started.',
+    });
     const draftPrompt = buildDraftPrompt(input, id);
     const draftRates = input.rates?.[initialAgent] ?? {};
     const projectedDraftCost = estimateCost(draftPrompt, MAX_OUTPUT_TOKENS, draftRates);
@@ -1342,12 +1388,14 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         const cost = calculateObservedCost(result, prompt, rates);
         observedCost += cost;
         const status = extractStatus(result.text);
-        const revisionReport = extractTagged(result.text, 'maestro_revision_report') || JSON.stringify({
-          reviewer,
-          current_author: currentAuthor,
-          status,
-          custody: 'unstructured_report_missing',
-        });
+        const revisionReport =
+          extractTagged(result.text, 'maestro_revision_report') ||
+          JSON.stringify({
+            reviewer,
+            current_author: currentAuthor,
+            status,
+            custody: 'unstructured_report_missing',
+          });
         const revisedText = extractTagged(result.text, 'maestro_final_text');
         const changedByReviewer = Boolean(revisedText && revisedText.trim() !== currentText.trim());
         const candidateText = revisedText && changedByReviewer ? revisedText : currentText;
@@ -1510,7 +1558,8 @@ async function resolveStartRequest(
   const protocolText = sanitizeText(settings.protocol_text, 160_000);
   const eligibleAgents = configuredAgents(env, rates);
   const initialAgent = sanitizeAgent(body.initial_agent, eligibleAgents[0] ?? 'claude');
-  const requestedAgents = Array.isArray(body.active_agents) && body.active_agents.length > 0 ? body.active_agents : eligibleAgents;
+  const requestedAgents =
+    Array.isArray(body.active_agents) && body.active_agents.length > 0 ? body.active_agents : eligibleAgents;
   const activeAgents = sanitizeAgents(requestedAgents, initialAgent).filter((agent) => eligibleAgents.includes(agent));
   const maxCostUsd = Number(body.max_cost_usd ?? settings.max_cost_usd);
   const maxRuntimeMinutes =
@@ -1519,7 +1568,8 @@ async function resolveStartRequest(
       : Number(settings.max_runtime_minutes);
   const maxCycles = Number(settings.max_cycles ?? 2);
   if (!prompt) return { ok: false, error: 'Prompt editorial obrigatorio.' };
-  if (protocolText.length < 100) return { ok: false, error: 'Configure e salve o protocolo editorial integral antes de iniciar.' };
+  if (protocolText.length < 100)
+    return { ok: false, error: 'Configure e salve o protocolo editorial integral antes de iniciar.' };
   if (activeAgents.length < 2) {
     return { ok: false, error: 'Configure pelo menos dois agentes com chave e tarifas antes de iniciar.' };
   }
@@ -1671,7 +1721,10 @@ export async function handleMaestroAiArtifactsGet(
       .all<MaestroArtifactRow>();
     return json({ ok: true, artifacts: rows.results.map(publicArtifactSummary) });
   } catch (error) {
-    return json({ ok: false, error: error instanceof Error ? error.message : 'Erro ao carregar autos Maestro AI.' }, 500);
+    return json(
+      { ok: false, error: error instanceof Error ? error.message : 'Erro ao carregar autos Maestro AI.' },
+      500,
+    );
   }
 }
 
@@ -1682,7 +1735,10 @@ export async function handleMaestroAiSettingsGet(context: RequestContext): Promi
     const row = await loadSettings(db);
     return json({ ok: true, settings: publicSettings(context.env, row) });
   } catch (error) {
-    return json({ ok: false, error: error instanceof Error ? error.message : 'Erro ao carregar configuracoes Maestro AI.' }, 500);
+    return json(
+      { ok: false, error: error instanceof Error ? error.message : 'Erro ao carregar configuracoes Maestro AI.' },
+      500,
+    );
   }
 }
 
@@ -1695,8 +1751,7 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
     const protocolText = sanitizeText(body.protocol_text ?? current.protocol_text, 160_000);
     const maxCostUsd = Number(body.max_cost_usd ?? current.max_cost_usd);
     const rawRuntimeLimit = body.max_runtime_minutes ?? current.max_runtime_minutes;
-    const maxRuntimeMinutes =
-      rawRuntimeLimit == null || Number(rawRuntimeLimit) <= 0 ? null : Number(rawRuntimeLimit);
+    const maxRuntimeMinutes = rawRuntimeLimit == null || Number(rawRuntimeLimit) <= 0 ? null : Number(rawRuntimeLimit);
     const maxCycles = Number(body.max_cycles ?? current.max_cycles);
     if (protocolText.length < 100) {
       return json({ ok: false, error: 'Protocolo editorial integral deve ter pelo menos 100 caracteres.' }, 400);
@@ -1707,7 +1762,10 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
     if (!Number.isInteger(maxCycles) || maxCycles < 1 || maxCycles > 5) {
       return json({ ok: false, error: 'Ciclos maximos devem ser um inteiro entre 1 e 5.' }, 400);
     }
-    if (maxRuntimeMinutes != null && (!Number.isFinite(maxRuntimeMinutes) || maxRuntimeMinutes < 1 || maxRuntimeMinutes > 720)) {
+    if (
+      maxRuntimeMinutes != null &&
+      (!Number.isFinite(maxRuntimeMinutes) || maxRuntimeMinutes < 1 || maxRuntimeMinutes > 720)
+    ) {
       return json({ ok: false, error: 'Limite de tempo opcional deve ficar entre 1 e 720 minutos.' }, 400);
     }
     const rates = sanitizeRates(body.rates ?? parseJson(current.rates_json, defaultRates()));
@@ -1750,7 +1808,9 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
       )
       .run();
     logMaestro('info', 'settings_saved', {
-      updated_api_keys: PROVIDER_KEYS.filter((agent) => typeof apiKeys[agent] === 'string' && Boolean(apiKeys[agent]?.trim())),
+      updated_api_keys: PROVIDER_KEYS.filter(
+        (agent) => typeof apiKeys[agent] === 'string' && Boolean(apiKeys[agent]?.trim()),
+      ),
       max_cost_usd: maxCostUsd,
       max_runtime_minutes: maxRuntimeMinutes,
       max_cycles: maxCycles,
@@ -1758,7 +1818,10 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
     const row = await loadSettings(db);
     return json({ ok: true, settings: publicSettings(context.env, row) });
   } catch (error) {
-    return json({ ok: false, error: error instanceof Error ? error.message : 'Erro ao salvar configuracoes Maestro AI.' }, 500);
+    return json(
+      { ok: false, error: error instanceof Error ? error.message : 'Erro ao salvar configuracoes Maestro AI.' },
+      500,
+    );
   }
 }
 
@@ -1821,6 +1884,9 @@ export async function handleMaestroAiSessionContentPut(context: RequestContext, 
     const next = await loadSession(db, sessionId);
     return json({ ok: true, session: next ? publicSession(next) : null });
   } catch (error) {
-    return json({ ok: false, error: error instanceof Error ? error.message : 'Erro ao salvar conteudo Maestro AI.' }, 500);
+    return json(
+      { ok: false, error: error instanceof Error ? error.message : 'Erro ao salvar conteudo Maestro AI.' },
+      500,
+    );
   }
 }

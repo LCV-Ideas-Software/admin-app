@@ -32,6 +32,12 @@ import {
   onRequestDelete as handleAstrologoUserdataDelete,
   onRequestGet as handleAstrologoUserdataGet,
 } from './handlers/routes/astrologo/userdata';
+import { onRequestGet as handleCalculadoraOverviewGet } from './handlers/routes/calculadora/overview';
+import {
+  onRequestGet as handleCalculadoraParametrosGet,
+  onRequestPost as handleCalculadoraParametrosPost,
+} from './handlers/routes/calculadora/parametros';
+import { onRequestPost as handleCalculadoraSyncPost } from './handlers/routes/calculadora/sync';
 import { onRequestDelete as handleCfdnsDeleteDelete } from './handlers/routes/cfdns/delete';
 import { onRequestGet as handleCfdnsRecordsGet } from './handlers/routes/cfdns/records';
 import { onRequestPost as handleCfdnsUpsertPost } from './handlers/routes/cfdns/upsert';
@@ -50,26 +56,20 @@ import {
   onRequestGet as handleConfigStoreGet,
   onRequestPost as handleConfigStorePost,
 } from './handlers/routes/config/config-store';
-import { onRequestGet as handleCalculadoraOverviewGet } from './handlers/routes/calculadora/overview';
-import {
-  onRequestGet as handleCalculadoraParametrosGet,
-  onRequestPost as handleCalculadoraParametrosPost,
-} from './handlers/routes/calculadora/parametros';
-import { onRequestPost as handleCalculadoraSyncPost } from './handlers/routes/calculadora/sync';
-import { onRequestPost as handleMainsiteAiTransformPost } from './handlers/routes/mainsite/ai/transform';
 import {
   handleMaestroAiArtifactsGet,
   handleMaestroAiSessionContentPut,
+  handleMaestroAiSessionsGet,
+  handleMaestroAiSessionsPost,
   handleMaestroAiSettingsGet,
   handleMaestroAiSettingsPut,
   handleMaestroAiSettingsTestPost,
-  handleMaestroAiSessionsGet,
-  handleMaestroAiSessionsPost,
 } from './handlers/routes/maestro-ai/sessions';
 import {
   onRequestGet as handleMainsiteAboutGet,
   onRequestPut as handleMainsiteAboutPut,
 } from './handlers/routes/mainsite/about';
+import { onRequestPost as handleMainsiteAiTransformPost } from './handlers/routes/mainsite/ai/transform';
 import {
   handleCommentsAdminAll,
   handleCommentsAdminBulk,
@@ -584,15 +584,11 @@ app.post('/api/maestro-ai/settings/test', (c) => handleMaestroAiSettingsTestPost
 app.get('/api/maestro-ai/sessions', (c) => handleMaestroAiSessionsGet(rc(c)));
 app.post('/api/maestro-ai/sessions', (c) => handleMaestroAiSessionsPost(rc(c)));
 app.get('/api/maestro-ai/sessions/:id', (c) => handleMaestroAiSessionsGet(rc(c), c.req.param('id')));
-app.get('/api/maestro-ai/sessions/:id/artifacts', (c) =>
-  handleMaestroAiArtifactsGet(rc(c), c.req.param('id')),
-);
+app.get('/api/maestro-ai/sessions/:id/artifacts', (c) => handleMaestroAiArtifactsGet(rc(c), c.req.param('id')));
 app.get('/api/maestro-ai/sessions/:id/artifacts/:artifactId', (c) =>
   handleMaestroAiArtifactsGet(rc(c), c.req.param('id'), c.req.param('artifactId')),
 );
-app.put('/api/maestro-ai/sessions/:id/content', (c) =>
-  handleMaestroAiSessionContentPut(rc(c), c.req.param('id')),
-);
+app.put('/api/maestro-ai/sessions/:id/content', (c) => handleMaestroAiSessionContentPut(rc(c), c.req.param('id')));
 
 // ── mainsite workers-ai ──
 app.post('/api/mainsite/workers-ai/sentiment', (c) => handleWorkersAiSentimentPost(rc(c)));

@@ -65,7 +65,10 @@ const toHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
-const parseObservabilidadeRows = (sourceRows: CalculadoraObservabilidadeSourceRow[], limit: number): ObservabilidadeRow[] => {
+const parseObservabilidadeRows = (
+  sourceRows: CalculadoraObservabilidadeSourceRow[],
+  limit: number,
+): ObservabilidadeRow[] => {
   const source = Array.isArray(sourceRows) ? sourceRows : [];
 
   const rows: ObservabilidadeRow[] = [];

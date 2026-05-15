@@ -20,9 +20,7 @@ describe('sanitizePostHtml — Tiptap-emitted formatting persistence', () => {
   });
 
   it('preserves EditorSpacing on paragraphs (line-height, margin-top, margin-bottom)', () => {
-    const out = sanitizePostHtml(
-      '<p style="line-height: 1.6; margin-top: 12px; margin-bottom: 24px">Spaced</p>',
-    );
+    const out = sanitizePostHtml('<p style="line-height: 1.6; margin-top: 12px; margin-bottom: 24px">Spaced</p>');
     expect(out).toMatch(/line-height:\s*1\.6/);
     expect(out).toMatch(/margin-top:\s*12px/);
     expect(out).toMatch(/margin-bottom:\s*24px/);
@@ -38,16 +36,12 @@ describe('sanitizePostHtml — Tiptap-emitted formatting persistence', () => {
   });
 
   it('preserves EditorSpacing on list items, ul, and ol (CRITICAL — lists were stripped pre-fix)', () => {
-    const li = sanitizePostHtml(
-      '<ul><li style="line-height: 1.8; margin-top: 4px; margin-bottom: 4px">item</li></ul>',
-    );
+    const li = sanitizePostHtml('<ul><li style="line-height: 1.8; margin-top: 4px; margin-bottom: 4px">item</li></ul>');
     expect(li).toMatch(/line-height:\s*1\.8/);
     expect(li).toMatch(/margin-top:\s*4px/);
     expect(li).toMatch(/margin-bottom:\s*4px/);
 
-    const ul = sanitizePostHtml(
-      '<ul style="margin-top: 16px; margin-bottom: 16px"><li>x</li></ul>',
-    );
+    const ul = sanitizePostHtml('<ul style="margin-top: 16px; margin-bottom: 16px"><li>x</li></ul>');
     expect(ul).toMatch(/<ul style="[^"]*margin-top:\s*16px/);
     expect(ul).toMatch(/margin-bottom:\s*16px/);
 
@@ -61,16 +55,12 @@ describe('sanitizePostHtml — Tiptap-emitted formatting persistence', () => {
   });
 
   it('preserves FontFamily on spans (common stack with quoted name)', () => {
-    const out = sanitizePostHtml(
-      '<p><span style="font-family: \'Inter\', system-ui, sans-serif">Inter</span></p>',
-    );
+    const out = sanitizePostHtml('<p><span style="font-family: \'Inter\', system-ui, sans-serif">Inter</span></p>');
     expect(out).toMatch(/font-family:\s*'Inter',\s*system-ui,\s*sans-serif/);
   });
 
   it('preserves Color on spans (hex, rgb, named)', () => {
-    expect(sanitizePostHtml('<p><span style="color: #ff0000">red</span></p>')).toMatch(
-      /color:\s*#ff0000/,
-    );
+    expect(sanitizePostHtml('<p><span style="color: #ff0000">red</span></p>')).toMatch(/color:\s*#ff0000/);
     expect(sanitizePostHtml('<p><span style="color: rgb(255, 0, 0)">red</span></p>')).toMatch(
       /color:\s*rgb\(255,\s*0,\s*0\)/,
     );
@@ -78,12 +68,8 @@ describe('sanitizePostHtml — Tiptap-emitted formatting persistence', () => {
   });
 
   it('preserves TextIndent on paragraphs and headings (rem units)', () => {
-    expect(sanitizePostHtml('<p style="text-indent: 1.5rem">Indented</p>')).toMatch(
-      /text-indent:\s*1\.5rem/,
-    );
-    expect(sanitizePostHtml('<h3 style="text-indent: 2rem">Indented heading</h3>')).toMatch(
-      /text-indent:\s*2rem/,
-    );
+    expect(sanitizePostHtml('<p style="text-indent: 1.5rem">Indented</p>')).toMatch(/text-indent:\s*1\.5rem/);
+    expect(sanitizePostHtml('<h3 style="text-indent: 2rem">Indented heading</h3>')).toMatch(/text-indent:\s*2rem/);
   });
 
   it('preserves CustomResizableImage style (width, height) on img', () => {
@@ -128,9 +114,7 @@ describe('sanitizePostHtml — Tiptap-emitted formatting persistence', () => {
   });
 
   it('drops disallowed CSS properties silently while keeping allowed ones in same declaration', () => {
-    const out = sanitizePostHtml(
-      '<p style="font-size: 18px; position: absolute; top: 0; line-height: 1.6">Hi</p>',
-    );
+    const out = sanitizePostHtml('<p style="font-size: 18px; position: absolute; top: 0; line-height: 1.6">Hi</p>');
     expect(out).toMatch(/font-size:\s*18px/);
     expect(out).toMatch(/line-height:\s*1\.6/);
     expect(out).not.toContain('position');
@@ -138,18 +122,14 @@ describe('sanitizePostHtml — Tiptap-emitted formatting persistence', () => {
   });
 
   it('rejects CSS-injection patterns inside allowed CSS properties', () => {
-    expect(
-      sanitizePostHtml('<p style="background-color: url(javascript:alert(1))">x</p>'),
-    ).not.toContain('javascript');
-    expect(
-      sanitizePostHtml('<span style="color: rgb(255,0,0); /* */ expression(alert(1))">x</span>'),
-    ).not.toContain('expression');
-    expect(
-      sanitizePostHtml('<p style="font-family: foo;</style><script>alert(1)</script>">x</p>'),
-    ).not.toContain('<script');
-    expect(sanitizePostHtml('<p style="background: url(javascript:alert(1))">x</p>')).not.toContain(
-      'javascript',
+    expect(sanitizePostHtml('<p style="background-color: url(javascript:alert(1))">x</p>')).not.toContain('javascript');
+    expect(sanitizePostHtml('<span style="color: rgb(255,0,0); /* */ expression(alert(1))">x</span>')).not.toContain(
+      'expression',
     );
+    expect(sanitizePostHtml('<p style="font-family: foo;</style><script>alert(1)</script>">x</p>')).not.toContain(
+      '<script',
+    );
+    expect(sanitizePostHtml('<p style="background: url(javascript:alert(1))">x</p>')).not.toContain('javascript');
   });
 
   it('rejects display: none (content-hiding footgun)', () => {
@@ -168,12 +148,10 @@ describe('sanitizePostHtml — Tiptap-emitted formatting persistence', () => {
   });
 
   it('forces loading=lazy on img unless eager is explicit', () => {
-    expect(sanitizePostHtml('<img src="https://example.com/x.png" alt="x">')).toContain(
-      'loading="lazy"',
+    expect(sanitizePostHtml('<img src="https://example.com/x.png" alt="x">')).toContain('loading="lazy"');
+    expect(sanitizePostHtml('<img src="https://example.com/x.png" alt="x" loading="eager">')).toContain(
+      'loading="eager"',
     );
-    expect(
-      sanitizePostHtml('<img src="https://example.com/x.png" alt="x" loading="eager">'),
-    ).toContain('loading="eager"');
   });
 
   it('preserves YouTube container empty-string marker (Tiptap actual emit format)', () => {
