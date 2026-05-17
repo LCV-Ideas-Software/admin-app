@@ -1,0 +1,26 @@
+version: 2
+
+projectIgnorePaths:
+  - "**/node_modules"
+  - "**/dist"
+  - "**/coverage"
+  - "**/.turbo"
+  - "**/.cache"
+  - "**/artifacts"
+
+triggerPaths:
+  - "**/package.json"
+  - "**/package-lock.json"
+  - "**/npm-shrinkwrap.json"
+  - "**/pnpm-lock.yaml"
+  - "**/pnpm-lock.yml"
+  - "**/yarn.lock"
+  - "**/bun.lock"
+  - "**/bun.lockb"
+
+githubApp:
+  enabled: true
+  pullRequestAlertsEnabled: true
+  dependencyOverviewEnabled: true
+  projectReportsEnabled: true
+  disableCommentsAndCheckRuns: false
