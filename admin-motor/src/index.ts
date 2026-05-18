@@ -34,9 +34,13 @@ import { onRequestPost as handleCalculadoraSyncPost } from './handlers/routes/ca
 import { onRequestDelete as handleCfdnsDeleteDelete } from './handlers/routes/cfdns/delete';
 import { onRequestGet as handleCfdnsRecordsGet } from './handlers/routes/cfdns/records';
 import {
+  onRequestPostCheck as handleCfdnsRegistrarCheckPost,
   onRequestGetRegistration as handleCfdnsRegistrarRegistrationGet,
+  onRequestPatchRegistration as handleCfdnsRegistrarRegistrationPatch,
+  onRequestPostRegistration as handleCfdnsRegistrarRegistrationPost,
   onRequestGetRegistrationStatus as handleCfdnsRegistrarRegistrationStatusGet,
   onRequestGetRegistrations as handleCfdnsRegistrarRegistrationsGet,
+  onRequestGetSearch as handleCfdnsRegistrarSearchGet,
   onRequestGetUpdateStatus as handleCfdnsRegistrarUpdateStatusGet,
 } from './handlers/routes/cfdns/registrar';
 import { onRequestPost as handleCfdnsUpsertPost } from './handlers/routes/cfdns/upsert';
@@ -446,8 +450,12 @@ app.delete('/api/astrologo/userdata', (c) => handleAstrologoUserdataDelete(rc(c)
 // ── cfdns ──
 app.get('/api/cfdns/zones', (c) => handleCfdnsZonesGet(re(c)));
 app.get('/api/cfdns/records', (c) => handleCfdnsRecordsGet(rc(c)));
+app.get('/api/cfdns/registrar/search', (c) => handleCfdnsRegistrarSearchGet(rc(c)));
+app.post('/api/cfdns/registrar/check', (c) => handleCfdnsRegistrarCheckPost(rc(c)));
 app.get('/api/cfdns/registrar/registrations', (c) => handleCfdnsRegistrarRegistrationsGet(rc(c)));
+app.post('/api/cfdns/registrar/registrations', (c) => handleCfdnsRegistrarRegistrationPost(rc(c)));
 app.get('/api/cfdns/registrar/registration', (c) => handleCfdnsRegistrarRegistrationGet(rc(c)));
+app.patch('/api/cfdns/registrar/registration', (c) => handleCfdnsRegistrarRegistrationPatch(rc(c)));
 app.get('/api/cfdns/registrar/registration-status', (c) => handleCfdnsRegistrarRegistrationStatusGet(rc(c)));
 app.get('/api/cfdns/registrar/update-status', (c) => handleCfdnsRegistrarUpdateStatusGet(rc(c)));
 app.delete('/api/cfdns/delete', (c) => handleCfdnsDeleteDelete(rc(c)));

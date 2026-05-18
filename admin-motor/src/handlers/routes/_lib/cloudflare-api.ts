@@ -7,6 +7,7 @@ type CloudflareApiResponse<T> = {
   errors?: CloudflareApiError[];
   result?: T;
   result_info?: {
+    cursor?: string;
     page?: number;
     per_page?: number;
     total_pages?: number;
@@ -87,10 +88,25 @@ export type CloudflareRegistrarRegistration = {
   locked: boolean | null;
 };
 
+export type CloudflareRegistrarPricing = {
+  currency: string;
+  registration_cost: string;
+  renewal_cost: string;
+};
+
+export type CloudflareRegistrarAvailability = {
+  name: string;
+  registrable: boolean;
+  pricing: CloudflareRegistrarPricing | null;
+  reason: string | null;
+  tier: string | null;
+};
+
 export type CloudflareRegistrarListResult = {
   account: CloudflareAccountResolution;
   registrations: CloudflareRegistrarRegistration[];
   pagination: {
+    cursor: string | null;
     page: number;
     perPage: number;
     totalPages: number;
@@ -114,6 +130,18 @@ export type CloudflareRegistrarWorkflowStatus = {
     self?: string;
     resource?: string;
   };
+};
+
+export type CloudflareRegistrarCreateInput = {
+  domain_name: string;
+  auto_renew?: boolean;
+  privacy_mode?: 'off' | 'redaction';
+  years?: number;
+  contacts?: Record<string, unknown>;
+};
+
+export type CloudflareRegistrarRegistrationPatch = {
+  auto_renew: boolean;
 };
 
 const resolveToken = (env: EnvWithCloudflareToken) => {
@@ -287,6 +315,27 @@ const normalizeRegistrarRegistration = (registration: Partial<CloudflareRegistra
   locked: typeof registration.locked === 'boolean' ? registration.locked : null,
 });
 
+const normalizeRegistrarAvailability = (domain: Partial<CloudflareRegistrarAvailability>) => {
+  const pricing =
+    domain.pricing && typeof domain.pricing === 'object'
+      ? {
+          currency: String(domain.pricing.currency ?? '').trim(),
+          registration_cost: String(domain.pricing.registration_cost ?? '').trim(),
+          renewal_cost: String(domain.pricing.renewal_cost ?? '').trim(),
+        }
+      : null;
+
+  return {
+    name: String(domain.name ?? '')
+      .trim()
+      .toLowerCase(),
+    registrable: Boolean(domain.registrable),
+    pricing,
+    reason: domain.reason ? String(domain.reason) : null,
+    tier: domain.tier ? String(domain.tier) : null,
+  };
+};
+
 const normalizeDomainName = (domainName: string) => {
   const normalized = domainName.trim().toLowerCase();
   if (!normalized) {
@@ -296,6 +345,85 @@ const normalizeDomainName = (domainName: string) => {
     throw new Error('Domínio inválido para consulta Registrar.');
   }
   return normalized;
+};
+
+const normalizeSearchTerm = (term: string) => {
+  const normalized = term.trim().toLowerCase();
+  if (!normalized) {
+    throw new Error('Termo de busca é obrigatório para consultar Registrar.');
+  }
+  if (normalized.length > 100) {
+    throw new Error('Termo de busca Registrar deve ter no máximo 100 caracteres.');
+  }
+  if (normalized.startsWith('.') && !normalized.slice(1).includes('.')) {
+    throw new Error('Busca por extensão isolada não é suportada; informe uma marca, termo ou domínio completo.');
+  }
+  return normalized;
+};
+
+const normalizeRegistrarDomainList = (raw: unknown) => {
+  if (!raw || typeof raw !== 'object') {
+    return [];
+  }
+  const domains = (raw as { domains?: unknown }).domains;
+  return (Array.isArray(domains) ? domains : [])
+    .map((domain) => normalizeRegistrarAvailability(domain as Partial<CloudflareRegistrarAvailability>))
+    .filter((domain) => domain.name);
+};
+
+const normalizeRegistrarWorkflowStatus = (status: CloudflareRegistrarWorkflowStatus) => ({
+  domain_name: status?.domain_name ? String(status.domain_name).trim().toLowerCase() : undefined,
+  state: status?.state ? String(status.state) : undefined,
+  completed: typeof status?.completed === 'boolean' ? status.completed : undefined,
+  created_at: status?.created_at ? String(status.created_at) : undefined,
+  updated_at: status?.updated_at ? String(status.updated_at) : undefined,
+  context: status?.context && typeof status.context === 'object' ? status.context : undefined,
+  error:
+    status?.error && typeof status.error === 'object'
+      ? {
+          code: status.error.code ? String(status.error.code) : undefined,
+          message: status.error.message ? String(status.error.message) : undefined,
+        }
+      : undefined,
+  links:
+    status?.links && typeof status.links === 'object'
+      ? {
+          self: status.links.self ? String(status.links.self) : undefined,
+          resource: status.links.resource ? String(status.links.resource) : undefined,
+        }
+      : undefined,
+});
+
+const normalizeRegistrarCreateInput = (input: CloudflareRegistrarCreateInput) => {
+  const domainName = normalizeDomainName(input.domain_name);
+  const payload: CloudflareRegistrarCreateInput = {
+    domain_name: domainName,
+  };
+
+  if (typeof input.auto_renew === 'boolean') {
+    payload.auto_renew = input.auto_renew;
+  }
+
+  if (input.privacy_mode) {
+    if (!['off', 'redaction'].includes(input.privacy_mode)) {
+      throw new Error('privacy_mode inválido para registro Registrar.');
+    }
+    payload.privacy_mode = input.privacy_mode;
+  }
+
+  if (input.years != null) {
+    const years = Number(input.years);
+    if (!Number.isInteger(years) || years < 1 || years > 10) {
+      throw new Error('years deve ser inteiro entre 1 e 10.');
+    }
+    payload.years = years;
+  }
+
+  if (input.contacts && typeof input.contacts === 'object') {
+    payload.contacts = input.contacts;
+  }
+
+  return payload;
 };
 
 export const listCloudflareRegistrarRegistrations = async (
@@ -317,12 +445,136 @@ export const listCloudflareRegistrarRegistrations = async (
     account,
     registrations,
     pagination: {
+      cursor: info.cursor ? String(info.cursor) : null,
       page: Number(info.page ?? 1),
       perPage: Number(info.per_page ?? registrations.length),
       totalPages: Number(info.total_pages ?? 1),
       totalCount: Number(info.total_count ?? registrations.length),
       count: Number(info.count ?? registrations.length),
     },
+  };
+};
+
+export const searchCloudflareRegistrarDomains = async (
+  env: EnvWithCloudflareToken,
+  options: {
+    q: string;
+    extensions?: string[];
+    limit?: number;
+  },
+) => {
+  const account = await resolveCloudflareAccount(env);
+  const query = new URLSearchParams({
+    q: normalizeSearchTerm(options.q),
+  });
+  const limit = options.limit == null ? 20 : Number(options.limit);
+  if (!Number.isFinite(limit) || limit < 1 || limit > 50) {
+    throw new Error('limit deve estar entre 1 e 50.');
+  }
+  query.set('limit', String(Math.trunc(limit)));
+
+  const extensions = Array.isArray(options.extensions)
+    ? options.extensions.map((extension) => extension.trim().replace(/^\./, '').toLowerCase()).filter(Boolean)
+    : [];
+  for (const extension of extensions.slice(0, 20)) {
+    query.append('extensions', extension);
+  }
+
+  const result = await cloudflareRequest<{ domains?: CloudflareRegistrarAvailability[] }>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/domain-search?${query.toString()}`,
+    'Falha ao buscar domínios disponíveis na Cloudflare',
+  );
+
+  return {
+    account,
+    domains: normalizeRegistrarDomainList(result),
+  };
+};
+
+export const checkCloudflareRegistrarDomains = async (env: EnvWithCloudflareToken, domains: string[]) => {
+  const account = await resolveCloudflareAccount(env);
+  const normalizedDomains = domains.map(normalizeDomainName).filter(Boolean);
+
+  if (normalizedDomains.length === 0) {
+    throw new Error('Informe ao menos um domínio para checagem Registrar.');
+  }
+  if (normalizedDomains.length > 20) {
+    throw new Error('A checagem Registrar aceita no máximo 20 domínios por chamada.');
+  }
+
+  const result = await cloudflareRequest<{ domains?: CloudflareRegistrarAvailability[] }>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/domain-check`,
+    'Falha ao checar disponibilidade no Cloudflare Registrar',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        domains: normalizedDomains,
+      }),
+    },
+  );
+
+  return {
+    account,
+    domains: normalizeRegistrarDomainList(result),
+  };
+};
+
+export const createCloudflareRegistrarRegistration = async (
+  env: EnvWithCloudflareToken,
+  input: CloudflareRegistrarCreateInput,
+) => {
+  const account = await resolveCloudflareAccount(env);
+  const payload = normalizeRegistrarCreateInput(input);
+  const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations`,
+    `Falha ao registrar domínio ${payload.domain_name} na Cloudflare`,
+    {
+      method: 'POST',
+      headers: {
+        Prefer: 'respond-async',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  return {
+    account,
+    status: normalizeRegistrarWorkflowStatus(status),
+  };
+};
+
+export const updateCloudflareRegistrarRegistration = async (
+  env: EnvWithCloudflareToken,
+  domainName: string,
+  patch: CloudflareRegistrarRegistrationPatch,
+) => {
+  const account = await resolveCloudflareAccount(env);
+  const normalizedDomain = normalizeDomainName(domainName);
+  if (typeof patch.auto_renew !== 'boolean') {
+    throw new Error('auto_renew booleano é obrigatório para atualizar Registrar.');
+  }
+
+  const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}`,
+    `Falha ao atualizar registro Registrar ${normalizedDomain}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Prefer: 'respond-async',
+      },
+      body: JSON.stringify({
+        auto_renew: patch.auto_renew,
+      }),
+    },
+  );
+
+  return {
+    account,
+    status: normalizeRegistrarWorkflowStatus(status),
   };
 };
 
@@ -352,7 +604,7 @@ export const getCloudflareRegistrarRegistrationStatus = async (env: EnvWithCloud
 
   return {
     account,
-    status,
+    status: normalizeRegistrarWorkflowStatus(status),
   };
 };
 
@@ -367,7 +619,7 @@ export const getCloudflareRegistrarUpdateStatus = async (env: EnvWithCloudflareT
 
   return {
     account,
-    status,
+    status: normalizeRegistrarWorkflowStatus(status),
   };
 };
 

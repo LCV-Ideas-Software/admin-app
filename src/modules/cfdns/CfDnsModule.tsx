@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   CalendarClock,
   Cloud,
+  ExternalLink,
   Loader2,
   LockKeyhole,
   Pencil,
@@ -35,20 +36,75 @@ type RegistrarRegistration = {
   locked: boolean | null;
 };
 
+type RegistrarPricing = {
+  currency: string;
+  registration_cost: string;
+  renewal_cost: string;
+};
+
+type RegistrarAvailability = {
+  name: string;
+  registrable: boolean;
+  pricing: RegistrarPricing | null;
+  reason: string | null;
+  tier: string | null;
+};
+
+type RegistrarWorkflowStatus = {
+  domain_name?: string;
+  state?: string;
+  completed?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  context?: Record<string, unknown>;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+  links?: {
+    self?: string;
+    resource?: string;
+  };
+};
+
+type RegistrarAccount = {
+  accountId?: string;
+  accountName?: string | null;
+  source?: string;
+};
+
 type RegistrarPayload = {
   ok: boolean;
   error?: string;
   request_id?: string;
-  account?: {
-    accountId?: string;
-    accountName?: string | null;
-    source?: string;
-  };
+  account?: RegistrarAccount;
   registrations?: RegistrarRegistration[];
   pagination?: {
     count?: number;
     totalCount?: number;
   };
+};
+
+type RegistrarAvailabilityPayload = {
+  ok: boolean;
+  error?: string;
+  request_id?: string;
+  account?: RegistrarAccount;
+  domains?: RegistrarAvailability[];
+};
+
+type RegistrarWorkflowPayload = {
+  ok: boolean;
+  error?: string;
+  request_id?: string;
+  account?: RegistrarAccount;
+  status?: RegistrarWorkflowStatus;
+};
+
+type RegistrarSettingsPatch = {
+  domain: string;
+  label: string;
+  auto_renew: boolean;
 };
 
 type DnsRecord = {
@@ -261,6 +317,58 @@ const formatRegistrarBoolean = (value: boolean | null, trueLabel: string, falseL
 
   return value ? trueLabel : falseLabel;
 };
+
+const formatRegistrarPrice = (pricing?: RegistrarPricing | null) => {
+  if (!pricing) {
+    return '—';
+  }
+
+  const currency = pricing.currency || 'USD';
+  const registration = pricing.registration_cost || '—';
+  const renewal = pricing.renewal_cost || '—';
+  return `${currency} ${registration} / renova ${renewal}`;
+};
+
+const formatRegistrarReason = (reason?: string | null) => {
+  if (!reason) {
+    return '—';
+  }
+
+  const labels: Record<string, string> = {
+    domain_premium: 'premium',
+    domain_unavailable: 'indisponível',
+    extension_disallows_registration: 'TLD bloqueado',
+    extension_not_supported: 'TLD não suportado',
+    extension_not_supported_via_api: 'só via dashboard',
+  };
+  return labels[reason] ?? reason;
+};
+
+const formatWorkflowState = (status?: RegistrarWorkflowStatus | null) => {
+  if (!status) {
+    return '—';
+  }
+
+  const state = status.state ?? '—';
+  if (status.error?.message) {
+    return `${state}: ${status.error.message}`;
+  }
+  return state;
+};
+
+const normalizeDomainInput = (value: string) => value.trim().toLowerCase();
+
+const splitRegistrarExtensions = (value: string) =>
+  value
+    .split(',')
+    .map((extension) => extension.trim().replace(/^\./, '').toLowerCase())
+    .filter(Boolean);
+
+const splitRegistrarDomains = (value: string) =>
+  value
+    .split(/[,\s]+/)
+    .map(normalizeDomainInput)
+    .filter((domain) => domain.includes('.') && !domain.startsWith('.') && !domain.includes('..'));
 
 const toIntOrFallback = (raw: string, fallback: number) => {
   const parsed = Number(raw);
@@ -571,8 +679,22 @@ export function CfDnsModule() {
   const [zones, setZones] = useState<ZoneItem[]>([]);
   const [zonesLoading, setZonesLoading] = useState(false);
   const [registrarRegistrations, setRegistrarRegistrations] = useState<RegistrarRegistration[]>([]);
+  const [registrarAccount, setRegistrarAccount] = useState<RegistrarAccount | null>(null);
   const [registrarLoading, setRegistrarLoading] = useState(false);
   const [registrarError, setRegistrarError] = useState('');
+  const [registrarQuery, setRegistrarQuery] = useState('');
+  const [registrarExtensions, setRegistrarExtensions] = useState('com,net,org,app,dev,cloud,tech,online');
+  const [registrarYears, setRegistrarYears] = useState('1');
+  const [registrarCreateAutoRenew, setRegistrarCreateAutoRenew] = useState(true);
+  const [registrarCreatePrivacyMode, setRegistrarCreatePrivacyMode] = useState<'redaction' | 'off'>('redaction');
+  const [registrarSearchResults, setRegistrarSearchResults] = useState<RegistrarAvailability[]>([]);
+  const [registrarCheckResults, setRegistrarCheckResults] = useState<RegistrarAvailability[]>([]);
+  const [registrarLookupLoading, setRegistrarLookupLoading] = useState(false);
+  const [registrarActionLoading, setRegistrarActionLoading] = useState('');
+  const [registrarRegistrationStatus, setRegistrarRegistrationStatus] = useState<RegistrarWorkflowStatus | null>(null);
+  const [registrarUpdateStatus, setRegistrarUpdateStatus] = useState<RegistrarWorkflowStatus | null>(null);
+  const [pendingRegistrarCreate, setPendingRegistrarCreate] = useState<RegistrarAvailability | null>(null);
+  const [pendingRegistrarSettings, setPendingRegistrarSettings] = useState<RegistrarSettingsPatch | null>(null);
 
   const [selectedZoneId, setSelectedZoneId] = useState('');
   const [selectedZoneName, setSelectedZoneName] = useState('');
@@ -666,6 +788,28 @@ export function CfDnsModule() {
     return map;
   }, [registrarRegistrations]);
 
+  const registrarCheckByDomain = useMemo(() => {
+    const map = new Map<string, RegistrarAvailability>();
+    for (const domain of registrarCheckResults) {
+      if (domain.name) {
+        map.set(domain.name, domain);
+      }
+    }
+    return map;
+  }, [registrarCheckResults]);
+
+  const registrarSuggestionRows = useMemo(() => {
+    const rows = registrarSearchResults.length > 0 ? registrarSearchResults : registrarCheckResults;
+    const seen = new Set<string>();
+    return rows.filter((domain) => {
+      if (!domain.name || seen.has(domain.name)) {
+        return false;
+      }
+      seen.add(domain.name);
+      return true;
+    });
+  }, [registrarCheckResults, registrarSearchResults]);
+
   const selectedRegistration = useMemo(() => {
     const domain = selectedZoneName.trim().toLowerCase();
     if (!domain) {
@@ -683,6 +827,14 @@ export function CfDnsModule() {
     () => getDaysUntil(selectedRegistration?.expires_at),
     [selectedRegistration?.expires_at],
   );
+
+  const registrarDashboardUrl = useMemo(() => {
+    const accountId = String(registrarAccount?.accountId ?? '').trim();
+    if (!accountId) {
+      return '';
+    }
+    return `https://dash.cloudflare.com/${accountId}/domains/registrations`;
+  }, [registrarAccount?.accountId]);
 
   const zoneContextLabel = useMemo(() => {
     const zoneName = selectedZoneName.trim();
@@ -847,7 +999,15 @@ export function CfDnsModule() {
   ]);
 
   const statusTone = useMemo(() => {
-    if (zonesLoading || recordsLoading || registrarLoading || saving || deletingId) {
+    if (
+      zonesLoading ||
+      recordsLoading ||
+      registrarLoading ||
+      registrarLookupLoading ||
+      registrarActionLoading ||
+      saving ||
+      deletingId
+    ) {
       return 'warning';
     }
     if (!selectedZoneId) {
@@ -857,10 +1017,28 @@ export function CfDnsModule() {
       return 'warning';
     }
     return 'ok';
-  }, [deletingId, operationalAlerts.length, recordsLoading, registrarLoading, saving, selectedZoneId, zonesLoading]);
+  }, [
+    deletingId,
+    operationalAlerts.length,
+    recordsLoading,
+    registrarActionLoading,
+    registrarLoading,
+    registrarLookupLoading,
+    saving,
+    selectedZoneId,
+    zonesLoading,
+  ]);
 
   const statusLabel = useMemo(() => {
-    if (zonesLoading || recordsLoading || registrarLoading || saving || deletingId) {
+    if (
+      zonesLoading ||
+      recordsLoading ||
+      registrarLoading ||
+      registrarLookupLoading ||
+      registrarActionLoading ||
+      saving ||
+      deletingId
+    ) {
       return 'Processando...';
     }
     if (!selectedZoneId) {
@@ -870,7 +1048,17 @@ export function CfDnsModule() {
       return `${operationalAlerts.length} alerta(s)`;
     }
     return 'Sincronizado';
-  }, [deletingId, operationalAlerts.length, recordsLoading, registrarLoading, saving, selectedZoneId, zonesLoading]);
+  }, [
+    deletingId,
+    operationalAlerts.length,
+    recordsLoading,
+    registrarActionLoading,
+    registrarLoading,
+    registrarLookupLoading,
+    saving,
+    selectedZoneId,
+    zonesLoading,
+  ]);
 
   const resetDraft = () => {
     setDraft(DEFAULT_DRAFT);
@@ -977,6 +1165,7 @@ export function CfDnsModule() {
         }
 
         const nextRegistrations = Array.isArray(payload.registrations) ? payload.registrations : [];
+        setRegistrarAccount(payload.account ?? null);
         setRegistrarRegistrations(nextRegistrations);
 
         if (shouldNotify) {
@@ -988,6 +1177,150 @@ export function CfDnsModule() {
         showNotification(message, 'error');
       } finally {
         setRegistrarLoading(false);
+      }
+    },
+    [adminActor, showNotification],
+  );
+
+  const searchRegistrarDomains = useCallback(async () => {
+    const q = registrarQuery.trim();
+    if (!q) {
+      showNotification('Informe uma marca, termo ou domínio para buscar.', 'error');
+      return;
+    }
+
+    setRegistrarLookupLoading(true);
+    setRegistrarError('');
+    try {
+      const query = new URLSearchParams({
+        q,
+        limit: '20',
+      });
+      const extensions = splitRegistrarExtensions(registrarExtensions);
+      if (extensions.length > 0) {
+        query.set('extensions', extensions.join(','));
+      }
+
+      const response = await fetch(`/api/cfdns/registrar/search?${query.toString()}`, {
+        headers: {
+          'X-Admin-Actor': adminActor,
+        },
+      });
+      const payload = await parseApiPayload<RegistrarAvailabilityPayload>(
+        response,
+        'Falha ao buscar domínios no Cloudflare Registrar',
+      );
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? 'Falha ao buscar domínios no Cloudflare Registrar.');
+      }
+
+      setRegistrarAccount(payload.account ?? registrarAccount);
+      setRegistrarSearchResults(Array.isArray(payload.domains) ? payload.domains : []);
+      setRegistrarCheckResults([]);
+      showNotification(withReq('Busca Registrar concluída.', payload), 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível buscar domínios no Registrar.';
+      setRegistrarError(message);
+      showNotification(message, 'error');
+    } finally {
+      setRegistrarLookupLoading(false);
+    }
+  }, [adminActor, registrarAccount, registrarExtensions, registrarQuery, showNotification]);
+
+  const checkRegistrarDomains = useCallback(
+    async (domainsOverride?: string[]) => {
+      const domains = domainsOverride?.length
+        ? domainsOverride.map(normalizeDomainInput).filter(Boolean)
+        : splitRegistrarDomains(registrarQuery);
+
+      if (domains.length === 0) {
+        showNotification('Informe domínio(s) completo(s) para checagem.', 'error');
+        return [];
+      }
+
+      setRegistrarLookupLoading(true);
+      setRegistrarError('');
+      try {
+        const response = await fetch('/api/cfdns/registrar/check', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Actor': adminActor,
+          },
+          body: JSON.stringify({ domains: domains.slice(0, 20) }),
+        });
+        const payload = await parseApiPayload<RegistrarAvailabilityPayload>(
+          response,
+          'Falha ao checar disponibilidade no Cloudflare Registrar',
+        );
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error ?? 'Falha ao checar disponibilidade no Cloudflare Registrar.');
+        }
+
+        const nextDomains = Array.isArray(payload.domains) ? payload.domains : [];
+        setRegistrarAccount(payload.account ?? registrarAccount);
+        setRegistrarCheckResults(nextDomains);
+        showNotification(withReq('Checagem Registrar concluída.', payload), 'success');
+        return nextDomains;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Não foi possível checar domínios no Registrar.';
+        setRegistrarError(message);
+        showNotification(message, 'error');
+        return [];
+      } finally {
+        setRegistrarLookupLoading(false);
+      }
+    },
+    [adminActor, registrarAccount, registrarQuery, showNotification],
+  );
+
+  const loadRegistrarStatuses = useCallback(
+    async (domainName: string, shouldNotify = false) => {
+      const domain = normalizeDomainInput(domainName);
+      if (!domain) {
+        return;
+      }
+
+      setRegistrarActionLoading(`status:${domain}`);
+      try {
+        const [registrationResponse, updateResponse] = await Promise.all([
+          fetch(`/api/cfdns/registrar/registration-status?domain=${encodeURIComponent(domain)}`, {
+            headers: { 'X-Admin-Actor': adminActor },
+          }),
+          fetch(`/api/cfdns/registrar/update-status?domain=${encodeURIComponent(domain)}`, {
+            headers: { 'X-Admin-Actor': adminActor },
+          }),
+        ]);
+
+        const registrationPayload = await parseApiPayload<RegistrarWorkflowPayload>(
+          registrationResponse,
+          'Falha ao consultar workflow de registro',
+        );
+        const updatePayload = await parseApiPayload<RegistrarWorkflowPayload>(
+          updateResponse,
+          'Falha ao consultar workflow de atualização',
+        );
+
+        if (!registrationResponse.ok || !registrationPayload.ok) {
+          throw new Error(registrationPayload.error ?? 'Falha ao consultar workflow de registro.');
+        }
+        if (!updateResponse.ok || !updatePayload.ok) {
+          throw new Error(updatePayload.error ?? 'Falha ao consultar workflow de atualização.');
+        }
+
+        setRegistrarRegistrationStatus(registrationPayload.status ?? null);
+        setRegistrarUpdateStatus(updatePayload.status ?? null);
+
+        if (shouldNotify) {
+          showNotification(withReq('Workflows Registrar atualizados.', updatePayload), 'success');
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Não foi possível consultar workflows Registrar.';
+        showNotification(message, 'error');
+      } finally {
+        setRegistrarActionLoading('');
       }
     },
     [adminActor, showNotification],
@@ -1082,6 +1415,8 @@ export function CfDnsModule() {
     setSelectedZoneId(zoneId);
     setSelectedZoneName(zone?.name ?? '');
     setPage(1);
+    setRegistrarRegistrationStatus(null);
+    setRegistrarUpdateStatus(null);
     resetDraft();
     setShowRecordForm(false);
   };
@@ -1094,6 +1429,119 @@ export function CfDnsModule() {
 
     setPage(1);
     void loadRecords(selectedZoneId, { shouldNotify: true, pageOverride: 1 });
+  };
+
+  const handleRegistrarCheckFromSearch = (domainName: string) => {
+    void checkRegistrarDomains([domainName]);
+  };
+
+  const handleRegistrarCreateRequest = (domain: RegistrarAvailability) => {
+    const checked = registrarCheckByDomain.get(domain.name) ?? domain;
+    if (!checked.registrable) {
+      showNotification('Domínio não registrável pela API do Registrar.', 'error');
+      return;
+    }
+    if (checked.tier === 'premium') {
+      showNotification('Registro premium não é suportado pela API do Registrar.', 'error');
+      return;
+    }
+    setPendingRegistrarCreate(checked);
+  };
+
+  const executeRegistrarCreate = async () => {
+    const target = pendingRegistrarCreate;
+    if (!target) {
+      return;
+    }
+
+    setPendingRegistrarCreate(null);
+    setRegistrarActionLoading(`create:${target.name}`);
+    try {
+      const freshCheck = await checkRegistrarDomains([target.name]);
+      const checked = freshCheck.find((domain) => domain.name === target.name);
+      if (!checked?.registrable || checked.tier === 'premium') {
+        throw new Error('Checagem autoritativa bloqueou o registro. Domínio indisponível, premium ou não suportado.');
+      }
+
+      const response = await fetch('/api/cfdns/registrar/registrations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
+        },
+        body: JSON.stringify({
+          domain_name: target.name,
+          years: toIntOrFallback(registrarYears, 1),
+          auto_renew: registrarCreateAutoRenew,
+          privacy_mode: registrarCreatePrivacyMode,
+        }),
+      });
+      const payload = await parseApiPayload<RegistrarWorkflowPayload>(
+        response,
+        'Falha ao registrar domínio no Cloudflare Registrar',
+      );
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? 'Falha ao registrar domínio no Cloudflare Registrar.');
+      }
+
+      setRegistrarAccount(payload.account ?? registrarAccount);
+      setRegistrarRegistrationStatus(payload.status ?? null);
+      await loadRegistrarRegistrations();
+      showNotification(withReq(`Workflow de registro iniciado para ${target.name}.`, payload), 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível registrar o domínio.';
+      showNotification(message, 'error');
+    } finally {
+      setRegistrarActionLoading('');
+    }
+  };
+
+  const queueRegistrarSettingsPatch = (patch: RegistrarSettingsPatch) => {
+    if (!patch.domain) {
+      showNotification('Selecione um domínio registrado.', 'error');
+      return;
+    }
+    setPendingRegistrarSettings(patch);
+  };
+
+  const executeRegistrarSettingsPatch = async () => {
+    const patch = pendingRegistrarSettings;
+    if (!patch) {
+      return;
+    }
+
+    setPendingRegistrarSettings(null);
+    setRegistrarActionLoading(`settings:${patch.domain}`);
+    try {
+      const query = new URLSearchParams({ domain: patch.domain });
+      const response = await fetch(`/api/cfdns/registrar/registration?${query.toString()}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Actor': adminActor,
+        },
+        body: JSON.stringify({ auto_renew: patch.auto_renew }),
+      });
+      const payload = await parseApiPayload<RegistrarWorkflowPayload>(
+        response,
+        'Falha ao atualizar Cloudflare Registrar',
+      );
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? 'Falha ao atualizar Cloudflare Registrar.');
+      }
+
+      setRegistrarUpdateStatus(payload.status ?? null);
+      await loadRegistrarRegistrations();
+      await loadRegistrarStatuses(patch.domain);
+      showNotification(withReq(`${patch.label} aplicado em ${patch.domain}.`, payload), 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível atualizar Registrar.';
+      showNotification(message, 'error');
+    } finally {
+      setRegistrarActionLoading('');
+    }
   };
 
   const handleSaveRecord = async () => {
@@ -1461,19 +1909,21 @@ export function CfDnsModule() {
                 type="button"
                 className="ghost-button"
                 onClick={() => void loadRegistrarRegistrations(true)}
-                disabled={registrarLoading}
+                disabled={registrarLoading || Boolean(registrarActionLoading)}
               >
                 {registrarLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
                 Atualizar Registrar
               </button>
+              {registrarDashboardUrl ? (
+                <a className="ghost-button" href={registrarDashboardUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink size={16} />
+                  Dashboard
+                </a>
+              ) : null}
             </div>
           </header>
 
-          {registrarLoading ? (
-            <p className="result-empty inline-loading-message">
-              <Loader2 size={16} className="spin" /> Carregando Cloudflare Registrar...
-            </p>
-          ) : registrarError ? (
+          {registrarError ? (
             <article className="integrity-banner integrity-banner--warning">
               <header className="integrity-banner__header">
                 <AlertTriangle size={16} />
@@ -1481,44 +1931,305 @@ export function CfDnsModule() {
               </header>
               <p className="field-hint">{registrarError}</p>
             </article>
-          ) : selectedRegistration ? (
-            <div className="cfdns-registrar-grid">
-              <div className="cfdns-registrar-item">
-                <span>Status</span>
-                <strong>{selectedRegistration.status || '—'}</strong>
-              </div>
-              <div className="cfdns-registrar-item">
-                <span>Expiração</span>
-                <strong>
-                  <CalendarClock size={14} /> {formatRegistrarDate(selectedRegistration.expires_at)}
-                </strong>
-                {selectedRegistrationDaysUntilExpiry != null && (
-                  <small>
-                    {selectedRegistrationDaysUntilExpiry >= 0
-                      ? `${selectedRegistrationDaysUntilExpiry} dia(s) restantes`
-                      : `${Math.abs(selectedRegistrationDaysUntilExpiry)} dia(s) vencido`}
-                  </small>
-                )}
-              </div>
-              <div className="cfdns-registrar-item">
-                <span>Auto-renew</span>
-                <strong>{formatRegistrarBoolean(selectedRegistration.auto_renew, 'Ativo', 'Inativo')}</strong>
-              </div>
-              <div className="cfdns-registrar-item">
-                <span>Privacidade</span>
-                <strong>{selectedRegistration.privacy_mode || '—'}</strong>
-              </div>
-              <div className="cfdns-registrar-item">
-                <span>Lock</span>
-                <strong>{formatRegistrarBoolean(selectedRegistration.locked, 'Bloqueado', 'Desbloqueado')}</strong>
-              </div>
+          ) : null}
+
+          <div className="cfdns-registrar-controls">
+            <div className="field-group cfdns-registrar-query">
+              <label htmlFor="cfdns-registrar-query">Busca / checagem</label>
+              <input
+                id="cfdns-registrar-query"
+                name="cfDnsRegistrarQuery"
+                type="text"
+                autoComplete="off"
+                placeholder="marca, termo ou dominio.com"
+                value={registrarQuery}
+                onChange={(event) => setRegistrarQuery(event.target.value.toLowerCase())}
+                disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+              />
             </div>
+
+            <div className="field-group">
+              <label htmlFor="cfdns-registrar-extensions">TLDs</label>
+              <input
+                id="cfdns-registrar-extensions"
+                name="cfDnsRegistrarExtensions"
+                type="text"
+                autoComplete="off"
+                value={registrarExtensions}
+                onChange={(event) => setRegistrarExtensions(event.target.value)}
+                disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfdns-registrar-years">Anos</label>
+              <input
+                id="cfdns-registrar-years"
+                name="cfDnsRegistrarYears"
+                type="number"
+                min={1}
+                max={10}
+                value={registrarYears}
+                onChange={(event) => setRegistrarYears(event.target.value)}
+                disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfdns-registrar-new-autorenew">Auto-renew inicial</label>
+              <select
+                id="cfdns-registrar-new-autorenew"
+                name="cfDnsRegistrarNewAutoRenew"
+                value={registrarCreateAutoRenew ? 'true' : 'false'}
+                onChange={(event) => setRegistrarCreateAutoRenew(event.target.value === 'true')}
+                disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+              >
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </select>
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="cfdns-registrar-new-privacy">Privacidade inicial</label>
+              <select
+                id="cfdns-registrar-new-privacy"
+                name="cfDnsRegistrarNewPrivacy"
+                value={registrarCreatePrivacyMode}
+                onChange={(event) => setRegistrarCreatePrivacyMode(event.target.value as 'redaction' | 'off')}
+                disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+              >
+                <option value="redaction">redaction</option>
+                <option value="off">off</option>
+              </select>
+            </div>
+
+            <div className="cfdns-registrar-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => void searchRegistrarDomains()}
+                disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+              >
+                {registrarLookupLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+                Buscar
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void checkRegistrarDomains()}
+                disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+              >
+                {registrarLookupLoading ? <Loader2 size={16} className="spin" /> : <ShieldCheck size={16} />}
+                Checar
+              </button>
+            </div>
+          </div>
+
+          {registrarSuggestionRows.length > 0 && (
+            <div className="cfdns-table-wrap cfdns-registrar-table-wrap">
+              <table className="cfdns-table cfdns-registrar-table">
+                <thead>
+                  <tr>
+                    <th>Domínio</th>
+                    <th>Disponível</th>
+                    <th>Preço</th>
+                    <th>Tier / razão</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrarSuggestionRows.map((domain) => {
+                    const checked = registrarCheckByDomain.get(domain.name);
+                    const effective = checked ?? domain;
+                    const canRegister = Boolean(checked?.registrable && checked.tier !== 'premium');
+                    const isCreating = registrarActionLoading === `create:${domain.name}`;
+
+                    return (
+                      <tr key={domain.name}>
+                        <td>{domain.name}</td>
+                        <td>
+                          {checked ? (checked.registrable ? 'Sim' : 'Não') : domain.registrable ? 'Provável' : '—'}
+                        </td>
+                        <td>{formatRegistrarPrice(effective.pricing)}</td>
+                        <td>
+                          {effective.tier ?? '—'} / {formatRegistrarReason(effective.reason)}
+                        </td>
+                        <td>
+                          <div className="cfdns-row-actions">
+                            <button
+                              type="button"
+                              className="ghost-button cfrow-action-btn"
+                              onClick={() => handleRegistrarCheckFromSearch(domain.name)}
+                              disabled={registrarLookupLoading || Boolean(registrarActionLoading)}
+                            >
+                              <ShieldCheck size={13} />
+                              Checar
+                            </button>
+                            <button
+                              type="button"
+                              className="primary-button cfrow-action-btn"
+                              onClick={() => handleRegistrarCreateRequest(domain)}
+                              disabled={!canRegister || registrarLookupLoading || Boolean(registrarActionLoading)}
+                            >
+                              {isCreating ? <Loader2 size={13} className="spin" /> : <Plus size={13} />}
+                              Registrar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {registrarLoading ? (
+            <p className="result-empty inline-loading-message">
+              <Loader2 size={16} className="spin" /> Carregando Cloudflare Registrar...
+            </p>
+          ) : selectedRegistration ? (
+            <>
+              <div className="cfdns-registrar-grid">
+                <div className="cfdns-registrar-item">
+                  <span>Status</span>
+                  <strong>{selectedRegistration.status || '—'}</strong>
+                </div>
+                <div className="cfdns-registrar-item">
+                  <span>Expiração</span>
+                  <strong>
+                    <CalendarClock size={14} /> {formatRegistrarDate(selectedRegistration.expires_at)}
+                  </strong>
+                  {selectedRegistrationDaysUntilExpiry != null && (
+                    <small>
+                      {selectedRegistrationDaysUntilExpiry >= 0
+                        ? `${selectedRegistrationDaysUntilExpiry} dia(s) restantes`
+                        : `${Math.abs(selectedRegistrationDaysUntilExpiry)} dia(s) vencido`}
+                    </small>
+                  )}
+                </div>
+                <div className="cfdns-registrar-item">
+                  <span>Auto-renew</span>
+                  <strong>{formatRegistrarBoolean(selectedRegistration.auto_renew, 'Ativo', 'Inativo')}</strong>
+                </div>
+                <div className="cfdns-registrar-item">
+                  <span>Privacidade</span>
+                  <strong>{selectedRegistration.privacy_mode || '—'}</strong>
+                </div>
+                <div className="cfdns-registrar-item">
+                  <span>Lock</span>
+                  <strong>{formatRegistrarBoolean(selectedRegistration.locked, 'Bloqueado', 'Desbloqueado')}</strong>
+                </div>
+              </div>
+
+              <div className="cfdns-registrar-actionbar">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() =>
+                    queueRegistrarSettingsPatch({
+                      domain: selectedRegistration.domain_name,
+                      label: selectedRegistration.auto_renew ? 'Auto-renew desativado' : 'Auto-renew ativado',
+                      auto_renew: !selectedRegistration.auto_renew,
+                    })
+                  }
+                  disabled={Boolean(registrarActionLoading)}
+                >
+                  <RefreshCw size={16} />
+                  {selectedRegistration.auto_renew ? 'Desativar auto-renew' : 'Ativar auto-renew'}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => void loadRegistrarStatuses(selectedRegistration.domain_name, true)}
+                  disabled={Boolean(registrarActionLoading)}
+                >
+                  {registrarActionLoading === `status:${selectedRegistration.domain_name}` ? (
+                    <Loader2 size={16} className="spin" />
+                  ) : (
+                    <RefreshCw size={16} />
+                  )}
+                  Status
+                </button>
+                {registrarDashboardUrl ? (
+                  <a className="ghost-button" href={registrarDashboardUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink size={16} />
+                    Renovar / lock / privacidade
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="cfdns-registrar-workflows">
+                <div className="cfdns-registrar-workflow-item">
+                  <span>Registration workflow</span>
+                  <strong>{formatWorkflowState(registrarRegistrationStatus)}</strong>
+                  <small>{formatDateTime(registrarRegistrationStatus?.updated_at)}</small>
+                </div>
+                <div className="cfdns-registrar-workflow-item">
+                  <span>Update workflow</span>
+                  <strong>{formatWorkflowState(registrarUpdateStatus)}</strong>
+                  <small>{formatDateTime(registrarUpdateStatus?.updated_at)}</small>
+                </div>
+              </div>
+            </>
           ) : (
             <p className="result-empty">
               {selectedZoneName
-                ? 'Esta zona não consta como domínio registrado no Cloudflare Registrar.'
+                ? 'Zona sem registro ativo no Cloudflare Registrar.'
                 : 'Selecione uma zona para cruzar DNS e Registrar.'}
             </p>
+          )}
+
+          {registrarRegistrations.length > 0 && (
+            <div className="cfdns-table-wrap cfdns-registrar-table-wrap">
+              <table className="cfdns-table cfdns-registrar-table">
+                <thead>
+                  <tr>
+                    <th>Registrado</th>
+                    <th>Status</th>
+                    <th>Expira</th>
+                    <th>Auto-renew</th>
+                    <th>Lock</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrarRegistrations.map((registration) => {
+                    const matchingZone = zones.find(
+                      (zone) => zone.name.trim().toLowerCase() === registration.domain_name,
+                    );
+
+                    return (
+                      <tr key={registration.domain_name}>
+                        <td>{registration.domain_name}</td>
+                        <td>{registration.status || '—'}</td>
+                        <td>{formatRegistrarDate(registration.expires_at)}</td>
+                        <td>{formatRegistrarBoolean(registration.auto_renew, 'Ativo', 'Inativo')}</td>
+                        <td>{formatRegistrarBoolean(registration.locked, 'Bloqueado', 'Desbloqueado')}</td>
+                        <td>
+                          <div className="cfdns-row-actions">
+                            <button
+                              type="button"
+                              className="ghost-button cfrow-action-btn"
+                              onClick={() => {
+                                if (matchingZone) {
+                                  handleZoneChange(matchingZone.id);
+                                }
+                                void loadRegistrarStatuses(registration.domain_name, true);
+                              }}
+                              disabled={Boolean(registrarActionLoading)}
+                            >
+                              <RefreshCw size={13} />
+                              Abrir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </article>
 
@@ -2608,6 +3319,90 @@ export function CfDnsModule() {
           </article>
         )}
       </section>
+
+      {pendingRegistrarCreate &&
+        createPortal(
+          // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop — click dismisses; keyboard dismissal handled by Escape
+          <div
+            className="cleanup-confirm-overlay"
+            onClick={() => setPendingRegistrarCreate(null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setPendingRegistrarCreate(null);
+            }}
+          >
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: event guard — isolates modal body from backdrop dismiss */}
+            <div
+              className="cleanup-confirm-modal"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <AlertTriangle size={32} className="cleanup-confirm-icon" />
+              <h3>Registrar domínio</h3>
+              <p>
+                Confirma o registro billable de <strong>{pendingRegistrarCreate.name}</strong> por {registrarYears}{' '}
+                ano(s), {formatRegistrarPrice(pendingRegistrarCreate.pricing)}?
+                <br />
+                Registros concluídos não são reembolsáveis.
+              </p>
+              <div className="cleanup-confirm-actions">
+                <button
+                  type="button"
+                  className="cleanup-confirm-cancel"
+                  onClick={() => setPendingRegistrarCreate(null)}
+                >
+                  Cancelar
+                </button>
+                <button type="button" className="cleanup-confirm-proceed" onClick={() => void executeRegistrarCreate()}>
+                  Confirmar registro
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {pendingRegistrarSettings &&
+        createPortal(
+          // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop — click dismisses; keyboard dismissal handled by Escape
+          <div
+            className="cleanup-confirm-overlay"
+            onClick={() => setPendingRegistrarSettings(null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setPendingRegistrarSettings(null);
+            }}
+          >
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: event guard — isolates modal body from backdrop dismiss */}
+            <div
+              className="cleanup-confirm-modal"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <AlertTriangle size={32} className="cleanup-confirm-icon" />
+              <h3>Atualizar Registrar</h3>
+              <p>
+                Confirma <strong>{pendingRegistrarSettings.label}</strong> em{' '}
+                <strong>{pendingRegistrarSettings.domain}</strong>?
+              </p>
+              <div className="cleanup-confirm-actions">
+                <button
+                  type="button"
+                  className="cleanup-confirm-cancel"
+                  onClick={() => setPendingRegistrarSettings(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="cleanup-confirm-proceed"
+                  onClick={() => void executeRegistrarSettingsPatch()}
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* ── Confirm Modal DNS Save (substitui window.confirm) ── */}
       {pendingSaveConfirm &&

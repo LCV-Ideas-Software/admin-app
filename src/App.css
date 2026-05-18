@@ -1899,6 +1899,42 @@ input[type="color"]:focus-visible {
   gap: 14px;
 }
 
+.cfdns-registrar-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1.2fr) 90px minmax(130px, 1fr) minmax(130px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid rgba(26, 115, 232, 0.14);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.74);
+}
+
+.cfdns-registrar-query {
+  min-width: 0;
+}
+
+.cfdns-registrar-actions,
+.cfdns-registrar-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.cfdns-registrar-actions {
+  justify-content: flex-end;
+}
+
+.cfdns-registrar-table-wrap {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+}
+
+.cfdns-registrar-table {
+  min-width: 780px;
+}
+
 .cfdns-registrar-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1943,13 +1979,67 @@ input[type="color"]:focus-visible {
   font-size: 0.76rem;
 }
 
+.cfdns-registrar-workflows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cfdns-registrar-workflow-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(26, 115, 232, 0.14);
+  background: rgba(239, 246, 255, 0.42);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cfdns-registrar-workflow-item span {
+  color: #5f6368;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cfdns-registrar-workflow-item strong {
+  color: #202124;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.cfdns-registrar-workflow-item small {
+  color: #5f6368;
+  font-size: 0.75rem;
+}
+
 @media (max-width: 900px) {
+  .cfdns-registrar-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cfdns-registrar-actions {
+    justify-content: flex-start;
+  }
+
   .cfdns-registrar-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cfdns-registrar-item {
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .cfdns-registrar-workflows {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .cfdns-registrar-controls {
+    grid-template-columns: 1fr;
   }
 }
 

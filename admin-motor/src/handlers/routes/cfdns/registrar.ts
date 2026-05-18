@@ -1,8 +1,12 @@
 import {
+  checkCloudflareRegistrarDomains,
+  createCloudflareRegistrarRegistration,
   getCloudflareRegistrarRegistration,
   getCloudflareRegistrarRegistrationStatus,
   getCloudflareRegistrarUpdateStatus,
   listCloudflareRegistrarRegistrations,
+  searchCloudflareRegistrarDomains,
+  updateCloudflareRegistrarRegistration,
 } from '../_lib/cloudflare-api';
 import type { D1Database } from '../_lib/operational';
 import { logModuleOperationalEvent } from '../_lib/operational';
@@ -77,6 +81,33 @@ const getRequiredDomain = (request: Request) => {
   return String(url.searchParams.get('domain') ?? '').trim();
 };
 
+const readJsonBody = async <T>(request: Request): Promise<T> => {
+  try {
+    return (await request.json()) as T;
+  } catch {
+    throw new Error('Body JSON inválido.');
+  }
+};
+
+const getSearchOptions = (request: Request) => {
+  const url = new URL(request.url);
+  const q = String(url.searchParams.get('q') ?? '').trim();
+  const limitRaw = url.searchParams.get('limit');
+  const extensionsRaw = String(url.searchParams.get('extensions') ?? '').trim();
+  const extensions = extensionsRaw
+    ? extensionsRaw
+        .split(',')
+        .map((extension) => extension.trim())
+        .filter(Boolean)
+    : [];
+
+  return {
+    q,
+    limit: limitRaw == null || limitRaw === '' ? undefined : Number(limitRaw),
+    extensions,
+  };
+};
+
 export async function onRequestGetRegistrations(context: Context) {
   const trace = createResponseTrace(context.request);
 
@@ -101,6 +132,107 @@ export async function onRequestGetRegistrations(context: Context) {
     const message = error instanceof Error ? error.message : 'Falha ao listar domínios registrados na Cloudflare.';
     await logRegistrarEvent(context, trace, { action: 'registrar-registrations-list' }, message);
     return toError(message, trace, 502);
+  }
+}
+
+export async function onRequestGetSearch(context: Context) {
+  const trace = createResponseTrace(context.request);
+  const options = getSearchOptions(context.request);
+  if (!options.q) {
+    return toError('Parâmetro q é obrigatório.', trace, 400);
+  }
+
+  try {
+    const payload = await searchCloudflareRegistrarDomains(getEnv(context), options);
+    await logRegistrarEvent(context, trace, {
+      action: 'registrar-domain-search',
+      accountSource: payload.account.source,
+      q: options.q,
+      count: payload.domains.length,
+    });
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        ...trace,
+        ...payload,
+      }),
+      { headers: toHeaders() },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao buscar domínios no Registrar.';
+    await logRegistrarEvent(context, trace, { action: 'registrar-domain-search', q: options.q }, message);
+    return toError(message, trace, 502);
+  }
+}
+
+export async function onRequestPostCheck(context: Context) {
+  const trace = createResponseTrace(context.request);
+
+  try {
+    const body = await readJsonBody<{ domains?: string[] }>(context.request);
+    const domains = Array.isArray(body.domains) ? body.domains : [];
+    const payload = await checkCloudflareRegistrarDomains(getEnv(context), domains);
+    await logRegistrarEvent(context, trace, {
+      action: 'registrar-domain-check',
+      accountSource: payload.account.source,
+      domains: payload.domains.map((domain) => domain.name),
+      count: payload.domains.length,
+    });
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        ...trace,
+        ...payload,
+      }),
+      { headers: toHeaders() },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao checar disponibilidade no Registrar.';
+    await logRegistrarEvent(context, trace, { action: 'registrar-domain-check' }, message);
+    return toError(message, trace, message.includes('JSON') || message.includes('domínio') ? 400 : 502);
+  }
+}
+
+export async function onRequestPostRegistration(context: Context) {
+  const trace = createResponseTrace(context.request);
+
+  try {
+    const body = await readJsonBody<{
+      domain_name?: string;
+      auto_renew?: boolean;
+      privacy_mode?: 'off' | 'redaction';
+      years?: number;
+      contacts?: Record<string, unknown>;
+    }>(context.request);
+    const payload = await createCloudflareRegistrarRegistration(getEnv(context), {
+      domain_name: String(body.domain_name ?? ''),
+      auto_renew: body.auto_renew,
+      privacy_mode: body.privacy_mode,
+      years: body.years,
+      contacts: body.contacts,
+    });
+    await logRegistrarEvent(context, trace, {
+      action: 'registrar-registration-create',
+      accountSource: payload.account.source,
+      domain: body.domain_name ?? null,
+      state: payload.status?.state ?? null,
+      completed: payload.status?.completed ?? null,
+    });
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        ...trace,
+        ...payload,
+      }),
+      { headers: toHeaders() },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao registrar domínio no Registrar.';
+    await logRegistrarEvent(context, trace, { action: 'registrar-registration-create' }, message);
+    return toError(message, trace, message.includes('obrigatório') || message.includes('years') ? 400 : 502);
   }
 }
 
@@ -131,6 +263,45 @@ export async function onRequestGetRegistration(context: Context) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar registro Registrar.';
     await logRegistrarEvent(context, trace, { action: 'registrar-registration-get', domain }, message);
     return toError(message, trace, 502);
+  }
+}
+
+export async function onRequestPatchRegistration(context: Context) {
+  const trace = createResponseTrace(context.request);
+  const domain = getRequiredDomain(context.request);
+  if (!domain) {
+    return toError('Parâmetro domain é obrigatório.', trace, 400);
+  }
+
+  try {
+    const body = await readJsonBody<{ auto_renew?: boolean }>(context.request);
+    if (typeof body.auto_renew !== 'boolean') {
+      return toError('auto_renew booleano é obrigatório.', trace, 400);
+    }
+    const payload = await updateCloudflareRegistrarRegistration(getEnv(context), domain, {
+      auto_renew: body.auto_renew,
+    });
+    await logRegistrarEvent(context, trace, {
+      action: 'registrar-registration-update',
+      accountSource: payload.account.source,
+      domain,
+      auto_renew: body.auto_renew,
+      state: payload.status?.state ?? null,
+      completed: payload.status?.completed ?? null,
+    });
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        ...trace,
+        ...payload,
+      }),
+      { headers: toHeaders() },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao atualizar registro Registrar.';
+    await logRegistrarEvent(context, trace, { action: 'registrar-registration-update', domain }, message);
+    return toError(message, trace, message.includes('JSON') || message.includes('auto_renew') ? 400 : 502);
   }
 }
 
