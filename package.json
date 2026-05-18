@@ -118,6 +118,7 @@
     "picomatch": "4.0.4",
     "undici": "6.24.0",
     "vite": "$vite",
-    "@xmldom/xmldom": "^0.9.10"
+    "@xmldom/xmldom": "^0.9.10",
+    "ws": "8.20.1"
   }
 }
