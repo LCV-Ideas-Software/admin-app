@@ -99,6 +99,7 @@ type RegistrarWorkflowPayload = {
   request_id?: string;
   account?: RegistrarAccount;
   status?: RegistrarWorkflowStatus;
+  workflow_missing?: boolean;
 };
 
 type RegistrarSettingsPatch = {
@@ -1314,7 +1315,16 @@ export function CfDnsModule() {
         setRegistrarUpdateStatus(updatePayload.status ?? null);
 
         if (shouldNotify) {
-          showNotification(withReq('Workflows Registrar atualizados.', updatePayload), 'success');
+          const missingWorkflows = registrationPayload.workflow_missing && updatePayload.workflow_missing;
+          showNotification(
+            withReq(
+              missingWorkflows
+                ? 'Nenhum workflow Registrar ativo para este domínio.'
+                : 'Workflows Registrar atualizados.',
+              updatePayload,
+            ),
+            missingWorkflows ? 'info' : 'success',
+          );
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Não foi possível consultar workflows Registrar.';

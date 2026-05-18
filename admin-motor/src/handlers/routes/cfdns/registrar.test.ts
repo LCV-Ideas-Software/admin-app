@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   onRequestGetRegistration,
+  onRequestGetRegistrationStatus,
   onRequestGetRegistrations,
+  onRequestGetUpdateStatus,
   onRequestPatchRegistration,
   onRequestPostCheck,
   onRequestPostRegistration,
@@ -245,5 +247,89 @@ describe('cfdns registrar routes', () => {
     const payload = (await response.json()) as { ok: boolean; status: { state: string } };
     expect(payload.ok).toBe(true);
     expect(payload.status.state).toBe('in_progress');
+  });
+
+  it('treats missing Registrar workflows as an empty status instead of a gateway error', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const target = String(input);
+      expect(target).toMatch(/\/registrar\/registrations\/lcvmail\.com\/(registration-status|update-status)$/);
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          errors: [
+            {
+              code: 10000,
+              message: 'No workflow found for lcvmail.com',
+            },
+          ],
+        }),
+        { status: 404 },
+      );
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const registrationResponse = await onRequestGetRegistrationStatus({
+      request: new Request('https://admin.lcv.dev/api/cfdns/registrar/registration-status?domain=lcvmail.com'),
+      env: {
+        CLOUDFLARE_DNS: 'dns-token',
+        CF_ACCOUNT_ID: 'acct-123',
+      },
+    });
+    const updateResponse = await onRequestGetUpdateStatus({
+      request: new Request('https://admin.lcv.dev/api/cfdns/registrar/update-status?domain=lcvmail.com'),
+      env: {
+        CLOUDFLARE_DNS: 'dns-token',
+        CF_ACCOUNT_ID: 'acct-123',
+      },
+    });
+
+    expect(registrationResponse.status).toBe(200);
+    expect(updateResponse.status).toBe(200);
+    await expect(registrationResponse.json()).resolves.toMatchObject({
+      ok: true,
+      status: null,
+      workflow_missing: true,
+    });
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      ok: true,
+      status: null,
+      workflow_missing: true,
+    });
+  });
+
+  it('keeps unexpected Registrar workflow failures as gateway errors', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: false,
+            errors: [
+              {
+                code: 1000,
+                message: 'Unexpected Cloudflare Registrar workflow failure',
+              },
+            ],
+          }),
+          { status: 500 },
+        ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await onRequestGetRegistrationStatus({
+      request: new Request('https://admin.lcv.dev/api/cfdns/registrar/registration-status?domain=lcvmail.com'),
+      env: {
+        CLOUDFLARE_DNS: 'dns-token',
+        CF_ACCOUNT_ID: 'acct-123',
+      },
+    });
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Unexpected Cloudflare Registrar workflow failure'),
+    });
   });
 });

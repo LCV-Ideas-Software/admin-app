@@ -320,6 +320,7 @@ export async function onRequestGetRegistrationStatus(context: Context) {
       domain,
       state: payload.status?.state ?? null,
       completed: payload.status?.completed ?? null,
+      workflowMissing: payload.workflow_missing ?? false,
     });
 
     return new Response(
@@ -352,6 +353,7 @@ export async function onRequestGetUpdateStatus(context: Context) {
       domain,
       state: payload.status?.state ?? null,
       completed: payload.status?.completed ?? null,
+      workflowMissing: payload.workflow_missing ?? false,
     });
 
     return new Response(

@@ -6,6 +6,23 @@
 
 - Sync inicial do MainSite grava `mainsite/ratelimit` apenas como toggles (`chatbot`, `email`, `comments`), alinhado ao rate limit nativo da Cloudflare; limites numericos nao sao mais semeados em D1.
 
+## [v02.02.06] - 2026-05-18
+
+### Corrigido
+
+- **CF DNS / Cloudflare Registrar**: consultas de `registration-status` e `update-status` agora tratam `10000: No workflow found` da Cloudflare como estado normal de domínio sem workflow ativo, retornando `200` com `status: null` e `workflow_missing: true` em vez de `502`.
+- **CF DNS UI**: o botão `Status` passa a exibir aviso informativo quando não existe workflow ativo para o domínio, sem quebrar o painel nem gerar erro no console.
+
+### Validação
+
+- APP v02.02.05 → APP v02.02.06.
+- `npm run biome` → OK.
+- `npm run lint` → OK.
+- `npm run build` → OK.
+- `npm run test:admin-motor` → 11 arquivos / 75 testes verdes.
+- `npm run test:admin-motor -- registrar.test.ts` → 1 arquivo / 7 testes verdes.
+- `cross-review` sessão `e4b4aaee-4195-4cfb-b674-d0a31094b529` → unanimous READY.
+
 ## [v02.02.05] - 2026-05-18
 
 ### Adicionado

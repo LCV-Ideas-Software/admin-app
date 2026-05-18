@@ -1,4 +1,5 @@
 type CloudflareApiError = {
+  code?: number | string;
   message?: string;
 };
 
@@ -195,10 +196,32 @@ const parseJsonOrThrow = <T>(rawText: string, fallback: string, response: Respon
   }
 };
 
-const toFirstError = (payload: CloudflareApiResponse<unknown>) => {
+class CloudflareRequestError extends Error {
+  readonly status: number;
+  readonly code: number | string | null;
+  readonly apiMessage: string | null;
+
+  constructor(message: string, options: { status: number; code?: number | string; apiMessage?: string | null }) {
+    super(message);
+    this.name = 'CloudflareRequestError';
+    this.status = options.status;
+    this.code = options.code ?? null;
+    this.apiMessage = options.apiMessage ?? null;
+  }
+}
+
+const toFirstErrorDetails = (payload: CloudflareApiResponse<unknown>) => {
   const firstError = Array.isArray(payload.errors) && payload.errors.length > 0 ? payload.errors[0] : null;
-  return firstError?.message?.trim() || null;
+  return {
+    code: firstError?.code ?? null,
+    message: firstError?.message?.trim() || null,
+  };
 };
+
+const isNoRegistrarWorkflowFound = (error: unknown) =>
+  error instanceof CloudflareRequestError &&
+  String(error.code) === '10000' &&
+  /no workflow found/i.test(error.apiMessage ?? error.message);
 
 const cloudflareRequest = async <T>(
   env: EnvWithCloudflareToken,
@@ -244,15 +267,20 @@ const cloudflareRequestPayload = async <T>(
   const payload = parseJsonOrThrow<CloudflareApiResponse<T>>(rawText, fallback, response);
 
   if (!response.ok || payload.success !== true) {
-    const message = toFirstError(payload);
+    const { code, message } = toFirstErrorDetails(payload);
     console.error('[cloudflare-api] request:error', {
       method: init?.method ?? 'GET',
       path,
       status: response.status,
+      code: code ?? null,
       message: message ?? null,
       fallback,
     });
-    throw new Error(message ? `${fallback}: ${message}` : `${fallback}: HTTP ${response.status}`);
+    throw new CloudflareRequestError(message ? `${fallback}: ${message}` : `${fallback}: HTTP ${response.status}`, {
+      status: response.status,
+      code,
+      apiMessage: message,
+    });
   }
 
   console.info('[cloudflare-api] request:ok', {
@@ -596,31 +624,55 @@ export const getCloudflareRegistrarRegistration = async (env: EnvWithCloudflareT
 export const getCloudflareRegistrarRegistrationStatus = async (env: EnvWithCloudflareToken, domainName: string) => {
   const account = await resolveCloudflareAccount(env);
   const normalizedDomain = normalizeDomainName(domainName);
-  const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
-    env,
-    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}/registration-status`,
-    `Falha ao consultar status de registro Registrar ${normalizedDomain}`,
-  );
+  try {
+    const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
+      env,
+      `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}/registration-status`,
+      `Falha ao consultar status de registro Registrar ${normalizedDomain}`,
+    );
 
-  return {
-    account,
-    status: normalizeRegistrarWorkflowStatus(status),
-  };
+    return {
+      account,
+      status: normalizeRegistrarWorkflowStatus(status),
+      workflow_missing: false,
+    };
+  } catch (error) {
+    if (isNoRegistrarWorkflowFound(error)) {
+      return {
+        account,
+        status: null,
+        workflow_missing: true,
+      };
+    }
+    throw error;
+  }
 };
 
 export const getCloudflareRegistrarUpdateStatus = async (env: EnvWithCloudflareToken, domainName: string) => {
   const account = await resolveCloudflareAccount(env);
   const normalizedDomain = normalizeDomainName(domainName);
-  const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
-    env,
-    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}/update-status`,
-    `Falha ao consultar status de atualização Registrar ${normalizedDomain}`,
-  );
+  try {
+    const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
+      env,
+      `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}/update-status`,
+      `Falha ao consultar status de atualização Registrar ${normalizedDomain}`,
+    );
 
-  return {
-    account,
-    status: normalizeRegistrarWorkflowStatus(status),
-  };
+    return {
+      account,
+      status: normalizeRegistrarWorkflowStatus(status),
+      workflow_missing: false,
+    };
+  } catch (error) {
+    if (isNoRegistrarWorkflowFound(error)) {
+      return {
+        account,
+        status: null,
+        workflow_missing: true,
+      };
+    }
+    throw error;
+  }
 };
 
 export const listCloudflareZones = async (env: EnvWithCloudflareToken) => {
