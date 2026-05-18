@@ -10,17 +10,7 @@ export type D1Database = {
 };
 
 type ModuleEventInput = {
-  module:
-    | 'ai-status'
-    | 'astrologo'
-    | 'cfdns'
-    | 'cfpw'
-    | 'calculadora'
-    | 'mainsite'
-    | 'mtasts'
-    | 'oraculo'
-    | 'apphub'
-    | 'adminhub';
+  module: 'astrologo' | 'cfdns' | 'cfpw' | 'calculadora' | 'mainsite' | 'mtasts' | 'oraculo' | 'apphub' | 'adminhub';
   source: 'bigdata_db' | 'bootstrap-default';
   fallbackUsed: boolean;
   ok: boolean;
@@ -29,17 +19,7 @@ type ModuleEventInput = {
 };
 
 type SyncRunStart = {
-  module:
-    | 'ai-status'
-    | 'astrologo'
-    | 'cfdns'
-    | 'cfpw'
-    | 'calculadora'
-    | 'mainsite'
-    | 'mtasts'
-    | 'oraculo'
-    | 'apphub'
-    | 'adminhub';
+  module: 'astrologo' | 'cfdns' | 'cfpw' | 'calculadora' | 'mainsite' | 'mtasts' | 'oraculo' | 'apphub' | 'adminhub';
   status: 'running';
   startedAt: number;
   metadata?: Record<string, unknown>;
@@ -56,7 +36,8 @@ type SyncRunFinish = {
 
 export async function ensureOperationalTables(db: D1Database) {
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS adminapp_module_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       created_at INTEGER NOT NULL,
@@ -67,7 +48,8 @@ export async function ensureOperationalTables(db: D1Database) {
       error_message TEXT,
       metadata_json TEXT
     )
-  `)
+  `,
+    )
     .run();
 
   await db
@@ -82,7 +64,8 @@ export async function ensureOperationalTables(db: D1Database) {
     .run();
 
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS adminapp_sync_runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       module TEXT NOT NULL,
@@ -94,7 +77,8 @@ export async function ensureOperationalTables(db: D1Database) {
       error_message TEXT,
       metadata_json TEXT
     )
-  `)
+  `,
+    )
     .run();
 
   await db
@@ -108,11 +92,13 @@ export async function logModuleOperationalEvent(db: D1Database, input: ModuleEve
   await ensureOperationalTables(db);
 
   await db
-    .prepare(`
+    .prepare(
+      `
     INSERT INTO adminapp_module_events
     (created_at, module, source, fallback_used, ok, error_message, metadata_json)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `)
+  `,
+    )
     .bind(
       Date.now(),
       input.module,
@@ -129,11 +115,13 @@ export async function startSyncRun(db: D1Database, run: SyncRunStart) {
   await ensureOperationalTables(db);
 
   await db
-    .prepare(`
+    .prepare(
+      `
     INSERT INTO adminapp_sync_runs
     (module, status, started_at, metadata_json)
     VALUES (?, ?, ?, ?)
-  `)
+  `,
+    )
     .bind(run.module, run.status, run.startedAt, run.metadata ? JSON.stringify(run.metadata) : null)
     .run();
 
@@ -149,7 +137,8 @@ export async function finishSyncRun(db: D1Database, run: SyncRunFinish) {
   await ensureOperationalTables(db);
 
   await db
-    .prepare(`
+    .prepare(
+      `
     UPDATE adminapp_sync_runs
     SET
       status = ?,
@@ -158,7 +147,8 @@ export async function finishSyncRun(db: D1Database, run: SyncRunFinish) {
       records_upserted = ?,
       error_message = ?
     WHERE id = ?
-  `)
+  `,
+    )
     .bind(run.status, run.finishedAt, run.recordsRead, run.recordsUpserted, run.errorMessage ?? null, run.id)
     .run();
 }

@@ -23,7 +23,10 @@ class LazyModuleErrorBoundary extends Component<{ children: ReactNode }, LazyMod
   }
 
   static getDerivedStateFromError(error: unknown): LazyModuleErrorBoundaryState {
-    return { hasError: true, message: error instanceof Error ? error.message : String(error) };
+    return {
+      hasError: true,
+      message: error instanceof Error ? error.message : String(error),
+    };
   }
 
   componentDidCatch(error: unknown, _errorInfo: ErrorInfo) {
@@ -86,57 +89,77 @@ function lazyWithAccessRecovery<T extends ComponentType<unknown>>(importer: () =
 
 /* ─── Lazy module imports ─── */
 
-const AiStatusModule = lazyWithAccessRecovery(() =>
-  import('./modules/ai-status/AiStatusModule').then((m) => ({ default: m.AiStatusModule })),
-);
 const AstrologoModule = lazyWithAccessRecovery(() =>
-  import('./modules/astrologo/AstrologoModule').then((m) => ({ default: m.AstrologoModule })),
+  import('./modules/astrologo/AstrologoModule').then((m) => ({
+    default: m.AstrologoModule,
+  })),
 );
 const ConfigModule = lazyWithAccessRecovery(() =>
-  import('./modules/config/ConfigModule').then((m) => ({ default: m.ConfigModule })),
+  import('./modules/config/ConfigModule').then((m) => ({
+    default: m.ConfigModule,
+  })),
 );
 const CalculadoraModule = lazyWithAccessRecovery(() =>
-  import('./modules/calculadora/CalculadoraModule').then((m) => ({ default: m.CalculadoraModule })),
+  import('./modules/calculadora/CalculadoraModule').then((m) => ({
+    default: m.CalculadoraModule,
+  })),
 );
 const MainsiteModule = lazyWithAccessRecovery(() =>
-  import('./modules/mainsite/MainsiteModule').then((m) => ({ default: m.MainsiteModule })),
+  import('./modules/mainsite/MainsiteModule').then((m) => ({
+    default: m.MainsiteModule,
+  })),
 );
 const MaestroAiModule = lazyWithAccessRecovery(() =>
-  import('./modules/maestro-ai/MaestroAiModule').then((m) => ({ default: m.MaestroAiModule })),
+  import('./modules/maestro-ai/MaestroAiModule').then((m) => ({
+    default: m.MaestroAiModule,
+  })),
 );
 const MtastsModule = lazyWithAccessRecovery(() =>
-  import('./modules/mtasts/MtastsModule').then((m) => ({ default: m.MtastsModule })),
+  import('./modules/mtasts/MtastsModule').then((m) => ({
+    default: m.MtastsModule,
+  })),
 );
 const CardHubModule = lazyWithAccessRecovery(() =>
-  import('./modules/hubs/CardHubModule').then((m) => ({ default: m.CardHubModule })),
+  import('./modules/hubs/CardHubModule').then((m) => ({
+    default: m.CardHubModule,
+  })),
 );
 const TelemetriaModule = lazyWithAccessRecovery(() =>
-  import('./modules/telemetria/TelemetriaModule').then((m) => ({ default: m.TelemetriaModule })),
+  import('./modules/telemetria/TelemetriaModule').then((m) => ({
+    default: m.TelemetriaModule,
+  })),
 );
 const CfDnsModule = lazyWithAccessRecovery(() =>
-  import('./modules/cfdns/CfDnsModule').then((m) => ({ default: m.CfDnsModule })),
+  import('./modules/cfdns/CfDnsModule').then((m) => ({
+    default: m.CfDnsModule,
+  })),
 );
 const CfPwModule = lazyWithAccessRecovery(() =>
   import('./modules/cfpw/CfPwModule').then((m) => ({ default: m.CfPwModule })),
 );
 const OraculoModule = lazyWithAccessRecovery(() =>
-  import('./modules/oraculo/OraculoModule').then((m) => ({ default: m.OraculoModule })),
+  import('./modules/oraculo/OraculoModule').then((m) => ({
+    default: m.OraculoModule,
+  })),
 );
 const NewsPanel = lazyWithAccessRecovery(() =>
   import('./modules/news/NewsPanel').then((m) => ({ default: m.NewsPanel })),
 );
 const TlsrptModule = lazyWithAccessRecovery(() =>
-  import('./modules/tlsrpt/TlsrptModule').then((m) => ({ default: m.TlsrptModule })),
+  import('./modules/tlsrpt/TlsrptModule').then((m) => ({
+    default: m.TlsrptModule,
+  })),
 );
 const LicencasModule = lazyWithAccessRecovery(() =>
-  import('./modules/compliance/LicencasModule').then((m) => ({ default: m.LicencasModule })),
+  import('./modules/compliance/LicencasModule').then((m) => ({
+    default: m.LicencasModule,
+  })),
 );
 
 /* ─── Module component map ─── */
 
 const MODULE_COMPONENTS: Record<ModuleId, ComponentType<Record<string, never>>> = {
   overview: NewsPanel as ComponentType<Record<string, never>>,
-  'ai-status': AiStatusModule as ComponentType<Record<string, never>>,
   astrologo: AstrologoModule as ComponentType<Record<string, never>>,
   cardhub: CardHubModule as ComponentType<Record<string, never>>,
   cfdns: CfDnsModule as ComponentType<Record<string, never>>,

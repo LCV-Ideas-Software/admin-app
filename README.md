@@ -40,14 +40,13 @@ Operator-only Cloudflare Access-protected dashboard with these modules:
 3. **Astrólogo** — astrology consultation viewer + Gemini synthesis, e-mail report dispatch.
 4. **Calculadora** — admin parameters and observability for a financial calculator app (PTAX/IPCA cache, rate-limit policies, backtest spot vs. PTAX, audit log).
 5. **Oráculo** — financial oracle records (LCI/CDB IPCA+ + Tesouro Direto) with cascade delete + per-user data lookup.
-6. **CF DNS / CF P&W** — Cloudflare DNS records CRUD + Pages/Workers project lifecycle (create, settings, observability, deployments cleanup) directly via Cloudflare API.
+6. **CF DNS / CF P&W** — Cloudflare DNS records CRUD, Cloudflare Registrar visibility for registered domains, and Pages/Workers project lifecycle (create, settings, observability, deployments cleanup) directly via Cloudflare API.
 7. **MTA-STS** — MTA-STS policy publishing + sync.
 8. **TLS-RPT** — TLS-RPT report viewer ingested by an internal Worker via SMTP.
-9. **AI Status** — multi-provider AI catalog (Gemini, Workers AI), GCP Cloud Logging integration, rate-limit configuration.
-10. **News** — RSS discovery + feed publication (operator content curation).
-11. **Telemetria** — operational events, sync runs, AI usage logs aggregation.
-12. **Configurações** — global app config + AI model selectors with D1 persistence.
-13. **Conformidade e Licenças** — AGPLv3 license display + third-party inventory.
+9. **News** — RSS discovery + feed publication (operator content curation).
+10. **Telemetria** — operational events, sync runs, AI usage logs aggregation.
+11. **Configurações** — global app config + AI model selectors with D1 persistence.
+12. **Conformidade e Licenças** — AGPLv3 license display + third-party inventory.
 
 ### Maestro AI settings and credentials
 

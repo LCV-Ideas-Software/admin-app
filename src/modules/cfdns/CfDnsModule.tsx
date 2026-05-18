@@ -3,7 +3,19 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { AlertTriangle, Cloud, Loader2, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  CalendarClock,
+  Cloud,
+  Loader2,
+  LockKeyhole,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
@@ -11,6 +23,32 @@ import { useNotification } from '../../components/Notification';
 type ZoneItem = {
   id: string;
   name: string;
+};
+
+type RegistrarRegistration = {
+  domain_name: string;
+  status: string;
+  created_at: string | null;
+  expires_at: string | null;
+  auto_renew: boolean | null;
+  privacy_mode: string | null;
+  locked: boolean | null;
+};
+
+type RegistrarPayload = {
+  ok: boolean;
+  error?: string;
+  request_id?: string;
+  account?: {
+    accountId?: string;
+    accountName?: string | null;
+    source?: string;
+  };
+  registrations?: RegistrarRegistration[];
+  pagination?: {
+    count?: number;
+    totalCount?: number;
+  };
 };
 
 type DnsRecord = {
@@ -184,6 +222,44 @@ const formatDateTimeFull = (value?: string) => {
   }
 
   return parsed.toLocaleString('pt-BR');
+};
+
+const formatRegistrarDate = (value?: string | null) => {
+  if (!value) {
+    return '—';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
+const getDaysUntil = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return Math.ceil((parsed.getTime() - Date.now()) / 86_400_000);
+};
+
+const formatRegistrarBoolean = (value: boolean | null, trueLabel: string, falseLabel: string) => {
+  if (value == null) {
+    return '—';
+  }
+
+  return value ? trueLabel : falseLabel;
 };
 
 const toIntOrFallback = (raw: string, fallback: number) => {
@@ -494,6 +570,9 @@ export function CfDnsModule() {
 
   const [zones, setZones] = useState<ZoneItem[]>([]);
   const [zonesLoading, setZonesLoading] = useState(false);
+  const [registrarRegistrations, setRegistrarRegistrations] = useState<RegistrarRegistration[]>([]);
+  const [registrarLoading, setRegistrarLoading] = useState(false);
+  const [registrarError, setRegistrarError] = useState('');
 
   const [selectedZoneId, setSelectedZoneId] = useState('');
   const [selectedZoneName, setSelectedZoneName] = useState('');
@@ -573,6 +652,37 @@ export function CfDnsModule() {
     isUriDraft,
     isHttpsDraft,
   ]);
+
+  const registrarByDomain = useMemo(() => {
+    const map = new Map<string, RegistrarRegistration>();
+    for (const registration of registrarRegistrations) {
+      const domain = String(registration.domain_name ?? '')
+        .trim()
+        .toLowerCase();
+      if (domain) {
+        map.set(domain, registration);
+      }
+    }
+    return map;
+  }, [registrarRegistrations]);
+
+  const selectedRegistration = useMemo(() => {
+    const domain = selectedZoneName.trim().toLowerCase();
+    if (!domain) {
+      return null;
+    }
+    return registrarByDomain.get(domain) ?? null;
+  }, [registrarByDomain, selectedZoneName]);
+
+  const registeredZoneCount = useMemo(
+    () => zones.filter((zone) => registrarByDomain.has(zone.name.trim().toLowerCase())).length,
+    [registrarByDomain, zones],
+  );
+
+  const selectedRegistrationDaysUntilExpiry = useMemo(
+    () => getDaysUntil(selectedRegistration?.expires_at),
+    [selectedRegistration?.expires_at],
+  );
 
   const zoneContextLabel = useMemo(() => {
     const zoneName = selectedZoneName.trim();
@@ -737,7 +847,7 @@ export function CfDnsModule() {
   ]);
 
   const statusTone = useMemo(() => {
-    if (zonesLoading || recordsLoading || saving || deletingId) {
+    if (zonesLoading || recordsLoading || registrarLoading || saving || deletingId) {
       return 'warning';
     }
     if (!selectedZoneId) {
@@ -747,10 +857,10 @@ export function CfDnsModule() {
       return 'warning';
     }
     return 'ok';
-  }, [deletingId, operationalAlerts.length, recordsLoading, saving, selectedZoneId, zonesLoading]);
+  }, [deletingId, operationalAlerts.length, recordsLoading, registrarLoading, saving, selectedZoneId, zonesLoading]);
 
   const statusLabel = useMemo(() => {
-    if (zonesLoading || recordsLoading || saving || deletingId) {
+    if (zonesLoading || recordsLoading || registrarLoading || saving || deletingId) {
       return 'Processando...';
     }
     if (!selectedZoneId) {
@@ -760,7 +870,7 @@ export function CfDnsModule() {
       return `${operationalAlerts.length} alerta(s)`;
     }
     return 'Sincronizado';
-  }, [deletingId, operationalAlerts.length, recordsLoading, saving, selectedZoneId, zonesLoading]);
+  }, [deletingId, operationalAlerts.length, recordsLoading, registrarLoading, saving, selectedZoneId, zonesLoading]);
 
   const resetDraft = () => {
     setDraft(DEFAULT_DRAFT);
@@ -818,10 +928,12 @@ export function CfDnsModule() {
             'X-Admin-Actor': adminActor,
           },
         });
-        const payload = await parseApiPayload<{ ok: boolean; error?: string; request_id?: string; zones?: ZoneItem[] }>(
-          response,
-          'Falha ao carregar domínios da Cloudflare',
-        );
+        const payload = await parseApiPayload<{
+          ok: boolean;
+          error?: string;
+          request_id?: string;
+          zones?: ZoneItem[];
+        }>(response, 'Falha ao carregar domínios da Cloudflare');
 
         if (!response.ok || !payload.ok) {
           throw new Error(payload.error ?? 'Falha ao carregar domínios da Cloudflare.');
@@ -846,6 +958,39 @@ export function CfDnsModule() {
       }
     },
     [adminActor, selectedZoneId, showNotification],
+  );
+
+  const loadRegistrarRegistrations = useCallback(
+    async (shouldNotify = false) => {
+      setRegistrarLoading(true);
+      setRegistrarError('');
+      try {
+        const response = await fetch('/api/cfdns/registrar/registrations', {
+          headers: {
+            'X-Admin-Actor': adminActor,
+          },
+        });
+        const payload = await parseApiPayload<RegistrarPayload>(response, 'Falha ao carregar Cloudflare Registrar');
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error ?? 'Falha ao carregar Cloudflare Registrar.');
+        }
+
+        const nextRegistrations = Array.isArray(payload.registrations) ? payload.registrations : [];
+        setRegistrarRegistrations(nextRegistrations);
+
+        if (shouldNotify) {
+          showNotification(withReq('Cloudflare Registrar atualizado.', payload), 'success');
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Não foi possível carregar Cloudflare Registrar.';
+        setRegistrarError(message);
+        showNotification(message, 'error');
+      } finally {
+        setRegistrarLoading(false);
+      }
+    },
+    [adminActor, showNotification],
   );
 
   const loadRecords = useCallback(
@@ -919,6 +1064,10 @@ export function CfDnsModule() {
   useEffect(() => {
     void loadZones();
   }, [loadZones]);
+
+  useEffect(() => {
+    void loadRegistrarRegistrations();
+  }, [loadRegistrarRegistrations]);
 
   useEffect(() => {
     if (!selectedZoneId) {
@@ -1077,10 +1226,11 @@ export function CfDnsModule() {
         }),
       });
 
-      const payload = await parseApiPayload<{ ok: boolean; error?: string; request_id?: string }>(
-        response,
-        'Falha ao salvar registro DNS',
-      );
+      const payload = await parseApiPayload<{
+        ok: boolean;
+        error?: string;
+        request_id?: string;
+      }>(response, 'Falha ao salvar registro DNS');
 
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? `Falha ao ${modeLabel} registro DNS.`);
@@ -1132,10 +1282,11 @@ export function CfDnsModule() {
         },
       });
 
-      const payload = await parseApiPayload<{ ok: boolean; error?: string; request_id?: string }>(
-        response,
-        'Falha ao remover registro DNS',
-      );
+      const payload = await parseApiPayload<{
+        ok: boolean;
+        error?: string;
+        request_id?: string;
+      }>(response, 'Falha ao remover registro DNS');
 
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? 'Falha ao remover registro DNS.');
@@ -1210,7 +1361,12 @@ export function CfDnsModule() {
               <button
                 type="button"
                 className="ghost-button"
-                onClick={() => void loadRecords(selectedZoneId, { shouldNotify: true, pageOverride: page })}
+                onClick={() =>
+                  void loadRecords(selectedZoneId, {
+                    shouldNotify: true,
+                    pageOverride: page,
+                  })
+                }
                 disabled={!selectedZoneId || recordsLoading || saving}
               >
                 {recordsLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
@@ -1233,6 +1389,7 @@ export function CfDnsModule() {
                 {zones.map((zone) => (
                   <option key={zone.id} value={zone.id}>
                     {zone.name}
+                    {registrarByDomain.has(zone.name.trim().toLowerCase()) ? ' · Registrar' : ''}
                   </option>
                 ))}
               </select>
@@ -1289,6 +1446,80 @@ export function CfDnsModule() {
               Aplicar filtros
             </button>
           </div>
+        </article>
+
+        <article className="result-card cfdns-registrar-panel">
+          <header className="result-header">
+            <h4>
+              <LockKeyhole size={16} /> Cloudflare Registrar
+            </h4>
+            <div className="inline-actions">
+              <span>
+                {registeredZoneCount}/{zones.length} zona(s) registradas · {registrarRegistrations.length} domínio(s)
+              </span>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => void loadRegistrarRegistrations(true)}
+                disabled={registrarLoading}
+              >
+                {registrarLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+                Atualizar Registrar
+              </button>
+            </div>
+          </header>
+
+          {registrarLoading ? (
+            <p className="result-empty inline-loading-message">
+              <Loader2 size={16} className="spin" /> Carregando Cloudflare Registrar...
+            </p>
+          ) : registrarError ? (
+            <article className="integrity-banner integrity-banner--warning">
+              <header className="integrity-banner__header">
+                <AlertTriangle size={16} />
+                <strong>Registrar indisponível</strong>
+              </header>
+              <p className="field-hint">{registrarError}</p>
+            </article>
+          ) : selectedRegistration ? (
+            <div className="cfdns-registrar-grid">
+              <div className="cfdns-registrar-item">
+                <span>Status</span>
+                <strong>{selectedRegistration.status || '—'}</strong>
+              </div>
+              <div className="cfdns-registrar-item">
+                <span>Expiração</span>
+                <strong>
+                  <CalendarClock size={14} /> {formatRegistrarDate(selectedRegistration.expires_at)}
+                </strong>
+                {selectedRegistrationDaysUntilExpiry != null && (
+                  <small>
+                    {selectedRegistrationDaysUntilExpiry >= 0
+                      ? `${selectedRegistrationDaysUntilExpiry} dia(s) restantes`
+                      : `${Math.abs(selectedRegistrationDaysUntilExpiry)} dia(s) vencido`}
+                  </small>
+                )}
+              </div>
+              <div className="cfdns-registrar-item">
+                <span>Auto-renew</span>
+                <strong>{formatRegistrarBoolean(selectedRegistration.auto_renew, 'Ativo', 'Inativo')}</strong>
+              </div>
+              <div className="cfdns-registrar-item">
+                <span>Privacidade</span>
+                <strong>{selectedRegistration.privacy_mode || '—'}</strong>
+              </div>
+              <div className="cfdns-registrar-item">
+                <span>Lock</span>
+                <strong>{formatRegistrarBoolean(selectedRegistration.locked, 'Bloqueado', 'Desbloqueado')}</strong>
+              </div>
+            </div>
+          ) : (
+            <p className="result-empty">
+              {selectedZoneName
+                ? 'Esta zona não consta como domínio registrado no Cloudflare Registrar.'
+                : 'Selecione uma zona para cruzar DNS e Registrar.'}
+            </p>
+          )}
         </article>
 
         <article className="result-card">
@@ -1448,7 +1679,10 @@ export function CfDnsModule() {
                                       type="text"
                                       value={draft.name}
                                       onChange={(event) =>
-                                        setDraft((current) => ({ ...current, name: event.target.value.toLowerCase() }))
+                                        setDraft((current) => ({
+                                          ...current,
+                                          name: event.target.value.toLowerCase(),
+                                        }))
                                       }
                                       disabled={saving}
                                     />
@@ -1463,7 +1697,10 @@ export function CfDnsModule() {
                                       max={86400}
                                       value={draft.ttl}
                                       onChange={(event) =>
-                                        setDraft((current) => ({ ...current, ttl: event.target.value }))
+                                        setDraft((current) => ({
+                                          ...current,
+                                          ttl: event.target.value,
+                                        }))
                                       }
                                       disabled={saving}
                                     />
@@ -1479,7 +1716,10 @@ export function CfDnsModule() {
                                         max={65535}
                                         value={draft.priority}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, priority: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            priority: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1496,7 +1736,10 @@ export function CfDnsModule() {
                                       rows={3}
                                       value={draft.content}
                                       onChange={(event) =>
-                                        setDraft((current) => ({ ...current, content: event.target.value }))
+                                        setDraft((current) => ({
+                                          ...current,
+                                          content: event.target.value,
+                                        }))
                                       }
                                       disabled={saving}
                                     />
@@ -1511,7 +1754,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-srv-service-${recordId}`}
                                         value={draft.srvService}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, srvService: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            srvService: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1522,7 +1768,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-srv-proto-${recordId}`}
                                         value={draft.srvProto}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, srvProto: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            srvProto: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1533,7 +1782,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-srv-target-${recordId}`}
                                         value={draft.srvTarget}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, srvTarget: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            srvTarget: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1545,7 +1797,10 @@ export function CfDnsModule() {
                                         type="number"
                                         value={draft.srvPort}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, srvPort: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            srvPort: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1564,7 +1819,10 @@ export function CfDnsModule() {
                                         max={255}
                                         value={draft.caaFlags}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, caaFlags: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            caaFlags: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1575,7 +1833,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-caa-tag-${recordId}`}
                                         value={draft.caaTag}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, caaTag: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            caaTag: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       >
@@ -1590,7 +1851,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-caa-value-${recordId}`}
                                         value={draft.caaValue}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, caaValue: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            caaValue: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1607,7 +1871,10 @@ export function CfDnsModule() {
                                         type="number"
                                         value={draft.uriPriority}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, uriPriority: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            uriPriority: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1619,7 +1886,10 @@ export function CfDnsModule() {
                                         type="number"
                                         value={draft.uriWeight}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, uriWeight: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            uriWeight: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1630,7 +1900,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-uri-target-${recordId}`}
                                         value={draft.uriTarget}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, uriTarget: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            uriTarget: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1649,7 +1922,10 @@ export function CfDnsModule() {
                                         type="number"
                                         value={draft.httpsPriority}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, httpsPriority: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            httpsPriority: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1662,7 +1938,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-https-target-${recordId}`}
                                         value={draft.httpsTarget}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, httpsTarget: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            httpsTarget: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1673,7 +1952,10 @@ export function CfDnsModule() {
                                         id={`cfdns-inline-https-value-${recordId}`}
                                         value={draft.httpsValue}
                                         onChange={(event) =>
-                                          setDraft((current) => ({ ...current, httpsValue: event.target.value }))
+                                          setDraft((current) => ({
+                                            ...current,
+                                            httpsValue: event.target.value,
+                                          }))
                                         }
                                         disabled={saving}
                                       />
@@ -1689,7 +1971,10 @@ export function CfDnsModule() {
                                       type="text"
                                       value={draft.comment}
                                       onChange={(event) =>
-                                        setDraft((current) => ({ ...current, comment: event.target.value }))
+                                        setDraft((current) => ({
+                                          ...current,
+                                          comment: event.target.value,
+                                        }))
                                       }
                                       disabled={saving}
                                     />
@@ -1700,7 +1985,10 @@ export function CfDnsModule() {
                                       id={`cfdns-inline-proxy-${recordId}`}
                                       value={draft.proxied ? 'true' : 'false'}
                                       onChange={(event) =>
-                                        setDraft((current) => ({ ...current, proxied: event.target.value === 'true' }))
+                                        setDraft((current) => ({
+                                          ...current,
+                                          proxied: event.target.value === 'true',
+                                        }))
                                       }
                                       disabled={saving}
                                     >
@@ -1816,7 +2104,12 @@ export function CfDnsModule() {
                   autoComplete="off"
                   placeholder={selectedZoneName ? `ex.: api.${selectedZoneName}` : 'ex.: api.seudominio.com'}
                   value={draft.name}
-                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value.toLowerCase() }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      name: event.target.value.toLowerCase(),
+                    }))
+                  }
                   disabled={saving}
                 />
               </div>
@@ -1832,7 +2125,12 @@ export function CfDnsModule() {
                   rows={4}
                   placeholder="ex.: 192.168.0.10, cname.exemplo.com, v=spf1 ..."
                   value={draft.content}
-                  onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      content: event.target.value,
+                    }))
+                  }
                   disabled={saving}
                 />
                 {!isProxyValidated && commonValidation.issues.length > 0 && (
@@ -1857,7 +2155,12 @@ export function CfDnsModule() {
                     autoComplete="off"
                     placeholder="_sip"
                     value={draft.srvService}
-                    onChange={(event) => setDraft((current) => ({ ...current, srvService: event.target.value }))}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        srvService: event.target.value,
+                      }))
+                    }
                     disabled={saving}
                   />
                 </div>
@@ -1872,7 +2175,12 @@ export function CfDnsModule() {
                       autoComplete="off"
                       placeholder="_tcp"
                       value={draft.srvProto}
-                      onChange={(event) => setDraft((current) => ({ ...current, srvProto: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          srvProto: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -1886,7 +2194,12 @@ export function CfDnsModule() {
                       autoComplete="off"
                       placeholder="example.com"
                       value={draft.srvName}
-                      onChange={(event) => setDraft((current) => ({ ...current, srvName: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          srvName: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -1902,7 +2215,12 @@ export function CfDnsModule() {
                       min={0}
                       max={65535}
                       value={draft.srvPriority}
-                      onChange={(event) => setDraft((current) => ({ ...current, srvPriority: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          srvPriority: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -1916,7 +2234,12 @@ export function CfDnsModule() {
                       min={0}
                       max={65535}
                       value={draft.srvWeight}
-                      onChange={(event) => setDraft((current) => ({ ...current, srvWeight: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          srvWeight: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -1932,7 +2255,12 @@ export function CfDnsModule() {
                       min={1}
                       max={65535}
                       value={draft.srvPort}
-                      onChange={(event) => setDraft((current) => ({ ...current, srvPort: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          srvPort: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -1946,7 +2274,12 @@ export function CfDnsModule() {
                       autoComplete="off"
                       placeholder="sip.example.com"
                       value={draft.srvTarget}
-                      onChange={(event) => setDraft((current) => ({ ...current, srvTarget: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          srvTarget: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -1966,7 +2299,12 @@ export function CfDnsModule() {
                       min={0}
                       max={255}
                       value={draft.caaFlags}
-                      onChange={(event) => setDraft((current) => ({ ...current, caaFlags: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          caaFlags: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -1977,7 +2315,12 @@ export function CfDnsModule() {
                       id="cfdns-caa-tag"
                       name="cfDnsCaaTag"
                       value={draft.caaTag}
-                      onChange={(event) => setDraft((current) => ({ ...current, caaTag: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          caaTag: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     >
                       <option value="issue">issue</option>
@@ -1996,7 +2339,12 @@ export function CfDnsModule() {
                     autoComplete="off"
                     placeholder="letsencrypt.org"
                     value={draft.caaValue}
-                    onChange={(event) => setDraft((current) => ({ ...current, caaValue: event.target.value }))}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        caaValue: event.target.value,
+                      }))
+                    }
                     disabled={saving}
                   />
                   {!isProxyValidated && isCaaDraft && caaValidation.issues.length > 0 && (
@@ -2023,7 +2371,12 @@ export function CfDnsModule() {
                       min={0}
                       max={65535}
                       value={draft.uriPriority}
-                      onChange={(event) => setDraft((current) => ({ ...current, uriPriority: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          uriPriority: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -2037,7 +2390,12 @@ export function CfDnsModule() {
                       min={0}
                       max={65535}
                       value={draft.uriWeight}
-                      onChange={(event) => setDraft((current) => ({ ...current, uriWeight: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          uriWeight: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -2052,7 +2410,12 @@ export function CfDnsModule() {
                     autoComplete="off"
                     placeholder="https://api.exemplo.com/.well-known"
                     value={draft.uriTarget}
-                    onChange={(event) => setDraft((current) => ({ ...current, uriTarget: event.target.value }))}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        uriTarget: event.target.value,
+                      }))
+                    }
                     disabled={saving}
                   />
                   {!isProxyValidated && isUriDraft && uriValidation.issues.length > 0 && (
@@ -2079,7 +2442,12 @@ export function CfDnsModule() {
                       min={0}
                       max={65535}
                       value={draft.httpsPriority}
-                      onChange={(event) => setDraft((current) => ({ ...current, httpsPriority: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          httpsPriority: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -2093,7 +2461,12 @@ export function CfDnsModule() {
                       autoComplete="off"
                       placeholder="."
                       value={draft.httpsTarget}
-                      onChange={(event) => setDraft((current) => ({ ...current, httpsTarget: event.target.value }))}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          httpsTarget: event.target.value,
+                        }))
+                      }
                       disabled={saving}
                     />
                   </div>
@@ -2108,7 +2481,12 @@ export function CfDnsModule() {
                     autoComplete="off"
                     placeholder="alpn=h3,h2 port=443 ipv4hint=203.0.113.10"
                     value={draft.httpsValue}
-                    onChange={(event) => setDraft((current) => ({ ...current, httpsValue: event.target.value }))}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        httpsValue: event.target.value,
+                      }))
+                    }
                     disabled={saving}
                   />
                   {!isProxyValidated && isHttpsDraft && httpsValidation.issues.length > 0 && (
@@ -2137,7 +2515,12 @@ export function CfDnsModule() {
                   max={86400}
                   placeholder="1 = auto"
                   value={draft.ttl}
-                  onChange={(event) => setDraft((current) => ({ ...current, ttl: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      ttl: event.target.value,
+                    }))
+                  }
                   disabled={saving}
                 />
               </div>
@@ -2152,7 +2535,12 @@ export function CfDnsModule() {
                     min={0}
                     max={65535}
                     value={draft.priority}
-                    onChange={(event) => setDraft((current) => ({ ...current, priority: event.target.value }))}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        priority: event.target.value,
+                      }))
+                    }
                     disabled={saving}
                   />
                 </div>
@@ -2169,7 +2557,12 @@ export function CfDnsModule() {
                   autoComplete="off"
                   placeholder="Observação opcional para operação"
                   value={draft.comment}
-                  onChange={(event) => setDraft((current) => ({ ...current, comment: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      comment: event.target.value,
+                    }))
+                  }
                   disabled={saving}
                 />
               </div>
@@ -2180,7 +2573,12 @@ export function CfDnsModule() {
                   id="cfdns-draft-proxied"
                   name="cfDnsDraftProxied"
                   value={draft.proxied ? 'true' : 'false'}
-                  onChange={(event) => setDraft((current) => ({ ...current, proxied: event.target.value === 'true' }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      proxied: event.target.value === 'true',
+                    }))
+                  }
                   disabled={saving}
                 >
                   <option value="false">DNS only (cinza)</option>

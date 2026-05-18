@@ -6,7 +6,6 @@
 import {
   BarChart3,
   Bot,
-  Brain,
   BrainCircuit,
   Database,
   Globe,
@@ -36,7 +35,6 @@ export type { ModuleId };
 const APP_VERSION = 'APP v02.02.04';
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
-  'ai-status': 'AI Status',
   astrologo: 'Astrólogo',
   cardhub: 'Card Hub',
   cfdns: 'CF DNS',
@@ -63,7 +61,6 @@ const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
 // precisa reordenar manualmente — a ordem visível é derivada em runtime.
 const RAW_NAV_ITEMS: NavItem[] = [
   { id: 'overview', label: 'Visão Geral', icon: PanelsTopLeft },
-  { id: 'ai-status', label: 'AI Status', icon: Brain },
   { id: 'astrologo', label: 'Astrólogo', icon: Sparkles },
   { id: 'calculadora', label: 'Calculadora', icon: Database },
   { id: 'cardhub', label: 'Card Hub', icon: LayoutGrid },
@@ -112,7 +109,10 @@ function App() {
     fetch('/api/config-store', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ module: HOMEPAGE_CONFIG_KEY, config: { moduleId } }),
+      body: JSON.stringify({
+        module: HOMEPAGE_CONFIG_KEY,
+        config: { moduleId },
+      }),
     }).catch((err) => console.error('[admin-app] homepage save failed', err));
   }, []);
 
@@ -128,7 +128,9 @@ function App() {
   const handleModuleClick = (moduleId: ModuleId) => {
     // Chrome-first: View Transitions API for smooth crossfade between modules
     // Falls back to instant switch on Firefox/Safari (zero regression)
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => void };
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void) => void;
+    };
     const doNavigate = () => navigate({ to: '/$moduleId', params: { moduleId } });
     if (doc.startViewTransition) {
       doc.startViewTransition(() => void doNavigate());

@@ -10,7 +10,6 @@ import { test, expect } from '@playwright/test';
  */
 const modules = [
   { id: 'overview', heading: 'Visão Geral' },
-  { id: 'ai-status', heading: 'AI Status' },
   { id: 'astrologo', heading: 'Astrólogo' },
   { id: 'cardhub', heading: 'Card Hub' },
   { id: 'cfdns', heading: 'CF DNS' },
@@ -30,7 +29,9 @@ for (const { id, heading } of modules) {
     await page.goto(`/${id}`);
 
     // Header shows correct module name
-    await expect(page.locator('.topbar h2')).toContainText(heading, { timeout: 10_000 });
+    await expect(page.locator('.topbar h2')).toContainText(heading, {
+      timeout: 10_000,
+    });
 
     // Module content area should not show error boundary
     await expect(page.locator('.module-error-panel')).not.toBeVisible();

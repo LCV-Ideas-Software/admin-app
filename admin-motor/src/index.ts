@@ -2,7 +2,6 @@ import { GoogleGenAI } from '@google/genai';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { toHeaders } from '../../functions/api/_lib/mainsite-admin';
-import { handleAiStatusModelsGet } from './handlers/aiStatusModels';
 import { handleAstrologoEnviarEmailPost } from './handlers/astrologoEmail';
 import { handleCfdnsZonesGet } from './handlers/cfdnsZones';
 import { handleCleanupDeploymentsGet, handleCleanupDeploymentsPost } from './handlers/cfpwCleanup';
@@ -13,13 +12,7 @@ import {
   onRequestGet as handleAdminhubConfigGet,
   onRequestPut as handleAdminhubConfigPut,
 } from './handlers/routes/adminhub/config';
-import { onRequestGet as handleAiStatusGcpLogsGet } from './handlers/routes/ai-status/gcp-logs';
-import { onRequestGet as handleAiStatusGcpMonitoringGet } from './handlers/routes/ai-status/gcp-monitoring';
 // ── Novos handlers migrados de Pages Functions ──
-import {
-  onRequestGet as handleAiStatusUsageGet,
-  onRequestPost as handleAiStatusUsagePost,
-} from './handlers/routes/ai-status/usage';
 import {
   onRequestGet as handleApphubConfigGet,
   onRequestPut as handleApphubConfigPut,
@@ -40,6 +33,12 @@ import {
 import { onRequestPost as handleCalculadoraSyncPost } from './handlers/routes/calculadora/sync';
 import { onRequestDelete as handleCfdnsDeleteDelete } from './handlers/routes/cfdns/delete';
 import { onRequestGet as handleCfdnsRecordsGet } from './handlers/routes/cfdns/records';
+import {
+  onRequestGetRegistration as handleCfdnsRegistrarRegistrationGet,
+  onRequestGetRegistrationStatus as handleCfdnsRegistrarRegistrationStatusGet,
+  onRequestGetRegistrations as handleCfdnsRegistrarRegistrationsGet,
+  onRequestGetUpdateStatus as handleCfdnsRegistrarUpdateStatusGet,
+} from './handlers/routes/cfdns/registrar';
 import { onRequestPost as handleCfdnsUpsertPost } from './handlers/routes/cfdns/upsert';
 import { onRequestPost as handleCfpwCleanupCacheProjectPost } from './handlers/routes/cfpw/cleanup-cache-project';
 import { onRequestPost as handleCfpwDeletePagePost } from './handlers/routes/cfpw/delete-page';
@@ -112,9 +111,6 @@ import {
 } from './handlers/routes/mainsite/settings';
 import { onRequestPost as handleMainsiteSyncPost } from './handlers/routes/mainsite/sync';
 import { onRequestPost as handleMainsiteUploadPost } from './handlers/routes/mainsite/upload';
-import { onRequestPost as handleWorkersAiSentimentPost } from './handlers/routes/mainsite/workers-ai/sentiment';
-import { onRequestPost as handleWorkersAiTagsPost } from './handlers/routes/mainsite/workers-ai/tags';
-import { onRequestPost as handleWorkersAiTranslatePost } from './handlers/routes/mainsite/workers-ai/translate';
 import { onRequestPost as handleMtastsOrchestratePost } from './handlers/routes/mtasts/orchestrate';
 import { onRequestGet as handleMtastsOverviewGet } from './handlers/routes/mtasts/overview';
 import { onRequestGet as handleMtastsPolicyGet } from './handlers/routes/mtasts/policy';
@@ -276,71 +272,6 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   ENFORCE_JWT_VALIDATION: await readSecretString(env.ENFORCE_JWT_VALIDATION),
 });
 
-const handleAiStatusHealth = async (
-  _request: Request,
-  env: ResolvedAdminMotorEnv,
-  _unparsedEnv: AdminMotorEnv,
-): Promise<Response> => {
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return json(
-      {
-        ok: false,
-        error: 'AI service not configured.',
-        keyConfigured: false,
-      },
-      503,
-    );
-  }
-  const ai = new GoogleGenAI({ apiKey });
-
-  try {
-    const start = Date.now();
-    const pager = await ai.models.list({ config: { pageSize: 1 } });
-    // Consume at least one model to verify API reachability
-    let firstModel = '';
-    for await (const m of pager) {
-      firstModel = m.name || '';
-      break;
-    }
-    const latencyMs = Date.now() - start;
-
-    console.info('[ai-status/health] request:ok', {
-      endpoint: 'models:list',
-      latencyMs,
-      sdk: true,
-    });
-    return json({
-      ok: true,
-      keyConfigured: true,
-      apiReachable: true,
-      model: firstModel || 'sdk-verified',
-      latencyMs,
-      httpStatus: 200,
-      checkedAt: new Date().toISOString(),
-    });
-  } catch (err) {
-    const errorBody = err instanceof Error ? err.message : String(err);
-    console.error('[ai-status/health] request:error', {
-      endpoint: 'models:list',
-      sdk: true,
-      error: errorBody,
-    });
-    return json(
-      {
-        ok: false,
-        keyConfigured: true,
-        apiReachable: false,
-        latencyMs: null,
-        httpStatus: null,
-        error: 'AI service unreachable.',
-        checkedAt: new Date().toISOString(),
-      },
-      500,
-    );
-  }
-};
-
 const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMotorEnv): Promise<ModelOption[]> => {
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -387,17 +318,23 @@ const handleMainsiteModelos = async (request: Request, env: ResolvedAdminMotorEn
   try {
     const models = await fetchMainsiteGeminiModels(request, env);
 
-    console.info('[ai-status/models] request:ok', {
+    console.info('[gemini-modelos] request:ok', {
       total: models.length,
       gatewayEnabled: false,
     });
     return json({ ok: true, models, total: models.length });
   } catch (err) {
-    console.error('[ai-status/models] request:error', {
+    console.error('[gemini-modelos] request:error', {
       gatewayEnabled: false,
       error: err instanceof Error ? err.message : String(err),
     });
-    return json({ ok: false, error: err instanceof Error ? err.message : 'Erro ao listar modelos.' }, 500);
+    return json(
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Erro ao listar modelos.',
+      },
+      500,
+    );
   }
 };
 
@@ -437,7 +374,11 @@ app.use('*', async (c, next) => {
   try {
     await next();
   } finally {
-    logInfo('request:end', { method, pathname, latencyMs: Date.now() - startedAt });
+    logInfo('request:end', {
+      method,
+      pathname,
+      latencyMs: Date.now() - startedAt,
+    });
   }
 });
 
@@ -470,18 +411,13 @@ const rc = <T>(c: Context<HonoEnv>) =>
     env: c.get('runtimeEnv'),
     waitUntil: (p: Promise<unknown>) => c.executionCtx.waitUntil(p),
   }) as unknown as T;
-const re = (c: Context<HonoEnv>) => ({ request: c.req.raw, env: c.get('runtimeEnv') });
+const re = (c: Context<HonoEnv>) => ({
+  request: c.req.raw,
+  env: c.get('runtimeEnv'),
+});
 
 // ── health (auth-gated via global middleware; replaces standalone Pages Function) ──
 app.get('/api/health', (c) => c.json({ ok: true, app: 'admin-motor' }));
-
-// ── ai-status ──
-app.get('/api/ai-status/health', (c) => handleAiStatusHealth(c.req.raw, c.get('runtimeEnv'), c.env));
-app.get('/api/ai-status/models', (c) => handleAiStatusModelsGet(re(c)));
-app.get('/api/ai-status/gcp-monitoring', (c) => handleAiStatusGcpMonitoringGet(rc(c)));
-app.get('/api/ai-status/gcp-logs', (c) => handleAiStatusGcpLogsGet(rc(c)));
-app.get('/api/ai-status/usage', (c) => handleAiStatusUsageGet(rc(c)));
-app.post('/api/ai-status/usage', (c) => handleAiStatusUsagePost(rc(c)));
 
 // ── modelos ──
 app.get('/api/mainsite/modelos', (c) => handleMainsiteModelos(c.req.raw, c.get('runtimeEnv')));
@@ -510,6 +446,10 @@ app.delete('/api/astrologo/userdata', (c) => handleAstrologoUserdataDelete(rc(c)
 // ── cfdns ──
 app.get('/api/cfdns/zones', (c) => handleCfdnsZonesGet(re(c)));
 app.get('/api/cfdns/records', (c) => handleCfdnsRecordsGet(rc(c)));
+app.get('/api/cfdns/registrar/registrations', (c) => handleCfdnsRegistrarRegistrationsGet(rc(c)));
+app.get('/api/cfdns/registrar/registration', (c) => handleCfdnsRegistrarRegistrationGet(rc(c)));
+app.get('/api/cfdns/registrar/registration-status', (c) => handleCfdnsRegistrarRegistrationStatusGet(rc(c)));
+app.get('/api/cfdns/registrar/update-status', (c) => handleCfdnsRegistrarUpdateStatusGet(rc(c)));
 app.delete('/api/cfdns/delete', (c) => handleCfdnsDeleteDelete(rc(c)));
 app.post('/api/cfdns/upsert', (c) => handleCfdnsUpsertPost(rc(c)));
 
@@ -569,7 +509,10 @@ app.get('/api/mainsite/media/:filename', (c) => {
   ) {
     return new Response('Invalid filename.', { status: 400 });
   }
-  return handleMainsiteMediaGet({ ...re(c), params: { filename } } as Parameters<typeof handleMainsiteMediaGet>[0]);
+  return handleMainsiteMediaGet({
+    ...re(c),
+    params: { filename },
+  } as Parameters<typeof handleMainsiteMediaGet>[0]);
 });
 app.get('/api/mainsite/post-summaries', (c) => handlePostSummariesGet(rc(c)));
 app.post('/api/mainsite/post-summaries', (c) => handlePostSummariesPost(rc(c)));
@@ -589,11 +532,6 @@ app.get('/api/maestro-ai/sessions/:id/artifacts/:artifactId', (c) =>
   handleMaestroAiArtifactsGet(rc(c), c.req.param('id'), c.req.param('artifactId')),
 );
 app.put('/api/maestro-ai/sessions/:id/content', (c) => handleMaestroAiSessionContentPut(rc(c), c.req.param('id')));
-
-// ── mainsite workers-ai ──
-app.post('/api/mainsite/workers-ai/sentiment', (c) => handleWorkersAiSentimentPost(rc(c)));
-app.post('/api/mainsite/workers-ai/tags', (c) => handleWorkersAiTagsPost(rc(c)));
-app.post('/api/mainsite/workers-ai/translate', (c) => handleWorkersAiTranslatePost(rc(c)));
 
 // ── mainsite comments admin ──
 app.get('/api/mainsite/comments/admin/all', (c) => handleCommentsAdminAll(re(c)));
@@ -651,14 +589,21 @@ app.get('/api/telemetry/telemetry', (c) => handleTelemetryGet(rc(c)));
 
 // ── 404 + error handler ──
 app.notFound((c) => {
-  logWarn('request:not-found', { method: c.req.method, pathname: new URL(c.req.url).pathname });
+  logWarn('request:not-found', {
+    method: c.req.method,
+    pathname: new URL(c.req.url).pathname,
+  });
   return c.json({ ok: false, error: 'Rota não encontrada no admin-motor.' }, 404);
 });
 
 app.onError((error, c) => {
   const method = c.req.method.toUpperCase();
   const pathname = new URL(c.req.url).pathname;
-  logError('request:unhandled-exception', { method, pathname, error: sanitizeErrorMessage(error) });
+  logError('request:unhandled-exception', {
+    method,
+    pathname,
+    error: sanitizeErrorMessage(error),
+  });
   return c.json({ ok: false, error: 'Erro interno no admin-motor.' }, 500);
 });
 

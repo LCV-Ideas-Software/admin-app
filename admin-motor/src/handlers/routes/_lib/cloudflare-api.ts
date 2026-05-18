@@ -20,6 +20,18 @@ export type CloudflareZone = {
   name?: string;
 };
 
+export type CloudflareAccount = {
+  id: string;
+  name: string;
+};
+
+export type CloudflareAccountResolution = {
+  accountId: string;
+  accountName: string | null;
+  source: 'CF_ACCOUNT_ID' | 'auto-discovery';
+  accounts: CloudflareAccount[];
+};
+
 type CloudflareDnsRecord = {
   id?: string;
   type?: string;
@@ -62,24 +74,70 @@ type EnvWithCloudflareToken = {
   CLOUDFLARE_DNS?: string;
   CLOUDFLARE_PW?: string;
   CLOUDFLARE_CACHE?: string;
+  CF_ACCOUNT_ID?: string;
+};
+
+export type CloudflareRegistrarRegistration = {
+  domain_name: string;
+  status: string;
+  created_at: string | null;
+  expires_at: string | null;
+  auto_renew: boolean | null;
+  privacy_mode: string | null;
+  locked: boolean | null;
+};
+
+export type CloudflareRegistrarListResult = {
+  account: CloudflareAccountResolution;
+  registrations: CloudflareRegistrarRegistration[];
+  pagination: {
+    page: number;
+    perPage: number;
+    totalPages: number;
+    totalCount: number;
+    count: number;
+  };
+};
+
+export type CloudflareRegistrarWorkflowStatus = {
+  domain_name?: string;
+  state?: string;
+  completed?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  context?: Record<string, unknown>;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+  links?: {
+    self?: string;
+    resource?: string;
+  };
 };
 
 const resolveToken = (env: EnvWithCloudflareToken) => {
   const byDnsToken = env.CLOUDFLARE_DNS?.trim();
   if (byDnsToken) {
-    console.debug('[cloudflare-api] token:using-CLOUDFLARE_DNS', { tokenLength: byDnsToken.length });
+    console.debug('[cloudflare-api] token:using-CLOUDFLARE_DNS', {
+      tokenLength: byDnsToken.length,
+    });
     return byDnsToken;
   }
 
   const byPwToken = env.CLOUDFLARE_PW?.trim();
   if (byPwToken) {
-    console.warn('[cloudflare-api] token:fallback-CLOUDFLARE_PW', { tokenLength: byPwToken.length });
+    console.warn('[cloudflare-api] token:fallback-CLOUDFLARE_PW', {
+      tokenLength: byPwToken.length,
+    });
     return byPwToken;
   }
 
   const byCacheToken = env.CLOUDFLARE_CACHE?.trim();
   if (byCacheToken) {
-    console.warn('[cloudflare-api] token:fallback-CLOUDFLARE_CACHE', { tokenLength: byCacheToken.length });
+    console.warn('[cloudflare-api] token:fallback-CLOUDFLARE_CACHE', {
+      tokenLength: byCacheToken.length,
+    });
     return byCacheToken;
   }
 
@@ -178,6 +236,141 @@ const cloudflareRequestPayload = async <T>(
   return payload;
 };
 
+const normalizeCloudflareAccount = (account: { id?: string; name?: string }): CloudflareAccount => ({
+  id: String(account.id ?? '').trim(),
+  name: String(account.name ?? '').trim(),
+});
+
+export const listCloudflareAccounts = async (env: EnvWithCloudflareToken) => {
+  const accounts = await cloudflareRequest<Array<{ id?: string; name?: string }>>(
+    env,
+    '/accounts?page=1&per_page=50',
+    'Falha ao carregar contas da Cloudflare',
+  );
+
+  return (Array.isArray(accounts) ? accounts : []).map(normalizeCloudflareAccount).filter((account) => account.id);
+};
+
+export const resolveCloudflareAccount = async (env: EnvWithCloudflareToken): Promise<CloudflareAccountResolution> => {
+  const byEnv = String(env.CF_ACCOUNT_ID ?? '').trim();
+  if (byEnv) {
+    return {
+      accountId: byEnv,
+      accountName: null,
+      source: 'CF_ACCOUNT_ID',
+      accounts: [],
+    };
+  }
+
+  const accounts = await listCloudflareAccounts(env);
+  if (accounts.length === 0) {
+    throw new Error('Nenhuma conta Cloudflare disponível para o token informado.');
+  }
+
+  return {
+    accountId: accounts[0].id,
+    accountName: accounts[0].name || null,
+    source: 'auto-discovery',
+    accounts,
+  };
+};
+
+const normalizeRegistrarRegistration = (registration: Partial<CloudflareRegistrarRegistration>) => ({
+  domain_name: String(registration.domain_name ?? '')
+    .trim()
+    .toLowerCase(),
+  status: String(registration.status ?? '').trim(),
+  created_at: registration.created_at ? String(registration.created_at) : null,
+  expires_at: registration.expires_at ? String(registration.expires_at) : null,
+  auto_renew: typeof registration.auto_renew === 'boolean' ? registration.auto_renew : null,
+  privacy_mode: registration.privacy_mode ? String(registration.privacy_mode) : null,
+  locked: typeof registration.locked === 'boolean' ? registration.locked : null,
+});
+
+const normalizeDomainName = (domainName: string) => {
+  const normalized = domainName.trim().toLowerCase();
+  if (!normalized) {
+    throw new Error('Domínio é obrigatório para consultar Registrar.');
+  }
+  if (!/^[a-z0-9.-]+$/.test(normalized) || normalized.includes('..') || normalized.startsWith('.')) {
+    throw new Error('Domínio inválido para consulta Registrar.');
+  }
+  return normalized;
+};
+
+export const listCloudflareRegistrarRegistrations = async (
+  env: EnvWithCloudflareToken,
+): Promise<CloudflareRegistrarListResult> => {
+  const account = await resolveCloudflareAccount(env);
+  const payload = await cloudflareRequestPayload<CloudflareRegistrarRegistration[]>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations`,
+    'Falha ao listar domínios registrados na Cloudflare',
+  );
+  const registrations = (Array.isArray(payload.result) ? payload.result : [])
+    .map(normalizeRegistrarRegistration)
+    .filter((registration) => registration.domain_name)
+    .sort((a, b) => a.domain_name.localeCompare(b.domain_name));
+  const info = payload.result_info ?? {};
+
+  return {
+    account,
+    registrations,
+    pagination: {
+      page: Number(info.page ?? 1),
+      perPage: Number(info.per_page ?? registrations.length),
+      totalPages: Number(info.total_pages ?? 1),
+      totalCount: Number(info.total_count ?? registrations.length),
+      count: Number(info.count ?? registrations.length),
+    },
+  };
+};
+
+export const getCloudflareRegistrarRegistration = async (env: EnvWithCloudflareToken, domainName: string) => {
+  const account = await resolveCloudflareAccount(env);
+  const normalizedDomain = normalizeDomainName(domainName);
+  const registration = await cloudflareRequest<CloudflareRegistrarRegistration>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}`,
+    `Falha ao consultar registro Registrar ${normalizedDomain}`,
+  );
+
+  return {
+    account,
+    registration: normalizeRegistrarRegistration(registration ?? {}),
+  };
+};
+
+export const getCloudflareRegistrarRegistrationStatus = async (env: EnvWithCloudflareToken, domainName: string) => {
+  const account = await resolveCloudflareAccount(env);
+  const normalizedDomain = normalizeDomainName(domainName);
+  const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}/registration-status`,
+    `Falha ao consultar status de registro Registrar ${normalizedDomain}`,
+  );
+
+  return {
+    account,
+    status,
+  };
+};
+
+export const getCloudflareRegistrarUpdateStatus = async (env: EnvWithCloudflareToken, domainName: string) => {
+  const account = await resolveCloudflareAccount(env);
+  const normalizedDomain = normalizeDomainName(domainName);
+  const status = await cloudflareRequest<CloudflareRegistrarWorkflowStatus>(
+    env,
+    `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}/update-status`,
+    `Falha ao consultar status de atualização Registrar ${normalizedDomain}`,
+  );
+
+  return {
+    account,
+    status,
+  };
+};
+
 export const listCloudflareZones = async (env: EnvWithCloudflareToken) => {
   const zones = await cloudflareRequest<CloudflareZone[]>(
     env,
@@ -200,7 +393,10 @@ const extractDnsResult = async (env: EnvWithCloudflareToken, path: string, fallb
   try {
     const result = await cloudflareRequest<CloudflareDnsRecord[]>(env, path, fallback);
     const normalized = Array.isArray(result) ? result : [];
-    console.debug('[cloudflare-api] extractDnsResult:ok', { path, total: normalized.length });
+    console.debug('[cloudflare-api] extractDnsResult:ok', {
+      path,
+      total: normalized.length,
+    });
     return normalized;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

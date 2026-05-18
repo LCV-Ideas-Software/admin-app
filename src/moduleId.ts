@@ -11,7 +11,6 @@
  */
 export type ModuleId =
   | 'overview'
-  | 'ai-status'
   | 'astrologo'
   | 'cardhub'
   | 'cfdns'
