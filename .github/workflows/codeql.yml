@@ -9,13 +9,16 @@ on:
     - cron: "11 6 * * 2"
 permissions:
   contents: read
-  security-events: write
   actions: read
 concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   analyze:
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
