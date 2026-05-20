@@ -14,7 +14,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
       day: "thursday"
       time: "01:00"
       timezone: "America/Los_Angeles"
@@ -31,7 +31,7 @@ updates:
     registries:
       - stepsecurity-javascript
     schedule:
-      interval: "weekly"
+      interval: "daily"
       day: "thursday"
       time: "01:00"
       timezone: "America/Los_Angeles"
@@ -89,7 +89,7 @@ updates:
     registries:
       - stepsecurity-javascript
     schedule:
-      interval: "weekly"
+      interval: "daily"
       day: "thursday"
       time: "01:00"
       timezone: "America/Los_Angeles"
