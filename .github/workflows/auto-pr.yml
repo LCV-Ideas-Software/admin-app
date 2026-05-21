@@ -40,7 +40,7 @@ jobs:
 
           pr_number="$(gh pr list \
             --repo "$REPO" \
-            --head "$head_ref" \
+            --head "$BRANCH" \
             --base main \
             --state open \
             --json number \
