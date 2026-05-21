@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Corrigido
+
+- **Gate de typecheck do `admin-motor`**: os fingerprints da baseline-ratchet passam a remover o prefixo de caminho absoluto do repositório das mensagens do TypeScript. Sem isso, uma baseline gerada no Windows nunca coincidia com a recalculada no CI (Linux) — o caminho `import("…")` embutido na mensagem diferia —, gerando uma falsa regressão que travava o workflow de Deploy.
+
 ### Alterado
 
 - Sync inicial do MainSite grava `mainsite/ratelimit` apenas como toggles (`chatbot`, `email`, `comments`), alinhado ao rate limit nativo da Cloudflare; limites numericos nao sao mais semeados em D1.

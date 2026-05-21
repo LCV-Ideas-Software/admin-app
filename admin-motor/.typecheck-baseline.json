@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "project": "admin-motor/tsconfig.json",
   "command": "npm run typecheck:admin-motor",
-  "generatedAt": "2026-05-21T18:38:08.055Z",
+  "generatedAt": "2026-05-21T19:14:17.863Z",
   "typescriptVersion": "6.0.3",
   "total": 245,
   "errors": [
@@ -1471,12 +1471,12 @@
       "message": "Property 'data' does not exist on type 'MainsiteContext'."
     },
     {
-      "fingerprint": "admin-motor/src/handlers/routes/mainsite/settings.ts:TS2345:Argument of type 'D1Database' is not assignable to parameter of type 'import(\"C:/Users/leona/lcv-workspace/admin-app/functions/api/_lib/operational\").D1Database'.#1",
+      "fingerprint": "admin-motor/src/handlers/routes/mainsite/settings.ts:TS2345:Argument of type 'D1Database' is not assignable to parameter of type 'import(\"/functions/api/_lib/operational\").D1Database'.#1",
       "file": "admin-motor/src/handlers/routes/mainsite/settings.ts",
       "line": 215,
       "column": 40,
       "code": "TS2345",
-      "message": "Argument of type 'D1Database' is not assignable to parameter of type 'import(\"C:/Users/leona/lcv-workspace/admin-app/functions/api/_lib/operational\").D1Database'."
+      "message": "Argument of type 'D1Database' is not assignable to parameter of type 'import(\"/functions/api/_lib/operational\").D1Database'."
     },
     {
       "fingerprint": "admin-motor/src/handlers/routes/mainsite/upload.ts:TS2345:Argument of type 'number | undefined' is not assignable to parameter of type 'number'.#1",
