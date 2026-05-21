@@ -49,7 +49,7 @@ jobs:
             --jq '.[0].number // empty')"
 
           if [ -z "$pr_number" ]; then
-            body=$'This PR was opened automatically after a branch push.\n\nAutomation:\n- direct pushes to main are blocked\n- PR checks run normally\n- auto-merge is enabled after checks pass\n- branch deletion is requested after merge'
+            body=$'This PR was opened automatically after a branch push.\n\nAutomation:\n- direct pushes to main are blocked\n- PR checks run normally\n- the PR is merged after checks pass\n- the source branch is deleted after merge'
             pr_url="$(gh pr create \
               --repo "$REPO" \
               --base main \
@@ -84,8 +84,6 @@ jobs:
               [
                 .statusCheckRollup[]
                 | select(.workflowName != "Auto PR")
-                | select(.name != "StepSecurity Optional Checks")
-                | select(.name != "StepSecurity Harden-Runner")
               ] as $checks
               | if ($checks | length) == 0 then "pending"
                 elif any($checks[]; .status != "COMPLETED") then "pending"
@@ -104,8 +102,6 @@ jobs:
                 gh pr view "$PR_URL" --json statusCheckRollup --jq '
                   .statusCheckRollup[]
                   | select(.workflowName != "Auto PR")
-                  | select(.name != "StepSecurity Optional Checks")
-                  | select(.name != "StepSecurity Harden-Runner")
                   | [.workflowName, .name, .status, .conclusion]
                   | @tsv
                 '
@@ -133,7 +129,7 @@ jobs:
           gh pr review "$PR_URL" --approve --body "Auto-approved after the configured PR checks passed." \
             || echo "::notice::Auto-approval was skipped; continuing because this repository does not require PR approvals."
 
-      - name: Enable auto-merge
+      - name: Merge pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ steps.open-pr.outputs.pr_url }}
@@ -142,10 +138,7 @@ jobs:
           if [ "$state" != "OPEN" ]; then
             exit 0
           fi
-          if [ "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
-            exit 0
-          fi
-          gh pr merge "$PR_URL" --auto --squash --delete-branch
+          gh pr merge "$PR_URL" --squash --delete-branch
 
   delete-merged-branch:
     name: Delete merged branch
