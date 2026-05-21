@@ -14,7 +14,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: socket-scan-${{ github.ref }}-${{ github.sha }}
+  group: socket-scan-${{ github.event_name == 'issue_comment' && format('pr-{0}', github.event.issue.number) || format('{0}-{1}', github.ref, github.sha) }}
   cancel-in-progress: true
 
 jobs:
@@ -29,21 +29,70 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Resolve scan context
+        id: socket-context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          pr_number=0
+          checkout_repo="${GITHUB_REPOSITORY}"
+          checkout_ref="${GITHUB_SHA}"
+          trusted=true
+
+          case "${GITHUB_EVENT_NAME}" in
+            pull_request)
+              pr_number="${{ github.event.pull_request.number }}"
+              checkout_repo="${{ github.event.pull_request.head.repo.full_name }}"
+              checkout_ref="${{ github.event.pull_request.head.sha }}"
+              if [ "$checkout_repo" != "$GITHUB_REPOSITORY" ] || [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+                trusted=false
+              fi
+              ;;
+            issue_comment)
+              pr_number="${{ github.event.issue.number }}"
+              checkout_repo="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.head.repo.full_name')"
+              checkout_ref="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.head.sha')"
+              pr_actor="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.user.login')"
+              if [ "$checkout_repo" != "$GITHUB_REPOSITORY" ] || [ "$pr_actor" = "dependabot[bot]" ]; then
+                trusted=false
+              fi
+              ;;
+          esac
+
+          {
+            echo "pr-number=$pr_number"
+            echo "checkout-repo=$checkout_repo"
+            echo "checkout-ref=$checkout_ref"
+            echo "trusted=$trusted"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Skip untrusted pull request context
+        if: ${{ steps.socket-context.outputs.trusted != 'true' }}
+        run: echo "::notice::Socket scan skipped because secrets are unavailable for fork or Dependabot pull requests."
+
       - name: Checkout
+        if: ${{ steps.socket-context.outputs.trusted == 'true' }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          repository: ${{ steps.socket-context.outputs.checkout-repo }}
+          ref: ${{ steps.socket-context.outputs.checkout-ref }}
           persist-credentials: false
           fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
 
       - name: Setup Python
+        if: ${{ steps.socket-context.outputs.trusted == 'true' }}
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.12'
 
       - name: Install Socket CLI
-        run: pip install socketsecurity --upgrade
+        if: ${{ steps.socket-context.outputs.trusted == 'true' }}
+        run: python -m pip install --disable-pip-version-check --require-hashes -r .github/socketsecurity-requirements.txt
 
       - name: Validate Socket API key
+        if: ${{ steps.socket-context.outputs.trusted == 'true' }}
         env:
           SOCKET_SECURITY_API_KEY: ${{ secrets.SOCKET_SECURITY_API_KEY }}
         run: |
@@ -53,19 +102,13 @@ jobs:
           fi
 
       - name: Run Socket Security Scan (audit)
+        if: ${{ steps.socket-context.outputs.trusted == 'true' }}
         continue-on-error: true
         env:
           SOCKET_SECURITY_API_KEY: ${{ secrets.SOCKET_SECURITY_API_KEY }}
           GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_NUMBER=0
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            PR_NUMBER=${{ github.event.pull_request.number }}
-          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
-            PR_NUMBER=${{ github.event.issue.number }}
-          fi
-
           socketcli \
             --target-path "$GITHUB_WORKSPACE" \
             --scm github \
-            --pr-number "$PR_NUMBER"
+            --pr-number "${{ steps.socket-context.outputs.pr-number }}"
