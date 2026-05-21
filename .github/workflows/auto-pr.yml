@@ -136,10 +136,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ steps.open-pr.outputs.pr_url }}
         run: |
-          state="$(gh pr view "$PR_URL" --json state --jq '.state')"
-          if [ "$state" != "OPEN" ]; then
-            exit 0
+          set -euo pipefail
+          for attempt in {1..60}; do
+            state="$(gh pr view "$PR_URL" --json state --jq '.state')"
+            if [ "$state" != "OPEN" ]; then
+              exit 0
+            fi
+
+            merge_state="$(gh pr view "$PR_URL" --json mergeStateStatus --jq '.mergeStateStatus')"
+            if [ "$merge_state" = "CLEAN" ]; then
+              break
+            fi
+
+            if [ "$merge_state" = "DIRTY" ] || [ "$merge_state" = "BEHIND" ]; then
+              echo "::error::PR cannot be merged automatically: mergeStateStatus=${merge_state}."
+              exit 1
+            fi
+
+            echo "Waiting for branch protection readiness (${merge_state}), attempt ${attempt}/60."
+            sleep 10
+          done
+
+          if [ "$(gh pr view "$PR_URL" --json mergeStateStatus --jq '.mergeStateStatus')" != "CLEAN" ]; then
+            echo "::error::Timed out waiting for branch protection readiness."
+            exit 1
           fi
+
           gh pr merge "$PR_URL" --squash --delete-branch
 
   delete-merged-branch:
