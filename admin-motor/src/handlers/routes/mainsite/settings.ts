@@ -124,13 +124,15 @@ const readPublicSettings = async (db: D1Database): Promise<MainsitePublicSetting
 
 const upsertSetting = async (db: D1Database, id: string, payload: Record<string, unknown>) => {
   await db
-    .prepare(`
+    .prepare(
+      `
     INSERT INTO mainsite_settings (id, payload, updated_at)
     VALUES (?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
       payload = excluded.payload,
       updated_at = CURRENT_TIMESTAMP
-  `)
+  `,
+    )
     .bind(id, JSON.stringify(payload))
     .run();
 };

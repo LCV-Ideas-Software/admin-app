@@ -102,7 +102,8 @@ export const ensureParametrosTables = async (db: D1Database) => {
     .run();
 
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS calc_parametros_auditoria (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       created_at INTEGER NOT NULL,
@@ -112,7 +113,8 @@ export const ensureParametrosTables = async (db: D1Database) => {
       valor_novo TEXT NOT NULL,
       origem TEXT NOT NULL
     )
-  `)
+  `,
+    )
     .run();
 };
 
@@ -139,7 +141,8 @@ export const readLatestParams = async (db: D1Database) => {
 
 export const ensureRateLimitTables = async (db: D1Database) => {
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS calc_rate_limit_policies (
       route_key TEXT PRIMARY KEY,
       enabled INTEGER NOT NULL,
@@ -148,18 +151,21 @@ export const ensureRateLimitTables = async (db: D1Database) => {
       updated_at INTEGER NOT NULL,
       updated_by TEXT
     )
-  `)
+  `,
+    )
     .run();
 
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS calc_rate_limit_hits (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       route_key TEXT NOT NULL,
       ip TEXT NOT NULL,
       created_at INTEGER NOT NULL
     )
-  `)
+  `,
+    )
     .run();
 };
 
@@ -169,10 +175,12 @@ export const ensureDefaultPolicies = async (db: D1Database) => {
   for (const routeKey of SUPPORTED_ROUTES) {
     const policy = DEFAULT_POLICIES[routeKey];
     await db
-      .prepare(`
+      .prepare(
+        `
       INSERT OR IGNORE INTO calc_rate_limit_policies (route_key, enabled, max_requests, window_minutes, updated_at, updated_by)
       VALUES (?, ?, ?, ?, ?, ?)
-    `)
+    `,
+      )
       .bind(policy.route_key, policy.enabled, policy.max_requests, policy.window_minutes, Date.now(), 'system-default')
       .run();
   }
@@ -183,11 +191,13 @@ const getRateLimitWindowStats = async (db: D1Database, routeKey: string, windowM
   const cutoff = now - Math.max(1, toInt(windowMinutes, 10)) * 60 * 1000;
 
   const row = await db
-    .prepare(`
+    .prepare(
+      `
     SELECT COUNT(1) AS total, COUNT(DISTINCT ip) AS ips
     FROM calc_rate_limit_hits
     WHERE route_key = ? AND created_at >= ?
-  `)
+  `,
+    )
     .bind(routeKey, cutoff)
     .first<{ total?: number; ips?: number }>();
 
@@ -205,12 +215,14 @@ export const listPoliciesWithStats = async (db: D1Database): Promise<Calculadora
   for (const routeKey of SUPPORTED_ROUTES) {
     const fallback = DEFAULT_POLICIES[routeKey];
     const row = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT route_key, enabled, max_requests, window_minutes, updated_at, updated_by
       FROM calc_rate_limit_policies
       WHERE route_key = ?
       LIMIT 1
-    `)
+    `,
+      )
       .bind(routeKey)
       .first<D1Row>();
 
@@ -247,7 +259,8 @@ export const upsertRateLimitPolicy = async (
   await ensureDefaultPolicies(db);
 
   await db
-    .prepare(`
+    .prepare(
+      `
     INSERT INTO calc_rate_limit_policies (route_key, enabled, max_requests, window_minutes, updated_at, updated_by)
     VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(route_key) DO UPDATE SET
@@ -256,7 +269,8 @@ export const upsertRateLimitPolicy = async (
       window_minutes = excluded.window_minutes,
       updated_at = excluded.updated_at,
       updated_by = excluded.updated_by
-  `)
+  `,
+    )
     .bind(input.routeKey, input.enabled, input.maxRequests, input.windowMinutes, Date.now(), input.updatedBy)
     .run();
 };

@@ -1,13 +1,13 @@
 name: OpenSSF Scorecard
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
     paths:
-      - ".github/workflows/**"
-      - ".github/dependabot.yml"
-      - "SECURITY.md"
+      - '.github/workflows/**'
+      - '.github/dependabot.yml'
+      - 'SECURITY.md'
   schedule:
-    - cron: "37 8 * * 1"
+    - cron: '37 8 * * 1'
   workflow_dispatch:
 concurrency:
   group: scorecard-${{ github.ref }}

@@ -500,13 +500,14 @@ async function loadSettings(db: D1Database): Promise<MaestroSettingsRow> {
 }
 
 function hasPositiveRates(rates: ProviderRates | undefined): boolean {
-  return Boolean(
-    rates &&
-      Number.isFinite(Number(rates.input_usd_per_million)) &&
-      Number(rates.input_usd_per_million) > 0 &&
-      Number.isFinite(Number(rates.output_usd_per_million)) &&
-      Number(rates.output_usd_per_million) > 0,
-  );
+  if (!rates) {
+    return false;
+  }
+
+  const inputRate = Number(rates.input_usd_per_million);
+  const outputRate = Number(rates.output_usd_per_million);
+
+  return Number.isFinite(inputRate) && inputRate > 0 && Number.isFinite(outputRate) && outputRate > 0;
 }
 
 function settingsRates(row: MaestroSettingsRow): Record<ProviderKey, ProviderRates> {

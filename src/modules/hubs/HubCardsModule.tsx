@@ -248,8 +248,9 @@ export function HubCardsModule(props: HubCardsModuleProps) {
           showNotification(withTrace(`${title} atualizado com ${nextPayload.total} card(s).`, nextPayload), 'success');
         }
 
-        if (Array.isArray(nextPayload.avisos) && nextPayload.avisos.length > 0) {
-          showNotification(nextPayload.avisos[0], 'info');
+        const firstAviso = Array.isArray(nextPayload.avisos) ? nextPayload.avisos[0] : undefined;
+        if (firstAviso !== undefined) {
+          showNotification(firstAviso, 'info');
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : `Não foi possível carregar ${title}.`;
@@ -377,6 +378,7 @@ export function HubCardsModule(props: HubCardsModuleProps) {
 
       const next = [...current];
       const [moved] = next.splice(index, 1);
+      if (!moved) return current;
       next.splice(targetIndex, 0, moved);
       return next;
     });
@@ -416,6 +418,7 @@ export function HubCardsModule(props: HubCardsModuleProps) {
     setCards((current) => {
       const next = [...current];
       const [dragged] = next.splice(draggedPreviewIndex, 1);
+      if (!dragged) return current;
       next.splice(dropIndex, 0, dragged);
       return next;
     });
@@ -429,6 +432,7 @@ export function HubCardsModule(props: HubCardsModuleProps) {
         if (toIndex < 0 || toIndex >= current.length || fromIndex === toIndex) return current;
         const next = [...current];
         const [moved] = next.splice(fromIndex, 1);
+        if (!moved) return current;
         next.splice(toIndex, 0, moved);
         return next;
       });
@@ -655,6 +659,7 @@ export function HubCardsModule(props: HubCardsModuleProps) {
                 (() => {
                   const index = selectedCardIndex;
                   const card = cards[index];
+                  if (!card) return null;
                   const errors = cardFieldErrors[index] ?? {};
                   const nameErrorId = `${adminActorFieldId}-name-${index}-error`;
                   const urlErrorId = `${adminActorFieldId}-url-${index}-error`;

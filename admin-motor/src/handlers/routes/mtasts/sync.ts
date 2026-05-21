@@ -89,12 +89,14 @@ export async function onRequestPost(context: Context) {
     let policiesUpserted = 0;
 
     for (const row of historyRows) {
-      await env.BIGDATA_DB.prepare(`
+      await env.BIGDATA_DB.prepare(
+        `
         INSERT INTO mtasts_history (gerado_em, domain, data_criacao)
         VALUES (?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(gerado_em) DO UPDATE SET
           domain = excluded.domain
-      `)
+      `,
+      )
         .bind(row.geradoEm, row.domain)
         .run();
 
@@ -110,14 +112,16 @@ export async function onRequestPost(context: Context) {
         continue;
       }
 
-      await env.BIGDATA_DB.prepare(`
+      await env.BIGDATA_DB.prepare(
+        `
         INSERT INTO mtasts_mta_sts_policies (domain, policy_text, tlsrpt_email, updated_at)
         VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(domain) DO UPDATE SET
           policy_text = excluded.policy_text,
           tlsrpt_email = excluded.tlsrpt_email,
           updated_at = CURRENT_TIMESTAMP
-      `)
+      `,
+      )
         .bind(domain, policyText, item.dns.dnsTlsRptEmail ?? existing.tlsrptEmail)
         .run();
 

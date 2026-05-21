@@ -6,6 +6,30 @@
 
 - Sync inicial do MainSite grava `mainsite/ratelimit` apenas como toggles (`chatbot`, `email`, `comments`), alinhado ao rate limit nativo da Cloudflare; limites numericos nao sao mais semeados em D1.
 
+## [v02.02.08] - 2026-05-21
+
+### Corrigido
+
+- **CF DNS / Cloudflare Registrar — 502 em produção**: uma rejeição da API Cloudflare (status `4xx`) na checagem de domínios não chegava ao operador. `resolveUpstreamStatus` achatava todo erro de upstream para `502`, e o edge da Cloudflare substitui o corpo de respostas `5xx` por uma página HTML — o frontend exibia "resposta HTML inesperada" em vez do motivo real. Agora um `4xx` de upstream é propagado como o próprio `4xx`, preservando o corpo JSON com a mensagem da API.
+- **CF DNS / Cloudflare Registrar — detecção de workflow (Codex P1)**: `isNoRegistrarWorkflowFound` passou a exigir `HTTP 404` **e** código `10000`. Um `404` isolado também ocorre em erros de roteamento/configuração (ex.: código `7003` "could not route request"); tratá-los como "sem workflow ativo" mascarava falha operacional como sucesso.
+- **CF DNS UI — auto-poll (Codex P2)**: o polling pós-criação só escreve `registrarRegistrationStatus` enquanto o domínio polido for o selecionado; trocar de zona durante o poll não sobrescreve mais o painel com o status de outro domínio.
+- **Modo estrito de TypeScript — 81 erros `tsc -b` em 24 arquivos**: as novas flags estritas do `tsconfig.base.json` (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noImplicitReturns`) revelaram 81 erros pré-existentes. Todos corrigidos na origem — verificações de nulidade reais, estreitamento de tipos, palavra-chave `override` e tipos mais honestos — sem relaxar nenhuma regra do `tsconfig` e sem usar asserções de não-nulidade (`!`). Inclui acessos de índice protegidos por invariante, spreads condicionais para propriedades opcionais exatas e o tipo `PartialHubCard` que expressa o contrato real de `sanitizeCard`.
+
+### Ferramentas
+
+- **Gate de typecheck do `admin-motor`**: o Worker `admin-motor` passa a ter verificação de tipos própria — `admin-motor/tsconfig.json`, script `npm run typecheck:admin-motor` (`scripts/typecheck-admin-motor.mjs`) e baseline-ratchet `admin-motor/.typecheck-baseline.json`. Antes o Worker era deployado sem nenhum typecheck.
+- **Configuração TypeScript**: `tsconfig.base.json` como base compartilhada, além de `tsconfig.e2e.json` e `tsconfig.test.json`.
+- **markdownlint**: removido o `.markdownlint.jsonc` por-repositório; o repositório passa a usar a config central única do workspace (`lcv-workspace/.markdownlint.jsonc`).
+- **prettier**: adicionado `.prettierrc.json`.
+- Atualizações em workflows de CI e configurações auxiliares do repositório.
+
+### Validação
+
+- APP v02.02.07 → APP v02.02.08.
+- `tsc -b` (modo estrito): 81 → 0 erros. `eslint`, `biome`, `prettier` e `markdownlint` sem violações.
+- Testes: 34 (app) + 84 (admin-motor) = 118 aprovados; `vite build` íntegro.
+- Baseline de typecheck do `admin-motor` reduzido de 250 para 245 erros (as correções R1/R2 do Registrar eliminaram 5 erros no Worker).
+
 ## [v02.02.07] - 2026-05-21
 
 ### Adicionado

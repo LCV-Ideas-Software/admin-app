@@ -206,7 +206,8 @@ const mapRowToCard = (row: HubConfigRow) =>
 
 export const ensureHubTables = async (db: D1Database) => {
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS apphub_cards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       display_order INTEGER NOT NULL,
@@ -218,7 +219,8 @@ export const ensureHubTables = async (db: D1Database) => {
       updated_at INTEGER NOT NULL,
       updated_by TEXT
     )
-  `)
+  `,
+    )
     .run();
 
   await db
@@ -226,7 +228,8 @@ export const ensureHubTables = async (db: D1Database) => {
     .run();
 
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS adminhub_cards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       display_order INTEGER NOT NULL,
@@ -238,7 +241,8 @@ export const ensureHubTables = async (db: D1Database) => {
       updated_at INTEGER NOT NULL,
       updated_by TEXT
     )
-  `)
+  `,
+    )
     .run();
 
   await db
@@ -251,11 +255,13 @@ const loadCardsFromDb = async (db: D1Database, module: HubModule) => {
   const table = toTable(module);
 
   const rows = await db
-    .prepare(`
+    .prepare(
+      `
     SELECT name, description, url, icon, badge, display_order
     FROM ${table}
     ORDER BY display_order ASC, id ASC
-  `)
+  `,
+    )
     .all<HubConfigRow>();
 
   return (rows.results ?? []).map((row) => mapRowToCard(row)).filter((item): item is HubCard => item !== null);
@@ -271,10 +277,12 @@ export const saveCardsToDb = async (db: D1Database, module: HubModule, cards: Hu
 
   for (const [index, card] of cards.entries()) {
     await db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO ${table} (display_order, name, description, url, icon, badge, updated_at, updated_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `)
+    `,
+      )
       .bind(index, card.name, card.description, card.url, card.icon, card.badge, updatedAt, adminActor ?? null)
       .run();
     inserted += 1;

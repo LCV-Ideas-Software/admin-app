@@ -27,15 +27,10 @@ export async function onRequest(context: CatchAllContext): Promise<Response> {
   }
 
   const originalUrl = new URL(context.request.url);
-  const targetUrl = new URL(
-    originalUrl.pathname + originalUrl.search,
-    'https://admin-motor.internal',
-  );
+  const targetUrl = new URL(originalUrl.pathname + originalUrl.search, 'https://admin-motor.internal');
 
   try {
-    const response = await service.fetch(
-      new Request(targetUrl.toString(), context.request),
-    );
+    const response = await service.fetch(new Request(targetUrl.toString(), context.request));
 
     if (response.status >= 500) {
       console.error('[catch-all] upstream:5xx', {
@@ -46,10 +41,7 @@ export async function onRequest(context: CatchAllContext): Promise<Response> {
 
     return response;
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Falha ao encaminhar requisição para o admin-motor.';
+    const message = error instanceof Error ? error.message : 'Falha ao encaminhar requisição para o admin-motor.';
     console.error('[catch-all] request:error', {
       path: originalUrl.pathname,
       error: message,

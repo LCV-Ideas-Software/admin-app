@@ -292,7 +292,8 @@ REGRAS:
 // ── Ensure table + self-healing migration for missing columns ──
 async function ensureTable(db: D1Database): Promise<void> {
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS mainsite_post_ai_summaries (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       post_id      INTEGER NOT NULL UNIQUE,
@@ -304,7 +305,8 @@ async function ensureTable(db: D1Database): Promise<void> {
       created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
     )
-  `)
+  `,
+    )
     .run();
 
   // Self-healing: add columns that may be missing on pre-existing tables.
@@ -336,12 +338,14 @@ export async function onRequestGet(context: SummaryContext) {
     await ensureTable(db);
 
     const { results } = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT s.*, p.title AS post_title
       FROM mainsite_post_ai_summaries s
       LEFT JOIN mainsite_posts p ON p.id = s.post_id
       ORDER BY s.updated_at DESC
-    `)
+    `,
+      )
       .all<SummaryRow>();
 
     // Also fetch posts without summaries
@@ -475,7 +479,8 @@ export async function onRequestPost(context: SummaryContext) {
           }
 
           await db
-            .prepare(`
+            .prepare(
+              `
             INSERT INTO mainsite_post_ai_summaries (post_id, summary_og, summary_ld, content_hash, is_manual, model, updated_at)
             VALUES (?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(post_id) DO UPDATE SET
@@ -485,7 +490,8 @@ export async function onRequestPost(context: SummaryContext) {
               is_manual = 0,
               model = excluded.model,
               updated_at = CURRENT_TIMESTAMP
-          `)
+          `,
+            )
             .bind(post.id, result.summary_og, result.summary_ld, newHash, resolvedModel)
             .run();
 
@@ -535,7 +541,8 @@ export async function onRequestPost(context: SummaryContext) {
       const contentHash = await hashContent(stripHtml(post.content));
 
       await db
-        .prepare(`
+        .prepare(
+          `
         INSERT INTO mainsite_post_ai_summaries (post_id, summary_og, summary_ld, content_hash, is_manual, model, updated_at)
         VALUES (?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(post_id) DO UPDATE SET
@@ -545,7 +552,8 @@ export async function onRequestPost(context: SummaryContext) {
           is_manual = 0,
           model = excluded.model,
           updated_at = CURRENT_TIMESTAMP
-      `)
+      `,
+        )
         .bind(body.postId, result.summary_og, result.summary_ld, contentHash, resolvedModel)
         .run();
 
@@ -567,7 +575,8 @@ export async function onRequestPost(context: SummaryContext) {
       const contentHash = await hashContent(stripHtml(post.content));
 
       await db
-        .prepare(`
+        .prepare(
+          `
         INSERT INTO mainsite_post_ai_summaries (post_id, summary_og, summary_ld, content_hash, is_manual, updated_at)
         VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
         ON CONFLICT(post_id) DO UPDATE SET
@@ -576,7 +585,8 @@ export async function onRequestPost(context: SummaryContext) {
           content_hash = excluded.content_hash,
           is_manual = 1,
           updated_at = CURRENT_TIMESTAMP
-      `)
+      `,
+        )
         .bind(
           body.postId,
           body.summary_og.trim().substring(0, 200),

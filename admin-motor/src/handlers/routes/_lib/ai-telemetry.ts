@@ -23,7 +23,8 @@ export async function logAiUsage(db: D1Database | undefined, entry: AiUsageLog):
   if (!db) return;
   try {
     await db
-      .prepare(`
+      .prepare(
+        `
       CREATE TABLE IF NOT EXISTS ai_usage_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp TEXT NOT NULL DEFAULT (datetime('now')),
@@ -35,7 +36,8 @@ export async function logAiUsage(db: D1Database | undefined, entry: AiUsageLog):
         status TEXT DEFAULT 'ok',
         error_detail TEXT
       )
-    `)
+    `,
+      )
       .run();
     await db
       .prepare(

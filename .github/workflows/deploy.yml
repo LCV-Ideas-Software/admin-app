@@ -10,9 +10,9 @@ on:
         default: true
         type: boolean
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  NODE_OPTIONS: "--no-deprecation"
-  WRANGLER_VERSION: "latest"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NODE_OPTIONS: '--no-deprecation'
+  WRANGLER_VERSION: 'latest'
 concurrency:
   group: deploy-main
   cancel-in-progress: true
@@ -166,6 +166,9 @@ jobs:
         working-directory: ./
       - name: Test Admin Motor
         run: npm run test:admin-motor
+        working-directory: ./
+      - name: Typecheck Admin Motor
+        run: npm run typecheck:admin-motor
         working-directory: ./
       - name: Inject D1 database_id from secret (root + admin-motor)
         run: |

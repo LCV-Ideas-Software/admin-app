@@ -131,7 +131,8 @@ const parseRateLimitPolicies = (sourceRows: CalculadoraRateLimitSourceRow[]): Ra
 
 const existsObservabilidade = async (db: D1Database, row: ObservabilidadeRow) => {
   const existing = await db
-    .prepare(`
+    .prepare(
+      `
     SELECT id
     FROM calc_oraculo_observabilidade
     WHERE
@@ -141,7 +142,8 @@ const existsObservabilidade = async (db: D1Database, row: ObservabilidadeRow) =>
       AND IFNULL(preview, '') = IFNULL(?, '')
       AND IFNULL(error_message, '') = IFNULL(?, '')
     LIMIT 1
-  `)
+  `,
+    )
     .bind(row.createdAt, row.status, row.moeda, row.preview, row.errorMessage)
     .first<{ id?: number }>();
 
@@ -178,18 +180,22 @@ export async function onRequestPost(context: Context) {
 
   try {
     const [observSource, rateLimitSource] = await Promise.all([
-      env.BIGDATA_DB?.prepare(`
+      env.BIGDATA_DB?.prepare(
+        `
         SELECT created_at, status, from_cache, force_refresh, duration_ms, moeda, valor_original, preview, error_message
         FROM calc_oraculo_observabilidade
         ORDER BY created_at DESC
         LIMIT ?
-      `)
+      `,
+      )
         .bind(limit)
         .all<CalculadoraObservabilidadeSourceRow>(),
-      env.BIGDATA_DB?.prepare(`
+      env.BIGDATA_DB?.prepare(
+        `
         SELECT route_key, enabled, max_requests, window_minutes, updated_at, updated_by
         FROM calc_rate_limit_policies
-      `).all<CalculadoraRateLimitSourceRow>(),
+      `,
+      ).all<CalculadoraRateLimitSourceRow>(),
     ]);
 
     const observabilidadeRows = parseObservabilidadeRows(observSource.results ?? [], limit);
@@ -204,7 +210,8 @@ export async function onRequestPost(context: Context) {
         continue;
       }
 
-      await env.BIGDATA_DB.prepare(`
+      await env.BIGDATA_DB.prepare(
+        `
         INSERT INTO calc_oraculo_observabilidade (
           created_at,
           status,
@@ -218,7 +225,8 @@ export async function onRequestPost(context: Context) {
           app_version
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
+      `,
+      )
         .bind(
           row.createdAt,
           row.status,
@@ -237,7 +245,8 @@ export async function onRequestPost(context: Context) {
     }
 
     for (const row of rateLimitRows) {
-      await env.BIGDATA_DB.prepare(`
+      await env.BIGDATA_DB.prepare(
+        `
         INSERT INTO calc_rate_limit_policies (
           route_key,
           enabled,
@@ -253,7 +262,8 @@ export async function onRequestPost(context: Context) {
           window_minutes = excluded.window_minutes,
           updated_at = excluded.updated_at,
           updated_by = excluded.updated_by
-      `)
+      `,
+      )
         .bind(row.routeKey, row.enabled, row.maxRequests, row.windowMinutes, row.updatedAt, row.updatedBy)
         .run();
 

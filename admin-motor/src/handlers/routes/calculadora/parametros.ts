@@ -168,10 +168,12 @@ export async function onRequestPost(context: Context) {
 
     for (const mudanca of mudancas) {
       await db
-        .prepare(`
+        .prepare(
+          `
         INSERT INTO calc_parametros_auditoria (created_at, admin_email, chave, valor_anterior, valor_novo, origem)
         VALUES (?, ?, ?, ?, ?, ?)
-      `)
+      `,
+        )
         .bind(
           Date.now(),
           adminActor,

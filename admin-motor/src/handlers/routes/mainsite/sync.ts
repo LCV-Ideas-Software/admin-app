@@ -104,10 +104,12 @@ export async function onRequestPost(context: Context) {
       const current = settingsMap.get(entry.id);
 
       if (!current) {
-        await env.BIGDATA_DB.prepare(`
+        await env.BIGDATA_DB.prepare(
+          `
           INSERT INTO mainsite_settings (id, payload, updated_at)
           VALUES (?, ?, CURRENT_TIMESTAMP)
-        `)
+        `,
+        )
           .bind(entry.id, JSON.stringify(entry.payload))
           .run();
         settingsInserted += 1;
@@ -115,11 +117,13 @@ export async function onRequestPost(context: Context) {
       }
 
       if (!isValidJson(current.payload)) {
-        await env.BIGDATA_DB.prepare(`
+        await env.BIGDATA_DB.prepare(
+          `
           UPDATE mainsite_settings
           SET payload = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `)
+        `,
+        )
           .bind(JSON.stringify(entry.payload), entry.id)
           .run();
         settingsFixed += 1;

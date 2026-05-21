@@ -45,27 +45,31 @@ export async function handleCommentsAdminAll(ctx: ModerationContext): Promise<Re
   try {
     // Fetch comments with post title join
     const comments = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT c.*, p.title AS post_title
       FROM mainsite_comments c
       LEFT JOIN mainsite_posts p ON p.id = c.post_id
       WHERE c.status = ?
       ORDER BY c.created_at DESC
       LIMIT ?
-    `)
+    `,
+      )
       .bind(status, limit)
       .all<Record<string, unknown>>();
 
     // Counts for all statuses
     const countsResult = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
         SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
         SUM(CASE WHEN status = 'rejected_auto' THEN 1 ELSE 0 END) AS rejected_auto,
         SUM(CASE WHEN status = 'rejected_manual' THEN 1 ELSE 0 END) AS rejected_manual
       FROM mainsite_comments
-    `)
+    `,
+      )
       .bind()
       .first<{ pending: number; approved: number; rejected_auto: number; rejected_manual: number }>();
 
@@ -98,11 +102,13 @@ export async function handleCommentsAdminModerate(ctx: ModerationContext, commen
     }
 
     await db
-      .prepare(`
+      .prepare(
+        `
       UPDATE mainsite_comments
       SET status = ?, admin_notes = ?, reviewed_at = datetime('now')
       WHERE id = ?
-    `)
+    `,
+      )
       .bind(newStatus, body.admin_notes || null, commentId)
       .run();
 
@@ -152,11 +158,13 @@ export async function handleCommentsAdminReply(ctx: ModerationContext, parentId:
     }
 
     await db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO mainsite_comments
         (post_id, parent_id, author_name, author_email, content, status, author_ip_hash, is_author_reply, created_at)
       VALUES (?, ?, 'Autor', null, ?, 'approved', 'admin', 1, datetime('now'))
-    `)
+    `,
+      )
       .bind(parent.post_id, parentId, body.content.trim())
       .run();
 
@@ -199,11 +207,13 @@ export async function handleCommentsAdminBulk(ctx: ModerationContext): Promise<R
     } else {
       const newStatus = action === 'approve' ? 'approved' : 'rejected_manual';
       await db
-        .prepare(`
+        .prepare(
+          `
         UPDATE mainsite_comments
         SET status = ?, reviewed_at = datetime('now')
         WHERE id IN (${placeholders})
-      `)
+      `,
+        )
         .bind(newStatus, ...ids)
         .run();
     }

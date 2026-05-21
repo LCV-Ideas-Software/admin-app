@@ -30,7 +30,8 @@ export async function onRequestGet(context: Context) {
 
     // ── Operational events (24h aggregate) ──
     const eventsAgg = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT module,
         COUNT(1) AS total_events,
         SUM(CASE WHEN fallback_used = 1 THEN 1 ELSE 0 END) AS fallback_events,
@@ -40,21 +41,25 @@ export async function onRequestGet(context: Context) {
       FROM adminapp_module_events e1
       WHERE created_at >= ?
       GROUP BY module ORDER BY module ASC
-    `)
+    `,
+      )
       .bind(since24h)
       .all();
 
     // ── Raw event log (last 100) ──
     const eventLog = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT id, created_at, module, source, fallback_used, ok, error_message, metadata_json
       FROM adminapp_module_events ORDER BY created_at DESC LIMIT 100
-    `)
+    `,
+      )
       .all();
 
     // ── Sync runs aggregate ──
     const syncAgg = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT module,
         COUNT(1) AS total_runs,
         SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs,
@@ -63,7 +68,8 @@ export async function onRequestGet(context: Context) {
         (SELECT finished_at FROM adminapp_sync_runs s3 WHERE s3.module = s1.module ORDER BY s3.started_at DESC LIMIT 1) AS last_finished_at
       FROM adminapp_sync_runs s1
       GROUP BY module ORDER BY module ASC
-    `)
+    `,
+      )
       .all();
 
     // ── Mainsite telemetry tables (best-effort: tables may not exist yet) ──

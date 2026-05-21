@@ -1,106 +1,104 @@
 type CloudflareApiError = {
-  message?: string
-}
+  message?: string;
+};
 
 type CloudflareApiResponse<T> = {
-  success?: boolean
-  errors?: CloudflareApiError[]
-  result?: T
+  success?: boolean;
+  errors?: CloudflareApiError[];
+  result?: T;
   result_info?: {
-    page?: number
-    per_page?: number
-    total_pages?: number
-    count?: number
-    total_count?: number
-  }
-}
+    page?: number;
+    per_page?: number;
+    total_pages?: number;
+    count?: number;
+    total_count?: number;
+  };
+};
 
 export type CloudflareZone = {
-  id?: string
-  name?: string
-}
+  id?: string;
+  name?: string;
+};
 
 type CloudflareDnsRecord = {
-  id?: string
-  type?: string
-  content?: string
-  name?: string
-  ttl?: number
-  proxied?: boolean
-  priority?: number
-  comment?: string
-  tags?: string[]
-  created_on?: string
-  modified_on?: string
-  data?: Record<string, unknown>
-}
+  id?: string;
+  type?: string;
+  content?: string;
+  name?: string;
+  ttl?: number;
+  proxied?: boolean;
+  priority?: number;
+  comment?: string;
+  tags?: string[];
+  created_on?: string;
+  modified_on?: string;
+  data?: Record<string, unknown>;
+};
 
 type CloudflareDnsRecordListResult = {
-  records: CloudflareDnsRecord[]
+  records: CloudflareDnsRecord[];
   pagination: {
-    page: number
-    perPage: number
-    totalPages: number
-    totalCount: number
-    count: number
-  }
-}
+    page: number;
+    perPage: number;
+    totalPages: number;
+    totalCount: number;
+    count: number;
+  };
+};
 
 export type CloudflareDnsRecordInput = {
-  type: string
-  name: string
-  content?: string | null
-  ttl?: number | null
-  proxied?: boolean | null
-  priority?: number | null
-  comment?: string | null
-  tags?: string[] | null
-  data?: Record<string, unknown> | null
-}
+  type: string;
+  name: string;
+  content?: string | null;
+  ttl?: number | null;
+  proxied?: boolean | null;
+  priority?: number | null;
+  comment?: string | null;
+  tags?: string[] | null;
+  data?: Record<string, unknown> | null;
+};
 
 type EnvWithCloudflareToken = {
-  CLOUDFLARE_DNS?: string
-  CLOUDFLARE_PW?: string
-}
+  CLOUDFLARE_DNS?: string;
+  CLOUDFLARE_PW?: string;
+};
 
 const resolveToken = (env: EnvWithCloudflareToken) => {
-  const byDnsToken = env.CLOUDFLARE_DNS?.trim()
+  const byDnsToken = env.CLOUDFLARE_DNS?.trim();
   if (byDnsToken) {
-    return byDnsToken
+    return byDnsToken;
   }
 
-  const byPwToken = env.CLOUDFLARE_PW?.trim()
+  const byPwToken = env.CLOUDFLARE_PW?.trim();
   if (byPwToken) {
-    return byPwToken
+    return byPwToken;
   }
 
-  return ''
-}
+  return '';
+};
 
 const parseJsonOrThrow = <T>(rawText: string, fallback: string, response: Response): T => {
-  const trimmed = rawText.trim()
+  const trimmed = rawText.trim();
   if (!trimmed) {
-    throw new Error(`${fallback}: corpo vazio inesperado (HTTP ${response.status}).`)
+    throw new Error(`${fallback}: corpo vazio inesperado (HTTP ${response.status}).`);
   }
 
-  const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')
+  const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html');
   if (looksLikeHtml) {
-    throw new Error(`${fallback}: resposta HTML inesperada da API Cloudflare (HTTP ${response.status}).`)
+    throw new Error(`${fallback}: resposta HTML inesperada da API Cloudflare (HTTP ${response.status}).`);
   }
 
   try {
-    return JSON.parse(trimmed) as T
+    return JSON.parse(trimmed) as T;
   } catch {
-    throw new Error(`${fallback}: resposta não-JSON da API Cloudflare (HTTP ${response.status}).`)
+    throw new Error(`${fallback}: resposta não-JSON da API Cloudflare (HTTP ${response.status}).`);
   }
-}
+};
 
 const toFirstError = (payload: CloudflareApiResponse<unknown>) => {
-  const firstError = Array.isArray(payload.errors) && payload.errors.length > 0
-    ? payload.errors[0]
-    : null
-  return firstError?.message?.trim() || null
-}
+  const firstError = Array.isArray(payload.errors) && payload.errors.length > 0 ? payload.errors[0] : null;
+  return firstError?.message?.trim() || null;
+};
 
 const cloudflareRequest = async <T>(
   env: EnvWithCloudflareToken,
@@ -108,9 +106,9 @@ const cloudflareRequest = async <T>(
   fallback: string,
   init?: RequestInit,
 ) => {
-  const payload = await cloudflareRequestPayload<T>(env, path, fallback, init)
-  return payload.result as T
-}
+  const payload = await cloudflareRequestPayload<T>(env, path, fallback, init);
+  return payload.result as T;
+};
 
 const cloudflareRequestPayload = async <T>(
   env: EnvWithCloudflareToken,
@@ -118,9 +116,9 @@ const cloudflareRequestPayload = async <T>(
   fallback: string,
   init?: RequestInit,
 ) => {
-  const token = resolveToken(env)
+  const token = resolveToken(env);
   if (!token) {
-    throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_DNS).')
+    throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_DNS).');
   }
 
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
@@ -131,105 +129,101 @@ const cloudflareRequestPayload = async <T>(
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
-    body: init?.body,
-  })
+    body: init?.body ?? null,
+  });
 
-  const rawText = await response.text()
-  const payload = parseJsonOrThrow<CloudflareApiResponse<T>>(rawText, fallback, response)
+  const rawText = await response.text();
+  const payload = parseJsonOrThrow<CloudflareApiResponse<T>>(rawText, fallback, response);
 
   if (!response.ok || payload.success !== true) {
-    const message = toFirstError(payload)
-    throw new Error(message ? `${fallback}: ${message}` : `${fallback}: HTTP ${response.status}`)
+    const message = toFirstError(payload);
+    throw new Error(message ? `${fallback}: ${message}` : `${fallback}: HTTP ${response.status}`);
   }
 
-  return payload
-}
+  return payload;
+};
 
 export const listCloudflareZones = async (env: EnvWithCloudflareToken) => {
   const zones = await cloudflareRequest<CloudflareZone[]>(
     env,
     '/zones?status=active&per_page=500',
     'Falha ao carregar zonas da Cloudflare',
-  )
+  );
 
   return (Array.isArray(zones) ? zones : [])
     .map((zone) => ({
       id: String(zone.id ?? '').trim(),
-      name: String(zone.name ?? '').trim().toLowerCase(),
+      name: String(zone.name ?? '')
+        .trim()
+        .toLowerCase(),
     }))
     .filter((zone) => zone.id && zone.name)
-    .sort((a, b) => a.name.localeCompare(b.name))
-}
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
 
 const extractDnsResult = async (env: EnvWithCloudflareToken, path: string, fallback: string) => {
-  const result = await cloudflareRequest<CloudflareDnsRecord[]>(env, path, fallback)
-  return Array.isArray(result) ? result : []
-}
+  const result = await cloudflareRequest<CloudflareDnsRecord[]>(env, path, fallback);
+  return Array.isArray(result) ? result : [];
+};
 
 const quoteTxtContent = (content: string) => {
-  const normalized = content.trim().replace(/^"|"$/g, '')
-  return `"${normalized}"`
-}
+  const normalized = content.trim().replace(/^"|"$/g, '');
+  return `"${normalized}"`;
+};
 
 const normalizeZoneId = (zoneId: string) => {
-  const normalized = zoneId.trim()
+  const normalized = zoneId.trim();
   if (!normalized) {
-    throw new Error('Zone ID é obrigatório.')
+    throw new Error('Zone ID é obrigatório.');
   }
-  return normalized
-}
+  return normalized;
+};
 
 const normalizeRecordId = (recordId: string) => {
-  const normalized = recordId.trim()
+  const normalized = recordId.trim();
   if (!normalized) {
-    throw new Error('Record ID é obrigatório.')
+    throw new Error('Record ID é obrigatório.');
   }
-  return normalized
-}
+  return normalized;
+};
 
 const normalizeRecordType = (recordType: string) => {
-  const normalized = recordType.trim().toUpperCase()
+  const normalized = recordType.trim().toUpperCase();
   if (!normalized) {
-    throw new Error('Tipo de registro DNS é obrigatório.')
+    throw new Error('Tipo de registro DNS é obrigatório.');
   }
-  return normalized
-}
+  return normalized;
+};
 
 const normalizeRecordName = (recordName: string) => {
-  const normalized = recordName.trim().toLowerCase()
+  const normalized = recordName.trim().toLowerCase();
   if (!normalized) {
-    throw new Error('Nome do registro DNS é obrigatório.')
+    throw new Error('Nome do registro DNS é obrigatório.');
   }
-  return normalized
-}
+  return normalized;
+};
 
 const normalizeRecordInput = (input: CloudflareDnsRecordInput) => {
-  const type = normalizeRecordType(input.type)
-  const name = normalizeRecordName(input.name)
-  const content = String(input.content ?? '').trim()
-  const ttl = Number(input.ttl ?? 1)
-  const proxied = input.proxied == null ? null : Boolean(input.proxied)
-  const priority = input.priority == null || Number.isNaN(Number(input.priority))
-    ? null
-    : Number(input.priority)
-  const comment = String(input.comment ?? '').trim()
-  const tags = Array.isArray(input.tags)
-    ? input.tags
-      .map((tag) => String(tag).trim())
-      .filter(Boolean)
-    : []
-  const data = input.data && typeof input.data === 'object' ? input.data : null
+  const type = normalizeRecordType(input.type);
+  const name = normalizeRecordName(input.name);
+  const content = String(input.content ?? '').trim();
+  const ttl = Number(input.ttl ?? 1);
+  const proxied = input.proxied == null ? null : Boolean(input.proxied);
+  const priority = input.priority == null || Number.isNaN(Number(input.priority)) ? null : Number(input.priority);
+  const comment = String(input.comment ?? '').trim();
+  const tags = Array.isArray(input.tags) ? input.tags.map((tag) => String(tag).trim()).filter(Boolean) : [];
+  const data = input.data && typeof input.data === 'object' ? input.data : null;
 
   if (!content && !data) {
-    throw new Error('Informe content ou data para o registro DNS.')
+    throw new Error('Informe content ou data para o registro DNS.');
   }
 
   if (!Number.isFinite(ttl) || (ttl !== 1 && (ttl < 60 || ttl > 86400))) {
-    throw new Error('TTL inválido. Use 1 (auto) ou um valor entre 60 e 86400 segundos.')
+    throw new Error('TTL inválido. Use 1 (auto) ou um valor entre 60 e 86400 segundos.');
   }
 
   if (priority != null && (!Number.isInteger(priority) || priority < 0 || priority > 65535)) {
-    throw new Error('Priority inválido. Use um inteiro entre 0 e 65535.')
+    throw new Error('Priority inválido. Use um inteiro entre 0 e 65535.');
   }
 
   return {
@@ -242,39 +236,39 @@ const normalizeRecordInput = (input: CloudflareDnsRecordInput) => {
     comment,
     tags,
     data,
-  }
-}
+  };
+};
 
 const buildDnsRecordPayload = (input: CloudflareDnsRecordInput) => {
-  const normalized = normalizeRecordInput(input)
+  const normalized = normalizeRecordInput(input);
 
   const payload: Record<string, unknown> = {
     type: normalized.type,
     name: normalized.name,
     ttl: normalized.ttl,
-  }
+  };
 
   if (normalized.content) {
-    payload.content = normalized.content
+    payload.content = normalized.content;
   }
   if (normalized.proxied != null) {
-    payload.proxied = normalized.proxied
+    payload.proxied = normalized.proxied;
   }
   if (normalized.priority != null) {
-    payload.priority = normalized.priority
+    payload.priority = normalized.priority;
   }
   if (normalized.comment) {
-    payload.comment = normalized.comment
+    payload.comment = normalized.comment;
   }
   if (normalized.tags.length > 0) {
-    payload.tags = normalized.tags
+    payload.tags = normalized.tags;
   }
   if (normalized.data) {
-    payload.data = normalized.data
+    payload.data = normalized.data;
   }
 
-  return payload
-}
+  return payload;
+};
 
 export const upsertCloudflareTxtRecord = async (
   env: EnvWithCloudflareToken,
@@ -282,21 +276,21 @@ export const upsertCloudflareTxtRecord = async (
   name: string,
   content: string,
 ) => {
-  const normalizedZoneId = zoneId.trim()
-  const normalizedName = name.trim().toLowerCase()
-  const normalizedContent = content.trim()
+  const normalizedZoneId = zoneId.trim();
+  const normalizedName = name.trim().toLowerCase();
+  const normalizedContent = content.trim();
 
   if (!normalizedZoneId || !normalizedName || !normalizedContent) {
-    throw new Error('ZoneId, name e content são obrigatórios para upsert TXT na Cloudflare.')
+    throw new Error('ZoneId, name e content são obrigatórios para upsert TXT na Cloudflare.');
   }
 
   const existing = await extractDnsResult(
     env,
     `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records?type=TXT&name=${encodeURIComponent(normalizedName)}`,
     `Falha ao consultar TXT ${normalizedName}`,
-  )
+  );
 
-  const existingRecordId = String(existing[0]?.id ?? '').trim()
+  const existingRecordId = String(existing[0]?.id ?? '').trim();
 
   if (existingRecordId) {
     await cloudflareRequest<CloudflareDnsRecord>(
@@ -309,12 +303,12 @@ export const upsertCloudflareTxtRecord = async (
           content: quoteTxtContent(normalizedContent),
         }),
       },
-    )
+    );
 
     return {
       mode: 'update' as const,
       recordId: existingRecordId,
-    }
+    };
   }
 
   const created = await cloudflareRequest<CloudflareDnsRecord>(
@@ -330,24 +324,20 @@ export const upsertCloudflareTxtRecord = async (
         ttl: 1,
       }),
     },
-  )
+  );
 
   return {
     mode: 'create' as const,
     recordId: String(created?.id ?? '').trim(),
-  }
-}
+  };
+};
 
-export const getCloudflareDnsSnapshot = async (
-  env: EnvWithCloudflareToken,
-  domain: string,
-  zoneId: string,
-) => {
-  const normalizedDomain = domain.trim().toLowerCase()
-  const normalizedZoneId = zoneId.trim()
+export const getCloudflareDnsSnapshot = async (env: EnvWithCloudflareToken, domain: string, zoneId: string) => {
+  const normalizedDomain = domain.trim().toLowerCase();
+  const normalizedZoneId = zoneId.trim();
 
   if (!normalizedDomain || !normalizedZoneId) {
-    throw new Error('Domain e zoneId são obrigatórios para auditar DNS na Cloudflare.')
+    throw new Error('Domain e zoneId são obrigatórios para auditar DNS na Cloudflare.');
   }
 
   const [mxRecordsRaw, tlsRptRaw, mtastsRaw] = await Promise.all([
@@ -366,71 +356,79 @@ export const getCloudflareDnsSnapshot = async (
       `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records?type=TXT&name=${encodeURIComponent(`_mta-sts.${normalizedDomain}`)}`,
       `Falha ao consultar MTA-STS TXT de ${normalizedDomain}`,
     ),
-  ])
+  ]);
 
   const mxRecords = mxRecordsRaw
-    .map((record) => String(record.content ?? '').trim().toLowerCase())
+    .map((record) =>
+      String(record.content ?? '')
+        .trim()
+        .toLowerCase(),
+    )
     .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b))
+    .sort((a, b) => a.localeCompare(b));
 
-  const tlsRptContent = String(tlsRptRaw[0]?.content ?? '').replace(/["\s]/g, '')
-  const tlsRptMatch = tlsRptContent.match(/mailto:([^;]+)/i)
-  const dnsTlsRptEmail = tlsRptMatch?.[1]?.trim().toLowerCase() || null
+  const tlsRptContent = String(tlsRptRaw[0]?.content ?? '').replace(/["\s]/g, '');
+  const tlsRptMatch = tlsRptContent.match(/mailto:([^;]+)/i);
+  const dnsTlsRptEmail = tlsRptMatch?.[1]?.trim().toLowerCase() || null;
 
-  const mtastsContent = String(mtastsRaw[0]?.content ?? '').replace(/["\s]/g, '')
-  const mtastsMatch = mtastsContent.match(/id=([a-zA-Z0-9_-]+)/)
-  const dnsMtaStsId = mtastsMatch?.[1]?.trim() || null
+  const mtastsContent = String(mtastsRaw[0]?.content ?? '').replace(/["\s]/g, '');
+  const mtastsMatch = mtastsContent.match(/id=([a-zA-Z0-9_-]+)/);
+  const dnsMtaStsId = mtastsMatch?.[1]?.trim() || null;
 
   return {
     mxRecords,
     dnsTlsRptEmail,
     dnsMtaStsId,
-  }
-}
+  };
+};
 
 export const listCloudflareDnsRecords = async (
   env: EnvWithCloudflareToken,
   zoneId: string,
   options?: {
-    page?: number
-    perPage?: number
-    type?: string
-    search?: string
+    page?: number;
+    perPage?: number;
+    type?: string;
+    search?: string;
   },
 ): Promise<CloudflareDnsRecordListResult> => {
-  const normalizedZoneId = normalizeZoneId(zoneId)
-  const page = Number.isFinite(Number(options?.page)) && Number(options?.page) > 0
-    ? Math.trunc(Number(options?.page))
-    : 1
-  const perPage = Number.isFinite(Number(options?.perPage)) && Number(options?.perPage) > 0
-    ? Math.min(Math.trunc(Number(options?.perPage)), 500)
-    : 100
-  const type = String(options?.type ?? '').trim().toUpperCase()
-  const search = String(options?.search ?? '').trim().toLowerCase()
+  const normalizedZoneId = normalizeZoneId(zoneId);
+  const page =
+    Number.isFinite(Number(options?.page)) && Number(options?.page) > 0 ? Math.trunc(Number(options?.page)) : 1;
+  const perPage =
+    Number.isFinite(Number(options?.perPage)) && Number(options?.perPage) > 0
+      ? Math.min(Math.trunc(Number(options?.perPage)), 500)
+      : 100;
+  const type = String(options?.type ?? '')
+    .trim()
+    .toUpperCase();
+  const search = String(options?.search ?? '')
+    .trim()
+    .toLowerCase();
 
   const query = new URLSearchParams({
     page: String(page),
     per_page: String(perPage),
     order: 'type',
     direction: 'asc',
-  })
+  });
 
   if (type) {
-    query.set('type', type)
+    query.set('type', type);
   }
 
   if (search) {
-    query.set('name', search)
+    query.set('name', search);
   }
 
   const payload = await cloudflareRequestPayload<CloudflareDnsRecord[]>(
     env,
     `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records?${query.toString()}`,
     'Falha ao listar registros DNS da zona',
-  )
+  );
 
-  const records = Array.isArray(payload.result) ? payload.result : []
-  const info = payload.result_info ?? {}
+  const records = Array.isArray(payload.result) ? payload.result : [];
+  const info = payload.result_info ?? {};
 
   return {
     records,
@@ -441,16 +439,16 @@ export const listCloudflareDnsRecords = async (
       totalCount: Number(info.total_count ?? records.length),
       count: Number(info.count ?? records.length),
     },
-  }
-}
+  };
+};
 
 export const createCloudflareDnsRecord = async (
   env: EnvWithCloudflareToken,
   zoneId: string,
   input: CloudflareDnsRecordInput,
 ) => {
-  const normalizedZoneId = normalizeZoneId(zoneId)
-  const payload = buildDnsRecordPayload(input)
+  const normalizedZoneId = normalizeZoneId(zoneId);
+  const payload = buildDnsRecordPayload(input);
   const created = await cloudflareRequest<CloudflareDnsRecord>(
     env,
     `/zones/${encodeURIComponent(normalizedZoneId)}/dns_records`,
@@ -459,10 +457,10 @@ export const createCloudflareDnsRecord = async (
       method: 'POST',
       body: JSON.stringify(payload),
     },
-  )
+  );
 
-  return created
-}
+  return created;
+};
 
 export const updateCloudflareDnsRecord = async (
   env: EnvWithCloudflareToken,
@@ -470,9 +468,9 @@ export const updateCloudflareDnsRecord = async (
   recordId: string,
   input: CloudflareDnsRecordInput,
 ) => {
-  const normalizedZoneId = normalizeZoneId(zoneId)
-  const normalizedRecordId = normalizeRecordId(recordId)
-  const payload = buildDnsRecordPayload(input)
+  const normalizedZoneId = normalizeZoneId(zoneId);
+  const normalizedRecordId = normalizeRecordId(recordId);
+  const payload = buildDnsRecordPayload(input);
 
   const updated = await cloudflareRequest<CloudflareDnsRecord>(
     env,
@@ -482,18 +480,14 @@ export const updateCloudflareDnsRecord = async (
       method: 'PUT',
       body: JSON.stringify(payload),
     },
-  )
+  );
 
-  return updated
-}
+  return updated;
+};
 
-export const deleteCloudflareDnsRecord = async (
-  env: EnvWithCloudflareToken,
-  zoneId: string,
-  recordId: string,
-) => {
-  const normalizedZoneId = normalizeZoneId(zoneId)
-  const normalizedRecordId = normalizeRecordId(recordId)
+export const deleteCloudflareDnsRecord = async (env: EnvWithCloudflareToken, zoneId: string, recordId: string) => {
+  const normalizedZoneId = normalizeZoneId(zoneId);
+  const normalizedRecordId = normalizeRecordId(recordId);
 
   await cloudflareRequest<CloudflareDnsRecord>(
     env,
@@ -502,5 +496,5 @@ export const deleteCloudflareDnsRecord = async (
     {
       method: 'DELETE',
     },
-  )
-}
+  );
+};

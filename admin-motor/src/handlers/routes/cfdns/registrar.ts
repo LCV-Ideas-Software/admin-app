@@ -49,12 +49,15 @@ const toError = (message: string, trace: { request_id: string; timestamp: string
 
 const getEnv = (context: Context) => context.data?.env ?? context.env;
 
-// Mapeia uma falha para o status HTTP que o admin deve ver. Rate-limit (429) da
-// Cloudflare é preservado; token ausente é erro de configuração (500); demais
-// falhas de upstream permanecem como 502 (bad gateway).
+// Mapeia uma falha para o status HTTP que o admin deve ver. Uma rejeição da API
+// Cloudflare (4xx, incluindo 429) não é falha de gateway: devolve o próprio 4xx
+// para que o corpo JSON com a mensagem real chegue ao browser — o edge da
+// Cloudflare substitui o corpo de respostas 5xx por uma página HTML de erro.
+// Token ausente é erro de configuração (500); demais falhas de upstream
+// permanecem como 502 (bad gateway).
 const resolveUpstreamStatus = (error: unknown): number => {
-  if (error instanceof CloudflareRequestError && error.status === 429) {
-    return 429;
+  if (error instanceof CloudflareRequestError && error.status >= 400 && error.status <= 499) {
+    return error.status;
   }
   if (error instanceof Error && /Token Cloudflare ausente/.test(error.message)) {
     return 500;

@@ -71,7 +71,7 @@ const formatPosicaoLabel = (pos: string): string => {
   if (p.startsWith('HORA PLANETÁRIA')) return p;
   if (p.includes('ASTRO')) {
     const match = p.match(/\((.*?)\)/);
-    return match ? `HORA PLANETÁRIA (${match[1].trim()})` : 'HORA PLANETÁRIA (ASTRO)';
+    return match ? `HORA PLANETÁRIA (${(match[1] ?? '').trim()})` : 'HORA PLANETÁRIA (ASTRO)';
   }
   return p;
 };
@@ -399,7 +399,7 @@ export function generateAstrologicalReport(mapa: MapaDetalhado): GeneratedReport
   // Summary from AI or fallback
   let summary: string;
   if (mapa.analise_ia) {
-    summary = htmlToPlainText(mapa.analise_ia).split('.')[0].trim();
+    summary = (htmlToPlainText(mapa.analise_ia).split('.')[0] ?? '').trim();
   } else {
     summary = `Mapa astrológico de ${mapa.nome}`;
   }

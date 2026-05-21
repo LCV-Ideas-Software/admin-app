@@ -84,9 +84,7 @@ export default {
 			const parser = new PostalMime();
 			const emailParsed = await parser.parse(message.raw);
 
-			const attachment = emailParsed.attachments.find(
-				(a) => a.mimeType === 'application/gzip' || a.filename?.endsWith('.gz')
-			);
+			const attachment = emailParsed.attachments.find((a) => a.mimeType === 'application/gzip' || a.filename?.endsWith('.gz'));
 
 			if (!attachment) {
 				structuredLog('warn', 'email.no_attachment', { from: message.from });
@@ -112,7 +110,7 @@ export default {
 			const rawJson = JSON.stringify(reportData);
 
 			await env.BIGDATA_DB.prepare(
-				'INSERT OR IGNORE INTO tlsrpt_relatorios_tls (report_id, org_name, start_date, end_date, raw_json) VALUES (?, ?, ?, ?, ?)'
+				'INSERT OR IGNORE INTO tlsrpt_relatorios_tls (report_id, org_name, start_date, end_date, raw_json) VALUES (?, ?, ?, ?, ?)',
 			)
 				.bind(reportId, orgName, startDate, endDate, rawJson)
 				.run();
@@ -152,7 +150,7 @@ export default {
 			// ── GET / → Lista de relatórios ──
 			if (path === '/') {
 				const { results } = await env.BIGDATA_DB.prepare(
-					'SELECT id, report_id, org_name, start_date, end_date, created_at FROM tlsrpt_relatorios_tls ORDER BY start_date DESC LIMIT 50'
+					'SELECT id, report_id, org_name, start_date, end_date, created_at FROM tlsrpt_relatorios_tls ORDER BY start_date DESC LIMIT 50',
 				).all();
 
 				return new Response(JSON.stringify(results), {
@@ -164,11 +162,7 @@ export default {
 			const reportMatch = path.match(/^\/report\/(.+)$/);
 			if (reportMatch) {
 				const reportId = decodeURIComponent(reportMatch[1]);
-				const result = await env.BIGDATA_DB.prepare(
-					'SELECT * FROM tlsrpt_relatorios_tls WHERE report_id = ?'
-				)
-					.bind(reportId)
-					.first();
+				const result = await env.BIGDATA_DB.prepare('SELECT * FROM tlsrpt_relatorios_tls WHERE report_id = ?').bind(reportId).first();
 
 				if (!result) {
 					return new Response(JSON.stringify({ error: 'Relatório não encontrado.' }), {

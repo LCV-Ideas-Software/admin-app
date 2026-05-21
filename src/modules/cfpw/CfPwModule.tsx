@@ -362,10 +362,10 @@ const SecretsManager: React.FC<{ domainType: 'worker' | 'page'; resourceId: stri
         const deploymentConfigs = projectRecord?.deployment_configs as Record<string, unknown> | undefined;
         const productionConfig = deploymentConfigs?.production as Record<string, unknown> | undefined;
         const envVars = (productionConfig?.env_vars as Record<string, { type: string; value?: string }>) || {};
-        const mapped = Object.keys(envVars).map((key) => ({
+        const mapped = Object.entries(envVars).map(([key, entry]) => ({
           name: key,
-          type: envVars[key].type,
-          value: envVars[key].value,
+          type: entry.type,
+          ...(entry.value !== undefined ? { value: entry.value } : {}),
         }));
         setSecrets(mapped);
       }
@@ -844,7 +844,7 @@ export function CfPwModule() {
 
     setOpsState((prev) => ({
       ...prev,
-      deploymentId: defaultDeploymentId || prev.deploymentId,
+      deploymentId: defaultDeploymentId || prev.deploymentId || '',
     }));
     setOpsModalOpen(true);
   };

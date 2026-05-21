@@ -107,23 +107,27 @@ export async function onRequestPost(context: Context) {
         : Promise.resolve(null),
     ]);
 
-    await (context.data?.env ?? context.env).BIGDATA_DB.prepare(`
+    await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+      `
       INSERT INTO mtasts_mta_sts_policies (domain, policy_text, tlsrpt_email, updated_at)
       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(domain) DO UPDATE SET
         policy_text = excluded.policy_text,
         tlsrpt_email = COALESCE(excluded.tlsrpt_email, mtasts_mta_sts_policies.tlsrpt_email),
         updated_at = CURRENT_TIMESTAMP
-    `)
+    `,
+    )
       .bind(domain, policyText, tlsrptEmail)
       .run();
 
-    await (context.data?.env ?? context.env).BIGDATA_DB.prepare(`
+    await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+      `
       INSERT INTO mtasts_history (gerado_em, domain, data_criacao)
       VALUES (?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(gerado_em) DO UPDATE SET
         domain = excluded.domain
-    `)
+    `,
+    )
       .bind(id, domain)
       .run();
 

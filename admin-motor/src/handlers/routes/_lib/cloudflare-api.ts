@@ -223,10 +223,13 @@ const toFirstErrorDetails = (payload: CloudflareApiResponse<unknown>) => {
   };
 };
 
-// O endpoint de status de workflow responde HTTP 404 quando não há workflow
-// para o domínio. O status é o sinal estável — o código numérico e o texto da
-// mensagem não são contrato e não devem ser usados para esta decisão.
-const isNoRegistrarWorkflowFound = (error: unknown) => error instanceof CloudflareRequestError && error.status === 404;
+// O endpoint de status responde HTTP 404 + código `10000` quando não há
+// workflow para o domínio. Exigimos AMBOS: um 404 isolado também ocorre em
+// erros de roteamento/configuração (ex.: código `7003` "could not route
+// request"); tratá-los como "sem workflow" mascararia falha operacional como
+// sucesso. O texto da mensagem (em inglês) não é contrato e não é usado.
+const isNoRegistrarWorkflowFound = (error: unknown) =>
+  error instanceof CloudflareRequestError && error.status === 404 && String(error.code) === '10000';
 
 const cloudflareRequest = async <T>(
   env: EnvWithCloudflareToken,

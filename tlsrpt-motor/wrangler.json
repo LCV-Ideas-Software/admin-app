@@ -1,33 +1,31 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "tlsrpt-motor",
-  "main": "src/index.js",
-  "compatibility_date": "2026-04-06",
-  "workers_dev": false,
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1,
-    "logs": {
-      "enabled": true,
-      "invocation_logs": true,
-      "head_sampling_rate": 1
-    },
-    "traces": {
-      "enabled": true
-    }
-  },
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
-  "vars": {
-    "ALLOWED_ORIGIN": "https://admin.lcv.app.br"
-  },
-  "d1_databases": [
-    {
-      "binding": "BIGDATA_DB",
-      "database_name": "bigdata_db",
-      "database_id": "00000000-0000-0000-0000-000000000000"
-    }
-  ],
-  "secrets_store_secrets": []
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "tlsrpt-motor",
+	"main": "src/index.js",
+	"compatibility_date": "2026-04-06",
+	"workers_dev": false,
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"logs": {
+			"enabled": true,
+			"invocation_logs": true,
+			"head_sampling_rate": 1
+		},
+		"traces": {
+			"enabled": true
+		}
+	},
+	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		"ALLOWED_ORIGIN": "https://admin.lcv.app.br"
+	},
+	"d1_databases": [
+		{
+			"binding": "BIGDATA_DB",
+			"database_name": "bigdata_db",
+			"database_id": "00000000-0000-0000-0000-000000000000"
+		}
+	],
+	"secrets_store_secrets": []
 }

@@ -417,7 +417,36 @@ describe('cfdns registrar routes', () => {
     expect(response.status).toBe(500);
   });
 
-  it('treats any HTTP 404 from a workflow status endpoint as workflow_missing', async () => {
+  it('surfaces a Cloudflare domain-check rejection (HTTP 400) as 400, not a 502 gateway error', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: false,
+            errors: [{ code: 1003, message: 'None of the provided domains are valid or have supported extensions' }],
+          }),
+          { status: 400 },
+        ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await onRequestPostCheck({
+      request: new Request('https://admin.lcv.dev/api/cfdns/registrar/check', {
+        method: 'POST',
+        body: JSON.stringify({ domains: ['naoexiste.zz'] }),
+      }),
+      env: { CLOUDFLARE_DNS: 'dns-token', CF_ACCOUNT_ID: 'acct-123' },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('None of the provided domains are valid or have supported extensions'),
+    });
+  });
+
+  it('treats an HTTP 404 with code 10000 as workflow_missing but surfaces other 404s as errors', async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(JSON.stringify({ success: false, errors: [{ code: 7003, message: 'Could not route request' }] }), {
@@ -432,11 +461,10 @@ describe('cfdns registrar routes', () => {
       env: { CLOUDFLARE_DNS: 'dns-token', CF_ACCOUNT_ID: 'acct-123' },
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({
-      ok: true,
-      status: null,
-      workflow_missing: true,
+      ok: false,
+      error: expect.stringContaining('Could not route request'),
     });
   });
 

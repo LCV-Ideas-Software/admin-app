@@ -133,7 +133,10 @@ const ICON_RULES: IconRule[] = [
   { keywords: ['chave api', 'api key', 'token', 'jwt', 'bearer'], icon: '🔑' },
   { keywords: ['chave', 'key'], icon: '🔑' },
   { keywords: ['bloqueio', 'lock', 'locked', 'cadeado', 'privado', 'private'], icon: '🔒' },
-  { keywords: ['firewall', 'antivirus', 'malware', 'ameaca', 'threat', 'vulnerabilidade', 'vulnerability'], icon: '🛡️' },
+  {
+    keywords: ['firewall', 'antivirus', 'malware', 'ameaca', 'threat', 'vulnerabilidade', 'vulnerability'],
+    icon: '🛡️',
+  },
   {
     keywords: ['compliance', 'conformidade', 'lgpd', 'gdpr', 'pci dss', 'iso 27001', 'regulamentacao', 'regulation'],
     icon: '⚖️',

@@ -73,12 +73,14 @@ export async function onRequestPost(context: Context) {
   });
 
   try {
-    const source = await env.BIGDATA_DB?.prepare(`
+    const source = await env.BIGDATA_DB?.prepare(
+      `
       SELECT id, nome, data_nascimento
       FROM astrologo_mapas
       ORDER BY created_at DESC
       LIMIT ?
-    `)
+    `,
+    )
       .bind(limit)
       .all<LegacyMapa>();
 
@@ -89,13 +91,15 @@ export async function onRequestPost(context: Context) {
     let upserted = 0;
 
     for (const row of rows) {
-      await env.BIGDATA_DB.prepare(`
+      await env.BIGDATA_DB.prepare(
+        `
         INSERT INTO astrologo_mapas (id, nome, data_nascimento, created_at)
         VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           nome = excluded.nome,
           data_nascimento = excluded.data_nascimento
-      `)
+      `,
+      )
         .bind(row.id, row.nome, row.dataNascimento)
         .run();
 

@@ -74,7 +74,8 @@ const requireDb = (env: MainsiteEnv) => {
 
 const ensureAboutTable = async (db: D1Database) => {
   await db
-    .prepare(`
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS mainsite_about (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         title TEXT NOT NULL DEFAULT '',
@@ -84,7 +85,8 @@ const ensureAboutTable = async (db: D1Database) => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
-    `)
+    `,
+    )
     .run();
 };
 
@@ -133,20 +135,24 @@ const restoreAboutAsPost = async (
   input: { title: string; content: string; author: string; isPublished: number },
 ) => {
   await db
-    .prepare(`
+    .prepare(
+      `
       INSERT INTO mainsite_posts (title, content, author, is_pinned, display_order, is_published, created_at, updated_at)
       VALUES (?, ?, ?, 0, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `)
+    `,
+    )
     .bind(input.title, input.content, input.author, input.isPublished)
     .run();
 
   const restored = await db
-    .prepare(`
+    .prepare(
+      `
       SELECT id
       FROM mainsite_posts
       ORDER BY id DESC
       LIMIT 1
-    `)
+    `,
+    )
     .first<{ id?: number }>();
 
   await db.prepare('DELETE FROM mainsite_about WHERE id = 1').run();
@@ -171,7 +177,8 @@ const upsertAbout = async (
   input: { title: string; content: string; author: string; sourcePostId: number | null },
 ) => {
   await db
-    .prepare(`
+    .prepare(
+      `
       INSERT INTO mainsite_about (id, title, content, author, source_post_id, created_at, updated_at)
       VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
@@ -180,7 +187,8 @@ const upsertAbout = async (
         author = excluded.author,
         source_post_id = excluded.source_post_id,
         updated_at = CURRENT_TIMESTAMP
-    `)
+    `,
+    )
     .bind(input.title, input.content, input.author, input.sourcePostId)
     .run();
 };

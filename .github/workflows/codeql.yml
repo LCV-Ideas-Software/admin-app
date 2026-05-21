@@ -2,11 +2,11 @@ name: CodeQL
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches: ['main']
   pull_request:
-    branches: ["main"]
+    branches: ['main']
   schedule:
-    - cron: "11 6 * * 2"
+    - cron: '11 6 * * 2'
 permissions:
   contents: read
   actions: read
@@ -50,4 +50,4 @@ jobs:
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
         with:
-          category: "/language:${{ matrix.language }}"
+          category: '/language:${{ matrix.language }}'

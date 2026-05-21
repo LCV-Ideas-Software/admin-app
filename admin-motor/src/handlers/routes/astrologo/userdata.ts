@@ -54,7 +54,8 @@ export const onRequestGet = async (context: HandlerContext) => {
 
     // Garantir tabela existe
     await db
-      .prepare(`
+      .prepare(
+        `
       CREATE TABLE IF NOT EXISTS astrologo_user_data (
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL,
@@ -62,7 +63,8 @@ export const onRequestGet = async (context: HandlerContext) => {
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       )
-    `)
+    `,
+      )
       .run();
 
     const countRow = await db.prepare('SELECT COUNT(*) as total FROM astrologo_user_data').first();

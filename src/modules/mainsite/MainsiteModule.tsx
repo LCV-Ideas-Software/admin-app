@@ -813,6 +813,7 @@ export function MainsiteModule() {
     if (draggedPostIndex === null || draggedPostIndex === dropIndex) return;
     const next = [...managedPosts];
     const [dragged] = next.splice(draggedPostIndex, 1);
+    if (!dragged) return;
     next.splice(dropIndex, 0, dragged);
     setManagedPosts(next);
     setDraggedPostIndex(null);
@@ -1861,7 +1862,7 @@ export function MainsiteModule() {
                           aria-pressed={isActive}
                           onClick={() => {
                             const next = [...disclaimers.items];
-                            next[idx] = { ...next[idx], enabled: !isActive };
+                            next[idx] = { ...item, enabled: !isActive };
                             setDisclaimers({ ...disclaimers, items: next });
                           }}
                         >
@@ -1891,7 +1892,7 @@ export function MainsiteModule() {
                           value={item.title}
                           onChange={(e) => {
                             const next = [...disclaimers.items];
-                            next[idx] = { ...next[idx], title: e.target.value };
+                            next[idx] = { ...item, title: e.target.value };
                             setDisclaimers({ ...disclaimers, items: next });
                           }}
                         />
@@ -1905,7 +1906,7 @@ export function MainsiteModule() {
                           value={item.buttonText}
                           onChange={(e) => {
                             const next = [...disclaimers.items];
-                            next[idx] = { ...next[idx], buttonText: e.target.value };
+                            next[idx] = { ...item, buttonText: e.target.value };
                             setDisclaimers({ ...disclaimers, items: next });
                           }}
                         />
@@ -1920,7 +1921,7 @@ export function MainsiteModule() {
                         value={item.text}
                         onChange={(e) => {
                           const next = [...disclaimers.items];
-                          next[idx] = { ...next[idx], text: e.target.value };
+                          next[idx] = { ...item, text: e.target.value };
                           setDisclaimers({ ...disclaimers, items: next });
                         }}
                       />

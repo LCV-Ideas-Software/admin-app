@@ -56,7 +56,8 @@ export async function onRequestGet(context: Context) {
 
     const since = Date.now() - 24 * 60 * 60 * 1000;
 
-    const eventsAgg = await env.BIGDATA_DB.prepare(`
+    const eventsAgg = await env.BIGDATA_DB.prepare(
+      `
       SELECT
         module,
         COUNT(1) AS total_events,
@@ -68,11 +69,13 @@ export async function onRequestGet(context: Context) {
       WHERE created_at >= ?
       GROUP BY module
       ORDER BY module ASC
-    `)
+    `,
+    )
       .bind(since)
       .all<EventAggRow>();
 
-    const syncAgg = await env.BIGDATA_DB.prepare(`
+    const syncAgg = await env.BIGDATA_DB.prepare(
+      `
       SELECT
         module,
         COUNT(1) AS total_runs,
@@ -83,7 +86,8 @@ export async function onRequestGet(context: Context) {
       FROM adminapp_sync_runs s1
       GROUP BY module
       ORDER BY module ASC
-    `).all<SyncAggRow>();
+    `,
+    ).all<SyncAggRow>();
 
     const modules = (eventsAgg.results ?? []).map((row) => ({
       module: String(row.module ?? 'unknown'),

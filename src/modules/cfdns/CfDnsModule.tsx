@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
 import {
@@ -704,6 +704,12 @@ export function CfDnsModule() {
   const [selectedZoneId, setSelectedZoneId] = useState('');
   const [selectedZoneName, setSelectedZoneName] = useState('');
 
+  // Codex P2: domínio do auto-poll de registro ativo. O poll só escreve em
+  // `registrarRegistrationStatus` enquanto esta ref bater com o seu domínio;
+  // `handleZoneChange` a limpa, evitando que o status de um domínio antigo
+  // sobrescreva o painel de uma zona recém-selecionada.
+  const registrationPollDomainRef = useRef('');
+
   const [filterType, setFilterType] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -1135,9 +1141,10 @@ export function CfDnsModule() {
         const nextZones = Array.isArray(payload.zones) ? payload.zones : [];
         setZones(nextZones);
 
-        if (!selectedZoneId && nextZones.length > 0) {
-          setSelectedZoneId(nextZones[0].id);
-          setSelectedZoneName(nextZones[0].name);
+        const firstZone = nextZones[0];
+        if (!selectedZoneId && firstZone) {
+          setSelectedZoneId(firstZone.id);
+          setSelectedZoneName(firstZone.name);
         }
 
         if (shouldNotify) {
@@ -1358,6 +1365,9 @@ export function CfDnsModule() {
         return;
       }
 
+      // Codex P2: marca este domínio como alvo do poll ativo.
+      registrationPollDomainRef.current = domain;
+
       // Polling limitado pós-criação: o registro sempre inicia assíncrono
       // (Prefer: respond-async). Para nos estados que não avançam sozinhos.
       const MAX_POLLS = 6;
@@ -1379,6 +1389,12 @@ export function CfDnsModule() {
           );
 
           if (!response.ok || !payload.ok) {
+            break;
+          }
+
+          // Codex P2: se o operador trocou de zona durante o poll, não
+          // sobrescreve o painel do domínio agora selecionado — encerra.
+          if (registrationPollDomainRef.current !== domain) {
             break;
           }
 
@@ -1489,6 +1505,8 @@ export function CfDnsModule() {
     setSelectedZoneId(zoneId);
     setSelectedZoneName(zone?.name ?? '');
     setPage(1);
+    // Codex P2: invalida qualquer auto-poll em andamento ao trocar de zona.
+    registrationPollDomainRef.current = '';
     setRegistrarRegistrationStatus(null);
     setRegistrarUpdateStatus(null);
     resetDraft();

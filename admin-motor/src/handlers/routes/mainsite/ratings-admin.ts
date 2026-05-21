@@ -71,20 +71,23 @@ export async function handleRatingsAdminAll(ctx: RatingsAdminContext): Promise<R
     binds.push(limit);
 
     const ratings = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT r.*, p.title AS post_title
       FROM mainsite_ratings r
       LEFT JOIN mainsite_posts p ON p.id = r.post_id
       ${whereClause}
       ORDER BY r.created_at DESC
       LIMIT ?
-    `)
+    `,
+      )
       .bind(...binds)
       .all<Record<string, unknown>>();
 
     // Contagens agregadas
     const stats = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT
         COUNT(*) AS total,
         COALESCE(AVG(rating), 0) AS avg_rating,
@@ -100,7 +103,8 @@ export async function handleRatingsAdminAll(ctx: RatingsAdminContext): Promise<R
         SUM(CASE WHEN reaction_type = 'inspiring' THEN 1 ELSE 0 END) AS react_inspiring,
         SUM(CASE WHEN reaction_type = 'beautiful' THEN 1 ELSE 0 END) AS react_beautiful
       FROM mainsite_ratings
-    `)
+    `,
+      )
       .bind()
       .first<Record<string, number>>();
 
@@ -140,7 +144,8 @@ export async function handleRatingsAdminStats(ctx: RatingsAdminContext): Promise
 
   try {
     const stats = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT
         COUNT(*) AS total,
         COALESCE(AVG(rating), 0) AS avg_rating,
@@ -156,20 +161,23 @@ export async function handleRatingsAdminStats(ctx: RatingsAdminContext): Promise
         SUM(CASE WHEN reaction_type = 'inspiring' THEN 1 ELSE 0 END) AS react_inspiring,
         SUM(CASE WHEN reaction_type = 'beautiful' THEN 1 ELSE 0 END) AS react_beautiful
       FROM mainsite_ratings
-    `)
+    `,
+      )
       .bind()
       .first<Record<string, number>>();
 
     // Top posts por avaliações
     const topPosts = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT r.post_id, p.title AS post_title, COUNT(*) AS vote_count, AVG(r.rating) AS avg_rating
       FROM mainsite_ratings r
       LEFT JOIN mainsite_posts p ON p.id = r.post_id
       GROUP BY r.post_id
       ORDER BY vote_count DESC
       LIMIT 10
-    `)
+    `,
+      )
       .bind()
       .all<{ post_id: number; post_title: string | null; vote_count: number; avg_rating: number }>();
 
@@ -246,9 +254,11 @@ export async function handleRatingsAdminUpdate(ctx: RatingsAdminContext, ratingI
     binds.push(ratingId);
 
     await db
-      .prepare(`
+      .prepare(
+        `
       UPDATE mainsite_ratings SET ${sets.join(', ')} WHERE id = ?
-    `)
+    `,
+      )
       .bind(...binds)
       .run();
 
