@@ -21,7 +21,14 @@ function toRepoPath(filePath) {
 }
 
 function normalizeMessage(message) {
-  return message.replace(/\s+/g, ' ').trim();
+  const collapsed = message.replace(/\s+/g, ' ').trim();
+
+  // TypeScript embeds absolute paths in some messages (e.g. import("/abs/.../mod")).
+  // Strip the repo-root prefix — in both separator styles — so error fingerprints
+  // stay identical across machines and OSes (Windows dev vs Linux CI). Without
+  // this, a baseline generated on Windows never matches the one CI computes.
+  const repoRootForward = repoRoot.replaceAll('\\', '/');
+  return collapsed.replaceAll(repoRootForward, '').replaceAll(repoRoot, '');
 }
 
 function parseTypeScriptErrors(output) {
