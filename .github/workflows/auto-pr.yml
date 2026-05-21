@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      actions: write
       checks: read
       contents: write
       pull-requests: write
@@ -59,6 +60,16 @@ jobs:
           fi
 
           echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch CodeQL for branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh workflow run codeql.yml --repo "$REPO" --ref "$BRANCH"
+          sleep 15
 
       - name: Wait for PR checks
         env:
