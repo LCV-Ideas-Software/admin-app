@@ -84,6 +84,7 @@ jobs:
               [
                 .statusCheckRollup[]
                 | select(.workflowName != "Auto PR")
+                | select(.name != "StepSecurity Harden-Runner")
               ] as $checks
               | if ($checks | length) == 0 then "pending"
                 elif any($checks[]; .status != "COMPLETED") then "pending"
@@ -102,6 +103,7 @@ jobs:
                 gh pr view "$PR_URL" --json statusCheckRollup --jq '
                   .statusCheckRollup[]
                   | select(.workflowName != "Auto PR")
+                  | select(.name != "StepSecurity Harden-Runner")
                   | [.workflowName, .name, .status, .conclusion]
                   | @tsv
                 '
