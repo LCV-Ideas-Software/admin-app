@@ -124,10 +124,10 @@ export const FigureNodeView = ({ node, updateAttributes, selected, editor, getPo
 
         for (let i = 0; i < data.length; i += 4) {
           const a = data[i + 3];
-          if (a < 32) continue;
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
+          if (a === undefined || a < 32) continue;
+          const r = data[i] ?? 0;
+          const g = data[i + 1] ?? 0;
+          const b = data[i + 2] ?? 0;
           total += 0.299 * r + 0.587 * g + 0.114 * b;
           count += 1;
         }
@@ -153,11 +153,13 @@ export const FigureNodeView = ({ node, updateAttributes, selected, editor, getPo
     event.preventDefault();
     event.stopPropagation();
     const point = 'touches' in event ? event.touches[0] : (event as React.MouseEvent);
+    if (!point) return;
     startXRef.current = point.clientX;
     startWidthRef.current = Number(String(node.attrs.width || '100').replace('%', '')) || 100;
 
     const onMove = (moveEvent: MouseEvent | TouchEvent) => {
       const p = 'touches' in moveEvent ? moveEvent.touches[0] : (moveEvent as MouseEvent);
+      if (!p) return;
       const deltaX = p.clientX - startXRef.current;
       const next = clamp(Math.round(startWidthRef.current + deltaX * 0.22), 20, 100);
       updateAttributes({ width: `${next}%` });
@@ -276,8 +278,8 @@ export const ResizableImageNodeView = ({ node, updateAttributes, selected, edito
         let count = 0;
         for (let i = 0; i < data.length; i += 4) {
           const a = data[i + 3];
-          if (a < 32) continue;
-          total += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          if (a === undefined || a < 32) continue;
+          total += 0.299 * (data[i] ?? 0) + 0.587 * (data[i + 1] ?? 0) + 0.114 * (data[i + 2] ?? 0);
           count += 1;
         }
         if (!count) {
@@ -299,11 +301,13 @@ export const ResizableImageNodeView = ({ node, updateAttributes, selected, edito
     event.preventDefault();
     event.stopPropagation();
     const point = 'touches' in event ? event.touches[0] : (event as React.MouseEvent);
+    if (!point) return;
     startXRef.current = point.clientX;
     startWidthRef.current = Number(String(node.attrs.width || '100').replace('%', '')) || 100;
 
     const onMove = (e: MouseEvent | TouchEvent) => {
       const p = 'touches' in e ? e.touches[0] : (e as MouseEvent);
+      if (!p) return;
       const next = clamp(Math.round(startWidthRef.current + (p.clientX - startXRef.current) * 0.22), 20, 100);
       updateAttributes({ width: `${next}%` });
     };
@@ -369,11 +373,13 @@ export const ResizableYoutubeNodeView = ({ node, updateAttributes, selected, edi
     event.preventDefault();
     event.stopPropagation();
     const point = 'touches' in event ? event.touches[0] : (event as React.MouseEvent);
+    if (!point) return;
     startXRef.current = point.clientX;
     startWidthRef.current = currentW;
 
     const onMove = (e: MouseEvent | TouchEvent) => {
       const p = 'touches' in e ? e.touches[0] : (e as MouseEvent);
+      if (!p) return;
       const nextW = clamp(Math.round(startWidthRef.current + (p.clientX - startXRef.current) * 1.2), 320, 1200);
       updateAttributes({ width: nextW, height: Math.round((nextW * 9) / 16) });
     };

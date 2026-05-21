@@ -313,7 +313,8 @@ export function ConfigModule() {
         setHighlightedIndex((prev) => Math.max(prev - 1, 0));
       } else if (e.key === 'Enter' && highlightedIndex >= 0) {
         e.preventDefault();
-        selectSuggestion(suggestions[highlightedIndex]);
+        const suggestion = suggestions[highlightedIndex];
+        if (suggestion) selectSuggestion(suggestion);
       } else if (e.key === 'Escape') {
         setSuggestions([]);
         setActiveField(null);

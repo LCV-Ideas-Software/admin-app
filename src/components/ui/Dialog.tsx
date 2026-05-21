@@ -37,7 +37,12 @@ export interface DialogProps {
 /** Root — controla estado open/close. */
 export function Dialog({ open, defaultOpen, onOpenChange, modal = true, children }: DialogProps) {
   return (
-    <RadixDialog.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange} modal={modal}>
+    <RadixDialog.Root
+      {...(open !== undefined ? { open } : {})}
+      {...(defaultOpen !== undefined ? { defaultOpen } : {})}
+      {...(onOpenChange !== undefined ? { onOpenChange } : {})}
+      modal={modal}
+    >
       {children}
     </RadixDialog.Root>
   );
@@ -70,14 +75,14 @@ export function DialogContent({
   onEscapeKeyDown,
   ...ariaProps
 }: DialogContentProps) {
+  const blockOutside = (event: { preventDefault: () => void }) => event.preventDefault();
   return (
     <RadixDialog.Portal>
       <RadixDialog.Overlay className={overlayClassName} />
       <RadixDialog.Content
-        className={className}
-        onEscapeKeyDown={onEscapeKeyDown}
-        onPointerDownOutside={preventOutsideClose ? (e) => e.preventDefault() : undefined}
-        onInteractOutside={preventOutsideClose ? (e) => e.preventDefault() : undefined}
+        {...(className !== undefined ? { className } : {})}
+        {...(onEscapeKeyDown !== undefined ? { onEscapeKeyDown } : {})}
+        {...(preventOutsideClose ? { onPointerDownOutside: blockOutside, onInteractOutside: blockOutside } : {})}
         {...ariaProps}
       >
         {children}

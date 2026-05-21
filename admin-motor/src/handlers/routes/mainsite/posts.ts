@@ -149,23 +149,27 @@ const updatePostIdAndReferences = async (
   if (fields.hasVisibilityFlag) {
     statements.push(
       db
-        .prepare(`
+        .prepare(
+          `
           INSERT INTO mainsite_posts (id, title, content, author, is_pinned, display_order, is_published, created_at, updated_at)
           SELECT ?, ?, ?, ?, is_pinned, display_order, ?, created_at, CURRENT_TIMESTAMP
           FROM mainsite_posts
           WHERE id = ?
-        `)
+        `,
+        )
         .bind(nextId, fields.title, fields.content, fields.author, fields.isPublished ?? 1, currentId),
     );
   } else {
     statements.push(
       db
-        .prepare(`
+        .prepare(
+          `
           INSERT INTO mainsite_posts (id, title, content, author, is_pinned, display_order, is_published, created_at, updated_at)
           SELECT ?, ?, ?, ?, is_pinned, display_order, is_published, created_at, CURRENT_TIMESTAMP
           FROM mainsite_posts
           WHERE id = ?
-        `)
+        `,
+        )
         .bind(nextId, fields.title, fields.content, fields.author, currentId),
     );
   }
@@ -220,12 +224,14 @@ export async function onRequestGet(context: MainsiteContext) {
     if (id) {
       await ensurePostColumns(db);
       const row = await db
-        .prepare(`
+        .prepare(
+          `
         SELECT id, title, content, author, created_at, updated_at, is_pinned, is_published
         FROM mainsite_posts
         WHERE id = ?
         LIMIT 1
-      `)
+      `,
+        )
         .bind(id)
         .first<PostRow>();
 
@@ -241,11 +247,13 @@ export async function onRequestGet(context: MainsiteContext) {
 
     await ensurePostColumns(db);
     const rows = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT id, title, content, author, created_at, updated_at, is_pinned, is_published
       FROM mainsite_posts
       ORDER BY is_pinned DESC, display_order ASC, created_at DESC
-    `)
+    `,
+      )
       .all<PostRow>();
 
     const posts = (rows.results ?? [])
@@ -313,39 +321,47 @@ export async function onRequestPost(context: MainsiteContext) {
 
     if (requestedId.value) {
       await db
-        .prepare(`
+        .prepare(
+          `
         INSERT INTO mainsite_posts (id, title, content, author, is_pinned, display_order, is_published, created_at, updated_at)
         VALUES (?, ?, ?, ?, 0, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `)
+      `,
+        )
         .bind(requestedId.value, title, content, author, isPublished)
         .run();
     } else {
       await db
-        .prepare(`
+        .prepare(
+          `
         INSERT INTO mainsite_posts (title, content, author, is_pinned, display_order, is_published, created_at, updated_at)
         VALUES (?, ?, ?, 0, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `)
+      `,
+        )
         .bind(title, content, author, isPublished)
         .run();
     }
 
     const created = requestedId.value
       ? await db
-          .prepare(`
+          .prepare(
+            `
           SELECT id, title, content, author, created_at, is_pinned, is_published
           FROM mainsite_posts
           WHERE id = ?
           LIMIT 1
-        `)
+        `,
+          )
           .bind(requestedId.value)
           .first<PostRow>()
       : await db
-          .prepare(`
+          .prepare(
+            `
           SELECT id, title, content, author, created_at, is_pinned, is_published
           FROM mainsite_posts
           ORDER BY id DESC
           LIMIT 1
-        `)
+        `,
+          )
           .first<PostRow>();
 
     const createdPost = created ? mapPostRow(created) : null;
@@ -478,12 +494,14 @@ export async function onRequestPut(context: MainsiteContext) {
     }
 
     const row = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT id, title, content, author, created_at, is_pinned, is_published
       FROM mainsite_posts
       WHERE id = ?
       LIMIT 1
-    `)
+    `,
+      )
       .bind(resolvedId)
       .first<PostRow>();
 

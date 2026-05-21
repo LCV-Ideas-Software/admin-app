@@ -75,7 +75,8 @@ const toInt = (value: unknown, fallback: number) => {
 
 export const ensureRateLimitTables = async (db: D1Database) => {
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS astrologo_rate_limit_policies (
       route TEXT PRIMARY KEY,
       enabled INTEGER NOT NULL DEFAULT 1,
@@ -83,11 +84,13 @@ export const ensureRateLimitTables = async (db: D1Database) => {
       window_minutes INTEGER NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
-  `)
+  `,
+    )
     .run();
 
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS astrologo_api_rate_limits (
       key TEXT PRIMARY KEY,
       route TEXT NOT NULL,
@@ -95,7 +98,8 @@ export const ensureRateLimitTables = async (db: D1Database) => {
       request_count INTEGER NOT NULL DEFAULT 0,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
-  `)
+  `,
+    )
     .run();
 };
 
@@ -105,10 +109,12 @@ export const ensureDefaultPolicies = async (db: D1Database) => {
   for (const route of SUPPORTED_ROUTES) {
     const policy = DEFAULT_POLICIES[route];
     await db
-      .prepare(`
+      .prepare(
+        `
       INSERT OR IGNORE INTO astrologo_rate_limit_policies (route, enabled, max_requests, window_minutes)
       VALUES (?, ?, ?, ?)
-    `)
+    `,
+      )
       .bind(toDbRoute(policy.route), policy.enabled, policy.max_requests, policy.window_minutes)
       .run();
   }
@@ -119,13 +125,15 @@ const getRateLimitWindowStats = async (db: D1Database, route: string, windowMinu
   const cutoff = now - Math.max(1, toInt(windowMinutes, 10)) * 60 * 1000;
 
   const row = await db
-    .prepare(`
+    .prepare(
+      `
     SELECT
       COALESCE(SUM(request_count), 0) AS total,
       COUNT(DISTINCT key) AS keys
     FROM astrologo_api_rate_limits
     WHERE route = ? AND window_start >= ?
-  `)
+  `,
+    )
     .bind(toDbRoute(route), cutoff)
     .first<{ total?: number; keys?: number }>();
 
@@ -143,12 +151,14 @@ export const listPoliciesWithStats = async (db: D1Database): Promise<AstrologoRa
   for (const route of SUPPORTED_ROUTES) {
     const fallback = DEFAULT_POLICIES[route];
     const row = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT route, enabled, max_requests, window_minutes, updated_at
       FROM astrologo_rate_limit_policies
       WHERE route = ?
       LIMIT 1
-    `)
+    `,
+      )
       .bind(toDbRoute(route))
       .first<D1Row>();
 
@@ -184,7 +194,8 @@ export const upsertRateLimitPolicy = async (
   await ensureDefaultPolicies(db);
 
   await db
-    .prepare(`
+    .prepare(
+      `
     INSERT INTO astrologo_rate_limit_policies (route, enabled, max_requests, window_minutes, updated_at)
     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(route) DO UPDATE SET
@@ -192,7 +203,8 @@ export const upsertRateLimitPolicy = async (
       max_requests = excluded.max_requests,
       window_minutes = excluded.window_minutes,
       updated_at = CURRENT_TIMESTAMP
-  `)
+  `,
+    )
     .bind(toDbRoute(input.route), input.enabled, input.maxRequests, input.windowMinutes)
     .run();
 };

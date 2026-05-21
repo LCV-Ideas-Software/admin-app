@@ -147,7 +147,8 @@ export const upsertPostsIntoBigdata = async (db: D1Database, posts: LegacyPost[]
     }
 
     await db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO mainsite_posts (id, title, content, is_pinned, display_order, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
@@ -156,7 +157,8 @@ export const upsertPostsIntoBigdata = async (db: D1Database, posts: LegacyPost[]
         is_pinned = excluded.is_pinned,
         display_order = excluded.display_order,
         created_at = excluded.created_at
-    `)
+    `,
+      )
       .bind(mapped.id, mapped.title, mapped.content, mapped.isPinned, mapped.displayOrder, mapped.createdAt)
       .run();
 
@@ -204,13 +206,15 @@ export const upsertPublicSettingsIntoBigdata = async (db: D1Database, settings: 
 
   for (const [id, payload] of rows) {
     await db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO mainsite_settings (id, payload, updated_at)
       VALUES (?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
         payload = excluded.payload,
         updated_at = CURRENT_TIMESTAMP
-    `)
+    `,
+      )
       .bind(id, payload)
       .run();
   }

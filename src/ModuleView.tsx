@@ -29,7 +29,7 @@ class LazyModuleErrorBoundary extends Component<{ children: ReactNode }, LazyMod
     };
   }
 
-  componentDidCatch(error: unknown, _errorInfo: ErrorInfo) {
+  override componentDidCatch(error: unknown, _errorInfo: ErrorInfo) {
     console.error('[admin-app] lazy module render error', error);
   }
 
@@ -39,7 +39,7 @@ class LazyModuleErrorBoundary extends Component<{ children: ReactNode }, LazyMod
     window.location.reload();
   };
 
-  render() {
+  override render() {
     if (!this.state.hasError) return this.props.children;
     const isChunkFailure = CHUNK_IMPORT_ERROR_REGEX.test(this.state.message);
     return (

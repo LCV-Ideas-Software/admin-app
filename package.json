@@ -12,6 +12,7 @@
     "biome:write": "biome check --write .",
     "test": "vitest run",
     "test:admin-motor": "vitest run --config vitest.admin-motor.config.ts",
+    "typecheck:admin-motor": "node scripts/typecheck-admin-motor.mjs",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "preview": "vite preview",

@@ -1,4 +1,3 @@
-
 const SECRET_ALIASES = {
   CLOUDFLARE_PW: ['cloudflare-pw'],
   GEMINI_API_KEY: ['gemini-api-key'],
@@ -16,10 +15,7 @@ const SECRET_ALIASES = {
   ADMINHUB_BEARER_TOKEN: ['adminhub-bearer-token'],
 } as const;
 
-const CRITICAL_KEYS = [
-  'CLOUDFLARE_PW',
-  'GEMINI_API_KEY',
-] as const;
+const CRITICAL_KEYS = ['CLOUDFLARE_PW', 'GEMINI_API_KEY'] as const;
 
 const toOptionalString = async (raw: unknown): Promise<string | undefined> => {
   if (typeof raw === 'string') {
@@ -65,7 +61,11 @@ const resolveFromAliases = async (
   return undefined;
 };
 
-export async function onRequest(context: { request: Request; env: Record<string, unknown>; next: () => Promise<Response> }) {
+export async function onRequest(context: {
+  request: Request;
+  env: Record<string, unknown>;
+  next: () => Promise<Response>;
+}) {
   const url = new URL(context.request.url);
 
   // Bloqueio de exposição pública via URL interna .pages.dev

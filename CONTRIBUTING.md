@@ -45,7 +45,7 @@ All gates must be GREEN. CI re-runs these on push.
 
 ### PR description
 
-Include what changed, why, and how you tested. Public surface changes (admin UI, admin-motor route shapes, D1 schema, /api/* paths) need careful review.
+Include what changed, why, and how you tested. Public surface changes (admin UI, admin-motor route shapes, D1 schema, /api/\* paths) need careful review.
 
 ### Action pinning
 

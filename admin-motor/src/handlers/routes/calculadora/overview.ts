@@ -100,7 +100,8 @@ const queryBigdataOverview = async (
 
   const telemetriaRow = hasMoedaFilter
     ? await db
-        .prepare(`
+        .prepare(
+          `
       SELECT
         COUNT(1) AS total,
         SUM(CASE WHEN from_cache = 1 THEN 1 ELSE 0 END) AS cache_hits,
@@ -108,18 +109,21 @@ const queryBigdataOverview = async (
         SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors
       FROM calc_oraculo_observabilidade
       WHERE moeda = ?
-    `)
+    `,
+        )
         .bind(moeda)
         .first<{ total?: number; cache_hits?: number; avg_duration?: number | null; errors?: number }>()
     : await db
-        .prepare(`
+        .prepare(
+          `
       SELECT
         COUNT(1) AS total,
         SUM(CASE WHEN from_cache = 1 THEN 1 ELSE 0 END) AS cache_hits,
         AVG(duration_ms) AS avg_duration,
         SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors
       FROM calc_oraculo_observabilidade
-    `)
+    `,
+        )
         .first<{ total?: number; cache_hits?: number; avg_duration?: number | null; errors?: number }>();
 
   const mappedUltimas = (ultimasRows.results ?? [])

@@ -173,6 +173,7 @@ export function DeploymentCleanupPanel() {
       }
 
       const item = allObsolete[i];
+      if (!item) continue;
       const label = `[${item.projectName}] ${shortId(item.id)}`;
 
       addLog(`  → Deletando ${label}...`, 'default');

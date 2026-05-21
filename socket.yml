@@ -1,22 +1,22 @@
 version: 2
 
 projectIgnorePaths:
-  - "**/node_modules"
-  - "**/dist"
-  - "**/coverage"
-  - "**/.turbo"
-  - "**/.cache"
-  - "**/artifacts"
+  - '**/node_modules'
+  - '**/dist'
+  - '**/coverage'
+  - '**/.turbo'
+  - '**/.cache'
+  - '**/artifacts'
 
 triggerPaths:
-  - "**/package.json"
-  - "**/package-lock.json"
-  - "**/npm-shrinkwrap.json"
-  - "**/pnpm-lock.yaml"
-  - "**/pnpm-lock.yml"
-  - "**/yarn.lock"
-  - "**/bun.lock"
-  - "**/bun.lockb"
+  - '**/package.json'
+  - '**/package-lock.json'
+  - '**/npm-shrinkwrap.json'
+  - '**/pnpm-lock.yaml'
+  - '**/pnpm-lock.yml'
+  - '**/yarn.lock'
+  - '**/bun.lock'
+  - '**/bun.lockb'
 
 githubApp:
   enabled: true

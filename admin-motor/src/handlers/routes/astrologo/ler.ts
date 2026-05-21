@@ -44,7 +44,8 @@ export async function onRequestPost(context: Context) {
     }
 
     const mapa = await db
-      .prepare(`
+      .prepare(
+        `
       SELECT
         id,
         nome,
@@ -59,7 +60,8 @@ export async function onRequestPost(context: Context) {
       FROM astrologo_mapas
       WHERE id = ?
       LIMIT 1
-    `)
+    `,
+      )
       .bind(id)
       .first<AstrologoMapa>();
 

@@ -248,9 +248,10 @@ export function MtastsModule() {
         const nextZones = Array.isArray(nextPayload.zones) ? nextPayload.zones : [];
         setZones(nextZones);
 
-        if (nextZones.length > 0 && !selectedDomain) {
-          setSelectedDomain(nextZones[0].name);
-          setSelectedZoneId(nextZones[0].id);
+        const firstZone = nextZones[0];
+        if (firstZone && !selectedDomain) {
+          setSelectedDomain(firstZone.name);
+          setSelectedZoneId(firstZone.id);
         }
 
         if (shouldNotify) {
@@ -358,8 +359,9 @@ export function MtastsModule() {
             'success',
           );
         }
-        if (Array.isArray(nextPayload.avisos) && nextPayload.avisos.length > 0) {
-          showNotification(nextPayload.avisos[0], 'info');
+        const firstAviso = Array.isArray(nextPayload.avisos) ? nextPayload.avisos[0] : undefined;
+        if (firstAviso !== undefined) {
+          showNotification(firstAviso, 'info');
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Não foi possível carregar o módulo MTA-STS.';

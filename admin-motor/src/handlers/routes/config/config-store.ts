@@ -33,13 +33,15 @@ const TABLE = 'admin_module_configs';
 
 async function ensureTable(db: D1Database): Promise<void> {
   await db
-    .prepare(`
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS ${TABLE} (
       module_key TEXT PRIMARY KEY,
       config_json TEXT NOT NULL,
       updated_at TEXT DEFAULT (datetime('now'))
     )
-  `)
+  `,
+    )
     .run();
 }
 
@@ -88,13 +90,15 @@ export async function onRequestPost(ctx: RequestContext): Promise<Response> {
   try {
     const json = JSON.stringify(config);
     await db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO ${TABLE} (module_key, config_json, updated_at)
       VALUES (?, ?, datetime('now'))
       ON CONFLICT(module_key) DO UPDATE SET
         config_json = excluded.config_json,
         updated_at = excluded.updated_at
-    `)
+    `,
+      )
       .bind(moduleKey, json)
       .run();
 

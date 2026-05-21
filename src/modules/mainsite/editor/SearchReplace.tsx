@@ -102,6 +102,7 @@ export function SearchReplacePanel({ editor }: SearchReplacePanelProps) {
     if (!editor || matches.length === 0) return;
     const safeIndex = Math.min(currentIndex, matches.length - 1);
     const match = matches[safeIndex];
+    if (!match) return;
     editor
       .chain()
       .focus()

@@ -348,8 +348,9 @@ export function AstrologoModule() {
       setItems(payload.items);
       showNotification(`Consulta concluída: ${payload.total} registro(s) localizado(s).`, 'success');
 
-      if (Array.isArray(payload.avisos) && payload.avisos.length > 0) {
-        showNotification(payload.avisos[0], 'info');
+      const firstAviso = Array.isArray(payload.avisos) ? payload.avisos[0] : undefined;
+      if (firstAviso !== undefined) {
+        showNotification(firstAviso, 'info');
       }
     } catch {
       showNotification('Não foi possível carregar os registros do Astrólogo.', 'error');

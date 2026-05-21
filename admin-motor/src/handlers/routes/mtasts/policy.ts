@@ -80,22 +80,26 @@ export async function onRequestGet(context: Context) {
     let lastGeneratedId: string | null = null;
 
     if ((context.data?.env ?? context.env).BIGDATA_DB) {
-      const policyRow = await (context.data?.env ?? context.env).BIGDATA_DB.prepare(`
+      const policyRow = await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+        `
         SELECT policy_text, tlsrpt_email
         FROM mtasts_mta_sts_policies
         WHERE domain = ?
         LIMIT 1
-      `)
+      `,
+      )
         .bind(domain)
         .first<DbPolicyRow>();
 
-      const historyRow = await (context.data?.env ?? context.env).BIGDATA_DB.prepare(`
+      const historyRow = await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+        `
         SELECT gerado_em
         FROM mtasts_history
         WHERE domain = ?
         ORDER BY id DESC
         LIMIT 1
-      `)
+      `,
+      )
         .bind(domain)
         .first<DbHistoryRow>();
 

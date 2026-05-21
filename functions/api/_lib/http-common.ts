@@ -1,12 +1,12 @@
 /**
  * HTTP Common Utilities
- * 
+ *
  * Consolidates HTTP headers and request/response patterns across all modules:
  * - astrologo-admin.ts
  * - calculadora-admin.ts
  * - mainsite-admin.ts
  * - mtasts-admin.ts
- * 
+ *
  * Eliminates code duplication and ensures consistency
  */
 
@@ -22,19 +22,19 @@ export const STANDARD_JSON_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'X-XSS-Protection': '1; mode=block',
-}
+};
 
 /**
  * Headers for CORS-enabled endpoints
  */
-export const ADMIN_ORIGIN = 'https://admin.lcv.app.br'
+export const ADMIN_ORIGIN = 'https://admin.lcv.app.br';
 
 export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': ADMIN_ORIGIN,
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Max-Age': '86400',
-}
+};
 
 /**
  * Headers for secure responses (forms, sensitive data)
@@ -43,7 +43,7 @@ export const SECURE_HEADERS: Record<string, string> = {
   ...STANDARD_JSON_HEADERS,
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Permitted-Cross-Domain-Policies': 'none',
-}
+};
 
 /**
  * Headers for non-sensitive responses.
@@ -52,7 +52,7 @@ export const SECURE_HEADERS: Record<string, string> = {
 export const CACHEABLE_HEADERS: Record<string, string> = {
   ...STANDARD_JSON_HEADERS,
   // Note: ETag is set dynamically per response - not included as a static header
-}
+};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -67,13 +67,13 @@ export const CACHEABLE_HEADERS: Record<string, string> = {
 export function createJsonHeaders(
   additional?: Record<string, string>,
   secure = true,
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 ): Record<string, any> {
-  const base = secure ? SECURE_HEADERS : STANDARD_JSON_HEADERS
+  const base = secure ? SECURE_HEADERS : STANDARD_JSON_HEADERS;
   return {
     ...base,
     ...(additional || {}),
-  }
+  };
 }
 
 /**
@@ -89,7 +89,7 @@ export function withDefaultHeaders(
   return {
     ...(defaultHeaders || STANDARD_JSON_HEADERS),
     ...headers,
-  }
+  };
 }
 
 /**
@@ -99,15 +99,11 @@ export function withDefaultHeaders(
  * @param additional Additional headers
  * @returns Response object
  */
-export function jsonResponse(
-  body: unknown,
-  status = 200,
-  additional?: Record<string, string>,
-): Response {
+export function jsonResponse(body: unknown, status = 200, additional?: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: createJsonHeaders(additional),
-  })
+  });
 }
 
 /**
@@ -120,11 +116,11 @@ export function jsonResponse(
 export function errorResponse(message: string, status = 400, details?: unknown): Response {
   const body: Record<string, unknown> = {
     error: message,
-  }
+  };
   if (details) {
-    body.details = details
+    body.details = details;
   }
-  return jsonResponse(body, status)
+  return jsonResponse(body, status);
 }
 
 /**
@@ -140,7 +136,7 @@ export function successResponse(data: unknown, status = 200): Response {
       data,
     },
     status,
-  )
+  );
 }
 
 /**
@@ -157,7 +153,7 @@ export function createdResponse(data: unknown, additional?: Record<string, strin
     },
     201,
     additional,
-  )
+  );
 }
 
 /**
@@ -168,7 +164,7 @@ export function noContentResponse(): Response {
   return new Response(null, {
     status: 204,
     headers: createJsonHeaders(),
-  })
+  });
 }
 
 // ============================================================================
@@ -182,11 +178,11 @@ export function noContentResponse(): Response {
  * @returns Base URL
  */
 export function resolveBaseUrl(request: Request, customHost?: string): string {
-  const url = new URL(request.url)
-  const host = customHost || url.host
-  const protocol = url.protocol
+  const url = new URL(request.url);
+  const host = customHost || url.host;
+  const protocol = url.protocol;
 
-  return `${protocol}//${host}`
+  return `${protocol}//${host}`;
 }
 
 /**
@@ -196,9 +192,9 @@ export function resolveBaseUrl(request: Request, customHost?: string): string {
  * @returns Full URL
  */
 export function buildUrl(baseUrl: string, path: string): string {
-  const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
-  const cleanPath = path.startsWith('/') ? path : `/${path}`
-  return `${base}${cleanPath}`
+  const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${cleanPath}`;
 }
 
 // ============================================================================
@@ -212,9 +208,9 @@ export function buildUrl(baseUrl: string, path: string): string {
  */
 export async function parseJsonBody(request: Request): Promise<unknown> {
   try {
-    return await request.json()
+    return await request.json();
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -224,11 +220,11 @@ export async function parseJsonBody(request: Request): Promise<unknown> {
  * @returns Token string or null if not found
  */
 export function getBearerToken(request: Request): string | null {
-  const auth = request.headers.get('Authorization')
+  const auth = request.headers.get('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) {
-    return null
+    return null;
   }
-  return auth.slice(7)
+  return auth.slice(7);
 }
 
 /**
@@ -237,7 +233,7 @@ export function getBearerToken(request: Request): string | null {
  * @returns true if this is a preflight request
  */
 export function isCorsPreflight(request: Request): boolean {
-  return request.method === 'OPTIONS'
+  return request.method === 'OPTIONS';
 }
 
 /**
@@ -250,9 +246,9 @@ export function handleCorsPreflight(request: Request): Response {
     status: 204,
     headers: {
       ...CORS_HEADERS,
-      'Allow': request.headers.get('Access-Control-Request-Method') || 'GET, POST, OPTIONS',
+      Allow: request.headers.get('Access-Control-Request-Method') || 'GET, POST, OPTIONS',
     },
-  })
+  });
 }
 
 // ============================================================================
@@ -267,12 +263,8 @@ export function handleCorsPreflight(request: Request): Response {
  * @param sMaxAge Server cache duration in seconds
  * @returns Modified response
  */
-export function addCacheHeaders(
-  response: Response,
-  _maxAge: number,
-  _sMaxAge?: number,
-): Response {
-  return response
+export function addCacheHeaders(response: Response, _maxAge: number, _sMaxAge?: number): Response {
+  return response;
 }
 
 /**
@@ -287,7 +279,7 @@ export function redirectResponse(url: string, status = 302): Response {
     headers: {
       Location: url,
     },
-  })
+  });
 }
 
 /**
@@ -296,13 +288,13 @@ export function redirectResponse(url: string, status = 302): Response {
  * @returns Response with security headers added
  */
 export function withSecurityHeaders(response: Response): Response {
-  const newResponse = new Response(response.body, response)
+  const newResponse = new Response(response.body, response);
 
   for (const [key, value] of Object.entries(SECURE_HEADERS)) {
     if (value !== undefined && !newResponse.headers.has(key)) {
-      newResponse.headers.set(key, value)
+      newResponse.headers.set(key, value);
     }
   }
 
-  return newResponse
+  return newResponse;
 }

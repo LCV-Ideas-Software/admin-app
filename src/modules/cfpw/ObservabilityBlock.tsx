@@ -181,7 +181,8 @@ export function ObservabilityBlock() {
 
   const timeframe = useMemo(() => {
     const now = Date.now();
-    return { from: now - TIME_RANGES[timeRange].ms, to: now };
+    const range = TIME_RANGES[timeRange] ?? TIME_RANGES[2];
+    return { from: now - range.ms, to: now };
   }, [timeRange]);
 
   // ── Dashboard queries ──

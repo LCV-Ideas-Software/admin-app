@@ -11,118 +11,118 @@ registries:
     token: ${{ secrets.DEPENDABOT_STEPSECURITY_NPM_TOKEN }}
 
 updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "daily"
-      day: "thursday"
-      time: "01:00"
-      timezone: "America/Los_Angeles"
+      interval: 'daily'
+      day: 'thursday'
+      time: '01:00'
+      timezone: 'America/Los_Angeles'
     labels:
-      - "dependencies"
-      - "github-actions"
+      - 'dependencies'
+      - 'github-actions'
     commit-message:
-      prefix: "deps"
-      include: "scope"
+      prefix: 'deps'
+      include: 'scope'
     open-pull-requests-limit: 10
 
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     registries:
       - stepsecurity-javascript
     schedule:
-      interval: "daily"
-      day: "thursday"
-      time: "01:00"
-      timezone: "America/Los_Angeles"
+      interval: 'daily'
+      day: 'thursday'
+      time: '01:00'
+      timezone: 'America/Los_Angeles'
     labels:
-      - "dependencies"
-      - "npm"
-      - "frontend"
+      - 'dependencies'
+      - 'npm'
+      - 'frontend'
     commit-message:
-      prefix: "deps"
-      include: "scope"
+      prefix: 'deps'
+      include: 'scope'
     versioning-strategy: increase
     groups:
       dev-dependencies:
         patterns:
-          - "eslint*"
-          - "typescript"
-          - "@types/*"
-          - "wrangler"
-          - "@cloudflare/*"
-          - "vite*"
-          - "@vitest/*"
-          - "@biomejs/*"
+          - 'eslint*'
+          - 'typescript'
+          - '@types/*'
+          - 'wrangler'
+          - '@cloudflare/*'
+          - 'vite*'
+          - '@vitest/*'
+          - '@biomejs/*'
         update-types:
-          - "major"
-          - "minor"
-          - "patch"
+          - 'major'
+          - 'minor'
+          - 'patch'
       tiptap-editor:
         patterns:
-          - "@tiptap/*"
-          - "tiptap-*"
+          - '@tiptap/*'
+          - 'tiptap-*'
         update-types:
-          - "major"
-          - "minor"
-          - "patch"
+          - 'major'
+          - 'minor'
+          - 'patch'
       tanstack:
         patterns:
-          - "@tanstack/*"
+          - '@tanstack/*'
         update-types:
-          - "major"
-          - "minor"
-          - "patch"
+          - 'major'
+          - 'minor'
+          - 'patch'
       eslint-ecosystem:
         patterns:
-          - "@eslint/*"
-          - "eslint-plugin-*"
-          - "typescript-eslint"
+          - '@eslint/*'
+          - 'eslint-plugin-*'
+          - 'typescript-eslint'
         update-types:
-          - "major"
-          - "minor"
-          - "patch"
+          - 'major'
+          - 'minor'
+          - 'patch'
     open-pull-requests-limit: 10
 
-  - package-ecosystem: "npm"
-    directory: "/tlsrpt-motor"
+  - package-ecosystem: 'npm'
+    directory: '/tlsrpt-motor'
     registries:
       - stepsecurity-javascript
     schedule:
-      interval: "daily"
-      day: "thursday"
-      time: "01:00"
-      timezone: "America/Los_Angeles"
+      interval: 'daily'
+      day: 'thursday'
+      time: '01:00'
+      timezone: 'America/Los_Angeles'
     labels:
-      - "dependencies"
-      - "npm"
-      - "worker"
+      - 'dependencies'
+      - 'npm'
+      - 'worker'
     commit-message:
-      prefix: "deps"
-      include: "scope"
+      prefix: 'deps'
+      include: 'scope'
     versioning-strategy: increase
     groups:
       dev-dependencies:
         patterns:
-          - "eslint*"
-          - "typescript"
-          - "@types/*"
-          - "wrangler"
-          - "@cloudflare/*"
-          - "vite*"
-          - "@vitest/*"
-          - "@biomejs/*"
+          - 'eslint*'
+          - 'typescript'
+          - '@types/*'
+          - 'wrangler'
+          - '@cloudflare/*'
+          - 'vite*'
+          - '@vitest/*'
+          - '@biomejs/*'
         update-types:
-          - "major"
-          - "minor"
-          - "patch"
+          - 'major'
+          - 'minor'
+          - 'patch'
       eslint-ecosystem:
         patterns:
-          - "@eslint/*"
-          - "eslint-plugin-*"
-          - "typescript-eslint"
+          - '@eslint/*'
+          - 'eslint-plugin-*'
+          - 'typescript-eslint'
         update-types:
-          - "major"
-          - "minor"
-          - "patch"
+          - 'major'
+          - 'minor'
+          - 'patch'
     open-pull-requests-limit: 10

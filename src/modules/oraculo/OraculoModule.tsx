@@ -215,11 +215,12 @@ export function OraculoModule() {
     try {
       const res = await fetch('/api/oraculo/cron');
       const data = (await res.json()) as { ok: boolean; schedules?: { cron: string }[]; error?: string };
-      if (data.ok && data.schedules && data.schedules.length > 0) {
-        const parts = data.schedules[0].cron.split(/\s+/);
+      const firstSchedule = data.schedules?.[0];
+      if (data.ok && firstSchedule) {
+        const parts = firstSchedule.cron.split(/\s+/);
         if (parts.length >= 2) {
-          const utcMinute = parseInt(parts[0], 10);
-          const utcHour = parseInt(parts[1], 10);
+          const utcMinute = parseInt(parts[0] ?? '', 10);
+          const utcHour = parseInt(parts[1] ?? '', 10);
           setCronMinute(Number.isNaN(utcMinute) ? 0 : utcMinute);
           setCronHour(Number.isNaN(utcHour) ? 2 : utcToBrt(utcHour));
           setCronDirty(false);

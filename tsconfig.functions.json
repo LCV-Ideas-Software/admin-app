@@ -1,4 +1,5 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.functions.tsbuildinfo",
     "composite": true,
@@ -16,8 +17,8 @@
     "verbatimModuleSyntax": false,
     "moduleDetection": "force",
     "allowImportingTsExtensions": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["functions"]
 }
