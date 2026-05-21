@@ -1,0 +1,150 @@
+name: Auto PR
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - 'dependabot/**'
+      - 'renovate/**'
+
+permissions:
+  contents: read
+
+jobs:
+  open-pr:
+    name: Open PR and enable auto-merge
+    if: ${{ !github.event.deleted && github.ref_type == 'branch' && github.ref_name != 'main' && !startsWith(github.ref_name, 'dependabot/') && !startsWith(github.ref_name, 'renovate/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      checks: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Open or update pull request
+        id: open-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          owner="${REPO%%/*}"
+          head_ref="${owner}:${BRANCH}"
+
+          pr_number="$(gh pr list \
+            --repo "$REPO" \
+            --head "$head_ref" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -z "$pr_number" ]; then
+            body=$'This PR was opened automatically after a branch push.\n\nAutomation:\n- direct pushes to main are blocked\n- PR checks run normally\n- auto-merge is enabled after checks pass\n- branch deletion is requested after merge'
+            pr_url="$(gh pr create \
+              --repo "$REPO" \
+              --base main \
+              --head "$head_ref" \
+              --title "chore: merge ${BRANCH}" \
+              --body "$body")"
+          else
+            pr_url="$(gh pr view "$pr_number" --repo "$REPO" --json url --jq '.url')"
+            echo "PR #${pr_number} already exists for ${head_ref}."
+          fi
+
+          echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch CodeQL for branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh workflow run codeql.yml --repo "$REPO" --ref "$BRANCH"
+          sleep 15
+
+      - name: Wait for PR checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..90}; do
+            state="$(gh pr view "$PR_URL" --json statusCheckRollup --jq '
+              [
+                .statusCheckRollup[]
+                | select(.workflowName != "Auto PR")
+                | select(.name != "StepSecurity Optional Checks")
+                | select(.name != "StepSecurity Harden-Runner")
+              ] as $checks
+              | if ($checks | length) == 0 then "pending"
+                elif any($checks[]; .status != "COMPLETED") then "pending"
+                elif all($checks[]; (.conclusion == "SUCCESS" or .conclusion == "SKIPPED" or .conclusion == "NEUTRAL")) then "success"
+                else "failure"
+                end
+            ')"
+
+            case "$state" in
+              success)
+                echo "PR checks are green for $PR_URL."
+                exit 0
+                ;;
+              failure)
+                echo "::error::One or more PR checks failed for $PR_URL; refusing automerge."
+                gh pr view "$PR_URL" --json statusCheckRollup --jq '
+                  .statusCheckRollup[]
+                  | select(.workflowName != "Auto PR")
+                  | select(.name != "StepSecurity Optional Checks")
+                  | select(.name != "StepSecurity Harden-Runner")
+                  | [.workflowName, .name, .status, .conclusion]
+                  | @tsv
+                '
+                exit 1
+                ;;
+              pending)
+                echo "Waiting for PR checks, attempt ${attempt}/90."
+                sleep 10
+                ;;
+              *)
+                echo "::error::Unexpected PR check state: $state"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "::error::Timed out waiting for PR checks."
+          exit 1
+
+      - name: Auto-approve pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+        run: |
+          gh pr review "$PR_URL" --approve --body "Auto-approved after the configured PR checks passed." \
+            || echo "::notice::Auto-approval was skipped; continuing because this repository does not require PR approvals."
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+        run: |
+          state="$(gh pr view "$PR_URL" --json state --jq '.state')"
+          if [ "$state" != "OPEN" ]; then
+            exit 0
+          fi
+          if [ "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
+            exit 0
+          fi
+          gh pr merge "$PR_URL" --auto --squash --delete-branch
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
