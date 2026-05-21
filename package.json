@@ -23,7 +23,7 @@
     "format:public:check": "prettier --check \"**/index.html\""
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
+    "@google/genai": "^2.5.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@tanstack/react-query": "^5.100.11",
     "@tiptap/core": "^3.23.5",
@@ -78,7 +78,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
-    "@cloudflare/workers-types": "^4.20260520.1",
+    "@cloudflare/workers-types": "^4.20260521.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@tanstack/react-query-devtools": "^5.100.11",
@@ -104,7 +104,7 @@
     "rollup-plugin-visualizer": "^7.0.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4",
-    "vite": "^8.0.13",
+    "vite": "^8.0.14",
     "vitest": "^4.1.7",
     "wrangler": "^4.93.0"
   },
