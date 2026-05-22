@@ -1,0 +1,35 @@
+name: Auto PR Request
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - 'dependabot/**'
+      - 'renovate/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-pr-request-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  request-pr:
+    name: Record branch push request
+    if: ${{ !github.event.deleted && github.ref_type == 'branch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Record request
+        env:
+          BRANCH: ${{ github.ref_name }}
+          HEAD_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          printf 'Auto PR requested for %s@%s (%s).\n' "$REPO" "$BRANCH" "$HEAD_SHA"

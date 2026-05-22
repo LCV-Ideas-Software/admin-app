@@ -1,0 +1,679 @@
+name: Auto Merge Controller
+
+on:
+  repository_dispatch:
+    types: [lcv-auto-merge-requested]
+  workflow_run:
+    workflows:
+      - Auto PR
+      - Auto PR Request
+      - CI
+      - CodeQL
+      - Dependency Review
+      - Deploy
+      - Public Format
+      - Socket Security
+    types: [completed]
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-merge-controller-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  merge-controller:
+    name: Verify gates and merge automation PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Verify and merge eligible PRs
+        env:
+          LCV_AUTOMATION_TOKEN: ${{ secrets.LCV_AUTOMATION_TOKEN }}
+          LCV_AUTOMATION_HMAC_KEY: ${{ secrets.LCV_AUTOMATION_HMAC_KEY }}
+          REPO: ${{ github.repository }}
+          DISPATCH_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: |
+          node --input-type=module <<'NODE'
+          import crypto from "node:crypto";
+
+          const token = process.env.LCV_AUTOMATION_TOKEN;
+          const hmacKey = process.env.LCV_AUTOMATION_HMAC_KEY;
+          const repoFull = process.env.REPO;
+          const dispatchPayload = process.env.DISPATCH_PAYLOAD ? JSON.parse(process.env.DISPATCH_PAYLOAD) : null;
+
+          if (!token || !hmacKey) {
+            throw new Error("LCV_AUTOMATION_TOKEN and LCV_AUTOMATION_HMAC_KEY must be configured.");
+          }
+
+          const [owner, repo] = repoFull.split("/");
+          const markerRegex = /<!-- lcv-auto-pr:v3 (\{.*?\}) -->/g;
+          const passingConclusions = new Set(["success", "neutral", "skipped"]);
+          const requiredSuccessChecks = [
+            { label: "Socket Security", matches: (name) => name === "Socket Security" },
+            { label: "StepSecurity Optional Checks", matches: (name) => name === "StepSecurity Optional Checks" },
+            { label: "StepSecurity Harden-Runner", matches: (name) => name === "StepSecurity Harden-Runner" },
+            { label: "CodeQL", matches: (name) => name === "CodeQL" || name.startsWith("Analyze ") },
+            { label: "Dependency Review", matches: (name) => name === "Dependency Review" },
+          ];
+          const requiredPrWorkflowNames = [
+            "Auto PR Request",
+            "CI",
+            "CodeQL",
+            "Dependency Review",
+            "Public Format",
+            "Socket Security",
+          ];
+          const missingRequiredCheckTimeoutMs = 60 * 60 * 1000;
+          const blockedCommentMarker = "<!-- lcv-auto-merge-controller:blocked -->";
+          const mergeReadyStates = new Set(["clean", "has_hooks"]);
+
+          function sleep(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+          }
+
+          function encodeRefPath(ref) {
+            return ref.split("/").map(encodeURIComponent).join("/");
+          }
+
+          function canonicalJson(value) {
+            const sorted = {};
+            for (const key of Object.keys(value).sort()) {
+              sorted[key] = value[key];
+            }
+            return JSON.stringify(sorted);
+          }
+
+          function expectedSig(payload) {
+            return `hmac-sha256:${crypto.createHmac("sha256", hmacKey).update(canonicalJson(payload)).digest("hex")}`;
+          }
+
+          async function api(path, options = {}) {
+            for (let attempt = 0; attempt < 4; attempt += 1) {
+              const response = await fetch(`https://api.github.com${path}`, {
+                ...options,
+                headers: {
+                  Accept: "application/vnd.github+json",
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  ...(options.headers || {}),
+                },
+              });
+              const text = await response.text();
+              let body = null;
+              if (text) {
+                try {
+                  body = JSON.parse(text);
+                } catch (error) {
+                  if (response.ok) {
+                    throw new Error(`${options.method || "GET"} ${path} returned invalid JSON: ${error.message}`);
+                  }
+                }
+              }
+
+              if (response.ok) {
+                return body;
+              }
+
+              if (![429, 502, 503, 504].includes(response.status) || attempt === 3) {
+                throw new Error(`${options.method || "GET"} ${path} failed: ${response.status} ${text}`);
+              }
+
+              await sleep([30000, 120000, 300000][attempt]);
+            }
+          }
+
+          async function getAutomationLogin() {
+            const user = await api("/user");
+            return user.login;
+          }
+
+          function extractSingleMarker(body) {
+            const matches = [...(body || "").matchAll(markerRegex)];
+            if (matches.length !== 1) {
+              return { ok: false, reason: `expected exactly one v3 marker, found ${matches.length}` };
+            }
+            try {
+              return { ok: true, marker: JSON.parse(matches[0][1]) };
+            } catch {
+              return { ok: false, reason: "marker JSON is malformed" };
+            }
+          }
+
+          function verifyMarker(pr) {
+            const extracted = extractSingleMarker(pr.body);
+            if (!extracted.ok) {
+              return extracted;
+            }
+
+            const marker = extracted.marker;
+            const { sig, ...unsigned } = marker;
+            if (!sig || expectedSig(unsigned) !== sig) {
+              return { ok: false, reason: "marker HMAC verification failed" };
+            }
+
+            const issuedAt = Date.parse(marker.issued_at);
+            if (!Number.isFinite(issuedAt)) {
+              return { ok: false, reason: "marker issued_at is invalid" };
+            }
+
+            const expected = {
+              repo: repoFull,
+              pr_number: pr.number,
+              pr_node_id: pr.node_id,
+              base: "main",
+              head_branch: pr.head.ref,
+              head_sha: pr.head.sha,
+              source: "branch-push",
+            };
+            for (const [key, value] of Object.entries(expected)) {
+              if (marker[key] !== value) {
+                return { ok: false, reason: `marker ${key} mismatch` };
+              }
+            }
+
+            return { ok: true, marker };
+          }
+
+          async function comment(prNumber, body) {
+            await api(`/repos/${owner}/${repo}/issues/${prNumber}/comments`, {
+              method: "POST",
+              body: JSON.stringify({ body }),
+            });
+          }
+
+          async function listIssueComments(prNumber) {
+            const comments = [];
+            for (let page = 1; page <= 10; page += 1) {
+              const batch = await api(`/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=100&page=${page}`);
+              comments.push(...batch);
+              if (batch.length < 100) {
+                break;
+              }
+            }
+            return comments;
+          }
+
+          async function upsertBlockedComment(prNumber, automationLogin, lines) {
+            const body = `${blockedCommentMarker}\nAutomation blocked by failing checks:\n\n${lines
+              .map((line) => `- ${line}`)
+              .join("\n")}`;
+            const comments = await listIssueComments(prNumber);
+            const existing = comments.find(
+              (item) => item.user?.login === automationLogin && (item.body || "").includes(blockedCommentMarker),
+            );
+
+            if (!existing) {
+              await comment(prNumber, body);
+              return;
+            }
+
+            if (existing.body !== body) {
+              await api(`/repos/${owner}/${repo}/issues/comments/${existing.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ body }),
+              });
+            }
+          }
+
+          async function addLabel(prNumber, label) {
+            await ensureLabel(label);
+            await api(`/repos/${owner}/${repo}/issues/${prNumber}/labels`, {
+              method: "POST",
+              body: JSON.stringify({ labels: [label] }),
+            });
+          }
+
+          async function ensureLabel(label) {
+            const encoded = encodeURIComponent(label);
+            try {
+              await api(`/repos/${owner}/${repo}/labels/${encoded}`);
+            } catch (error) {
+              if (!error.message.includes(" 404 ")) {
+                throw error;
+              }
+              await api(`/repos/${owner}/${repo}/labels`, {
+                method: "POST",
+                body: JSON.stringify({
+                  name: label,
+                  color: "b60205",
+                  description: "Automation PR is blocked by checks or repository merge requirements.",
+                }),
+              });
+            }
+          }
+
+          async function getPr(number) {
+            return api(`/repos/${owner}/${repo}/pulls/${number}`);
+          }
+
+          async function listCandidates() {
+            if (dispatchPayload && Number.isInteger(dispatchPayload.pr)) {
+              const pr = await getPr(dispatchPayload.pr);
+              if (dispatchPayload.head_sha && dispatchPayload.head_sha !== pr.head.sha) {
+                console.log(`Ignoring stale dispatch payload for PR #${pr.number}; live head is ${pr.head.sha}.`);
+              }
+              return [pr];
+            }
+
+            const pulls = [];
+            for (let page = 1; page <= 5; page += 1) {
+              const batch = await api(
+                `/repos/${owner}/${repo}/pulls?state=open&base=main&per_page=100&page=${page}&sort=updated&direction=desc`,
+              );
+              pulls.push(...batch);
+              if (batch.length < 100) {
+                break;
+              }
+            }
+
+            return pulls.filter((pr) => pr.labels?.some((label) => label.name === "automation: lcv-auto-pr")).slice(0, 50);
+          }
+
+          function checkRefsForPr(pr) {
+            const refs = new Map([["head", pr.head.sha]]);
+            if (pr.merge_commit_sha && pr.merge_commit_sha !== pr.head.sha) {
+              refs.set("merge", pr.merge_commit_sha);
+            }
+            return [...refs.entries()].map(([source, ref]) => ({ source, ref }));
+          }
+
+          async function getCheckRuns({ source, ref }) {
+            try {
+              const checkRuns = [];
+              for (let page = 1; page <= 10; page += 1) {
+                const result = await api(
+                  `/repos/${owner}/${repo}/commits/${encodeRefPath(ref)}/check-runs?per_page=100&page=${page}&filter=latest`,
+                );
+                const batch = result.check_runs || [];
+                checkRuns.push(...batch);
+                if (batch.length < 100) {
+                  break;
+                }
+              }
+              return checkRuns.map((check) => ({ ...check, source }));
+            } catch (error) {
+              if (source === "merge" && error.message.includes(" 404 ")) {
+                console.log(`Merge ref ${ref} has no check runs yet.`);
+                return [];
+              }
+              throw error;
+            }
+          }
+
+          async function getStatuses({ source, ref }) {
+            try {
+              const statuses = [];
+              for (let page = 1; page <= 10; page += 1) {
+                const result = await api(`/repos/${owner}/${repo}/commits/${encodeRefPath(ref)}/status?per_page=100&page=${page}`);
+                const batch = result.statuses || [];
+                statuses.push(...batch);
+                if (batch.length < 100) {
+                  break;
+                }
+              }
+              return statuses.map((status) => ({ ...status, source }));
+            } catch (error) {
+              if (source === "merge" && error.message.includes(" 404 ")) {
+                console.log(`Merge ref ${ref} has no statuses yet.`);
+                return [];
+              }
+              throw error;
+            }
+          }
+
+          async function listActiveRequiredPrWorkflows() {
+            const workflows = [];
+            for (let page = 1; ; page += 1) {
+              const result = await api(`/repos/${owner}/${repo}/actions/workflows?per_page=100&page=${page}`);
+              const batch = result.workflows || [];
+              workflows.push(...batch);
+              if (batch.length < 100) {
+                break;
+              }
+            }
+            return workflows.filter(
+              (workflow) =>
+                workflow.state === "active" &&
+                workflow.path.startsWith(".github/workflows/") &&
+                requiredPrWorkflowNames.includes(workflow.name),
+            );
+          }
+
+          async function listWorkflowRunsForHead(sha) {
+            const runs = [];
+            for (let page = 1; ; page += 1) {
+              const result = await api(
+                `/repos/${owner}/${repo}/actions/runs?head_sha=${sha}&per_page=100&page=${page}`,
+              );
+              const batch = result.workflow_runs || [];
+              runs.push(...batch);
+              if (batch.length < 100) {
+                break;
+              }
+            }
+            return runs;
+          }
+
+          function workflowIdentity({ name, path }) {
+            return `${name} @ ${(path || "").split("@")[0]}`;
+          }
+
+          function latestTimestamp(item) {
+            return Date.parse(item.completed_at || item.started_at || item.updated_at || item.created_at || "") || 0;
+          }
+
+          function latestBy(items, keyFor) {
+            const latest = new Map();
+            for (const item of items) {
+              const key = keyFor(item);
+              const current = latest.get(key);
+              if (!current || latestTimestamp(item) >= latestTimestamp(current)) {
+                latest.set(key, item);
+              }
+            }
+            return latest;
+          }
+
+          async function getPrSignals(pr) {
+            const refs = checkRefsForPr(pr);
+            const [checkRunGroups, statusGroups] = await Promise.all([
+              Promise.all(refs.map((ref) => getCheckRuns(ref))),
+              Promise.all(refs.map((ref) => getStatuses(ref))),
+            ]);
+
+            const currentHeadCheckRuns = checkRunGroups
+              .flat()
+              .filter((check) => check.source === "head" || check.head_sha === pr.head.sha);
+            const currentHeadStatuses = statusGroups.flat().filter((status) => status.source === "head");
+
+            return {
+              checkRuns: [...latestBy(currentHeadCheckRuns, (check) => check.name).values()],
+              statuses: [...latestBy(currentHeadStatuses, (status) => status.context).values()],
+            };
+          }
+
+          function evaluateChecks(pr, marker, checkRuns, statuses) {
+            const failures = [];
+            const pending = [];
+            const missingRequired = [];
+
+            for (const check of checkRuns) {
+              if (check.status !== "completed") {
+                pending.push(`${check.name}: ${check.status}`);
+                continue;
+              }
+
+              const isRequired = requiredSuccessChecks.some((required) => required.matches(check.name));
+              if (isRequired && check.conclusion !== "success") {
+                failures.push(`${check.name}: ${check.conclusion}`);
+              } else if (!isRequired && !passingConclusions.has(check.conclusion)) {
+                failures.push(`${check.name}: ${check.conclusion}`);
+              }
+            }
+
+            for (const status of statuses) {
+              if (status.state === "pending") {
+                pending.push(`${status.context}: pending`);
+              } else if (status.state !== "success") {
+                failures.push(`${status.context}: ${status.state}`);
+              }
+            }
+
+            for (const required of requiredSuccessChecks) {
+              const requiredCheck = checkRuns.find((check) => required.matches(check.name));
+              const requiredStatus = statuses.find((status) => required.matches(status.context));
+
+              if (!requiredCheck && !requiredStatus) {
+                missingRequired.push(`${required.label}: missing`);
+                continue;
+              }
+
+              if (requiredCheck?.status && requiredCheck.status !== "completed") {
+                continue;
+              }
+              if (requiredCheck?.conclusion === "success" || requiredStatus?.state === "success") {
+                continue;
+              }
+              if (requiredStatus?.state === "pending") {
+                pending.push(`${required.label}: pending`);
+                continue;
+              }
+
+              failures.push(`${required.label}: not successful`);
+            }
+
+            if (missingRequired.length > 0) {
+              const issuedAt = Date.parse(marker.issued_at);
+              const ageMs = Number.isFinite(issuedAt) ? Date.now() - issuedAt : Date.now() - Date.parse(pr.created_at);
+              if (ageMs < missingRequiredCheckTimeoutMs) {
+                pending.push(...missingRequired);
+              } else {
+                failures.push(...missingRequired);
+              }
+            }
+
+            return { failures, pending };
+          }
+
+          function evaluateWorkflowRuns(pr, marker, workflowRuns, activeRequiredPrWorkflows) {
+            const failures = [];
+            const pending = [];
+            const missingRequired = [];
+            const latestWorkflowRuns = latestBy(workflowRuns, workflowIdentity);
+            const requiredWorkflowIdentities = new Set(activeRequiredPrWorkflows.map(workflowIdentity));
+
+            for (const run of latestWorkflowRuns.values()) {
+              const label = workflowIdentity(run);
+              if (!requiredWorkflowIdentities.has(label)) {
+                continue;
+              }
+              if (run.status !== "completed") {
+                pending.push(`${label}: ${run.status}`);
+                continue;
+              }
+              if (!passingConclusions.has(run.conclusion)) {
+                failures.push(`${label}: ${run.conclusion}`);
+              }
+            }
+
+            for (const workflow of activeRequiredPrWorkflows) {
+              const label = workflowIdentity(workflow);
+              if (!latestWorkflowRuns.has(label)) {
+                missingRequired.push(`${label}: missing workflow run for current head`);
+              }
+            }
+
+            if (missingRequired.length > 0) {
+              const issuedAt = Date.parse(marker.issued_at);
+              const ageMs = Number.isFinite(issuedAt) ? Date.now() - issuedAt : Date.now() - Date.parse(pr.created_at);
+              if (ageMs < missingRequiredCheckTimeoutMs) {
+                pending.push(...missingRequired);
+              } else {
+                failures.push(...missingRequired);
+              }
+            }
+
+            return { failures, pending };
+          }
+
+          async function assertNoCodeScanningAlerts(prNumber) {
+            const alerts = await api(
+              `/repos/${owner}/${repo}/code-scanning/alerts?state=open&tool_name=CodeQL&pr=${prNumber}&per_page=100`,
+            );
+            if (alerts.length > 0) {
+              throw new Error(`CodeQL has ${alerts.length} open alert(s) for PR #${prNumber}.`);
+            }
+          }
+
+          async function updateBranch(pr) {
+            await api(`/repos/${owner}/${repo}/pulls/${pr.number}/update-branch`, {
+              method: "PUT",
+              body: JSON.stringify({ expected_head_sha: pr.head.sha }),
+            });
+          }
+
+          async function waitForMergeReadyPr(pr) {
+            let current = pr;
+            const delays = [15000, 30000, 60000, 60000, 60000];
+
+            for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+              if (mergeReadyStates.has(current.mergeable_state) || ["dirty", "behind"].includes(current.mergeable_state)) {
+                return current;
+              }
+
+              if (attempt === delays.length) {
+                return current;
+              }
+
+              console.log(
+                `PR #${current.number} mergeable_state=${current.mergeable_state || "null"}; rechecking after ${
+                  delays[attempt] / 1000
+                }s.`,
+              );
+              await sleep(delays[attempt]);
+              current = await getPr(current.number);
+            }
+
+            return current;
+          }
+
+          async function mergeAndDelete(pr) {
+            const beforeMerge = await getPr(pr.number);
+            if (beforeMerge.head.sha !== pr.head.sha) {
+              console.log(`Head changed before merge for PR #${pr.number}; waiting for next pass.`);
+              return;
+            }
+
+            await api(`/repos/${owner}/${repo}/pulls/${pr.number}/merge`, {
+              method: "PUT",
+              body: JSON.stringify({
+                commit_title: beforeMerge.title,
+                merge_method: "squash",
+                sha: beforeMerge.head.sha,
+              }),
+            });
+
+            try {
+              await api(`/repos/${owner}/${repo}/git/refs/heads/${encodeRefPath(beforeMerge.head.ref)}`, {
+                method: "DELETE",
+              });
+              console.log(`Merged PR #${pr.number} and deleted ${beforeMerge.head.ref}.`);
+            } catch (error) {
+              console.log(`Merged PR #${pr.number}; branch deletion did not complete: ${error.message}`);
+            }
+          }
+
+          async function processPr(candidate, automationLogin) {
+            let pr = await getPr(candidate.number);
+
+            if (pr.state !== "open" || pr.draft || pr.base.ref !== "main" || pr.head.repo.full_name !== repoFull) {
+              console.log(`Skipping PR #${pr.number}: not an eligible same-repo main PR.`);
+              return;
+            }
+            if (pr.head.ref === "main" || pr.head.ref.startsWith("dependabot/") || pr.head.ref.startsWith("renovate/")) {
+              console.log(`Skipping PR #${pr.number}: protected or bot branch.`);
+              return;
+            }
+            if (pr.user.login !== automationLogin) {
+              console.log(`Skipping PR #${pr.number}: author ${pr.user.login} is not automation identity ${automationLogin}.`);
+              return;
+            }
+
+            const marker = verifyMarker(pr);
+            if (!marker.ok) {
+              console.log(`Skipping PR #${pr.number}: ${marker.reason}.`);
+              return;
+            }
+
+            const [{ checkRuns, statuses }, workflowRuns, activeRequiredPrWorkflows] = await Promise.all([
+              getPrSignals(pr),
+              listWorkflowRunsForHead(pr.head.sha),
+              listActiveRequiredPrWorkflows(),
+            ]);
+            const checkEvaluation = evaluateChecks(pr, marker.marker, checkRuns, statuses);
+            const workflowEvaluation = evaluateWorkflowRuns(
+              pr,
+              marker.marker,
+              workflowRuns,
+              activeRequiredPrWorkflows,
+            );
+            const evaluation = {
+              failures: [...checkEvaluation.failures, ...workflowEvaluation.failures],
+              pending: [...checkEvaluation.pending, ...workflowEvaluation.pending],
+            };
+            if (evaluation.pending.length > 0) {
+              console.log(`PR #${pr.number} still has pending checks: ${evaluation.pending.join("; ")}`);
+              return;
+            }
+            if (evaluation.failures.length > 0) {
+              await addLabel(pr.number, "automation: blocked");
+              await upsertBlockedComment(pr.number, automationLogin, evaluation.failures);
+              return;
+            }
+
+            await assertNoCodeScanningAlerts(pr.number);
+
+            pr = await waitForMergeReadyPr(pr);
+            if (pr.state !== "open" || pr.draft || pr.base.ref !== "main" || pr.head.repo.full_name !== repoFull) {
+              console.log(`Skipping PR #${pr.number}: PR changed while waiting for GitHub readiness.`);
+              return;
+            }
+
+            const liveMarker = verifyMarker(pr);
+            if (!liveMarker.ok) {
+              console.log(`Skipping PR #${pr.number}: ${liveMarker.reason}.`);
+              return;
+            }
+
+            if (pr.mergeable_state === "dirty") {
+              await addLabel(pr.number, "automation: blocked");
+              await upsertBlockedComment(pr.number, automationLogin, [
+                "This PR has merge conflicts and needs human resolution.",
+              ]);
+              return;
+            }
+
+            if (pr.mergeable_state === "behind") {
+              await updateBranch(pr);
+              console.log(`Requested branch update for PR #${pr.number}; waiting for new checks.`);
+              return;
+            }
+
+            if (pr.mergeable_state === "blocked") {
+              await addLabel(pr.number, "automation: blocked");
+              await upsertBlockedComment(pr.number, automationLogin, [
+                "GitHub reports this PR is blocked by repository merge requirements. Required checks are green, but a review, conversation, branch protection rule, or repository rule still needs to clear before automation can merge.",
+              ]);
+              return;
+            }
+
+            if (!mergeReadyStates.has(pr.mergeable_state)) {
+              console.log(`PR #${pr.number} mergeable_state=${pr.mergeable_state}; waiting for GitHub readiness.`);
+              return;
+            }
+
+            await mergeAndDelete(pr);
+          }
+
+          const automationLogin = await getAutomationLogin();
+          const candidates = await listCandidates();
+          console.log(`Controller found ${candidates.length} candidate PR(s).`);
+
+          for (const pr of candidates) {
+            try {
+              await processPr(pr, automationLogin);
+            } catch (error) {
+              console.log(`Failed to process PR #${pr.number}: ${error.message}`);
+            }
+          }
+          NODE
