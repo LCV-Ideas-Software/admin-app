@@ -5,10 +5,15 @@
 	"scripts": {
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
+		"format": "biome format --write .",
+		"lint": "biome check .",
+		"biome": "biome check .",
+		"biome:write": "biome check --write .",
 		"start": "wrangler dev",
 		"test": "vitest"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "^2.4.15",
 		"@cloudflare/vitest-pool-workers": "^0.16.8",
 		"vitest": "^4.1.7",
 		"wrangler": "^4.85.0"
