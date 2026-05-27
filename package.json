@@ -59,7 +59,7 @@
     "@tiptap/react": "^3.23.6",
     "@tiptap/starter-kit": "^3.23.6",
     "@tiptap/suggestion": "^3.23.6",
-    "@tiptap/y-tiptap": "^3.0.3",
+    "@tiptap/y-tiptap": "^3.0.4",
     "@types/sanitize-html": "^2.16.1",
     "dompurify": "^3.4.6",
     "hono": "^4.12.23",
