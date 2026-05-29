@@ -79,7 +79,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
-    "@cloudflare/workers-types": "^4.20260528.1",
+    "@cloudflare/workers-types": "^4.20260529.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@tanstack/react-query-devtools": "^5.100.14",
