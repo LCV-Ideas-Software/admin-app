@@ -23,21 +23,36 @@ jobs:
           egress-policy: audit
 
       - name: Wait for PR checks
+        id: wait
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           set -euo pipefail
           for attempt in {1..90}; do
-            state="$(gh pr view "$PR_URL" --json statusCheckRollup --jq '
+            # Read the check rollup and the head commit in a SINGLE query so the
+            # green verdict provably belongs to that exact SHA. A grouped-update
+            # rebase can force-push a new head between check-validation and the
+            # merge; capturing the head here lets the merge step pin to it.
+            pr_json="$(gh pr view "$PR_URL" --json statusCheckRollup,headRefOid)"
+            head_sha="$(printf '%s' "$pr_json" | jq -r '.headRefOid')"
+            # The CodeQL code-scanning RESULTS check (the one OpenSSF Scorecard
+            # keys on) surfaces in the rollup as a CheckRun named "CodeQL".
+            # Require it present AND successful: otherwise "green" could be
+            # declared on a head whose CodeQL result has not attached yet, and
+            # the pinned merge below would faithfully merge that unscanned head.
+            state="$(printf '%s' "$pr_json" | jq -r '
               [
                 .statusCheckRollup[]
                 | select(.workflowName != "Dependabot Automerge")
                 | select(.name != "StepSecurity Optional Checks")
                 | select(.name != "StepSecurity Harden-Runner")
               ] as $checks
+              | ([ $checks[] | select(.name == "CodeQL") ]) as $codeql
               | if ($checks | length) == 0 then "pending"
                 elif any($checks[]; .status != "COMPLETED") then "pending"
+                elif ($codeql | length) == 0 then "pending"
+                elif any($codeql[]; .conclusion != "SUCCESS") then "failure"
                 elif all($checks[]; (.conclusion == "SUCCESS" or .conclusion == "SKIPPED" or .conclusion == "NEUTRAL")) then "success"
                 else "failure"
                 end
@@ -45,12 +60,13 @@ jobs:
 
             case "$state" in
               success)
-                echo "PR checks are green for $PR_URL."
+                echo "PR checks are green for $PR_URL at ${head_sha}."
+                echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
                 exit 0
                 ;;
               failure)
                 echo "::error::One or more PR checks failed for $PR_URL; refusing automerge."
-                gh pr view "$PR_URL" --json statusCheckRollup --jq '
+                printf '%s' "$pr_json" | jq -r '
                   .statusCheckRollup[]
                   | select(.workflowName != "Dependabot Automerge")
                   | select(.name != "StepSecurity Optional Checks")
@@ -85,12 +101,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ steps.wait.outputs.head_sha }}
         run: |
+          set -euo pipefail
           state="$(gh pr view "$PR_URL" --json state --jq '.state')"
           if [ "$state" != "OPEN" ]; then
             exit 0
           fi
-          gh pr merge "$PR_URL" --squash --delete-branch
+          # Only merge the exact commit whose checks we validated. If a rebase
+          # advanced the head since validation, defer: the synchronize event
+          # from that rebase starts a fresh automerge run that re-validates the
+          # new head, so an unchecked commit is never merged (and the branch is
+          # left intact for that run to finish on).
+          current_head="$(gh pr view "$PR_URL" --json headRefOid --jq '.headRefOid')"
+          if [ "$current_head" != "$HEAD_SHA" ]; then
+            echo "::notice::Head advanced from ${HEAD_SHA} to ${current_head} since validation; deferring to the fresh automerge run."
+            exit 0
+          fi
+          # --match-head-commit is an atomic backstop for the sub-second window
+          # between the check above and the merge call itself.
+          gh pr merge "$PR_URL" --squash --delete-branch --match-head-commit "$HEAD_SHA"
     timeout-minutes: 30
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
