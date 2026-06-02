@@ -44,6 +44,14 @@ updates:
       include: 'scope'
     versioning-strategy: increase
     groups:
+      react:
+        patterns:
+          - 'react'
+          - 'react-dom'
+        update-types:
+          - 'major'
+          - 'minor'
+          - 'patch'
       dev-dependencies:
         patterns:
           - 'eslint*'
