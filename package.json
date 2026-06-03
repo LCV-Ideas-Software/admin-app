@@ -61,7 +61,7 @@
     "@tiptap/suggestion": "^3.25.0",
     "@tiptap/y-tiptap": "^3.0.4",
     "@types/sanitize-html": "^2.16.1",
-    "dompurify": "^3.4.7",
+    "dompurify": "^3.4.8",
     "hono": "^4.12.23",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.17.0",
