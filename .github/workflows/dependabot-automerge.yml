@@ -22,7 +22,27 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Detect workflow-file changes
+        id: workflow_changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          if ! changed_files="$(gh pr diff "$PR_URL" --name-only)"; then
+            echo "::warning::Unable to inspect PR diff; skipping automerge rather than merging without workflow-file classification."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if printf '%s\n' "$changed_files" | grep -Eq '^\.github/workflows/'; then
+            echo "::notice::Dependabot PR changes GitHub Actions workflow files. Skipping automerge because GITHUB_TOKEN cannot update workflows; merge this PR manually with a credential that has workflow permission."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
       - name: Wait for PR checks
+        if: steps.workflow_changes.outputs.skip != 'true'
         id: wait
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -91,6 +111,7 @@ jobs:
           exit 1
 
       - name: Auto-approve Dependabot PR
+        if: steps.workflow_changes.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -98,6 +119,7 @@ jobs:
           gh pr review "$PR_URL" --approve --body "Auto-approved Dependabot dependency update after the configured PR checks passed."
 
       - name: Merge PR
+        if: steps.workflow_changes.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -124,4 +146,4 @@ jobs:
     timeout-minutes: 30
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
