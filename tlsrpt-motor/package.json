@@ -14,7 +14,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.16",
-		"@cloudflare/vitest-pool-workers": "^0.16.13",
+		"@cloudflare/vitest-pool-workers": "^0.16.14",
 		"vitest": "^4.1.8",
 		"wrangler": "^4.85.0"
 	},
