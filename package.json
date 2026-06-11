@@ -69,7 +69,7 @@
     "marked": "^18.0.5",
     "prosemirror-model": "^1.25.7",
     "prosemirror-state": "^1.4.4",
-    "prosemirror-view": "^1.41.8",
+    "prosemirror-view": "^1.41.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "sanitize-html": "^2.17.4",
