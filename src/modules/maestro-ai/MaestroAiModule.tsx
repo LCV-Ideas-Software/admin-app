@@ -5,6 +5,7 @@
 
 import {
   AlertTriangle,
+  Ban,
   Bot,
   CheckCircle,
   CircleDollarSign,
@@ -208,6 +209,8 @@ const statusLabel: Record<string, string> = {
   blocked_time: 'Bloqueada por tempo',
   blocked_max_cycles: 'Sem unanimidade',
   blocked_revision_contract: 'Bloqueada por contrato',
+  blocked_link_audit: 'Bloqueada por link inválido',
+  blocked_cancelled: 'Cancelada',
   error: 'Erro',
 };
 
@@ -303,6 +306,7 @@ export function MaestroAiModule() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [testingApis, setTestingApis] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [creatingPost, setCreatingPost] = useState(false);
   const [postEditorOpen, setPostEditorOpen] = useState(false);
   const [loadingArtifacts, setLoadingArtifacts] = useState(false);
@@ -603,6 +607,21 @@ export function MaestroAiModule() {
     }
   };
 
+  const cancelSession = async (sessionId: string) => {
+    setCancelling(true);
+    try {
+      await readJson<{ ok: true; session: MaestroSession }>(
+        await fetch(`/api/maestro-ai/sessions/${encodeURIComponent(sessionId)}/cancel`, { method: 'POST' }),
+      );
+      await loadSessions(true);
+      showNotification('Sessão cancelada.', 'success');
+    } catch (error) {
+      showNotification(error instanceof Error ? error.message : 'Erro ao cancelar sessão.', 'error');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const createMainSitePost = async (
     postTitle: string,
     author: string,
@@ -661,6 +680,16 @@ export function MaestroAiModule() {
           <strong>Redação editorial em colegiado circular</strong>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          {selectedSession && isRunning(selectedSession.status) && (
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => void cancelSession(selectedSession.id)}
+              disabled={cancelling}
+            >
+              {cancelling ? <Loader2 size={14} className="spin" /> : <Ban size={14} />} Cancelar
+            </button>
+          )}
           <button type="button" className="ghost-button" onClick={() => void loadSessions()} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'spin' : ''} /> Atualizar
           </button>

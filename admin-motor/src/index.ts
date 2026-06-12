@@ -7,7 +7,7 @@ import { handleCfdnsZonesGet } from './handlers/cfdnsZones';
 import { handleCleanupDeploymentsGet, handleCleanupDeploymentsPost } from './handlers/cfpwCleanup';
 import { handleOraculoCronGet, handleOraculoCronPut } from './handlers/oraculoCron';
 import { handleOraculoModelosGet } from './handlers/oraculoModelos';
-import { validatePutAuth } from './handlers/routes/_lib/auth';
+import { resolveAdminBearerToken, validatePutAuth } from './handlers/routes/_lib/auth';
 import {
   onRequestGet as handleAdminhubConfigGet,
   onRequestPut as handleAdminhubConfigPut,
@@ -62,12 +62,14 @@ import {
 } from './handlers/routes/config/config-store';
 import {
   handleMaestroAiArtifactsGet,
+  handleMaestroAiSessionCancelPost,
   handleMaestroAiSessionContentPut,
   handleMaestroAiSessionsGet,
   handleMaestroAiSessionsPost,
   handleMaestroAiSettingsGet,
   handleMaestroAiSettingsPut,
   handleMaestroAiSettingsTestPost,
+  runMaestroSweep,
 } from './handlers/routes/maestro-ai/sessions';
 import {
   onRequestGet as handleMainsiteAboutGet,
@@ -157,6 +159,7 @@ type AdminMotorEnv = {
   CF_ACCESS_TEAM_DOMAIN?: unknown;
   CF_ACCESS_AUD?: unknown;
   ENFORCE_JWT_VALIDATION?: unknown;
+  ADMIN_BEARER_TOKEN?: unknown;
 };
 
 type ResolvedAdminMotorEnv = {
@@ -182,6 +185,7 @@ type ResolvedAdminMotorEnv = {
   CF_ACCESS_TEAM_DOMAIN?: string;
   CF_ACCESS_AUD?: string;
   ENFORCE_JWT_VALIDATION?: string;
+  ADMIN_BEARER_TOKEN?: string;
 };
 
 type D1Like = {
@@ -275,6 +279,7 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   CF_ACCESS_TEAM_DOMAIN: await readSecretString(env.CF_ACCESS_TEAM_DOMAIN),
   CF_ACCESS_AUD: await readSecretString(env.CF_ACCESS_AUD),
   ENFORCE_JWT_VALIDATION: await readSecretString(env.ENFORCE_JWT_VALIDATION),
+  ADMIN_BEARER_TOKEN: await readSecretString(env.ADMIN_BEARER_TOKEN),
 });
 
 const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMotorEnv): Promise<ModelOption[]> => {
@@ -397,7 +402,7 @@ app.use('*', async (c, next) => {
 app.use('*', async (c, next) => {
   if (c.req.method.toUpperCase() === 'OPTIONS') return next();
   const env = c.get('runtimeEnv');
-  const authCtx = await validatePutAuth(c.req.raw, env.CLOUDFLARE_PW, {
+  const authCtx = await validatePutAuth(c.req.raw, resolveAdminBearerToken(env), {
     teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
     audience: env.CF_ACCESS_AUD,
     enforcement: env.ENFORCE_JWT_VALIDATION,
@@ -542,6 +547,7 @@ app.get('/api/maestro-ai/sessions/:id/artifacts/:artifactId', (c) =>
   handleMaestroAiArtifactsGet(rc(c), c.req.param('id'), c.req.param('artifactId')),
 );
 app.put('/api/maestro-ai/sessions/:id/content', (c) => handleMaestroAiSessionContentPut(rc(c), c.req.param('id')));
+app.post('/api/maestro-ai/sessions/:id/cancel', (c) => handleMaestroAiSessionCancelPost(rc(c), c.req.param('id')));
 
 // ── mainsite comments admin ──
 app.get('/api/mainsite/comments/admin/all', (c) => handleCommentsAdminAll(re(c)));
@@ -617,4 +623,26 @@ app.onError((error, c) => {
   return c.json({ ok: false, error: 'Erro interno no admin-motor.' }, 500);
 });
 
-export default app;
+// Cron entry point: reap orphaned Maestro AI sessions whose background runner
+// was evicted/redeployed mid-run (see runMaestroSweep). Scheduled via the
+// triggers.crons entry in wrangler.json.
+async function scheduled(
+  _controller: unknown,
+  env: AdminMotorEnv,
+  ctx: { waitUntil(p: Promise<unknown>): void },
+): Promise<void> {
+  const runtimeEnv = await resolveRuntimeEnv(env);
+  ctx.waitUntil(
+    runMaestroSweep(runtimeEnv as Parameters<typeof runMaestroSweep>[0]).then(
+      (reaped) => {
+        if (reaped > 0) logWarn('maestro:sweep', { reaped });
+      },
+      (error) => logError('maestro:sweep:error', { error: sanitizeErrorMessage(error) }),
+    ),
+  );
+}
+
+export default {
+  fetch: (request: Request, env: AdminMotorEnv, ctx: ExecutionContext) => app.fetch(request, env, ctx),
+  scheduled,
+};

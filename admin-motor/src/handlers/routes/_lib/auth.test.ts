@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { validatePutAuth } from './auth.ts';
+import { resolveAdminBearerToken, validatePutAuth } from './auth.ts';
+
+describe('resolveAdminBearerToken', () => {
+  it('prefers the dedicated ADMIN_BEARER_TOKEN over CLOUDFLARE_PW', () => {
+    expect(resolveAdminBearerToken({ ADMIN_BEARER_TOKEN: 'dedicated', CLOUDFLARE_PW: 'cf-account-token' })).toBe(
+      'dedicated',
+    );
+  });
+
+  it('falls back to CLOUDFLARE_PW when no dedicated bearer is configured', () => {
+    expect(resolveAdminBearerToken({ CLOUDFLARE_PW: 'cf-account-token' })).toBe('cf-account-token');
+  });
+
+  it('returns undefined when neither secret is set, and ignores blank values', () => {
+    expect(resolveAdminBearerToken({})).toBeUndefined();
+    expect(resolveAdminBearerToken({ ADMIN_BEARER_TOKEN: '   ', CLOUDFLARE_PW: '  ' })).toBeUndefined();
+  });
+});
 
 describe('validatePutAuth', () => {
   it('accepts a valid bearer token in constant time flow', async () => {

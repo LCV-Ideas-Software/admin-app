@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "project": "admin-motor/tsconfig.json",
   "command": "npm run typecheck:admin-motor",
-  "generatedAt": "2026-05-21T19:14:17.863Z",
+  "generatedAt": "2026-06-12T18:30:54.236Z",
   "typescriptVersion": "6.0.3",
-  "total": 245,
+  "total": 243,
   "errors": [
     {
       "fingerprint": "admin-motor/src/handlers/routes/_lib/auth.ts:TS2345:Argument of type 'string | undefined' is not assignable to parameter of type 'string'.#1",
       "file": "admin-motor/src/handlers/routes/_lib/auth.ts",
-      "line": 102,
+      "line": 122,
       "column": 76,
       "code": "TS2345",
       "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
@@ -17,7 +17,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/_lib/auth.ts:TS2345:Argument of type 'string | undefined' is not assignable to parameter of type 'string'.#2",
       "file": "admin-motor/src/handlers/routes/_lib/auth.ts",
-      "line": 106,
+      "line": 126,
       "column": 77,
       "code": "TS2345",
       "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
@@ -25,7 +25,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/_lib/auth.ts:TS2345:Argument of type 'string | undefined' is not assignable to parameter of type 'string'.#3",
       "file": "admin-motor/src/handlers/routes/_lib/auth.ts",
-      "line": 153,
+      "line": 173,
       "column": 39,
       "code": "TS2345",
       "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
@@ -33,7 +33,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/_lib/auth.ts:TS2375:Type '{ isAuthenticated: false; source: \"cloudflare-access\"; error: string | undefined; }' is not assignable to type 'AuthContext' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#1",
       "file": "admin-motor/src/handlers/routes/_lib/auth.ts",
-      "line": 215,
+      "line": 235,
       "column": 11,
       "code": "TS2375",
       "message": "Type '{ isAuthenticated: false; source: \"cloudflare-access\"; error: string | undefined; }' is not assignable to type 'AuthContext' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
@@ -41,7 +41,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/_lib/auth.ts:TS2375:Type '{ valid: true; email: string | undefined; }' is not assignable to type '{ valid: boolean; email?: string; error?: string; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#1",
       "file": "admin-motor/src/handlers/routes/_lib/auth.ts",
-      "line": 158,
+      "line": 178,
       "column": 5,
       "code": "TS2375",
       "message": "Type '{ valid: true; email: string | undefined; }' is not assignable to type '{ valid: boolean; email?: string; error?: string; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
@@ -1039,25 +1039,9 @@
       "message": "Property 'data' does not exist on type 'Context'."
     },
     {
-      "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.test.ts:TS2532:Object is possibly 'undefined'.#1",
-      "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.test.ts",
-      "line": 380,
-      "column": 12,
-      "code": "TS2532",
-      "message": "Object is possibly 'undefined'."
-    },
-    {
-      "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.test.ts:TS2532:Object is possibly 'undefined'.#2",
-      "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.test.ts",
-      "line": 396,
-      "column": 12,
-      "code": "TS2532",
-      "message": "Object is possibly 'undefined'."
-    },
-    {
       "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts:TS2322:Type 'ProviderKey | undefined' is not assignable to type 'ProviderKey'.#1",
       "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts",
-      "line": 1613,
+      "line": 1771,
       "column": 7,
       "code": "TS2322",
       "message": "Type 'ProviderKey | undefined' is not assignable to type 'ProviderKey'."
@@ -1065,7 +1049,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts:TS2339:Property 'all' does not exist on type '{ bind(...values: unknown[]): { first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[]; }>; run(): Promise<unknown>; }; run(): Promise<unknown>; }'.#1",
       "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts",
-      "line": 1642,
+      "line": 1800,
       "column": 8,
       "code": "TS2339",
       "message": "Property 'all' does not exist on type '{ bind(...values: unknown[]): { first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[]; }>; run(): Promise<unknown>; }; run(): Promise<unknown>; }'."
@@ -1073,7 +1057,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts:TS2375:Type '{ input_usd_per_million: number | undefined; output_usd_per_million: number | undefined; request_usd_per_1k: number; }' is not assignable to type 'ProviderRates' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#1",
       "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts",
-      "line": 322,
+      "line": 323,
       "column": 5,
       "code": "TS2375",
       "message": "Type '{ input_usd_per_million: number | undefined; output_usd_per_million: number | undefined; request_usd_per_1k: number; }' is not assignable to type 'ProviderRates' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
@@ -1081,7 +1065,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts:TS2375:Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#1",
       "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts",
-      "line": 1036,
+      "line": 1148,
       "column": 5,
       "code": "TS2375",
       "message": "Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
@@ -1089,7 +1073,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts:TS2375:Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#2",
       "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts",
-      "line": 1050,
+      "line": 1162,
       "column": 5,
       "code": "TS2375",
       "message": "Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
@@ -1097,7 +1081,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts:TS2375:Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#3",
       "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts",
-      "line": 1065,
+      "line": 1177,
       "column": 5,
       "code": "TS2375",
       "message": "Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
@@ -1105,7 +1089,7 @@
     {
       "fingerprint": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts:TS2375:Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#4",
       "file": "admin-motor/src/handlers/routes/maestro-ai/sessions.ts",
-      "line": 1074,
+      "line": 1186,
       "column": 3,
       "code": "TS2375",
       "message": "Type '{ text: string; inputTokens: number | undefined; outputTokens: number | undefined; model: string; }' is not assignable to type 'ProviderCallResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
@@ -1935,18 +1919,18 @@
       "message": "Property 'total' does not exist on type '{}'."
     },
     {
-      "fingerprint": "admin-motor/src/index.ts:TS2375:Type '{ BIGDATA_DB: D1Like | undefined; MEDIA_BUCKET: unknown; AI: unknown; MAESTRO_OPENAI_API_KEY: string; MAESTRO_SECRET_STORE_ID: string; MAESTRO_ANTHROPIC_API_KEY: string; MAESTRO_GEMINI_API_KEY: string; ... 14 more ...; ENFORCE_JWT_VALIDATION: string; }' is not assignable to type 'ResolvedAdminMotorEnv' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#1",
+      "fingerprint": "admin-motor/src/index.ts:TS2375:Type '{ BIGDATA_DB: D1Like | undefined; MEDIA_BUCKET: unknown; AI: unknown; MAESTRO_OPENAI_API_KEY: string; MAESTRO_SECRET_STORE_ID: string; MAESTRO_ANTHROPIC_API_KEY: string; MAESTRO_GEMINI_API_KEY: string; ... 15 more ...; ADMIN_BEARER_TOKEN: string; }' is not assignable to type 'ResolvedAdminMotorEnv' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#1",
       "file": "admin-motor/src/index.ts",
-      "line": 255,
+      "line": 259,
       "column": 90,
       "code": "TS2375",
-      "message": "Type '{ BIGDATA_DB: D1Like | undefined; MEDIA_BUCKET: unknown; AI: unknown; MAESTRO_OPENAI_API_KEY: string; MAESTRO_SECRET_STORE_ID: string; MAESTRO_ANTHROPIC_API_KEY: string; MAESTRO_GEMINI_API_KEY: string; ... 14 more ...; ENFORCE_JWT_VALIDATION: string; }' is not assignable to type 'ResolvedAdminMotorEnv' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
+      "message": "Type '{ BIGDATA_DB: D1Like | undefined; MEDIA_BUCKET: unknown; AI: unknown; MAESTRO_OPENAI_API_KEY: string; MAESTRO_SECRET_STORE_ID: string; MAESTRO_ANTHROPIC_API_KEY: string; MAESTRO_GEMINI_API_KEY: string; ... 15 more ...; ADMIN_BEARER_TOKEN: string; }' is not assignable to type 'ResolvedAdminMotorEnv' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
     },
     {
       "fingerprint": "admin-motor/src/index.ts:TS2379:Argument of type '{ teamDomain: string | undefined; audience: string | undefined; enforcement: string | undefined; }' is not assignable to parameter of type 'JwtConfig' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.#1",
       "file": "admin-motor/src/index.ts",
-      "line": 400,
-      "column": 71,
+      "line": 405,
+      "column": 82,
       "code": "TS2379",
       "message": "Argument of type '{ teamDomain: string | undefined; audience: string | undefined; enforcement: string | undefined; }' is not assignable to parameter of type 'JwtConfig' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
     },
