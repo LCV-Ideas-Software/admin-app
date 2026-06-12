@@ -17,6 +17,7 @@ const modules = [
   { id: 'config', heading: 'Configurações' },
   { id: 'calculadora', heading: 'Calculadora' },
   { id: 'mainsite', heading: 'MainSite' },
+  { id: 'maestro-ai', heading: 'Maestro AI' },
   { id: 'mtasts', heading: 'MTA-STS' },
   { id: 'oraculo', heading: 'Oráculo' },
   { id: 'telemetria', heading: 'Telemetria' },

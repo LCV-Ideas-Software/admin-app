@@ -2,13 +2,39 @@
 
 ## [Unreleased]
 
+## [v02.03.00] - 2026-06-12
+
+### Adicionado
+
+- **Maestro AI — cancelamento cooperativo de sessões**: novo endpoint `POST /api/maestro-ai/sessions/:id/cancel` e verificação de status vivo entre as etapas do runner. Uma sessão em andamento pode ser interrompida; o runner detecta o estado terminal e para sem sobrescrever o status que o cancelamento gravou. Botão **Cancelar** na interface, com os novos estados `blocked_cancelled` e `blocked_link_audit`.
+- **Maestro AI — varredura de sessões travadas**: handler `scheduled` no Worker `admin-motor` + gatilho cron (`*/5 * * * *`) que finaliza como `error` sessões `queued`/`running` paradas além do limite, garantindo durabilidade mesmo quando uma execução em segundo plano (`waitUntil`) é interrompida.
+
 ### Corrigido
 
+- **Maestro AI — SSRF na auditoria de links**: links no conteúdo auditado que apontam para hosts internos/privados — IPv4 literais (loopback, RFC1918, link-local), IPv6 (`::1`, ULA `fc00::/7`, link-local `fe80::/10`), IPv4 mapeado/compatível em IPv6 (`[::ffff:127.0.0.1]`, `[::1]`) e nomes `localhost`/`.internal`/`.local` — são rejeitados **sem** requisição de saída e surgem como falha de auditoria, em vez de serem buscados (exfiltração) ou silenciosamente ignorados. O seguidor de redirecionamento (limitado) revalida o host de cada `Location`, e o tokenizador de URLs preserva literais IPv6 entre colchetes.
+- **Maestro AI — trabalho pago após cancelamento**: cancelar uma sessão agora interrompe o runner antes e depois de cada chamada de provedor — tanto o rascunho inicial quanto cada turno de revisão —, impedindo a chamada paga e a escrita de artefatos/eventos para a sessão cancelada.
+- **Maestro AI — rascunho/revisão vazios**: uma resposta de provedor em branco passa a falhar explicitamente, em vez de iniciar uma cadeia de revisão paga sobre texto vazio.
+- **Maestro AI — persistência atômica**: `persistSession` faz UPDATE dinâmico com _compare-and-swap_ (`status IN (...)`), evitando que uma transição terminal concorrente (cancelamento, varredura, finalização) seja sobrescrita.
+- **Maestro AI — timeout por chamada de provedor** (120 s) para evitar execuções presas indefinidamente.
 - **Gate de typecheck do `admin-motor`**: os fingerprints da baseline-ratchet passam a remover o prefixo de caminho absoluto do repositório das mensagens do TypeScript. Sem isso, uma baseline gerada no Windows nunca coincidia com a recalculada no CI (Linux) — o caminho `import("…")` embutido na mensagem diferia —, gerando uma falsa regressão que travava o workflow de Deploy.
+
+### Segurança
+
+- **Maestro AI — segregação do token de admin**: `resolveAdminBearerToken` prefere um `ADMIN_BEARER_TOKEN` dedicado, desacoplando a credencial de autenticação do admin do token de conta Cloudflare (`CLOUDFLARE_PW`, mantido como _fallback_). Requisições _bearer-only_ de navegador sem Cloudflare Access continuam rejeitadas.
 
 ### Alterado
 
 - Sync inicial do MainSite grava `mainsite/ratelimit` apenas como toggles (`chatbot`, `email`, `comments`), alinhado ao rate limit nativo da Cloudflare; limites numericos nao sao mais semeados em D1.
+
+### Ferramentas
+
+- **Maestro AI — cobertura de testes**: novos testes cobrindo durabilidade (cancelamento cooperativo, varredura, timeout), bloqueio de host SSRF, retry + seguimento de redirecionamento do link-audit, IPv4 mapeado em IPv6, extração de URLs IPv6 entre colchetes e persistência com _compare-and-swap_. Cenário `maestro-ai` adicionado ao smoke de módulos (e2e).
+
+### Validação
+
+- APP v02.02.08 → APP v02.03.00.
+- Testes: 34 (app) + 123 (`admin-motor`) aprovados. `tsc -b` + `vite build` íntegros.
+- Baseline de typecheck do `admin-motor`: 243/243 (sem regressão). `eslint`, `biome` e `prettier` sem violações.
 
 ## [v02.02.08] - 2026-05-21
 

@@ -22,6 +22,26 @@ export interface JwtConfig {
 }
 
 /**
+ * Resolve the admin Bearer token used to authenticate inbound requests.
+ *
+ * Prefers a dedicated ADMIN_BEARER_TOKEN so the admin auth credential is
+ * decoupled from CLOUDFLARE_PW (the account-level Cloudflare API token used
+ * for Secret Store / DNS / Pages operations). Falls back to CLOUDFLARE_PW for
+ * backward compatibility until the dedicated secret is provisioned.
+ */
+export function resolveAdminBearerToken(env: {
+  ADMIN_BEARER_TOKEN?: string;
+  CLOUDFLARE_PW?: string;
+}): string | undefined {
+  const dedicated = env.ADMIN_BEARER_TOKEN?.trim();
+  if (dedicated) {
+    return dedicated;
+  }
+  const legacy = env.CLOUDFLARE_PW?.trim();
+  return legacy || undefined;
+}
+
+/**
  * Constant-time string comparison to prevent timing attacks.
  */
 function timingSafeEqual(a: string, b: string): boolean {

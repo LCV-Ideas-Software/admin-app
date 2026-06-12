@@ -859,13 +859,87 @@ function extractTagged(text: string, tag: string): string | null {
   return match?.[1]?.trim() || null;
 }
 
+/**
+ * Block link-audit fetches against private, loopback, link-local and internal
+ * hosts. The audited text is LLM-authored (and may be steered by untrusted web
+ * search content), so the auto-fetch must never reach internal infrastructure
+ * (SSRF). Returns true when the host must NOT be fetched.
+ */
+/** True when an IPv4 literal falls in a private / loopback / link-local / unspecified range. */
+function isPrivateIpv4(host: string): boolean {
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!ipv4) return false;
+  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
+
+/**
+ * Extract the embedded IPv4 from an IPv4-mapped/compatible IPv6 literal so the
+ * private-range check can be applied. URL.hostname normalizes such literals to
+ * the hex form (e.g. ::ffff:127.0.0.1 -> ::ffff:7f00:1), which would otherwise
+ * slip past the prefix checks and allow SSRF to loopback/private IPv4 targets.
+ */
+function embeddedIpv4FromIpv6(host: string): string | null {
+  const dotted = /^::(?:ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);
+  if (dotted) return dotted[1] ?? null;
+  const hex = /^::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(host);
+  if (hex) {
+    const hi = Number.parseInt(hex[1] ?? '0', 16);
+    const lo = Number.parseInt(hex[2] ?? '0', 16);
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+  }
+  return null;
+}
+
+function isBlockedAuditHost(hostname: string): boolean {
+  const host = hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '');
+  if (!host) return true;
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host.endsWith('.internal') || host.endsWith('.local')) return true;
+  // Bare single-label hostnames (no dot) resolve to internal names.
+  if (!host.includes('.') && !host.includes(':')) return true;
+
+  // IPv4 literal in private / loopback / link-local / unspecified ranges.
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+    return isPrivateIpv4(host);
+  }
+
+  // IPv6 loopback / unspecified / unique-local (fc00::/7) / link-local (fe80::/10).
+  if (host.includes(':')) {
+    if (host === '::1' || host === '::') return true;
+    if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
+    if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
+    // IPv4-mapped / IPv4-compatible IPv6 (e.g. ::ffff:127.0.0.1): apply the
+    // IPv4 private-range check to the embedded address.
+    const embedded = embeddedIpv4FromIpv6(host);
+    if (embedded) return isPrivateIpv4(embedded);
+    return false;
+  }
+
+  return false;
+}
+
 function extractUrls(text: string): string[] {
   const urls = new Set<string>();
-  for (const match of text.matchAll(/https?:\/\/[^\s<>"')\]}]+/gi)) {
+  // First alternative keeps a bracketed IPv6 host (e.g. http://[::ffff:127.0.0.1]/)
+  // intact so internal IPv6 literals still reach checkOneLink; without it the
+  // generic tokenizer stops at the closing `]` and the URL is dropped as malformed.
+  for (const match of text.matchAll(/https?:\/\/\[[0-9a-f:.]+\][^\s<>"')\]}]*|https?:\/\/[^\s<>"')\]}]+/gi)) {
     const url = match[0].replace(/[.,;:!?]+$/g, '');
     try {
       const parsed = new URL(url);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') urls.add(parsed.toString());
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+      // Blocked (internal/private) hosts are NOT filtered out here: checkOneLink
+      // rejects them as broken WITHOUT fetching, so an internal URL in the
+      // content surfaces as an audit failure instead of being silently dropped.
+      urls.add(parsed.toString());
     } catch {
       // Ignore malformed candidates; the checker reports only concrete URLs.
     }
@@ -873,20 +947,90 @@ function extractUrls(text: string): string[] {
   return [...urls].slice(0, 40);
 }
 
-async function checkOneLink(url: string): Promise<LinkAuditResult> {
+/** A 5xx or 429 may be momentary; everything else (e.g. 404) is decisive. */
+function isRetryableLinkStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+type LinkAttempt = { ok: boolean; status?: number; error?: string; retryable: boolean };
+
+/**
+ * One link-reachability attempt. Follows redirects MANUALLY (bounded) so a
+ * public link that redirects into an internal host is never fetched (SSRF
+ * pivot), while a public redirect chain is still followed to its final status
+ * so a redirect that ends in a 404 is correctly reported as broken.
+ */
+async function attemptLink(url: string, timeoutMs = 8000): Promise<LinkAttempt> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    let response = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: controller.signal });
-    if (response.status === 405 || response.status === 403) {
-      response = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal });
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const headOrGet = async (target: string): Promise<Response> => {
+    let res = await fetch(target, { method: 'HEAD', redirect: 'manual', signal: controller.signal });
+    if (res.status === 405 || res.status === 403) {
+      res = await fetch(target, { method: 'GET', redirect: 'manual', signal: controller.signal });
     }
-    return { url, ok: response.status >= 200 && response.status < 400, status: response.status };
+    return res;
+  };
+  try {
+    let current = url;
+    let response = await headOrGet(current);
+    for (let hops = 0; response.status >= 300 && response.status < 400 && hops < 3; hops += 1) {
+      const location = response.headers.get('location');
+      if (!location) break; // 3xx without Location — stop following; judged not-reachable by the 2xx check below.
+      let target: URL;
+      try {
+        target = new URL(location, current);
+      } catch {
+        return { ok: false, status: response.status, error: 'redirect invalido', retryable: false };
+      }
+      if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+        return { ok: false, status: response.status, error: 'redirect nao-http', retryable: false };
+      }
+      if (isBlockedAuditHost(target.hostname)) {
+        return { ok: false, status: response.status, error: 'redirect para host bloqueado', retryable: false };
+      }
+      current = target.toString();
+      response = await headOrGet(current);
+    }
+    // After resolving redirects ourselves, only a final 2xx confirms the link is
+    // reachable. A leftover 3xx (redirect without a Location header, or a chain
+    // still redirecting past the hop limit) is NOT confirmed and counts as broken.
+    const ok = response.status >= 200 && response.status < 300;
+    return { ok, status: response.status, retryable: !ok && isRetryableLinkStatus(response.status) };
   } catch (error) {
-    return { url, ok: false, error: error instanceof Error ? sanitizeText(error.message, 240) : String(error) };
+    return {
+      ok: false,
+      error: error instanceof Error ? sanitizeText(error.message, 240) : String(error),
+      retryable: true,
+    };
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function checkOneLink(url: string): Promise<LinkAuditResult> {
+  // A blocked (internal/private/loopback) host is reported as broken WITHOUT any
+  // fetch — this is the single point that both prevents SSRF and surfaces an
+  // internal URL in the content as an audit failure (extractUrls no longer drops it).
+  try {
+    if (isBlockedAuditHost(new URL(url).hostname)) {
+      return { url, ok: false, error: 'host bloqueado' };
+    }
+  } catch {
+    return { url, ok: false, error: 'url invalida' };
+  }
+  // A single retry absorbs a momentary failure (timeout / network / 429 / 5xx)
+  // without giving a PERSISTENTLY broken link a free pass: if the retry also
+  // fails, the link is reported as broken and the session is blocked.
+  let attempt = await attemptLink(url);
+  if (!attempt.ok && attempt.retryable) {
+    attempt = await attemptLink(url);
+  }
+  return {
+    url,
+    ok: attempt.ok,
+    ...(attempt.status !== undefined ? { status: attempt.status } : {}),
+    ...(attempt.error !== undefined ? { error: attempt.error } : {}),
+  };
 }
 
 async function auditLinks(text: string): Promise<LinkAuditResult[]> {
@@ -1011,6 +1155,48 @@ ${JSON.stringify(args.history.slice(-12), null, 2)}
 `;
 }
 
+const PROVIDER_TIMEOUT_MS = 120_000;
+
+/**
+ * fetch with a hard timeout. A single hung provider/network call must not be
+ * allowed to consume the entire runner budget (and silently exceed the
+ * waitUntil window); it fails fast with a clear error instead.
+ */
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = PROVIDER_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`Provider request excedeu o tempo limite de ${Math.round(timeoutMs / 1000)}s.`, { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Reject a promise if it does not settle within timeoutMs (for SDK calls that take no AbortSignal). */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} excedeu o tempo limite de ${Math.round(timeoutMs / 1000)}s.`)),
+      timeoutMs,
+    );
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function callProvider(
   env: MaestroAiEnv,
   agent: ProviderKey,
@@ -1028,11 +1214,15 @@ async function callProvider(
 
   if (agent === 'gemini') {
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model,
-      contents: `${system}\n\n${prompt}`,
-      config: { temperature: 0.2, topP: 0.9, maxOutputTokens },
-    });
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model,
+        contents: `${system}\n\n${prompt}`,
+        config: { temperature: 0.2, topP: 0.9, maxOutputTokens },
+      }),
+      PROVIDER_TIMEOUT_MS,
+      `${AGENT_LABELS[agent]} request`,
+    );
     return {
       text: response.text?.trim() || '',
       inputTokens: response.usageMetadata?.promptTokenCount ?? undefined,
@@ -1042,7 +1232,7 @@ async function callProvider(
   }
 
   const request = buildProviderHttpRequest(agent, apiKey, model, system, prompt, maxOutputTokens);
-  const response = await fetch(request.endpoint, request.init);
+  const response = await fetchWithTimeout(request.endpoint, request.init);
   const parsed = await parseProviderResponse(response);
 
   if (agent === 'claude') {
@@ -1180,6 +1370,13 @@ export const maestroAiTestHooks = {
   buildProviderHttpRequest,
   publicApiHealthResult,
   validateRevisionGuard,
+  isBlockedAuditHost,
+  extractUrls,
+  checkOneLink,
+  fetchWithTimeout,
+  persistSession,
+  runSession,
+  sweepStaleSessions,
 };
 
 async function parseProviderResponse(response: Response): Promise<ProviderResponsePayload> {
@@ -1201,36 +1398,69 @@ async function loadSession(db: D1Database, id: string): Promise<MaestroSessionRo
   return db.prepare('SELECT * FROM maestro_ai_sessions WHERE id = ? LIMIT 1').bind(id).first<MaestroSessionRow>();
 }
 
+type SessionPatch = Partial<
+  Pick<
+    MaestroSessionRow,
+    'status' | 'current_author' | 'current_text' | 'final_text' | 'observed_cost_usd' | 'events_json' | 'error'
+  >
+>;
+
+const PERSIST_COLUMNS: ReadonlyArray<keyof SessionPatch> = [
+  'status',
+  'current_author',
+  'current_text',
+  'final_text',
+  'observed_cost_usd',
+  'events_json',
+  'error',
+];
+
+/**
+ * Atomic partial update: writes ONLY the columns present in `patch` in a single
+ * UPDATE, with no preceding read. This removes the read-modify-write race (a
+ * concurrent writer touching other columns is no longer clobbered) and lets a
+ * nullable column be set explicitly to null (the old `?? row.x` merge could
+ * never persist null for final_text). Column names come from a fixed allowlist;
+ * values are always bound.
+ */
 async function persistSession(
   db: D1Database,
   id: string,
-  patch: Partial<
-    Pick<
-      MaestroSessionRow,
-      'status' | 'current_author' | 'current_text' | 'final_text' | 'observed_cost_usd' | 'events_json' | 'error'
-    >
-  >,
+  patch: SessionPatch,
+  opts: { ifStatusIn?: readonly string[] } = {},
 ): Promise<void> {
-  const row = await loadSession(db, id);
-  if (!row) return;
+  const assignments: string[] = [];
+  const values: unknown[] = [];
+  for (const column of PERSIST_COLUMNS) {
+    if (Object.hasOwn(patch, column)) {
+      assignments.push(`${column} = ?`);
+      values.push(patch[column]);
+    }
+  }
+  if (assignments.length === 0) return;
+  assignments.push('updated_at = ?');
+  values.push(nowIso());
+  let where = 'id = ?';
+  values.push(id);
+  // Optional compare-and-swap guard: only apply the write if the row is still in
+  // one of the expected statuses. This makes terminal transitions atomic so a
+  // concurrent operator cancel / sweeper / finalization cannot be clobbered.
+  if (opts.ifStatusIn?.length) {
+    where += ` AND status IN (${opts.ifStatusIn.map(() => '?').join(', ')})`;
+    values.push(...opts.ifStatusIn);
+  }
   await db
-    .prepare(
-      `UPDATE maestro_ai_sessions
-       SET status = ?, current_author = ?, current_text = ?, final_text = ?, observed_cost_usd = ?, events_json = ?, error = ?, updated_at = ?
-       WHERE id = ?`,
-    )
-    .bind(
-      patch.status ?? row.status,
-      patch.current_author ?? row.current_author,
-      patch.current_text ?? row.current_text,
-      patch.final_text ?? row.final_text,
-      patch.observed_cost_usd ?? row.observed_cost_usd,
-      patch.events_json ?? row.events_json,
-      patch.error ?? row.error,
-      nowIso(),
-      id,
-    )
+    .prepare(`UPDATE maestro_ai_sessions SET ${assignments.join(', ')} WHERE ${where}`)
+    .bind(...values)
     .run();
+}
+
+/** True when the runner must stop: the row is gone or no longer in a runnable
+ *  (queued/running) status, i.e. an operator cancel / sweeper / finalization has
+ *  already written a terminal status that must not be clobbered. */
+function runnerStopRequested(row: { status?: unknown } | null): boolean {
+  const status = row?.status;
+  return !row || (status !== 'queued' && status !== 'running');
 }
 
 async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promise<void> {
@@ -1274,6 +1504,20 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
 
   try {
     logMaestro('info', 'session_started', { session_id: id, initial_agent: initialAgent, active_agents: activeAgents });
+    // Cooperative cancellation (pre-draft): an operator cancel / sweeper can flip
+    // the status to terminal while the session is still queued. Detect it BEFORE
+    // the cost guard, the paid provider call, and any draft event/artifact.
+    const preDraftLive = await loadSession(db, id);
+    if (runnerStopRequested(preDraftLive)) {
+      logMaestro('warn', 'session_interrupted', { session_id: id, status: preDraftLive?.status });
+      return;
+    }
+    const draftPrompt = buildDraftPrompt(input, id);
+    const draftRates = input.rates?.[initialAgent] ?? {};
+    const projectedDraftCost = estimateCost(draftPrompt, MAX_OUTPUT_TOKENS, draftRates);
+    if (!Number.isFinite(projectedDraftCost) || observedCost + projectedDraftCost > Number(input.max_cost_usd)) {
+      throw new Error(`Cost guard blocked initial draft before provider call (${AGENT_LABELS[initialAgent]}).`);
+    }
     await pushEvent({
       at: nowIso(),
       agent: initialAgent,
@@ -1281,18 +1525,37 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       status: 'running',
       message: 'Draft call started.',
     });
-    const draftPrompt = buildDraftPrompt(input, id);
-    const draftRates = input.rates?.[initialAgent] ?? {};
-    const projectedDraftCost = estimateCost(draftPrompt, MAX_OUTPUT_TOKENS, draftRates);
-    if (!Number.isFinite(projectedDraftCost) || observedCost + projectedDraftCost > Number(input.max_cost_usd)) {
-      throw new Error(`Cost guard blocked initial draft before provider call (${AGENT_LABELS[initialAgent]}).`);
+    // Re-check immediately before the paid call: a cancel can land during the
+    // `await pushEvent` above, and the provider request must not run (cost) for a
+    // session that is no longer queued/running. This load is the last statement
+    // before callProvider, so no await can interpose a stale read.
+    const beforeCallLive = await loadSession(db, id);
+    if (runnerStopRequested(beforeCallLive)) {
+      logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeCallLive?.status });
+      return;
     }
     const draft = await callProvider(env, initialAgent, draftPrompt, input.models ?? {});
     const draftCost = calculateObservedCost(draft, draftPrompt, draftRates);
     observedCost += draftCost;
+    // Cooperative cancellation (post-draft): if the session was cancelled while
+    // the initial provider call was in flight, do not write the draft
+    // artifact/events for the now-cancelled session.
+    const postDraftLive = await loadSession(db, id);
+    if (runnerStopRequested(postDraftLive)) {
+      logMaestro('warn', 'session_interrupted', { session_id: id, status: postDraftLive?.status });
+      return;
+    }
     let currentText = draft.text;
-    const draftLinkAudit = await auditLinks(currentText);
-    const invalidDraftLinks = draftLinkAudit.filter((result) => !result.ok);
+    // M3: an empty provider response (e.g. a thinking-only completion) must not
+    // silently start a paid review chain over a blank text. Fail fast.
+    if (!currentText.trim()) {
+      throw new Error(`O provedor ${AGENT_LABELS[initialAgent]} retornou um rascunho vazio (texto em branco).`);
+    }
+    let currentLinkAudit = await auditLinks(currentText);
+    // M4: only a genuinely broken link (4xx other than 429) blocks the session.
+    // Transient failures (timeout / network / 429 / 5xx) must not terminate a
+    // paid session — they are logged but the run proceeds.
+    const brokenDraftLinks = currentLinkAudit.filter((result) => !result.ok);
     artifactTurn += 1;
     const draftArtifact = await createArtifact(db, {
       sessionId: id,
@@ -1300,16 +1563,16 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       turn: artifactTurn,
       agent: initialAgent,
       role: 'draft',
-      status: invalidDraftLinks.length ? 'blocked' : 'ready',
+      status: brokenDraftLinks.length ? 'blocked' : 'ready',
       title: input.title,
       contentMd: currentText,
       revisionReport: JSON.stringify({
         reviewer: initialAgent,
         role: 'initial_drafter',
-        status: invalidDraftLinks.length ? 'blocked' : 'ready',
+        status: brokenDraftLinks.length ? 'blocked' : 'ready',
         custody: 'created',
       }),
-      linkAudit: draftLinkAudit,
+      linkAudit: currentLinkAudit,
       costUsd: draftCost,
       model: draft.model,
       previousArtifactId,
@@ -1319,32 +1582,37 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       at: nowIso(),
       agent: initialAgent,
       role: 'draft',
-      status: invalidDraftLinks.length ? 'blocked' : 'ready',
-      message: invalidDraftLinks.length
-        ? `Initial draft produced with ${invalidDraftLinks.length} invalid link(s).`
+      status: brokenDraftLinks.length ? 'blocked' : 'ready',
+      message: brokenDraftLinks.length
+        ? `Initial draft produced with ${brokenDraftLinks.length} broken link(s).`
         : 'Initial draft produced.',
       cost_usd: draftCost,
       model: draft.model,
-      link_audit: draftLinkAudit,
+      link_audit: currentLinkAudit,
     });
-    if (invalidDraftLinks.length) {
-      await persistSession(db, id, {
-        status: 'error',
-        current_author: currentAuthor,
-        current_text: currentText,
-        observed_cost_usd: observedCost,
-        error: `Link audit blocked draft: ${invalidDraftLinks
-          .map((result) => `${result.url} (${result.status ?? result.error ?? 'invalid'})`)
-          .join('; ')}`,
-      });
+    if (brokenDraftLinks.length) {
+      await persistSession(
+        db,
+        id,
+        {
+          status: 'blocked_link_audit',
+          current_author: currentAuthor,
+          current_text: currentText,
+          observed_cost_usd: observedCost,
+          error: `Link audit blocked draft: ${brokenDraftLinks
+            .map((result) => `${result.url} (${result.status ?? result.error ?? 'invalid'})`)
+            .join('; ')}`,
+        },
+        { ifStatusIn: ['queued', 'running'] },
+      );
       return;
     }
-    await persistSession(db, id, {
-      status: 'running',
-      current_author: currentAuthor,
-      current_text: currentText,
-      observed_cost_usd: observedCost,
-    });
+    await persistSession(
+      db,
+      id,
+      { status: 'running', current_author: currentAuthor, current_text: currentText, observed_cost_usd: observedCost },
+      { ifStatusIn: ['queued', 'running'] },
+    );
 
     const order = [
       ...activeAgents.slice(activeAgents.indexOf(initialAgent) + 1),
@@ -1359,6 +1627,14 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       let changedThisCycle = false;
       for (const reviewer of order) {
         if (reviewer === currentAuthor) continue;
+        // Cooperative cancellation: an operator cancel (or sweeper) flips the
+        // stored status to a terminal state; detect it between turns and stop
+        // without clobbering the terminal status the canceller already wrote.
+        const live = await loadSession(db, id);
+        if (live && live.status !== 'running') {
+          logMaestro('warn', 'session_interrupted', { session_id: id, status: live.status });
+          return;
+        }
         if (runtimeLimitExceeded(startedAtMs, input.max_runtime_minutes)) {
           await pushEvent({
             at: nowIso(),
@@ -1367,7 +1643,12 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             status: 'blocked',
             message: `Time guard blocked provider call before ${AGENT_LABELS[reviewer]}.`,
           });
-          await persistSession(db, id, { status: 'blocked_time', observed_cost_usd: observedCost });
+          await persistSession(
+            db,
+            id,
+            { status: 'blocked_time', observed_cost_usd: observedCost },
+            { ifStatusIn: ['queued', 'running'] },
+          );
           return;
         }
         eligibleVotes += 1;
@@ -1398,12 +1679,38 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             message: `Cost guard blocked provider call before ${AGENT_LABELS[reviewer]}.`,
             cost_usd: projected,
           });
-          await persistSession(db, id, { status: 'blocked_cost', observed_cost_usd: observedCost });
+          await persistSession(
+            db,
+            id,
+            { status: 'blocked_cost', observed_cost_usd: observedCost },
+            { ifStatusIn: ['queued', 'running'] },
+          );
+          return;
+        }
+        // Cooperative cancellation (pre-call): a cancel can land during the
+        // revision start event's await above; re-check immediately before the paid
+        // reviewer call so it is not issued for a no-longer-running session.
+        const beforeReviewLive = await loadSession(db, id);
+        if (runnerStopRequested(beforeReviewLive)) {
+          logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeReviewLive?.status });
           return;
         }
         const result = await callProvider(env, reviewer, prompt, input.models ?? {});
         const cost = calculateObservedCost(result, prompt, rates);
         observedCost += cost;
+        // Cooperative cancellation (post-call): if cancelled while the reviewer
+        // call was in flight, do not write revision artifacts/events for the
+        // now-cancelled session.
+        const afterReviewLive = await loadSession(db, id);
+        if (runnerStopRequested(afterReviewLive)) {
+          logMaestro('warn', 'session_interrupted', { session_id: id, status: afterReviewLive?.status });
+          return;
+        }
+        // M3: an empty reviewer response is a provider failure, not a silent
+        // NOT_READY vote. Fail fast instead of recording a meaningless turn.
+        if (!result.text.trim()) {
+          throw new Error(`O provedor ${AGENT_LABELS[reviewer]} retornou uma revisao vazia (texto em branco).`);
+        }
         const status = extractStatus(result.text);
         const revisionReport =
           extractTagged(result.text, 'maestro_revision_report') ||
@@ -1447,17 +1754,26 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             cost_usd: cost,
             model: result.model,
           });
-          await persistSession(db, id, {
-            status: 'blocked_revision_contract',
-            current_author: currentAuthor,
-            current_text: currentText,
-            observed_cost_usd: observedCost,
-            error: revisionGuardError,
-          });
+          await persistSession(
+            db,
+            id,
+            {
+              status: 'blocked_revision_contract',
+              current_author: currentAuthor,
+              current_text: currentText,
+              observed_cost_usd: observedCost,
+              error: revisionGuardError,
+            },
+            { ifStatusIn: ['queued', 'running'] },
+          );
           return;
         }
-        const linkAudit = await auditLinks(candidateText);
-        const invalidLinks = linkAudit.filter((link) => !link.ok);
+        // M4: re-audit only when the custody text actually changed. Unchanged
+        // text already passed the previous audit, so re-fetching its links only
+        // risks a transient failure killing an otherwise-valid session.
+        const linkAudit = changedByReviewer ? await auditLinks(candidateText) : currentLinkAudit;
+        if (changedByReviewer) currentLinkAudit = linkAudit;
+        const brokenLinks = linkAudit.filter((link) => !link.ok);
         artifactTurn += 1;
         const artifact = await createArtifact(db, {
           sessionId: id,
@@ -1465,7 +1781,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           turn: artifactTurn,
           agent: reviewer,
           role: 'revision',
-          status: invalidLinks.length ? 'blocked' : status.toLowerCase(),
+          status: brokenLinks.length ? 'blocked' : status.toLowerCase(),
           title: input.title,
           contentMd: candidateText,
           revisionReport,
@@ -1475,26 +1791,31 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           previousArtifactId,
         });
         previousArtifactId = artifact.id;
-        if (invalidLinks.length) {
+        if (brokenLinks.length) {
           await pushEvent({
             at: nowIso(),
             agent: reviewer,
             role: 'revision',
             status: 'blocked',
-            message: `Automatic link audit blocked ${invalidLinks.length} invalid link(s).`,
+            message: `Automatic link audit blocked ${brokenLinks.length} broken link(s).`,
             cost_usd: cost,
             model: result.model,
             link_audit: linkAudit,
           });
-          await persistSession(db, id, {
-            status: 'error',
-            current_author: currentAuthor,
-            current_text: currentText,
-            observed_cost_usd: observedCost,
-            error: `Link audit blocked revision: ${invalidLinks
-              .map((link) => `${link.url} (${link.status ?? link.error ?? 'invalid'})`)
-              .join('; ')}`,
-          });
+          await persistSession(
+            db,
+            id,
+            {
+              status: 'blocked_link_audit',
+              current_author: currentAuthor,
+              current_text: currentText,
+              observed_cost_usd: observedCost,
+              error: `Link audit blocked revision: ${brokenLinks
+                .map((link) => `${link.url} (${link.status ?? link.error ?? 'invalid'})`)
+                .join('; ')}`,
+            },
+            { ifStatusIn: ['queued', 'running'] },
+          );
           return;
         }
         if (revisedText && changedByReviewer) {
@@ -1513,8 +1834,11 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           model: result.model,
           link_audit: linkAudit,
         });
+        // Do NOT re-assert status:'running' here. The session is already
+        // 'running'; rewriting it would clobber a concurrent operator cancel
+        // (blocked_cancelled) that landed during this turn, defeating the
+        // cooperative-cancel check at the top of the next iteration.
         await persistSession(db, id, {
-          status: 'running',
           current_author: currentAuthor,
           current_text: currentText,
           observed_cost_usd: observedCost,
@@ -1534,14 +1858,19 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       observed_cost_usd: observedCost,
       current_author: currentAuthor,
     });
-    await persistSession(db, id, {
-      status: converged ? 'converged' : 'blocked_max_cycles',
-      current_author: currentAuthor,
-      current_text: currentText,
-      final_text: converged ? currentText : null,
-      observed_cost_usd: observedCost,
-      events_json: JSON.stringify(events),
-    });
+    await persistSession(
+      db,
+      id,
+      {
+        status: converged ? 'converged' : 'blocked_max_cycles',
+        current_author: currentAuthor,
+        current_text: currentText,
+        final_text: converged ? currentText : null,
+        observed_cost_usd: observedCost,
+        events_json: JSON.stringify(events),
+      },
+      { ifStatusIn: ['queued', 'running'] },
+    );
   } catch (error) {
     logMaestro('error', 'session_failed', {
       session_id: id,
@@ -1553,12 +1882,17 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       status: 'error',
       message: error instanceof Error ? error.message : 'Unknown Maestro AI failure.',
     });
-    await persistSession(db, id, {
-      status: 'error',
-      observed_cost_usd: observedCost,
-      events_json: JSON.stringify(events),
-      error: error instanceof Error ? error.message : String(error),
-    });
+    await persistSession(
+      db,
+      id,
+      {
+        status: 'error',
+        observed_cost_usd: observedCost,
+        events_json: JSON.stringify(events),
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { ifStatusIn: ['queued', 'running'] },
+    );
   }
 }
 
@@ -1767,7 +2101,12 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
     const body = (await context.request.json()) as MaestroSettingsRequest;
     const protocolText = sanitizeText(body.protocol_text ?? current.protocol_text, 160_000);
     const maxCostUsd = Number(body.max_cost_usd ?? current.max_cost_usd);
-    const rawRuntimeLimit = body.max_runtime_minutes ?? current.max_runtime_minutes;
+    // Distinguish "field present and null" (clear the limit) from "field absent"
+    // (keep current). A bare `??` treats an explicit null as absent, making the
+    // limit impossible to clear back to "no limit" once set.
+    const rawRuntimeLimit = Object.hasOwn(body, 'max_runtime_minutes')
+      ? body.max_runtime_minutes
+      : current.max_runtime_minutes;
     const maxRuntimeMinutes = rawRuntimeLimit == null || Number(rawRuntimeLimit) <= 0 ? null : Number(rawRuntimeLimit);
     const maxCycles = Number(body.max_cycles ?? current.max_cycles);
     if (protocolText.length < 100) {
@@ -1894,9 +2233,22 @@ export async function handleMaestroAiSessionContentPut(context: RequestContext, 
     const body = (await context.request.json()) as { title?: string; content?: string };
     const row = await loadSession(db, sessionId);
     if (!row) return json({ ok: false, error: 'Sessao Maestro AI nao encontrada.' }, 404);
+    if (row.status === 'running' || row.status === 'queued') {
+      return json(
+        { ok: false, error: 'Sessao em execucao; aguarde terminar ou cancele antes de editar o conteudo.' },
+        409,
+      );
+    }
+    // Fallback simétrico: title e content ausentes preservam o valor atual.
+    // Sem isso, `content` omitido apagaria current_text (sanitizeText(undefined) === '').
     await db
       .prepare('UPDATE maestro_ai_sessions SET title = ?, current_text = ?, updated_at = ? WHERE id = ?')
-      .bind(sanitizeText(body.title || row.title, 200), sanitizeText(body.content, 160_000), nowIso(), sessionId)
+      .bind(
+        sanitizeText(body.title ?? row.title, 200),
+        sanitizeText(body.content ?? row.current_text, 160_000),
+        nowIso(),
+        sessionId,
+      )
       .run();
     const next = await loadSession(db, sessionId);
     return json({ ok: true, session: next ? publicSession(next) : null });
@@ -1906,4 +2258,84 @@ export async function handleMaestroAiSessionContentPut(context: RequestContext, 
       500,
     );
   }
+}
+
+const ACTIVE_SESSION_STATUSES = new Set(['queued', 'running']);
+
+/**
+ * P0: operator-driven cancellation. A session whose runner is wedged (or simply
+ * unwanted) can be moved to a terminal state without surgery on D1. The running
+ * runner detects this between turns (cooperative cancel) and stops.
+ */
+export async function handleMaestroAiSessionCancelPost(context: RequestContext, sessionId: string): Promise<Response> {
+  try {
+    const db = requireDb(context.env);
+    await ensureSchema(db);
+    const row = await loadSession(db, sessionId);
+    if (!row) return json({ ok: false, error: 'Sessao Maestro AI nao encontrada.' }, 404);
+    if (!ACTIVE_SESSION_STATUSES.has(row.status)) {
+      return json({ ok: false, error: 'Sessao ja finalizada; nada a cancelar.' }, 409);
+    }
+    const events = parseJson<SessionEvent[]>(row.events_json, []);
+    events.push({ at: nowIso(), status: 'blocked', message: 'Sessao cancelada pelo operador.' });
+    await persistSession(
+      db,
+      sessionId,
+      {
+        status: 'blocked_cancelled',
+        events_json: JSON.stringify(events),
+        error: 'Sessao cancelada pelo operador.',
+      },
+      { ifStatusIn: ['queued', 'running'] },
+    );
+    const next = await loadSession(db, sessionId);
+    return json({ ok: true, session: next ? publicSession(next) : null });
+  } catch (error) {
+    return json({ ok: false, error: error instanceof Error ? error.message : 'Erro ao cancelar Maestro AI.' }, 500);
+  }
+}
+
+// A session whose updated_at has not advanced within this window while still in
+// a non-terminal state is considered orphaned (the waitUntil runner was evicted
+// or the worker was redeployed mid-run) and is swept to a terminal state.
+const STALE_SESSION_MS = 10 * 60_000;
+
+/**
+ * P0: reap orphaned sessions. The runner advances updated_at after every turn,
+ * so a queued/running row that has been silent past STALE_SESSION_MS will never
+ * complete on its own — move it to a terminal 'error' instead of leaving it
+ * stuck forever. Returns the number of sessions reaped.
+ */
+async function sweepStaleSessions(db: D1Database, nowMs = Date.now()): Promise<number> {
+  const rows = await db
+    .prepare("SELECT id, status, updated_at FROM maestro_ai_sessions WHERE status IN ('queued', 'running')")
+    .bind()
+    .all<{ id: string; status: string; updated_at: string }>();
+  let reaped = 0;
+  for (const row of rows.results) {
+    if (row.status !== 'queued' && row.status !== 'running') continue;
+    const updatedMs = Date.parse(String(row.updated_at));
+    if (Number.isFinite(updatedMs) && nowMs - updatedMs > STALE_SESSION_MS) {
+      await persistSession(
+        db,
+        row.id,
+        {
+          status: 'error',
+          error:
+            'Sessao interrompida: o processamento nao avancou dentro do tempo esperado e foi encerrado automaticamente.',
+        },
+        { ifStatusIn: ['queued', 'running'] },
+      );
+      reaped += 1;
+    }
+  }
+  return reaped;
+}
+
+/** Cron entry point: ensure the schema exists and reap stale sessions. */
+export async function runMaestroSweep(env: MaestroAiEnv): Promise<number> {
+  const db = env.BIGDATA_DB;
+  if (!db) return 0;
+  await ensureSchema(db);
+  return sweepStaleSessions(db);
 }

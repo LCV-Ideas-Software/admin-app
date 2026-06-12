@@ -5,6 +5,9 @@
   "compatibility_date": "2026-04-06",
   "workers_dev": false,
   "compatibility_flags": ["nodejs_compat"],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "observability": {
     "enabled": true,
     "logs": {
