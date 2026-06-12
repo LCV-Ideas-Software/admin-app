@@ -847,6 +847,84 @@ describe('runSession orchestrator', () => {
     expect(db.__artifacts.size).toBe(0);
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
   });
+
+  it('does not write a revision artifact when cancelled during a reviewer call', async () => {
+    const db = createInMemoryDb({
+      sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'codex']), max_cycles: 1 })],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (hostOf(url) === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({ content: [{ type: 'text', text: 'Rascunho valido e robusto.' }], usage: {} }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        // Operator cancels while the reviewer call is in flight.
+        const row = db.__sessions.get('run-1');
+        if (row) row.status = 'blocked_cancelled';
+        return new Response(JSON.stringify({ output_text: 'MAESTRO_STATUS: READY' }), { status: 200 });
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // The reviewer call happened but the cancelled turn writes no revision artifact;
+    // only the draft artifact remains.
+    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
+    expect(db.__artifacts.size).toBe(1);
+  });
+
+  it('does not issue the reviewer call when cancelled during the revision start event', async () => {
+    const db = createInMemoryDb({
+      sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'codex']), max_cycles: 1 })],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (hostOf(String(input)) === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({ content: [{ type: 'text', text: 'Rascunho valido e robusto.' }], usage: {} }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ output_text: 'MAESTRO_STATUS: READY' }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    // Cancel lands while the "Serial revision turn started" event is persisted —
+    // the await between the pre-turn check and the reviewer callProvider.
+    const realPrepare = db.prepare.bind(db);
+    db.prepare = ((query: string) => {
+      const stmt = realPrepare(query);
+      const realBind = stmt.bind.bind(stmt);
+      stmt.bind = (...values: unknown[]) => {
+        const bound = realBind(...values);
+        const realRun = bound.run.bind(bound);
+        bound.run = async () => {
+          const result = await realRun();
+          if (
+            /UPDATE maestro_ai_sessions/i.test(query) &&
+            values.some((v) => typeof v === 'string' && v.includes('Serial revision turn started'))
+          ) {
+            const row = db.__sessions.get('run-1');
+            if (row) row.status = 'blocked_cancelled';
+          }
+          return result;
+        };
+        return bound;
+      };
+      return stmt;
+    }) as typeof db.prepare;
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // The before-call re-check catches the cancel: the reviewer (openai) is never
+    // called and only the draft artifact exists.
+    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
+    expect(db.__artifacts.size).toBe(1);
+  });
 });
 
 describe('handleMaestroAiSessionsGet (list)', () => {

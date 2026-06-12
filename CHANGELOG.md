@@ -12,7 +12,7 @@
 ### Corrigido
 
 - **Maestro AI — SSRF na auditoria de links**: links no conteúdo auditado que apontam para hosts internos/privados — IPv4 literais (loopback, RFC1918, link-local), IPv6 (`::1`, ULA `fc00::/7`, link-local `fe80::/10`), IPv4 mapeado/compatível em IPv6 (`[::ffff:127.0.0.1]`, `[::1]`) e nomes `localhost`/`.internal`/`.local` — são rejeitados **sem** requisição de saída e surgem como falha de auditoria, em vez de serem buscados (exfiltração) ou silenciosamente ignorados. O seguidor de redirecionamento (limitado) revalida o host de cada `Location`, e o tokenizador de URLs preserva literais IPv6 entre colchetes.
-- **Maestro AI — trabalho pago após cancelamento**: cancelar uma sessão ainda `queued` agora impede a chamada inicial (paga) de rascunho e a escrita de artefatos/eventos da sessão cancelada.
+- **Maestro AI — trabalho pago após cancelamento**: cancelar uma sessão agora interrompe o runner antes e depois de cada chamada de provedor — tanto o rascunho inicial quanto cada turno de revisão —, impedindo a chamada paga e a escrita de artefatos/eventos para a sessão cancelada.
 - **Maestro AI — rascunho/revisão vazios**: uma resposta de provedor em branco passa a falhar explicitamente, em vez de iniciar uma cadeia de revisão paga sobre texto vazio.
 - **Maestro AI — persistência atômica**: `persistSession` faz UPDATE dinâmico com _compare-and-swap_ (`status IN (...)`), evitando que uma transição terminal concorrente (cancelamento, varredura, finalização) seja sobrescrita.
 - **Maestro AI — timeout por chamada de provedor** (120 s) para evitar execuções presas indefinidamente.

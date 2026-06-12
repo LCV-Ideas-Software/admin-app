@@ -1687,9 +1687,25 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           );
           return;
         }
+        // Cooperative cancellation (pre-call): a cancel can land during the
+        // revision start event's await above; re-check immediately before the paid
+        // reviewer call so it is not issued for a no-longer-running session.
+        const beforeReviewLive = await loadSession(db, id);
+        if (runnerStopRequested(beforeReviewLive)) {
+          logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeReviewLive?.status });
+          return;
+        }
         const result = await callProvider(env, reviewer, prompt, input.models ?? {});
         const cost = calculateObservedCost(result, prompt, rates);
         observedCost += cost;
+        // Cooperative cancellation (post-call): if cancelled while the reviewer
+        // call was in flight, do not write revision artifacts/events for the
+        // now-cancelled session.
+        const afterReviewLive = await loadSession(db, id);
+        if (runnerStopRequested(afterReviewLive)) {
+          logMaestro('warn', 'session_interrupted', { session_id: id, status: afterReviewLive?.status });
+          return;
+        }
         // M3: an empty reviewer response is a provider failure, not a silent
         // NOT_READY vote. Fail fast instead of recording a meaningless turn.
         if (!result.text.trim()) {
