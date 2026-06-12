@@ -22,6 +22,16 @@ const rates = {
   perplexity: { input_usd_per_million: 2, output_usd_per_million: 8, request_usd_per_1k: 14 },
 };
 
+// Exact-hostname match for fetch URLs (substring `.includes(host)` checks are
+// both fragile and flagged by CodeQL's incomplete-URL-sanitization query).
+const hostOf = (u: unknown): string => {
+  try {
+    return new URL(String(u)).hostname;
+  } catch {
+    return '';
+  }
+};
+
 type Row = Record<string, unknown>;
 
 function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; artifacts?: Row[] } = {}) {
@@ -603,7 +613,7 @@ describe('runSession orchestrator', () => {
   }) =>
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes('api.anthropic.com')) {
+      if (hostOf(url) === 'api.anthropic.com') {
         opts.onAnthropic?.();
         return new Response(
           JSON.stringify({
@@ -613,7 +623,7 @@ describe('runSession orchestrator', () => {
           { status: 200 },
         );
       }
-      if (url.includes('api.openai.com')) {
+      if (hostOf(url) === 'api.openai.com') {
         return new Response(
           JSON.stringify({
             output_text: opts.codexText ?? 'MAESTRO_STATUS: READY',
@@ -649,7 +659,7 @@ describe('runSession orchestrator', () => {
 
     expect(db.__sessions.get('run-1')?.status).toBe('error');
     expect(String(db.__sessions.get('run-1')?.error)).toMatch(/vazi|empty/i);
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('api.openai.com'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
   });
 
   it('converges when the sole reviewer returns READY without changing custody', async () => {
@@ -702,14 +712,14 @@ describe('runSession orchestrator', () => {
     vi.unstubAllGlobals();
 
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_link_audit');
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('api.openai.com'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
   });
 
   it('blocks the session when the draft contains an internal-host link, without ever fetching it', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('api.anthropic.com')) {
+      if (hostOf(url) === 'api.anthropic.com') {
         return new Response(
           JSON.stringify({
             content: [{ type: 'text', text: 'Veja http://169.254.169.254/latest/meta e http://localhost:8787/admin' }],
@@ -726,10 +736,10 @@ describe('runSession orchestrator', () => {
 
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_link_audit');
     // The internal hosts were judged broken WITHOUT any outbound fetch to them.
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('169.254.169.254'))).toBe(false);
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('localhost'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === '169.254.169.254')).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'localhost')).toBe(false);
     // ...and reviewers were never invoked.
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('api.openai.com'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
   });
 
   it('stops cooperatively when the session is cancelled mid-run and skips remaining reviewers', async () => {
@@ -742,12 +752,12 @@ describe('runSession orchestrator', () => {
     // The pre-turn check before deepseek must detect it and stop.
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('api.anthropic.com')) {
+      if (hostOf(url) === 'api.anthropic.com') {
         return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Rascunho valido.' }], usage: {} }), {
           status: 200,
         });
       }
-      if (url.includes('api.openai.com')) {
+      if (hostOf(url) === 'api.openai.com') {
         const row = db.__sessions.get('run-1');
         if (row) row.status = 'blocked_cancelled';
         return new Response(JSON.stringify({ output_text: 'MAESTRO_STATUS: NOT_READY' }), { status: 200 });
@@ -759,7 +769,7 @@ describe('runSession orchestrator', () => {
     vi.unstubAllGlobals();
 
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('api.deepseek.com'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.deepseek.com')).toBe(false);
   });
 });
 
@@ -1216,14 +1226,14 @@ describe('checkOneLink (retry + bounded redirect follow)', () => {
   it('refuses to follow a redirect into an internal host and never fetches it', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('169.254.169.254')) return new Response('secret', { status: 200 });
+      if (hostOf(url) === '169.254.169.254') return new Response('secret', { status: 200 });
       return new Response('', { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' } });
     });
     vi.stubGlobal('fetch', fetchMock);
     const result = await maestroAiTestHooks.checkOneLink('https://example.com/start');
     vi.unstubAllGlobals();
     expect(result.ok).toBe(false);
-    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('169.254.169.254'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === '169.254.169.254')).toBe(false);
   });
 });
 
@@ -1252,13 +1262,38 @@ describe('maestro link-audit host safety (SSRF hardening)', () => {
     }
   });
 
+  it('blocks IPv4-mapped/compat IPv6 literals that resolve to loopback/private (SSRF bypass)', () => {
+    // URL.hostname normalizes ::ffff:127.0.0.1 -> ::ffff:7f00:1, ::ffff:192.168.0.1 -> ::ffff:c0a8:1
+    for (const host of [
+      '::ffff:7f00:1',
+      '[::ffff:7f00:1]',
+      '::ffff:127.0.0.1',
+      '::ffff:c0a8:1',
+      '::ffff:192.168.0.1',
+      '::127.0.0.1',
+    ]) {
+      expect(maestroAiTestHooks.isBlockedAuditHost(host)).toBe(true);
+    }
+    // A mapped PUBLIC address (8.8.8.8 -> ::ffff:808:808) stays allowed.
+    expect(maestroAiTestHooks.isBlockedAuditHost('::ffff:808:808')).toBe(false);
+  });
+
+  it('never fetches an IPv4-mapped IPv6 loopback target', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await maestroAiTestHooks.checkOneLink('http://[::ffff:127.0.0.1]/');
+    vi.unstubAllGlobals();
+    expect(result.ok).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('flags a blocked-host URL as broken WITHOUT fetching it (audit failure, not silent omission)', async () => {
     // extractUrls surfaces the blocked host so the audit can report it...
     const urls = maestroAiTestHooks.extractUrls(
       'See https://example.com/ok and http://169.254.169.254/meta and http://localhost:8787/admin',
     );
     expect(urls).toContain('https://example.com/ok');
-    expect(urls.some((u: string) => u.includes('169.254.169.254'))).toBe(true);
+    expect(urls.some((u: string) => hostOf(u) === '169.254.169.254')).toBe(true);
     // ...but checkOneLink rejects it as !ok and never performs a fetch.
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

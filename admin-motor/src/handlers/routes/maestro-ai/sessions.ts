@@ -865,6 +865,36 @@ function extractTagged(text: string, tag: string): string | null {
  * search content), so the auto-fetch must never reach internal infrastructure
  * (SSRF). Returns true when the host must NOT be fetched.
  */
+/** True when an IPv4 literal falls in a private / loopback / link-local / unspecified range. */
+function isPrivateIpv4(host: string): boolean {
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!ipv4) return false;
+  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
+
+/**
+ * Extract the embedded IPv4 from an IPv4-mapped/compatible IPv6 literal so the
+ * private-range check can be applied. URL.hostname normalizes such literals to
+ * the hex form (e.g. ::ffff:127.0.0.1 -> ::ffff:7f00:1), which would otherwise
+ * slip past the prefix checks and allow SSRF to loopback/private IPv4 targets.
+ */
+function embeddedIpv4FromIpv6(host: string): string | null {
+  const dotted = /^::(?:ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);
+  if (dotted) return dotted[1] ?? null;
+  const hex = /^::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(host);
+  if (hex) {
+    const hi = Number.parseInt(hex[1] ?? '0', 16);
+    const lo = Number.parseInt(hex[2] ?? '0', 16);
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+  }
+  return null;
+}
+
 function isBlockedAuditHost(hostname: string): boolean {
   const host = hostname
     .trim()
@@ -877,14 +907,8 @@ function isBlockedAuditHost(hostname: string): boolean {
   if (!host.includes('.') && !host.includes(':')) return true;
 
   // IPv4 literal in private / loopback / link-local / unspecified ranges.
-  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    return false;
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+    return isPrivateIpv4(host);
   }
 
   // IPv6 loopback / unspecified / unique-local (fc00::/7) / link-local (fe80::/10).
@@ -892,6 +916,10 @@ function isBlockedAuditHost(hostname: string): boolean {
     if (host === '::1' || host === '::') return true;
     if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
     if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
+    // IPv4-mapped / IPv4-compatible IPv6 (e.g. ::ffff:127.0.0.1): apply the
+    // IPv4 private-range check to the embedded address.
+    const embedded = embeddedIpv4FromIpv6(host);
+    if (embedded) return isPrivateIpv4(embedded);
     return false;
   }
 
