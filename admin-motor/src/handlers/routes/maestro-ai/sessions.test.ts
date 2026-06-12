@@ -771,6 +771,82 @@ describe('runSession orchestrator', () => {
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
     expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.deepseek.com')).toBe(false);
   });
+
+  it('skips the initial draft provider call entirely when cancelled while queued', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    // Operator cancelled the session before the runner reached the draft call.
+    const queued = db.__sessions.get('run-1');
+    if (queued) queued.status = 'blocked_cancelled';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // No paid provider work, no draft artifact, cancelled status preserved.
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(db.__artifacts.size).toBe(0);
+    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
+  });
+
+  it('does not write a draft artifact when cancelled during the initial draft call', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (hostOf(String(input)) === 'api.anthropic.com') {
+        // Operator cancels while the draft provider call is in flight.
+        const row = db.__sessions.get('run-1');
+        if (row) row.status = 'blocked_cancelled';
+        return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Rascunho valido.' }], usage: {} }), {
+          status: 200,
+        });
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // The draft artifact is not written for the cancelled session and no reviewer runs.
+    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
+    expect(db.__artifacts.size).toBe(0);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
+  });
+
+  it('does not make the paid draft call when cancelled during the start event (pre-call window)', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    // Simulate an operator cancel landing exactly while the "Draft call started"
+    // event is persisted — the await between the pre-draft check and callProvider.
+    const realPrepare = db.prepare.bind(db);
+    db.prepare = ((query: string) => {
+      const stmt = realPrepare(query);
+      const realBind = stmt.bind.bind(stmt);
+      stmt.bind = (...values: unknown[]) => {
+        const bound = realBind(...values);
+        const realRun = bound.run.bind(bound);
+        bound.run = async () => {
+          const result = await realRun();
+          if (
+            /UPDATE maestro_ai_sessions/i.test(query) &&
+            values.some((v) => typeof v === 'string' && v.includes('Draft call started'))
+          ) {
+            const row = db.__sessions.get('run-1');
+            if (row) row.status = 'blocked_cancelled';
+          }
+          return result;
+        };
+        return bound;
+      };
+      return stmt;
+    }) as typeof db.prepare;
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // The before-call re-check catches the cancel: no paid provider request, no artifact.
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(db.__artifacts.size).toBe(0);
+    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
+  });
 });
 
 describe('handleMaestroAiSessionsGet (list)', () => {
@@ -1303,6 +1379,19 @@ describe('maestro link-audit host safety (SSRF hardening)', () => {
     expect(internal.ok).toBe(false);
     expect(localhost.ok).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('surfaces bracketed IPv6 URLs so internal IPv6 links are audited, not silently dropped', () => {
+    // The URL tokenizer must not truncate `http://[::ffff:127.0.0.1]/` at the
+    // bracket: an internal IPv6 literal has to reach checkOneLink as a real URL,
+    // otherwise isBlockedAuditHost is never consulted and the link is ignored.
+    const urls = maestroAiTestHooks.extractUrls(
+      'Veja http://[::ffff:127.0.0.1]/latest e http://[::1]/admin e https://example.com/ok',
+    );
+    const hosts = urls.map((u: string) => hostOf(u));
+    expect(hosts).toContain('[::ffff:7f00:1]'); // ::ffff:127.0.0.1 normalized by URL.hostname
+    expect(hosts).toContain('[::1]');
+    expect(urls).toContain('https://example.com/ok');
   });
 });
 

@@ -928,7 +928,10 @@ function isBlockedAuditHost(hostname: string): boolean {
 
 function extractUrls(text: string): string[] {
   const urls = new Set<string>();
-  for (const match of text.matchAll(/https?:\/\/[^\s<>"')\]}]+/gi)) {
+  // First alternative keeps a bracketed IPv6 host (e.g. http://[::ffff:127.0.0.1]/)
+  // intact so internal IPv6 literals still reach checkOneLink; without it the
+  // generic tokenizer stops at the closing `]` and the URL is dropped as malformed.
+  for (const match of text.matchAll(/https?:\/\/\[[0-9a-f:.]+\][^\s<>"')\]}]*|https?:\/\/[^\s<>"')\]}]+/gi)) {
     const url = match[0].replace(/[.,;:!?]+$/g, '');
     try {
       const parsed = new URL(url);
@@ -1452,6 +1455,14 @@ async function persistSession(
     .run();
 }
 
+/** True when the runner must stop: the row is gone or no longer in a runnable
+ *  (queued/running) status, i.e. an operator cancel / sweeper / finalization has
+ *  already written a terminal status that must not be clobbered. */
+function runnerStopRequested(row: { status?: unknown } | null): boolean {
+  const status = row?.status;
+  return !row || (status !== 'queued' && status !== 'running');
+}
+
 async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promise<void> {
   const row = await loadSession(db, id);
   if (!row) return;
@@ -1493,6 +1504,20 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
 
   try {
     logMaestro('info', 'session_started', { session_id: id, initial_agent: initialAgent, active_agents: activeAgents });
+    // Cooperative cancellation (pre-draft): an operator cancel / sweeper can flip
+    // the status to terminal while the session is still queued. Detect it BEFORE
+    // the cost guard, the paid provider call, and any draft event/artifact.
+    const preDraftLive = await loadSession(db, id);
+    if (runnerStopRequested(preDraftLive)) {
+      logMaestro('warn', 'session_interrupted', { session_id: id, status: preDraftLive?.status });
+      return;
+    }
+    const draftPrompt = buildDraftPrompt(input, id);
+    const draftRates = input.rates?.[initialAgent] ?? {};
+    const projectedDraftCost = estimateCost(draftPrompt, MAX_OUTPUT_TOKENS, draftRates);
+    if (!Number.isFinite(projectedDraftCost) || observedCost + projectedDraftCost > Number(input.max_cost_usd)) {
+      throw new Error(`Cost guard blocked initial draft before provider call (${AGENT_LABELS[initialAgent]}).`);
+    }
     await pushEvent({
       at: nowIso(),
       agent: initialAgent,
@@ -1500,15 +1525,26 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       status: 'running',
       message: 'Draft call started.',
     });
-    const draftPrompt = buildDraftPrompt(input, id);
-    const draftRates = input.rates?.[initialAgent] ?? {};
-    const projectedDraftCost = estimateCost(draftPrompt, MAX_OUTPUT_TOKENS, draftRates);
-    if (!Number.isFinite(projectedDraftCost) || observedCost + projectedDraftCost > Number(input.max_cost_usd)) {
-      throw new Error(`Cost guard blocked initial draft before provider call (${AGENT_LABELS[initialAgent]}).`);
+    // Re-check immediately before the paid call: a cancel can land during the
+    // `await pushEvent` above, and the provider request must not run (cost) for a
+    // session that is no longer queued/running. This load is the last statement
+    // before callProvider, so no await can interpose a stale read.
+    const beforeCallLive = await loadSession(db, id);
+    if (runnerStopRequested(beforeCallLive)) {
+      logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeCallLive?.status });
+      return;
     }
     const draft = await callProvider(env, initialAgent, draftPrompt, input.models ?? {});
     const draftCost = calculateObservedCost(draft, draftPrompt, draftRates);
     observedCost += draftCost;
+    // Cooperative cancellation (post-draft): if the session was cancelled while
+    // the initial provider call was in flight, do not write the draft
+    // artifact/events for the now-cancelled session.
+    const postDraftLive = await loadSession(db, id);
+    if (runnerStopRequested(postDraftLive)) {
+      logMaestro('warn', 'session_interrupted', { session_id: id, status: postDraftLive?.status });
+      return;
+    }
     let currentText = draft.text;
     // M3: an empty provider response (e.g. a thinking-only completion) must not
     // silently start a paid review chain over a blank text. Fail fast.
