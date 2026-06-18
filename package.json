@@ -60,7 +60,7 @@
     "@tiptap/starter-kit": "^3.27.0",
     "@tiptap/suggestion": "^3.27.0",
     "@tiptap/y-tiptap": "^3.0.5",
-    "dompurify": "^3.4.10",
+    "dompurify": "^3.4.11",
     "hono": "^4.12.25",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.20.0",
