@@ -26,7 +26,7 @@
   "dependencies": {
     "@google/genai": "^2.10.0",
     "@radix-ui/react-dialog": "^1.1.17",
-    "@tanstack/react-query": "^5.101.1",
+    "@tanstack/react-query": "^5.101.2",
     "@tiptap/core": "^3.27.1",
     "@tiptap/extension-character-count": "^3.27.1",
     "@tiptap/extension-code-block-lowlight": "^3.27.1",
@@ -81,7 +81,7 @@
     "@cloudflare/workers-types": "^4.20260629.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
-    "@tanstack/react-query-devtools": "^5.101.1",
+    "@tanstack/react-query-devtools": "^5.101.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.0.0",
