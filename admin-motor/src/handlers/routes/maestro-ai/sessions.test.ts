@@ -444,7 +444,7 @@ describe('Maestro AI settings', () => {
   it('saves API keys through Cloudflare Secret Store and not into D1 settings JSON', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith('/secrets') && !init?.method) {
+      if (url.includes('/secrets?') && !init?.method) {
         return new Response(JSON.stringify({ success: true, result: [] }), { status: 200 });
       }
       return new Response(JSON.stringify({ success: true, result: [{ id: 'created' }] }), { status: 200 });
@@ -480,6 +480,54 @@ describe('Maestro AI settings', () => {
       },
     ]);
     expect(JSON.stringify(payload.settings)).not.toContain('new-secret-claude');
+    vi.unstubAllGlobals();
+  });
+
+  it('updates an existing Secret Store key even when it sits beyond the first list page', async () => {
+    const fillerPage = Array.from({ length: 100 }, (_, i) => ({
+      id: `filler-${i}`,
+      name: `FILLER_${i}`,
+      status: 'active',
+    }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/secrets') && !url.includes('/secrets/') && (!init?.method || init.method === 'GET')) {
+        const page = new URL(url).searchParams.get('page');
+        const result =
+          page === '1'
+            ? fillerPage
+            : page === '2'
+              ? [{ id: 'sec-claude', name: 'MAESTRO_ANTHROPIC_API_KEY', status: 'active' }]
+              : [];
+        return new Response(JSON.stringify({ success: true, result }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: true, result: { id: 'sec-claude' } }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await handleMaestroAiSettingsPut(
+      createContext(
+        {
+          protocol_text: protocolText,
+          max_cost_usd: 20,
+          max_runtime_minutes: null,
+          max_cycles: 2,
+          rates,
+          api_keys: { claude: 'rotated-secret-claude' },
+        },
+        {},
+        createMaestroDb(),
+      ),
+    );
+    const payload = (await response.json()) as { ok: boolean };
+
+    expect(response.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/secrets/sec-claude'),
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+    const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(postCall).toBeUndefined();
     vi.unstubAllGlobals();
   });
 });

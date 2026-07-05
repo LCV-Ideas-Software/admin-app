@@ -759,10 +759,21 @@ async function cloudflareRequest<T>(env: MaestroAiEnv, path: string, init: Reque
 
 async function listSecretStoreSecrets(env: MaestroAiEnv): Promise<SecretStoreSecret[]> {
   const { accountId, storeId } = requireSecretStoreConfig(env);
-  return cloudflareRequest<SecretStoreSecret[]>(
-    env,
-    `/accounts/${encodeURIComponent(accountId)}/secrets_store/stores/${encodeURIComponent(storeId)}/secrets`,
-  );
+  // The store is shared with other apps, so the MAESTRO_* secrets can sit past
+  // the first page (the API defaults to per_page=20); read every page or the
+  // upsert below falls into the create branch and Cloudflare rejects the
+  // duplicate name.
+  const secrets: SecretStoreSecret[] = [];
+  const perPage = 100;
+  for (let page = 1; page <= 50; page += 1) {
+    const batch = await cloudflareRequest<SecretStoreSecret[]>(
+      env,
+      `/accounts/${encodeURIComponent(accountId)}/secrets_store/stores/${encodeURIComponent(storeId)}/secrets?page=${page}&per_page=${perPage}`,
+    );
+    secrets.push(...(batch ?? []));
+    if (!batch || batch.length < perPage) break;
+  }
+  return secrets;
 }
 
 async function upsertSecretStoreSecret(env: MaestroAiEnv, agent: ProviderKey, value: string): Promise<void> {
