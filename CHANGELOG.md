@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.04.00] - 2026-07-05
+
+### Alterado
+
+- **Maestro AI — paridade de contrato de I/O com o maestro-app (Plano A do roadmap de equiparação)**: o maestro-app (desktop) é a fonte canônica de comportamento; quatro rotinas do módulo web passam a espelhar a semântica dele byte-a-byte. (1) `MAESTRO_STATUS` agora é reconhecido em **qualquer linha** da resposta, mas exige a linha exata `MAESTRO_STATUS: READY`/`NOT_READY` (um espaço após os dois-pontos) — antes só a primeira linha era lida, com regex flexível e remoção de `<think>`. (2) Blocos `<maestro_final_text>`/`<maestro_revision_report>` duplicados resolvem para o **último** par completo (tolerância a eco), não mais o primeiro. (3) Mudança substantiva de custódia usa a normalização canônica (CRLF→LF + colapso de todo whitespace): diferenças só de espaçamento/quebras de linha não transferem custódia nem reiniciam a estabilidade; pontuação e capitalização seguem substantivas. (4) Tabela de aliases de agente completa (`agy`/`antigravity`→Gemini, `deepseek-api`, `grok-api`, `perplexity-api`). Roadmap completo em `docs/superpowers/plans/2026-07-05-maestro-ai-parity-roadmap.md`.
+
 ## [v02.03.01] - 2026-07-05
 
 ### Corrigido
