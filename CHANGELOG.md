@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.03.01] - 2026-07-05
+
+### Corrigido
+
+- **Maestro AI — troca de chave de agente falhava com "already exists" no Cloudflare Secrets Store**: `listSecretStoreSecrets` lia apenas a primeira página (padrão da API: 20 itens) de um endpoint paginado; como o store é compartilhado entre os apps (29 secrets) e as chaves `MAESTRO_*` ficam além da primeira página, a busca por nome nunca as encontrava e o salvamento caía no caminho de criação (POST), rejeitado pela Cloudflare como nome duplicado — o caminho de atualização (PATCH) existia, mas era inalcançável. A listagem agora pagina (`per_page=100`, acumula até página curta, teto de 50 páginas), restaurando o upsert correto. Teste de regressão cobre o cenário de secret existente além da primeira página (exige PATCH e proíbe POST).
+
 ## [v02.03.00] - 2026-06-12
 
 ### Adicionado
