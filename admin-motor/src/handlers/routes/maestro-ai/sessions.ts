@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { toHeaders } from '../../../../../functions/api/_lib/mainsite-admin';
-import { validateRevisionContentLock } from './content-lock.ts';
+import { formatBlockManifestForPrompt, validateRevisionContentLock } from './content-lock.ts';
 
 type D1Database = {
   prepare(query: string): {
@@ -1594,7 +1594,7 @@ ${input.protocol_text}
 `;
 }
 
-function buildRevisionPrompt(args: {
+async function buildRevisionPrompt(args: {
   input: MaestroResolvedSessionInput;
   runId: string;
   turn: number;
@@ -1602,7 +1602,8 @@ function buildRevisionPrompt(args: {
   currentAuthor: ProviderKey;
   reviewer: ProviderKey;
   history: SessionEvent[];
-}): string {
+}): Promise<string> {
+  const blockManifest = await formatBlockManifestForPrompt(args.currentText);
   return `# Maestro Editorial AI - Web/API Serial Review-Rewrite Turn
 
 Run: \`${args.runId}\`
@@ -1642,14 +1643,49 @@ Codex and Claude are the strongest long-form writers in this system. Gemini is s
 Preserve the strongest existing formulation unless a concrete editorial-protocol defect requires a narrow change.
 Do not reduce breadth, depth, articulation, nuance, reflexivity, or argumentative amplitude.
 
+## Evidence and Bibliographic Integrity Gate
+
+- Do not invent links, editions, publishers, years, URLs, page ranges, or source details.
+- If evidence is missing, do not pass [EVIDENCIA_PENDENTE], bracketed lacunae, or unsupported reference placeholders forward inside <maestro_final_text>.
+- Unverified claims or references are correctable defects when they can be removed, narrowed, generalized, or quarantined without damaging the article.
+- Do not convert evidence-pending markers into publicable references, bracketed lacunae, or bibliographic placeholders such as [s. d.], [S. l.: s. n.], or [Edição consultada não identificada].
+- If the current text depends on an unverified reference, source, link, or bibliographic detail, revise the article in this same turn by deleting, narrowing, generalizing, or quarantining that dependency unless the missing evidence or operator decision is truly indispensable.
+- Missing evidence by itself is not a sufficient reason to pass the blocker forward. First remove, narrow, generalize, or quarantine the unsupported claim/reference; request operator evidence only for a blocker that cannot be resolved by any of those editorial actions.
+- A text is not final-deliverable while it still depends on unresolved evidence markers or bibliographic lacunae.
+- A blocker that can be corrected with the current text, prior reports, supplied evidence, or the editorial protocol MUST be corrected in this same turn. Do not merely point it out or pass it to the next reviewer.
+- Do not return MAESTRO_STATUS: NOT_READY with custody set to "unchanged". That is an invalid pass-through objection.
+- If no concrete blocker remains, return MAESTRO_STATUS: READY, set custody to "unchanged", keep changes empty, and omit <maestro_final_text>.
+- If any concrete blocker remains, correct it in this same turn, return MAESTRO_STATUS: READY or MAESTRO_STATUS: NOT_READY according to the revised article's safety, set custody to "revised", and include the complete corrected article inside <maestro_final_text>.
+- Use operator_evidence_required only to document external evidence still desirable after you have already removed, narrowed, generalized, or quarantined the unsupported dependency in the revised article.
+
 ## Required Output Contract
 
 The answer MUST contain exactly these parts:
 
 1. First line: MAESTRO_STATUS: READY or MAESTRO_STATUS: NOT_READY.
-2. <maestro_revision_report> containing en_US JSON-like audit data with reviewer, current_author, status, changes, out_of_scope, quality_preservation, and custody.
+2. <maestro_revision_report> containing en_US JSON-like audit data:
+   - reviewer
+   - current_author
+   - status
+   - changed_blocks: list every changed received block using block_id, change_type, reason, protocol_basis, and required: true|false. Use change_type: "split" or "addition" whenever the revised article creates extra blocks, and change_type: "reorder" whenever approved blocks move.
+   - unchanged_approved_blocks: list approved block IDs that you intentionally preserved.
+   - changes: list of changed passages, received line/passage reference, reason, protocol citation, and whether the change was required.
+   - operator_evidence_required: list of blockers that cannot be corrected from supplied materials and require external evidence or operator decision.
+   - out_of_scope: concerns intentionally not changed.
+   - quality_preservation: explicit statement that approved strong formulations were preserved; if not, justify each reduction.
+   - custody: exactly "revised" when you changed the article, or exactly "unchanged" only when you approve the current article without changing custody.
 3. Include <maestro_final_text> containing only the complete operator-facing article in pt_BR only when custody is "revised".
-4. If custody is "unchanged", omit <maestro_final_text> entirely. Do not repeat the current article.
+4. If custody is "unchanged", status MUST be READY, changes MUST be empty, <maestro_final_text> MUST be omitted, and all remaining concerns must be non-blocking out_of_scope notes.
+5. MAESTRO_STATUS: NOT_READY with custody: "unchanged" is a contract violation: either fix the blocker and transfer revised custody, or approve the current version as READY unchanged.
+
+Anything outside those tags may be discarded by the app.
+An incomplete tag, missing closing tag, reproduced protocol text, or truncated JSON/report is a contract violation and will not count as READY.
+
+## Current Text Block Manifest
+
+Every received block is locked by default. If <maestro_final_text> changes, deletes, compresses, splits, moves, or replaces a received block, the corresponding received block_id MUST appear in changed_blocks with a concrete protocol_basis. Silent changes to approved blocks are contract violations. Extra blocks require change_type: "split" or "addition"; moved approved blocks require change_type: "reorder".
+
+${blockManifest}
 
 ## Operator Request
 
@@ -1888,6 +1924,7 @@ function publicApiHealthResult(
 
 export const maestroAiTestHooks = {
   buildProviderHttpRequest,
+  buildRevisionPrompt,
   publicApiHealthResult,
   extractStatus,
   extractTagged,
@@ -2200,7 +2237,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
                 : `Serial revision turn started in cycle ${cycle}.`,
           });
           const prompt =
-            buildRevisionPrompt({
+            (await buildRevisionPrompt({
               input,
               runId: id,
               turn: events.length + 1,
@@ -2208,7 +2245,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               currentAuthor,
               reviewer,
               history: events,
-            }) + (correctiveRetryCount > 0 ? correctiveRetrySection(correctiveRetryCount) : '');
+            })) + (correctiveRetryCount > 0 ? correctiveRetrySection(correctiveRetryCount) : '');
           const rates = input.rates?.[reviewer] ?? {};
           const projected = estimateCost(prompt, MAX_OUTPUT_TOKENS, rates);
           if (!Number.isFinite(projected) || observedCost + projected > Number(input.max_cost_usd)) {

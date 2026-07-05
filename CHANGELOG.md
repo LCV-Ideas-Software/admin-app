@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.06.01] - 2026-07-05
+
+### Corrigido
+
+- **Maestro AI — prompt de revisão passa a ensinar o contrato de blocos que o B2 impõe** (achado P1 do chatgpt-codex-connector no PR #298): o `buildRevisionPrompt` agora inclui a seção **Current Text Block Manifest** com a tabela canônica de blocos travados (`block_id`, `kind`, `chars`, `sha256_12` real via `crypto.subtle`, excerto), o esquema completo do relatório (`changed_blocks` com `block_id`/`change_type`/`protocol_basis`, `unchanged_approved_blocks`, `operator_evidence_required`) e o **Evidence and Bibliographic Integrity Gate** com as regras de outcome (NOT_READY+unchanged é violação; READY unchanged omite texto). Sem isso, revisões legítimas de agentes seguindo o prompt antigo cairiam em CONTRACT_VIOLATION→retry×3→skip por não declararem blocos que nunca lhes foram apresentados.
+
 ## [v02.06.00] - 2026-07-05
 
 ### Alterado
