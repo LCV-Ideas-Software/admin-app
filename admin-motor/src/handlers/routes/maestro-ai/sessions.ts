@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { toHeaders } from '../../../../../functions/api/_lib/mainsite-admin';
+import { validateRevisionContentLock } from './content-lock.ts';
 
 type D1Database = {
   prepare(query: string): {
@@ -2271,6 +2272,13 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
                 custodyReleaseError ??
                 'NOT_READY unchanged is not a valid serial-review outcome: the reviewer must either return READY unchanged when no blocker remains, or return a revised complete text that resolves the concrete blocker.';
             }
+          }
+          if (!contractError && revisedText !== null) {
+            // Desktop parity (validate_serial_revised_content_lock): a revised
+            // custody may only change/reorder/grow blocks declared in the
+            // report's changed_blocks section; violations take the same
+            // CONTRACT_VIOLATION corrective-retry path.
+            contractError = validateRevisionContentLock(currentText, revisedText, report ?? '');
           }
           if (contractError) {
             const retryKey = `${cycle}:${order.indexOf(reviewer)}:${reviewer}:${currentText}`;
