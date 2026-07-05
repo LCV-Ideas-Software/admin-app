@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { segmentEditorialBlocks, validateRevisionContentLock } from './content-lock.ts';
+import { formatBlockManifestForPrompt, segmentEditorialBlocks, validateRevisionContentLock } from './content-lock.ts';
 
 // Oracle fixtures mirror maestro-app editorial_content_lock.rs (canonical).
 const BEFORE = '# Titulo\n\nParagrafo aprovado e denso.\n\nReferencia pendente citada.';
@@ -117,5 +117,19 @@ describe('Maestro AI approved-content lock (Plan B2)', () => {
     const after = '# Titulo\n\nParagrafo corrigido com base protocolar.\n\nReferencia pendente citada.';
     const report = 'changed_blocks:\n- block_id: B0002, protocol_basis: precision clause\ncustody: revised';
     expect(validateRevisionContentLock(BEFORE, after, report)).toBeNull();
+  });
+
+  it('formats the block manifest exactly like the desktop prompt table', async () => {
+    const manifest = await formatBlockManifestForPrompt(BEFORE);
+    const lines = manifest.split('\n');
+    expect(lines[0]).toBe('| block_id | kind | chars | sha256_12 | locked_by_default | excerpt |');
+    expect(lines[1]).toBe('|---|---:|---:|---|---|---|');
+    expect(lines[2]).toContain('| B0001 | heading |');
+    expect(lines[3]).toContain('| B0002 | paragraph |');
+    expect(lines[2]).toContain('| yes |');
+    // sha256_12 column: 12 lowercase hex chars of the normalized block hash.
+    const sha12 = lines[2]?.split('|')[4]?.trim() ?? '';
+    expect(sha12).toMatch(/^[0-9a-f]{12}$/);
+    expect(await formatBlockManifestForPrompt('   ')).toBe('No editorial content blocks were detected.');
   });
 });

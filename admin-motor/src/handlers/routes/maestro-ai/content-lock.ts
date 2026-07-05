@@ -13,6 +13,9 @@
 type EditorialContentBlock = {
   id: string;
   normalizedKey: string;
+  text: string;
+  kind: string;
+  chars: number;
 };
 
 type ChangedBlockDeclaration = {
@@ -67,7 +70,62 @@ export function segmentEditorialBlocks(text: string): EditorialContentBlock[] {
     .map((block, index) => ({
       id: `B${String(index + 1).padStart(4, '0')}`,
       normalizedKey: normalizeBlockText(block),
+      text: block,
+      kind: classifyBlockKind(block),
+      chars: Array.from(block).length,
     }));
+}
+
+// Desktop parity (classify_block_kind): heading/quote by leading marker, list
+// when every line starts with a bullet or ASCII digit, table when two or more
+// lines contain a pipe, else paragraph.
+function classifyBlockKind(text: string): string {
+  const trimmed = rustTrimStart(text);
+  if (trimmed.startsWith('#')) return 'heading';
+  if (trimmed.startsWith('>')) return 'quote';
+  const lines = trimmed.split('\n');
+  if (
+    lines.every((line) => {
+      const lineStart = rustTrimStart(line);
+      return lineStart.startsWith('- ') || lineStart.startsWith('* ') || /^[0-9]/.test(lineStart.charAt(0));
+    })
+  ) {
+    return 'list';
+  }
+  if (lines.filter((line) => line.includes('|')).length >= 2) return 'table';
+  return 'paragraph';
+}
+
+function markdownTableExcerpt(text: string): string {
+  const compact = normalizeBlockText(text).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const characters = Array.from(compact);
+  let excerpt = characters.slice(0, 96).join('');
+  if (characters.length > 96) excerpt += '...';
+  return excerpt;
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Desktop parity (format_block_manifest_for_prompt): the prompt-facing table
+// of locked blocks. The sha256_12 column here IS the desktop hash — computed
+// asynchronously via crypto.subtle over the normalized block text.
+export async function formatBlockManifestForPrompt(text: string): Promise<string> {
+  const blocks = segmentEditorialBlocks(text);
+  if (blocks.length === 0) return 'No editorial content blocks were detected.';
+  const lines = [
+    '| block_id | kind | chars | sha256_12 | locked_by_default | excerpt |',
+    '|---|---:|---:|---|---|---|',
+  ];
+  for (const block of blocks) {
+    const hash = await sha256Hex(block.normalizedKey);
+    lines.push(
+      `| ${block.id} | ${block.kind} | ${block.chars} | ${hash.slice(0, 12)} | yes | ${markdownTableExcerpt(block.text)} |`,
+    );
+  }
+  return lines.join('\n');
 }
 
 export function validateRevisionContentLock(before: string, after: string, report: string): string | null {

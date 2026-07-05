@@ -588,6 +588,42 @@ describe('Maestro AI desktop-parity parsing (Plan A)', () => {
   });
 });
 
+describe('Maestro AI revision prompt teaches the block contract', () => {
+  it('exposes the block manifest and changed_blocks schema in the revision prompt', async () => {
+    const prompt = await maestroAiTestHooks.buildRevisionPrompt({
+      input: {
+        title: 'Sessao',
+        prompt: 'Escreva.',
+        protocol_text: protocolText,
+        initial_agent: 'claude',
+        active_agents: ['claude', 'codex'],
+        initial_content: '',
+        max_cost_usd: 10,
+        max_runtime_minutes: null,
+        rates,
+        models: {},
+        max_cycles: 2,
+      } as Parameters<(typeof maestroAiTestHooks)['buildRevisionPrompt']>[0]['input'],
+      runId: 'run-1',
+      turn: 1,
+      currentText: '# Titulo\n\nCorpo do artigo em custodia.',
+      currentAuthor: 'claude',
+      reviewer: 'codex',
+      history: [],
+    });
+    expect(prompt).toContain('## Current Text Block Manifest');
+    expect(prompt).toContain('| block_id | kind | chars | sha256_12 | locked_by_default | excerpt |');
+    expect(prompt).toContain('| B0001 | heading |');
+    expect(prompt).toContain('changed_blocks: list every changed received block using block_id');
+    expect(prompt).toContain('unchanged_approved_blocks');
+    expect(prompt).toContain('change_type: "reorder"');
+    expect(prompt).toContain('## Evidence and Bibliographic Integrity Gate');
+    expect(prompt).toContain('Missing evidence by itself is not a sufficient reason to pass the blocker forward.');
+    expect(prompt).toContain('A text is not final-deliverable while it still depends on unresolved evidence markers');
+    expect(prompt).toContain('MAESTRO_STATUS: NOT_READY with custody: "unchanged" is a contract violation');
+  });
+});
+
 describe('Maestro AI serial turn contract (Plan B1)', () => {
   it('reportDeclaresCustodyValue mirrors JSON-first then scalar-scan semantics', () => {
     const { reportDeclaresCustodyValue } = maestroAiTestHooks;
