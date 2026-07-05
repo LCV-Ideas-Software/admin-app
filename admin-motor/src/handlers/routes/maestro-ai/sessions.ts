@@ -832,32 +832,6 @@ function calculateObservedCost(result: ProviderCallResult, fallbackPrompt: strin
   return (inputTokens / 1_000_000) * inputRate + (outputTokens / 1_000_000) * outputRate + requestRate / 1000;
 }
 
-function validateRevisionGuard(
-  previousText: string,
-  candidateText: string,
-  status: string,
-  revisionReport: string,
-): string | null {
-  const previous = previousText.trim();
-  const candidate = candidateText.trim();
-  if (!candidate || candidate === previous) return null;
-  if (status === 'READY') {
-    return 'READY reviewers cannot alter custody text; READY means the current text is accepted unchanged.';
-  }
-  const previousLength = previous.length;
-  const candidateLength = candidate.length;
-  if (previousLength >= 1200 && candidateLength < previousLength * 0.85) {
-    return `Revision rejected by anti-impoverishment guard: candidate length ${candidateLength} is below 85% of previous length ${previousLength}.`;
-  }
-  if (revisionReport.trim().length < 80) {
-    return 'Revision changed custody text without a substantive revision report.';
-  }
-  if (!/(alter|change|linha|line|protocol|rule|corre|corrig|improv|melhor|justific|basis)/i.test(revisionReport)) {
-    return 'Revision report does not identify concrete changed lines, protocol basis, or correction rationale.';
-  }
-  return null;
-}
-
 function runtimeLimitExceeded(startedAtMs: number, maxRuntimeMinutes?: number | null): boolean {
   if (!Number.isFinite(Number(maxRuntimeMinutes)) || Number(maxRuntimeMinutes) <= 0) return false;
   return Date.now() - startedAtMs > Number(maxRuntimeMinutes) * 60_000;
@@ -918,6 +892,490 @@ function normalizedEditorialText(text: string): string {
 
 function isSubstantiveEditorialChange(before: string, after: string): boolean {
   return normalizedEditorialText(before) !== normalizedEditorialText(after);
+}
+
+// ── Plan B1: serial turn output contract (desktop parity) ───────────────────
+// Byte-exact ports of the session_orchestration.rs validators. The report
+// field scanning mirrors the Rust micro-parser (strict-JSON first, then a
+// quoted/bare scalar scan with line/brace key-position rules).
+
+const MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN = 3;
+
+const RUST_WS_START = new RegExp(`^${RUST_WS_CLASS}+`);
+
+function rustTrimStart(text: string): string {
+  return text.replace(RUST_WS_START, '');
+}
+
+// Rust to_ascii_lowercase: only A-Z are lowercased; Unicode case mappings
+// must NOT apply.
+function asciiLowercase(text: string): string {
+  return text.replace(/[A-Z]/g, (character) => character.toLowerCase());
+}
+
+function asciiEqualsIgnoreCase(a: string, b: string): boolean {
+  return asciiLowercase(a) === asciiLowercase(b);
+}
+
+function countOccurrences(text: string, needle: string): number {
+  let count = 0;
+  let index = text.indexOf(needle);
+  while (index !== -1) {
+    count += 1;
+    index = text.indexOf(needle, index + needle.length);
+  }
+  return count;
+}
+
+function requireBalancedTag(stdout: string, tag: string): string | null {
+  const open = countOccurrences(stdout, `<${tag}>`);
+  const close = countOccurrences(stdout, `</${tag}>`);
+  if (open === 0 && close === 0) return `missing ${tag} block`;
+  // Tolerate a duplicated/echoed block as long as it is balanced;
+  // extractTagged resolves to the last complete one.
+  if (open === close) return null;
+  return `incomplete ${tag} block`;
+}
+
+function requireBalancedOptionalTag(stdout: string, tag: string): string | null {
+  const open = countOccurrences(stdout, `<${tag}>`);
+  const close = countOccurrences(stdout, `</${tag}>`);
+  return open === close ? null : `incomplete ${tag} block`;
+}
+
+const PROMPT_ECHO_MARKERS = [
+  '# maestro editorial ai - serial review-rewrite turn',
+  '## full editorial protocol',
+  '## required output contract',
+  '## sovereign approved-content lock',
+  '## current text under custody',
+  '## prior serial revision reports',
+  'internal coordination, critique, changelog, and revision report',
+] as const;
+
+function containsPromptOrProtocolEcho(stdout: string): boolean {
+  const normalized = asciiLowercase(stdout);
+  return PROMPT_ECHO_MARKERS.some((marker) => normalized.includes(marker));
+}
+
+function charAtOffset(value: string, offset: number): [string, number] | null {
+  if (offset >= value.length) return null;
+  const codePoint = value.codePointAt(offset);
+  if (codePoint === undefined) return null;
+  const character = String.fromCodePoint(codePoint);
+  return [character, offset + character.length];
+}
+
+function advancePastUnclosedQuoteLine(value: string, offset: number): number {
+  const newlineOffset = value.indexOf('\n', offset);
+  return newlineOffset === -1 ? value.length : newlineOffset + 1;
+}
+
+function isStructureStart(value: string, offset: number): boolean {
+  const before = value.slice(0, offset);
+  if (rustTrim(before) === '') return true;
+  const lastNewline = before.lastIndexOf('\n');
+  if (lastNewline !== -1) return rustTrim(before.slice(lastNewline + 1)) === '';
+  return false;
+}
+
+function isFieldKeyStart(value: string, offset: number): boolean {
+  const before = value.slice(0, offset);
+  if (rustTrim(before) === '') return true;
+  const lastNewline = before.lastIndexOf('\n');
+  if (lastNewline !== -1 && rustTrim(before.slice(lastNewline + 1)) === '') return true;
+  const braceOffset = before.lastIndexOf('{');
+  if (braceOffset !== -1) {
+    return rustTrim(before.slice(braceOffset + 1)) === '' && isStructureStart(value, braceOffset);
+  }
+  return false;
+}
+
+function parseQuotedToken(value: string, start: number, quote: string): [string, number] | null {
+  let token = '';
+  let offset = start + quote.length;
+  let escaped = false;
+  while (offset < value.length) {
+    const step = charAtOffset(value, offset);
+    if (!step) return null;
+    const [character, nextOffset] = step;
+    if (escaped) {
+      token += character;
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (character === quote) {
+      return [token, nextOffset];
+    } else {
+      token += character;
+    }
+    offset = nextOffset;
+  }
+  return null;
+}
+
+function isFieldNameCharacter(character: string): boolean {
+  return /^[A-Za-z0-9_]$/.test(character);
+}
+
+function isBareFieldBoundary(value: string, offset: number, fieldLen: number): boolean {
+  const beforeOk = offset === 0 || !isFieldNameCharacter(value.charAt(offset - 1));
+  const afterOffset = offset + fieldLen;
+  const afterOk = afterOffset >= value.length || !isFieldNameCharacter(value.charAt(afterOffset));
+  return beforeOk && afterOk;
+}
+
+function isScalarValueCharacter(character: string): boolean {
+  return /^[A-Za-z0-9_-]$/.test(character);
+}
+
+function arrayFieldHasContent(afterField: string): boolean {
+  const afterSeparator = rustTrimStart(afterField);
+  if (!afterSeparator.startsWith(':')) return false;
+  const afterColon = rustTrimStart(afterSeparator.slice(1));
+  if (!afterColon.startsWith('[')) return false;
+  return !rustTrimStart(afterColon.slice(1)).startsWith(']');
+}
+
+function scalarFieldMatchesValue(afterField: string, expected: string): boolean {
+  const afterSeparator = rustTrimStart(afterField);
+  if (!afterSeparator.startsWith(':')) return false;
+  const afterColon = rustTrimStart(afterSeparator.slice(1));
+  const first = charAtOffset(afterColon, 0);
+  if (first) {
+    const [quote] = first;
+    if (quote === '"' || quote === "'" || quote === '`') {
+      const parsed = parseQuotedToken(afterColon, 0, quote);
+      return parsed !== null && asciiEqualsIgnoreCase(rustTrim(parsed[0]), expected);
+    }
+  }
+  let actual = '';
+  for (const character of afterColon) {
+    if (!isScalarValueCharacter(character)) break;
+    actual += character;
+  }
+  return actual !== '' && asciiEqualsIgnoreCase(actual, expected);
+}
+
+function fieldPrefixMatches(text: string, offset: number, normalizedField: string): boolean {
+  return asciiLowercase(text.slice(offset, offset + normalizedField.length)) === normalizedField;
+}
+
+function reportDeclaresScalarFieldValue(report: string, field: string, expected: string): boolean {
+  const normalizedField = asciiLowercase(field);
+  let offset = 0;
+  while (offset < report.length) {
+    const step = charAtOffset(report, offset);
+    if (!step) break;
+    const [character, nextOffset] = step;
+    if (character === '"' || character === "'" || character === '`') {
+      const parsed = parseQuotedToken(report, offset, character);
+      if (!parsed) {
+        offset = advancePastUnclosedQuoteLine(report, nextOffset);
+        continue;
+      }
+      const [quoted, afterQuote] = parsed;
+      if (
+        isFieldKeyStart(report, offset) &&
+        asciiEqualsIgnoreCase(quoted, normalizedField) &&
+        scalarFieldMatchesValue(report.slice(afterQuote), expected)
+      ) {
+        return true;
+      }
+      offset = afterQuote;
+      continue;
+    }
+    if (
+      fieldPrefixMatches(report, offset, normalizedField) &&
+      isFieldKeyStart(report, offset) &&
+      isBareFieldBoundary(report, offset, field.length) &&
+      scalarFieldMatchesValue(report.slice(offset + field.length), expected)
+    ) {
+      return true;
+    }
+    offset = nextOffset;
+  }
+  return false;
+}
+
+function tryParseJsonObject(report: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(report);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Not strict JSON — fall back to the scalar/array field scan.
+  }
+  return null;
+}
+
+function reportDeclaresNonemptyArrayField(report: string, field: string): boolean {
+  const parsedObject = tryParseJsonObject(report);
+  if (parsedObject) {
+    const items = parsedObject[field];
+    return Array.isArray(items) && items.length > 0;
+  }
+  const normalizedField = asciiLowercase(field);
+  let offset = 0;
+  while (offset < report.length) {
+    const step = charAtOffset(report, offset);
+    if (!step) break;
+    const [character, nextOffset] = step;
+    if (character === '"' || character === "'" || character === '`') {
+      const parsed = parseQuotedToken(report, offset, character);
+      if (!parsed) {
+        offset = advancePastUnclosedQuoteLine(report, nextOffset);
+        continue;
+      }
+      const [quoted, afterQuote] = parsed;
+      if (
+        isFieldKeyStart(report, offset) &&
+        asciiEqualsIgnoreCase(quoted, normalizedField) &&
+        arrayFieldHasContent(report.slice(afterQuote))
+      ) {
+        return true;
+      }
+      offset = afterQuote;
+      continue;
+    }
+    if (
+      fieldPrefixMatches(report, offset, normalizedField) &&
+      isFieldKeyStart(report, offset) &&
+      isBareFieldBoundary(report, offset, field.length) &&
+      arrayFieldHasContent(report.slice(offset + field.length))
+    ) {
+      return true;
+    }
+    offset = nextOffset;
+  }
+  return false;
+}
+
+function reportDeclaresCustodyValue(report: string, value: string): boolean {
+  const parsedObject = tryParseJsonObject(report);
+  if (parsedObject) {
+    const custody = parsedObject.custody;
+    return typeof custody === 'string' && asciiEqualsIgnoreCase(rustTrim(custody), value);
+  }
+  return reportDeclaresScalarFieldValue(report, 'custody', value);
+}
+
+function reportDeclaresNonemptyChanges(report: string): boolean {
+  return reportDeclaresNonemptyArrayField(report, 'changes');
+}
+
+function asciiFoldedAlnum(character: string): string | null {
+  if (/^[a-z0-9]$/.test(character)) return character;
+  switch (character) {
+    case 'á':
+    case 'à':
+    case 'ã':
+    case 'â':
+    case 'ä':
+      return 'a';
+    case 'é':
+    case 'è':
+    case 'ê':
+    case 'ë':
+      return 'e';
+    case 'í':
+    case 'ì':
+    case 'î':
+    case 'ï':
+      return 'i';
+    case 'ó':
+    case 'ò':
+    case 'õ':
+    case 'ô':
+    case 'ö':
+      return 'o';
+    case 'ú':
+    case 'ù':
+    case 'û':
+    case 'ü':
+      return 'u';
+    case 'ç':
+      return 'c';
+    default:
+      return null;
+  }
+}
+
+function compactAsciiSignature(value: string): string {
+  let compact = '';
+  for (const character of value.toLowerCase()) {
+    const folded = asciiFoldedAlnum(character);
+    if (folded) compact += folded;
+  }
+  return compact;
+}
+
+function asciiFoldedTokens(value: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  for (const character of value.toLowerCase()) {
+    const folded = asciiFoldedAlnum(character);
+    if (folded) {
+      current += folded;
+    } else if (current) {
+      tokens.push(current);
+      current = '';
+    }
+  }
+  if (current) tokens.push(current);
+  return tokens;
+}
+
+function containsUncertainDateMarker(raw: string, tokens: string[]): boolean {
+  if (!/[0-9]/.test(raw)) return false;
+  if (raw.includes('?') || raw.includes('--')) return true;
+  for (let index = 0; index + 3 < tokens.length; index += 1) {
+    if (
+      tokens[index] === 'entre' &&
+      /^[0-9]+$/.test(tokens[index + 1] ?? '') &&
+      tokens[index + 2] === 'e' &&
+      /^[0-9]+$/.test(tokens[index + 3] ?? '')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isBibliographicLacunaMarker(raw: string, compact: string): boolean {
+  if (
+    ['sd', 'nd', 'sl', 'sn', 'slsn', 'sineloco', 'sinenomine', 'sinedata'].includes(compact) ||
+    compact.includes('sinedata') ||
+    compact.includes('sineloco') ||
+    compact.includes('sinenomine')
+  ) {
+    return true;
+  }
+  const tokens = asciiFoldedTokens(raw);
+  for (let index = 0; index + 1 < tokens.length; index += 1) {
+    const first = tokens[index];
+    const second = tokens[index + 1];
+    if (
+      (first === 's' && second === 'd') ||
+      (first === 'n' && second === 'd') ||
+      (first === 's' && second === 'l') ||
+      (first === 's' && second === 'n')
+    ) {
+      return true;
+    }
+  }
+  return containsUncertainDateMarker(raw, tokens);
+}
+
+function containsFinalReleaseBlocker(text: string): boolean {
+  const compact = compactAsciiSignature(text);
+  if (compact.includes('evidenciapendente') || compact.includes('edicaoconsultadanaoidentificada')) {
+    return true;
+  }
+  let remaining = text;
+  for (;;) {
+    const open = remaining.indexOf('[');
+    if (open === -1) break;
+    const afterOpen = remaining.slice(open + 1);
+    const close = afterOpen.indexOf(']');
+    if (close === -1) break;
+    const bracketed = afterOpen.slice(0, close);
+    const marker = compactAsciiSignature(bracketed);
+    if (
+      isBibliographicLacunaMarker(bracketed, marker) ||
+      marker.includes('evidenciapendente') ||
+      marker.includes('edicaoconsultadanaoidentificada')
+    ) {
+      return true;
+    }
+    remaining = afterOpen.slice(close + 1);
+  }
+  return false;
+}
+
+function validateFinalReleaseCandidate(text: string): string | null {
+  if (containsFinalReleaseBlocker(text)) {
+    return 'final candidate failed bibliographic integrity gate: unresolved evidence marker or bibliographic lacuna found';
+  }
+  return null;
+}
+
+function validateSerialTurnOutput(
+  rawText: string,
+  status: string,
+  report: string | null,
+  finalText: string | null,
+): string | null {
+  if (status !== 'READY' && status !== 'NOT_READY') return `invalid serial status: ${status}`;
+  if (containsPromptOrProtocolEcho(rawText)) return 'output appears to reproduce prompt/protocol scaffolding';
+  const reportTagError = requireBalancedTag(rawText, 'maestro_revision_report');
+  if (reportTagError) return reportTagError;
+  const finalTagError = requireBalancedOptionalTag(rawText, 'maestro_final_text');
+  if (finalTagError) return finalTagError;
+  if (report === null) return 'missing complete maestro_revision_report block';
+  if (rustTrim(report) === '') return 'empty maestro_revision_report block';
+  const hasRevisedCustody = reportDeclaresCustodyValue(report, 'revised');
+  const hasUnchangedCustody = reportDeclaresCustodyValue(report, 'unchanged');
+  if (hasRevisedCustody && hasUnchangedCustody) return 'ambiguous custody declaration in maestro_revision_report';
+  if (finalText !== null) {
+    if (rustTrim(finalText) === '') return 'empty maestro_final_text block';
+    if (!hasRevisedCustody) return 'maestro_final_text requires custody revised in the report';
+    const releaseError = validateFinalReleaseCandidate(finalText);
+    if (releaseError) return releaseError;
+  }
+  if (finalText === null && hasRevisedCustody) return 'revised custody requires a complete maestro_final_text block';
+  if (finalText === null && !hasUnchangedCustody) {
+    return `${status} without maestro_final_text must explicitly declare custody unchanged`;
+  }
+  if (finalText === null && hasUnchangedCustody && reportDeclaresNonemptyChanges(report)) {
+    return 'correctable changes require custody revised and a complete maestro_final_text block';
+  }
+  return null;
+}
+
+function editorialQualityTier(agentKey: string): number {
+  switch (asciiLowercase(agentKey)) {
+    case 'claude':
+    case 'codex':
+      return 3;
+    case 'gemini':
+      return 2;
+    case 'deepseek':
+    case 'grok':
+    case 'perplexity':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function qualityGuardBlocksRevision(
+  currentAuthorKey: string | null,
+  reviewerKey: string,
+  before: string,
+  after: string,
+  substantiveChange: boolean,
+): boolean {
+  if (!substantiveChange) return false;
+  if (currentAuthorKey === null) return false;
+  if (editorialQualityTier(reviewerKey) >= editorialQualityTier(currentAuthorKey)) return false;
+  const beforeChars = Array.from(before).length;
+  const afterChars = Array.from(after).length;
+  return beforeChars >= 400 && afterChars * 100 < beforeChars * 85;
+}
+
+// Desktop parity: the exact Mandatory Corrective Retry prompt section injected
+// on each corrective re-run of a contract-violating reviewer turn.
+function correctiveRetrySection(retryCount: number): string {
+  return [
+    '\n\n## Mandatory Corrective Retry\n',
+    `\nThis is corrective retry ${retryCount}/${MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN} for this same reviewer turn.`,
+    '\nYour previous answer failed the required output contract or identified a blocker without revising the article.',
+    '\nYou MUST resolve every correctable blocker in this turn by producing `custody: "revised"` and a complete `<maestro_final_text>`.',
+    '\nUnresolved evidence markers or bibliographic lacunae in the current text are correctable defects: if supplied evidence does not verify them, remove or rewrite the unsupported claim/reference in the article and explain the quarantine in the report. Do not preserve `[EVIDENCIA_PENDENTE]`, bracketed lacunae, or unverifiable reference placeholders in `<maestro_final_text>`.',
+    '\nOnly request operator evidence for a decision that cannot be made by deleting, narrowing, or quarantining the unsupported claim without harming the article.\n',
+  ].join('');
 }
 
 /**
@@ -1430,11 +1888,16 @@ function publicApiHealthResult(
 export const maestroAiTestHooks = {
   buildProviderHttpRequest,
   publicApiHealthResult,
-  validateRevisionGuard,
   extractStatus,
   extractTagged,
   isSubstantiveEditorialChange,
   sanitizeAgent,
+  reportDeclaresCustodyValue,
+  reportDeclaresNonemptyChanges,
+  containsFinalReleaseBlocker,
+  containsPromptOrProtocolEcho,
+  validateSerialTurnOutput,
+  qualityGuardBlocksRevision,
   isBlockedAuditHost,
   extractUrls,
   checkOneLink,
@@ -1565,6 +2028,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
   let currentAuthor: ProviderKey = initialAgent;
   let artifactTurn = 0;
   let previousArtifactId: string | null = null;
+  const correctiveRetryCounts = new Map<string, number>();
   const startedAtMs = Date.now();
 
   try {
@@ -1717,197 +2181,269 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           return;
         }
         eligibleVotes += 1;
-        await pushEvent({
-          at: nowIso(),
-          agent: reviewer,
-          role: 'revision',
-          status: 'running',
-          message: `Serial revision turn started in cycle ${cycle}.`,
-        });
-        const prompt = buildRevisionPrompt({
-          input,
-          runId: id,
-          turn: events.length + 1,
-          currentText,
-          currentAuthor,
-          reviewer,
-          history: events,
-        });
-        const rates = input.rates?.[reviewer] ?? {};
-        const projected = estimateCost(prompt, MAX_OUTPUT_TOKENS, rates);
-        if (!Number.isFinite(projected) || observedCost + projected > Number(input.max_cost_usd)) {
+        let correctiveRetryCount = 0;
+        // Desktop parity: a contract-violating turn is retried with the SAME
+        // reviewer up to MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN times, with a
+        // Mandatory Corrective Retry section appended to the prompt; exhaustion
+        // skips the turn instead of killing the session (full desktop round
+        // accounting arrives with Plan B3).
+        for (;;) {
           await pushEvent({
             at: nowIso(),
             agent: reviewer,
             role: 'revision',
-            status: 'blocked',
-            message: `Cost guard blocked provider call before ${AGENT_LABELS[reviewer]}.`,
-            cost_usd: projected,
+            status: 'running',
+            message:
+              correctiveRetryCount > 0
+                ? `Corrective retry ${correctiveRetryCount}/${MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN} started in cycle ${cycle}.`
+                : `Serial revision turn started in cycle ${cycle}.`,
           });
-          await persistSession(
-            db,
-            id,
-            { status: 'blocked_cost', observed_cost_usd: observedCost },
-            { ifStatusIn: ['queued', 'running'] },
-          );
-          return;
-        }
-        // Cooperative cancellation (pre-call): a cancel can land during the
-        // revision start event's await above; re-check immediately before the paid
-        // reviewer call so it is not issued for a no-longer-running session.
-        const beforeReviewLive = await loadSession(db, id);
-        if (runnerStopRequested(beforeReviewLive)) {
-          logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeReviewLive?.status });
-          return;
-        }
-        const result = await callProvider(env, reviewer, prompt, input.models ?? {});
-        const cost = calculateObservedCost(result, prompt, rates);
-        observedCost += cost;
-        // Cooperative cancellation (post-call): if cancelled while the reviewer
-        // call was in flight, do not write revision artifacts/events for the
-        // now-cancelled session.
-        const afterReviewLive = await loadSession(db, id);
-        if (runnerStopRequested(afterReviewLive)) {
-          logMaestro('warn', 'session_interrupted', { session_id: id, status: afterReviewLive?.status });
-          return;
-        }
-        // M3: an empty reviewer response is a provider failure, not a silent
-        // NOT_READY vote. Fail fast instead of recording a meaningless turn.
-        if (!result.text.trim()) {
-          throw new Error(`O provedor ${AGENT_LABELS[reviewer]} retornou uma revisao vazia (texto em branco).`);
-        }
-        const status = extractStatus(result.text);
-        const revisionReport =
-          extractTagged(result.text, 'maestro_revision_report') ||
-          JSON.stringify({
-            reviewer,
-            current_author: currentAuthor,
-            status,
-            custody: 'unstructured_report_missing',
-          });
-        const revisedText = extractTagged(result.text, 'maestro_final_text');
-        const changedByReviewer = Boolean(revisedText && isSubstantiveEditorialChange(currentText, revisedText));
-        const candidateText = revisedText && changedByReviewer ? revisedText : currentText;
-        const revisionGuardError = validateRevisionGuard(currentText, candidateText, status, revisionReport);
-        if (revisionGuardError) {
+          const prompt =
+            buildRevisionPrompt({
+              input,
+              runId: id,
+              turn: events.length + 1,
+              currentText,
+              currentAuthor,
+              reviewer,
+              history: events,
+            }) + (correctiveRetryCount > 0 ? correctiveRetrySection(correctiveRetryCount) : '');
+          const rates = input.rates?.[reviewer] ?? {};
+          const projected = estimateCost(prompt, MAX_OUTPUT_TOKENS, rates);
+          if (!Number.isFinite(projected) || observedCost + projected > Number(input.max_cost_usd)) {
+            await pushEvent({
+              at: nowIso(),
+              agent: reviewer,
+              role: 'revision',
+              status: 'blocked',
+              message: `Cost guard blocked provider call before ${AGENT_LABELS[reviewer]}.`,
+              cost_usd: projected,
+            });
+            await persistSession(
+              db,
+              id,
+              { status: 'blocked_cost', observed_cost_usd: observedCost },
+              { ifStatusIn: ['queued', 'running'] },
+            );
+            return;
+          }
+          // Cooperative cancellation (pre-call): a cancel can land during the
+          // revision start event's await above; re-check immediately before the paid
+          // reviewer call so it is not issued for a no-longer-running session.
+          const beforeReviewLive = await loadSession(db, id);
+          if (runnerStopRequested(beforeReviewLive)) {
+            logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeReviewLive?.status });
+            return;
+          }
+          const result = await callProvider(env, reviewer, prompt, input.models ?? {});
+          const cost = calculateObservedCost(result, prompt, rates);
+          observedCost += cost;
+          // Cooperative cancellation (post-call): if cancelled while the reviewer
+          // call was in flight, do not write revision artifacts/events for the
+          // now-cancelled session.
+          const afterReviewLive = await loadSession(db, id);
+          if (runnerStopRequested(afterReviewLive)) {
+            logMaestro('warn', 'session_interrupted', { session_id: id, status: afterReviewLive?.status });
+            return;
+          }
+          // M3: an empty reviewer response is a provider failure, not a silent
+          // NOT_READY vote. Fail fast instead of recording a meaningless turn.
+          if (!result.text.trim()) {
+            throw new Error(`O provedor ${AGENT_LABELS[reviewer]} retornou uma revisao vazia (texto em branco).`);
+          }
+          const status = extractStatus(result.text);
+          const report = extractTagged(result.text, 'maestro_revision_report');
+          const revisedText = extractTagged(result.text, 'maestro_final_text');
+          let effectiveStatus: 'READY' | 'NOT_READY' = status;
+          let readyRejectedReason: string | null = null;
+          let contractError = validateSerialTurnOutput(result.text, status, report, revisedText);
+          if (!contractError && revisedText === null) {
+            // Desktop parity (unrevised-turn audit): a READY vote on a custody
+            // text that still fails the release gate is rewritten to NOT_READY
+            // without retry (ReadyRejected); NOT_READY without a corrective text
+            // is itself a contract violation and goes to corrective retry.
+            const custodyReleaseError = validateFinalReleaseCandidate(currentText);
+            if (status === 'READY' && custodyReleaseError) {
+              effectiveStatus = 'NOT_READY';
+              readyRejectedReason = custodyReleaseError;
+            } else if (status === 'NOT_READY') {
+              contractError =
+                custodyReleaseError ??
+                'NOT_READY unchanged is not a valid serial-review outcome: the reviewer must either return READY unchanged when no blocker remains, or return a revised complete text that resolves the concrete blocker.';
+            }
+          }
+          if (contractError) {
+            const retryKey = `${cycle}:${order.indexOf(reviewer)}:${reviewer}:${currentText}`;
+            const retryCount = (correctiveRetryCounts.get(retryKey) ?? 0) + 1;
+            correctiveRetryCounts.set(retryKey, retryCount);
+            artifactTurn += 1;
+            await createArtifact(db, {
+              sessionId: id,
+              cycle,
+              turn: artifactTurn,
+              agent: reviewer,
+              role: 'revision',
+              status: 'blocked',
+              title: input.title,
+              contentMd: currentText,
+              revisionReport: JSON.stringify({
+                guard: 'serial_turn_contract',
+                reclassified: 'CONTRACT_VIOLATION',
+                reason: contractError,
+                attempt: retryCount,
+                attempted_report: (report ?? '').slice(0, 2000),
+              }),
+              linkAudit: [],
+              costUsd: cost,
+              model: result.model,
+              previousArtifactId,
+            });
+            await pushEvent({
+              at: nowIso(),
+              agent: reviewer,
+              role: 'revision',
+              status: 'blocked',
+              message: `Reclassificado para CONTRACT_VIOLATION: ${sanitizeText(contractError, 300)}`,
+              cost_usd: cost,
+              model: result.model,
+            });
+            await persistSession(db, id, { observed_cost_usd: observedCost });
+            if (retryCount <= MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN) {
+              correctiveRetryCount = retryCount;
+              continue;
+            }
+            await pushEvent({
+              at: nowIso(),
+              agent: reviewer,
+              role: 'revision',
+              status: 'blocked',
+              message: 'Corrective retries exhausted; reviewer turn skipped without a vote.',
+            });
+            break;
+          }
+          const changedByReviewer = Boolean(revisedText && isSubstantiveEditorialChange(currentText, revisedText));
+          if (
+            revisedText !== null &&
+            changedByReviewer &&
+            qualityGuardBlocksRevision(currentAuthor, reviewer, currentText, revisedText, true)
+          ) {
+            // Desktop parity (anti-impoverishment quality ratchet): the shrunk
+            // revision from a lower-tier reviewer is rejected and discarded; the
+            // custody text and author stay unchanged and the session continues.
+            artifactTurn += 1;
+            await createArtifact(db, {
+              sessionId: id,
+              cycle,
+              turn: artifactTurn,
+              agent: reviewer,
+              role: 'revision',
+              status: 'blocked',
+              title: input.title,
+              contentMd: currentText,
+              revisionReport: JSON.stringify({
+                guard: 'anti_impoverishment_quality_ratchet',
+                reason: 'Lower-tier reviewer shrank stronger custody text beyond the allowed ratio; revision rejected.',
+                attempted_report: (report ?? '').slice(0, 2000),
+              }),
+              linkAudit: [],
+              costUsd: cost,
+              model: result.model,
+              previousArtifactId,
+            });
+            await pushEvent({
+              at: nowIso(),
+              agent: reviewer,
+              role: 'revision',
+              status: 'blocked',
+              message: 'Quality guard rejected lower-tier shrink revision; custody unchanged.',
+              cost_usd: cost,
+              model: result.model,
+            });
+            await persistSession(db, id, { observed_cost_usd: observedCost });
+            break;
+          }
+          const candidateText = revisedText && changedByReviewer ? revisedText : currentText;
+          // M4: re-audit only when the custody text actually changed. Unchanged
+          // text already passed the previous audit, so re-fetching its links only
+          // risks a transient failure killing an otherwise-valid session.
+          const linkAudit = changedByReviewer ? await auditLinks(candidateText) : currentLinkAudit;
+          if (changedByReviewer) currentLinkAudit = linkAudit;
+          const brokenLinks = linkAudit.filter((link) => !link.ok);
           artifactTurn += 1;
-          await createArtifact(db, {
+          const artifact = await createArtifact(db, {
             sessionId: id,
             cycle,
             turn: artifactTurn,
             agent: reviewer,
             role: 'revision',
-            status: 'blocked',
+            status: brokenLinks.length ? 'blocked' : effectiveStatus.toLowerCase(),
             title: input.title,
-            contentMd: currentText,
-            revisionReport: JSON.stringify({
-              guard: 'approved_content_lock',
-              reason: revisionGuardError,
-              attempted_report: revisionReport.slice(0, 2000),
-            }),
-            linkAudit: [],
+            contentMd: candidateText,
+            revisionReport: report ?? '',
+            linkAudit,
             costUsd: cost,
             model: result.model,
             previousArtifactId,
           });
+          previousArtifactId = artifact.id;
+          if (brokenLinks.length) {
+            await pushEvent({
+              at: nowIso(),
+              agent: reviewer,
+              role: 'revision',
+              status: 'blocked',
+              message: `Automatic link audit blocked ${brokenLinks.length} broken link(s).`,
+              cost_usd: cost,
+              model: result.model,
+              link_audit: linkAudit,
+            });
+            await persistSession(
+              db,
+              id,
+              {
+                status: 'blocked_link_audit',
+                current_author: currentAuthor,
+                current_text: currentText,
+                observed_cost_usd: observedCost,
+                error: `Link audit blocked revision: ${brokenLinks
+                  .map((link) => `${link.url} (${link.status ?? link.error ?? 'invalid'})`)
+                  .join('; ')}`,
+              },
+              { ifStatusIn: ['queued', 'running'] },
+            );
+            return;
+          }
+          if (revisedText && changedByReviewer) {
+            currentText = revisedText;
+            currentAuthor = reviewer;
+            changedThisCycle = true;
+          }
+          if (effectiveStatus === 'READY') readyVotes += 1;
           await pushEvent({
             at: nowIso(),
             agent: reviewer,
             role: 'revision',
-            status: 'blocked',
-            message: revisionGuardError,
-            cost_usd: cost,
-            model: result.model,
-          });
-          await persistSession(
-            db,
-            id,
-            {
-              status: 'blocked_revision_contract',
-              current_author: currentAuthor,
-              current_text: currentText,
-              observed_cost_usd: observedCost,
-              error: revisionGuardError,
-            },
-            { ifStatusIn: ['queued', 'running'] },
-          );
-          return;
-        }
-        // M4: re-audit only when the custody text actually changed. Unchanged
-        // text already passed the previous audit, so re-fetching its links only
-        // risks a transient failure killing an otherwise-valid session.
-        const linkAudit = changedByReviewer ? await auditLinks(candidateText) : currentLinkAudit;
-        if (changedByReviewer) currentLinkAudit = linkAudit;
-        const brokenLinks = linkAudit.filter((link) => !link.ok);
-        artifactTurn += 1;
-        const artifact = await createArtifact(db, {
-          sessionId: id,
-          cycle,
-          turn: artifactTurn,
-          agent: reviewer,
-          role: 'revision',
-          status: brokenLinks.length ? 'blocked' : status.toLowerCase(),
-          title: input.title,
-          contentMd: candidateText,
-          revisionReport,
-          linkAudit,
-          costUsd: cost,
-          model: result.model,
-          previousArtifactId,
-        });
-        previousArtifactId = artifact.id;
-        if (brokenLinks.length) {
-          await pushEvent({
-            at: nowIso(),
-            agent: reviewer,
-            role: 'revision',
-            status: 'blocked',
-            message: `Automatic link audit blocked ${brokenLinks.length} broken link(s).`,
+            status: effectiveStatus === 'READY' ? 'ready' : 'not_ready',
+            message: readyRejectedReason
+              ? `READY rejected by release gate: ${sanitizeText(readyRejectedReason, 300)}`
+              : changedByReviewer
+                ? 'Reviewer revised custody text.'
+                : 'Reviewer left custody unchanged.',
             cost_usd: cost,
             model: result.model,
             link_audit: linkAudit,
           });
-          await persistSession(
-            db,
-            id,
-            {
-              status: 'blocked_link_audit',
-              current_author: currentAuthor,
-              current_text: currentText,
-              observed_cost_usd: observedCost,
-              error: `Link audit blocked revision: ${brokenLinks
-                .map((link) => `${link.url} (${link.status ?? link.error ?? 'invalid'})`)
-                .join('; ')}`,
-            },
-            { ifStatusIn: ['queued', 'running'] },
-          );
-          return;
+          // Do NOT re-assert status:'running' here. The session is already
+          // 'running'; rewriting it would clobber a concurrent operator cancel
+          // (blocked_cancelled) that landed during this turn, defeating the
+          // cooperative-cancel check at the top of the next iteration.
+          await persistSession(db, id, {
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+          });
+          break;
         }
-        if (revisedText && changedByReviewer) {
-          currentText = revisedText;
-          currentAuthor = reviewer;
-          changedThisCycle = true;
-        }
-        if (status === 'READY') readyVotes += 1;
-        await pushEvent({
-          at: nowIso(),
-          agent: reviewer,
-          role: 'revision',
-          status: status === 'READY' ? 'ready' : 'not_ready',
-          message: changedByReviewer ? 'Reviewer revised custody text.' : 'Reviewer left custody unchanged.',
-          cost_usd: cost,
-          model: result.model,
-          link_audit: linkAudit,
-        });
-        // Do NOT re-assert status:'running' here. The session is already
-        // 'running'; rewriting it would clobber a concurrent operator cancel
-        // (blocked_cancelled) that landed during this turn, defeating the
-        // cooperative-cancel check at the top of the next iteration.
-        await persistSession(db, id, {
-          current_author: currentAuthor,
-          current_text: currentText,
-          observed_cost_usd: observedCost,
-        });
       }
       converged = eligibleVotes > 0 && readyVotes === eligibleVotes && !changedThisCycle;
     }
