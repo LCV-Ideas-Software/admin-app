@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.05.00] - 2026-07-05
+
+### Alterado
+
+- **Maestro AI — contrato de turno serial, retry corretivo e trava de qualidade por tier (Plano B1 da equiparação com o maestro-app)**: o turno de revisão agora valida a saída do agente contra o contrato estrutural canônico do desktop (`validate_serial_turn_output`): eco de prompt/protocolo, tags balanceadas, relatório obrigatório, declaração de custódia `revised`/`unchanged` com consistência cruzada (texto final presente ⇔ custódia revised; `changes` não-vazio exige revisão) e gate de integridade bibliográfica (`[EVIDENCIA_PENDENTE]`, lacunas como `[s.d.]`, `[S. l.]`, `[entre N e M]`, datas incertas). Violação vira **CONTRACT_VIOLATION com até 3 retries corretivos do mesmo reviewer** (seção "Mandatory Corrective Retry" injetada no prompt, idêntica à do desktop); exaustão pula o turno sem voto em vez de matar a sessão. **Bans de outcome invertidos para a semântica canônica**: READY com texto revisado substantivo é turno normal (avança a custódia); NOT_READY sem texto corretivo é violação com retry; READY sobre custódia que ainda carrega bloqueador bibliográfico é reescrito para NOT_READY (ReadyRejected). O anti-empobrecimento passa a ser **por tier de qualidade** (Claude/Codex=3, Gemini=2, DeepSeek/Grok/Perplexity=1; dispara só quando reviewer de tier inferior encolhe >15% de texto ≥400 chars) e **rejeita a revisão continuando a sessão**, em vez de bloquear terminalmente. O guard antigo (`validateRevisionGuard`) foi substituído por essas rotinas. Micro-parser de campos do relatório portado byte-a-byte do Rust (JSON estrito primeiro, depois varredura escalar/array com regras de posição de chave).
+
 ## [v02.04.00] - 2026-07-05
 
 ### Alterado

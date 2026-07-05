@@ -588,6 +588,147 @@ describe('Maestro AI desktop-parity parsing (Plan A)', () => {
   });
 });
 
+describe('Maestro AI serial turn contract (Plan B1)', () => {
+  it('reportDeclaresCustodyValue mirrors JSON-first then scalar-scan semantics', () => {
+    const { reportDeclaresCustodyValue } = maestroAiTestHooks;
+    expect(reportDeclaresCustodyValue('{"custody":"revised"}', 'revised')).toBe(true);
+    expect(reportDeclaresCustodyValue('{"custody":"REVISED"}', 'revised')).toBe(true);
+    expect(reportDeclaresCustodyValue('{"custody":"unchanged"}', 'revised')).toBe(false);
+    expect(reportDeclaresCustodyValue('custody: revised', 'revised')).toBe(true);
+    expect(reportDeclaresCustodyValue('"custody": \'Revised\'', 'revised')).toBe(true);
+    expect(reportDeclaresCustodyValue('notes\ncustody: unchanged\nmore', 'unchanged')).toBe(true);
+    expect(reportDeclaresCustodyValue('xcustody: revised', 'revised')).toBe(false);
+    expect(reportDeclaresCustodyValue('the custody was transferred', 'revised')).toBe(false);
+  });
+
+  it('reportDeclaresNonemptyChanges detects non-empty arrays only', () => {
+    const { reportDeclaresNonemptyChanges } = maestroAiTestHooks;
+    expect(reportDeclaresNonemptyChanges('{"changes":["fixed typo"]}')).toBe(true);
+    expect(reportDeclaresNonemptyChanges('{"changes":[]}')).toBe(false);
+    expect(reportDeclaresNonemptyChanges('changes: ["a"]')).toBe(true);
+    expect(reportDeclaresNonemptyChanges('changes: []')).toBe(false);
+    expect(reportDeclaresNonemptyChanges('no such field')).toBe(false);
+  });
+
+  it('containsFinalReleaseBlocker flags evidence markers and bibliographic lacunae', () => {
+    const { containsFinalReleaseBlocker } = maestroAiTestHooks;
+    expect(containsFinalReleaseBlocker('texto com [EVIDENCIA_PENDENTE] no meio')).toBe(true);
+    expect(containsFinalReleaseBlocker('nota [Edição consultada não identificada]')).toBe(true);
+    expect(containsFinalReleaseBlocker('obra rara [s.d.] citada')).toBe(true);
+    expect(containsFinalReleaseBlocker('publicado [S. l.] em 1990')).toBe(true);
+    expect(containsFinalReleaseBlocker('datado [entre 1990 e 1995]')).toBe(true);
+    expect(containsFinalReleaseBlocker('lançado [1990?]')).toBe(true);
+    expect(containsFinalReleaseBlocker('impresso [sine data]')).toBe(true);
+    expect(containsFinalReleaseBlocker('publicado em [2001]')).toBe(false);
+    expect(containsFinalReleaseBlocker('fonte [IBGE Censo 2020]')).toBe(false);
+    expect(containsFinalReleaseBlocker('texto limpo sem marcadores')).toBe(false);
+  });
+
+  it('containsPromptOrProtocolEcho matches the seven markers case-insensitively', () => {
+    const { containsPromptOrProtocolEcho } = maestroAiTestHooks;
+    expect(containsPromptOrProtocolEcho('...\n## Required Output Contract\n...')).toBe(true);
+    expect(containsPromptOrProtocolEcho('# MAESTRO EDITORIAL AI - SERIAL REVIEW-REWRITE TURN')).toBe(true);
+    expect(containsPromptOrProtocolEcho('## Current Text Under Custody')).toBe(true);
+    expect(containsPromptOrProtocolEcho('normal reviewer output')).toBe(false);
+  });
+
+  it('validateSerialTurnOutput enforces the desktop output contract in order', () => {
+    const { validateSerialTurnOutput } = maestroAiTestHooks;
+    const wrap = (report: string, finalText?: string) =>
+      `MAESTRO_STATUS: READY\n<maestro_revision_report>${report}</maestro_revision_report>${
+        finalText === undefined ? '' : `\n<maestro_final_text>${finalText}</maestro_final_text>`
+      }`;
+    expect(validateSerialTurnOutput('x', 'MAYBE', 'r', null)).toBe('invalid serial status: MAYBE');
+    expect(
+      validateSerialTurnOutput(
+        '## Required Output Contract\n<maestro_revision_report>x</maestro_revision_report>',
+        'READY',
+        'x',
+        null,
+      ),
+    ).toBe('output appears to reproduce prompt/protocol scaffolding');
+    expect(validateSerialTurnOutput('no tags at all', 'READY', null, null)).toBe(
+      'missing maestro_revision_report block',
+    );
+    expect(validateSerialTurnOutput('<maestro_revision_report>x', 'READY', null, null)).toBe(
+      'incomplete maestro_revision_report block',
+    );
+    const ambiguous = 'custody: "revised"\ncustody: "unchanged"';
+    expect(validateSerialTurnOutput(wrap(ambiguous), 'READY', ambiguous, null)).toBe(
+      'ambiguous custody declaration in maestro_revision_report',
+    );
+    expect(
+      validateSerialTurnOutput(
+        wrap('custody: "unchanged"', 'novo texto'),
+        'READY',
+        'custody: "unchanged"',
+        'novo texto',
+      ),
+    ).toBe('maestro_final_text requires custody revised in the report');
+    expect(
+      validateSerialTurnOutput(
+        wrap('custody: "revised"', 'texto com [EVIDENCIA_PENDENTE]'),
+        'READY',
+        'custody: "revised"',
+        'texto com [EVIDENCIA_PENDENTE]',
+      ),
+    ).toBe(
+      'final candidate failed bibliographic integrity gate: unresolved evidence marker or bibliographic lacuna found',
+    );
+    expect(validateSerialTurnOutput(wrap('custody: "revised"'), 'READY', 'custody: "revised"', null)).toBe(
+      'revised custody requires a complete maestro_final_text block',
+    );
+    expect(validateSerialTurnOutput(wrap('relatorio sem custody'), 'READY', 'relatorio sem custody', null)).toBe(
+      'READY without maestro_final_text must explicitly declare custody unchanged',
+    );
+    const correctable = 'custody: "unchanged"\nchanges: ["algo corrigivel"]';
+    expect(validateSerialTurnOutput(wrap(correctable), 'NOT_READY', correctable, null)).toBe(
+      'correctable changes require custody revised and a complete maestro_final_text block',
+    );
+    const cleanUnchanged = 'custody: "unchanged"\nchanges: []';
+    expect(validateSerialTurnOutput(wrap(cleanUnchanged), 'READY', cleanUnchanged, null)).toBeNull();
+    expect(
+      validateSerialTurnOutput(
+        wrap('custody: "revised"', 'texto novo limpo'),
+        'NOT_READY',
+        'custody: "revised"',
+        'texto novo limpo',
+      ),
+    ).toBeNull();
+  });
+
+  it('treats complete-but-empty tag blocks exactly like the desktop (extract collapses to missing)', () => {
+    const { extractTagged, validateSerialTurnOutput } = maestroAiTestHooks;
+    // Canonical parity (editorial_io.rs:325): extract_tagged_block returns None
+    // for an empty body, so the desktop maps <t></t> to the MISSING error, and
+    // the "empty ... block" arms are unreachable on both platforms.
+    const emptyReport = 'MAESTRO_STATUS: READY\n<maestro_revision_report></maestro_revision_report>';
+    expect(extractTagged(emptyReport, 'maestro_revision_report')).toBeNull();
+    expect(validateSerialTurnOutput(emptyReport, 'READY', null, null)).toBe(
+      'missing complete maestro_revision_report block',
+    );
+    const emptyFinal =
+      'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "revised"\nchanges: ["x"]</maestro_revision_report>\n<maestro_final_text></maestro_final_text>';
+    expect(extractTagged(emptyFinal, 'maestro_final_text')).toBeNull();
+    expect(validateSerialTurnOutput(emptyFinal, 'NOT_READY', 'custody: "revised"\nchanges: ["x"]', null)).toBe(
+      'revised custody requires a complete maestro_final_text block',
+    );
+  });
+
+  it('qualityGuardBlocksRevision fires only for lower-tier shrinkage of long text', () => {
+    const { qualityGuardBlocksRevision } = maestroAiTestHooks;
+    const longText = 'x'.repeat(500);
+    const shrunk = 'x'.repeat(400);
+    expect(qualityGuardBlocksRevision('claude', 'gemini', longText, shrunk, true)).toBe(true);
+    expect(qualityGuardBlocksRevision('claude', 'codex', longText, shrunk, true)).toBe(false);
+    expect(qualityGuardBlocksRevision('gemini', 'claude', longText, shrunk, true)).toBe(false);
+    expect(qualityGuardBlocksRevision('claude', 'gemini', longText, shrunk, false)).toBe(false);
+    expect(qualityGuardBlocksRevision('claude', 'gemini', 'x'.repeat(399), 'x'.repeat(100), true)).toBe(false);
+    expect(qualityGuardBlocksRevision('claude', 'gemini', longText, 'x'.repeat(426), true)).toBe(false);
+    expect(qualityGuardBlocksRevision(null, 'gemini', longText, shrunk, true)).toBe(false);
+  });
+});
+
 describe('Maestro AI autos/artifacts', () => {
   const session = {
     id: 'web-session-1',
@@ -730,7 +871,9 @@ describe('runSession orchestrator', () => {
       if (hostOf(url) === 'api.openai.com') {
         return new Response(
           JSON.stringify({
-            output_text: opts.codexText ?? 'MAESTRO_STATUS: READY',
+            output_text:
+              opts.codexText ??
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -768,15 +911,103 @@ describe('runSession orchestrator', () => {
 
   it('converges when the sole reviewer returns READY without changing custody', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
-    vi.stubGlobal(
-      'fetch',
-      providerFetch({ claudeText: 'Texto de rascunho robusto e completo.', codexText: 'MAESTRO_STATUS: READY' }),
-    );
+    vi.stubGlobal('fetch', providerFetch({ claudeText: 'Texto de rascunho robusto e completo.' }));
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
 
     expect(db.__sessions.get('run-1')?.status).toBe('converged');
     expect(db.__sessions.get('run-1')?.final_text).toBe('Texto de rascunho robusto e completo.');
+  });
+
+  it('retries a NOT_READY-unchanged reviewer turn with the corrective section, then converges', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    let codexCalls = 0;
+    const codexBodies: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (hostOf(url) === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: 'Rascunho valido e completo.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        codexCalls += 1;
+        codexBodies.push(String(init?.body ?? ''));
+        const text =
+          codexCalls === 1
+            ? 'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nvague complaint without correction</maestro_revision_report>'
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+        return new Response(JSON.stringify({ output_text: text, usage: { input_tokens: 10, output_tokens: 20 } }), {
+          status: 200,
+        });
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    expect(codexCalls).toBe(2);
+    expect(codexBodies[1]).toContain('Mandatory Corrective Retry');
+    expect(db.__sessions.get('run-1')?.status).toBe('converged');
+  });
+
+  it('accepts READY with a substantive revision as a normal turn (desktop bans inversion)', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const revised = 'Texto revisado, mais preciso e completo, sem marcadores pendentes.';
+    const codexText = `MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "revised"\nchanges: ["improved precision"]\nprotocol basis: precision rule</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
+    vi.stubGlobal('fetch', providerFetch({ claudeText: 'Rascunho original razoavel e completo.', codexText }));
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    // The revision is accepted and takes custody; the new version has not yet
+    // earned a full approval pass, so the single-cycle session does not converge.
+    expect(row?.current_text).toBe(revised);
+    expect(row?.current_author).toBe('codex');
+    expect(row?.status).toBe('blocked_max_cycles');
+  });
+
+  it('rejects a lower-tier shrink revision and keeps custody unchanged (quality ratchet)', async () => {
+    const original = `Paragrafo extenso e detalhado. ${'Argumento com contexto e profundidade analitica. '.repeat(12)}`;
+    const shrunk = original.slice(0, Math.floor(original.length * 0.5));
+    const db = createInMemoryDb({
+      sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'deepseek']) })],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (hostOf(url) === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: original }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.deepseek.com') {
+        const text = `MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "revised"\nchanges: ["trimmed"]</maestro_revision_report>\n<maestro_final_text>${shrunk}</maestro_final_text>`;
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: text } }],
+            usage: { prompt_tokens: 10, completion_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, MAESTRO_DEEPSEEK_API_KEY: 'k-ds', BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.current_text).toBe(original.trim());
+    expect(row?.status).toBe('blocked_max_cycles');
   });
 
   it('marks the session as error when a reviewer returns empty text', async () => {
@@ -1574,42 +1805,5 @@ describe('maestro link-audit host safety (SSRF hardening)', () => {
     expect(hosts).toContain('[::ffff:7f00:1]'); // ::ffff:127.0.0.1 normalized by URL.hostname
     expect(hosts).toContain('[::1]');
     expect(urls).toContain('https://example.com/ok');
-  });
-});
-
-describe('maestro revision contract guard', () => {
-  it('blocks READY reviewers from changing custody text', () => {
-    const result = maestroAiTestHooks.validateRevisionGuard(
-      'Texto aprovado anterior.',
-      'Texto aprovado anterior com mudanca.',
-      'READY',
-      'Changed line 1 based on protocol rule.',
-    );
-
-    expect(result).toContain('READY reviewers cannot alter');
-  });
-
-  it('blocks material text impoverishment', () => {
-    const previous = `${'Paragrafo robusto com argumento, contexto e nuance. '.repeat(40)}`;
-    const candidate = 'Versao curta.';
-    const result = maestroAiTestHooks.validateRevisionGuard(
-      previous,
-      candidate,
-      'NOT_READY',
-      'Changed lines 1-20 based on protocol rule because the text needed correction.',
-    );
-
-    expect(result).toContain('anti-impoverishment');
-  });
-
-  it('allows a documented focused correction', () => {
-    const result = maestroAiTestHooks.validateRevisionGuard(
-      'Linha 1\nLinha 2 com erro factual.',
-      'Linha 1\nLinha 2 com correcao factual.',
-      'NOT_READY',
-      'Changed line 2 based on the protocol rule for factual precision; no other line was altered.',
-    );
-
-    expect(result).toBeNull();
   });
 });
