@@ -956,10 +956,53 @@ describe('runSession orchestrator', () => {
     expect(db.__sessions.get('run-1')?.status).toBe('converged');
   });
 
+  it('sends an undeclared block change to corrective retry via the approved-content lock', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    let codexCalls = 0;
+    const codexBodies: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (hostOf(url) === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: 'Rascunho valido e completo.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        codexCalls += 1;
+        codexBodies.push(String(init?.body ?? ''));
+        const text =
+          codexCalls === 1
+            ? 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "revised"\nchanges: ["rewrote the paragraph"]</maestro_revision_report>\n<maestro_final_text>Texto reescrito sem declarar blocos.</maestro_final_text>'
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+        return new Response(JSON.stringify({ output_text: text, usage: { input_tokens: 10, output_tokens: 20 } }), {
+          status: 200,
+        });
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // The undeclared block change is a content-lock CONTRACT_VIOLATION: the
+    // same reviewer is retried and the original custody text survives.
+    expect(codexCalls).toBe(2);
+    expect(codexBodies[1]).toContain('Mandatory Corrective Retry');
+    expect(db.__sessions.get('run-1')?.status).toBe('converged');
+    expect(db.__sessions.get('run-1')?.final_text).toBe('Rascunho valido e completo.');
+  });
+
   it('accepts READY with a substantive revision as a normal turn (desktop bans inversion)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
     const revised = 'Texto revisado, mais preciso e completo, sem marcadores pendentes.';
-    const codexText = `MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "revised"\nchanges: ["improved precision"]\nprotocol basis: precision rule</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
+    // changed_blocks leads the report: the canonical section finder recognizes
+    // the key at report start or after {, [ or , (a preceding quoted value
+    // line would hide it, matching the desktop parser).
+    const codexText = `MAESTRO_STATUS: READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "precision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
     vi.stubGlobal('fetch', providerFetch({ claudeText: 'Rascunho original razoavel e completo.', codexText }));
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
@@ -978,6 +1021,7 @@ describe('runSession orchestrator', () => {
     const db = createInMemoryDb({
       sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'deepseek']) })],
     });
+    let deepseekCalls = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (hostOf(url) === 'api.anthropic.com') {
@@ -990,7 +1034,8 @@ describe('runSession orchestrator', () => {
         );
       }
       if (hostOf(url) === 'api.deepseek.com') {
-        const text = `MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "revised"\nchanges: ["trimmed"]</maestro_revision_report>\n<maestro_final_text>${shrunk}</maestro_final_text>`;
+        deepseekCalls += 1;
+        const text = `MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "concision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${shrunk}</maestro_final_text>`;
         return new Response(
           JSON.stringify({
             choices: [{ message: { content: text } }],
@@ -1008,6 +1053,8 @@ describe('runSession orchestrator', () => {
     const row = db.__sessions.get('run-1');
     expect(row?.current_text).toBe(original.trim());
     expect(row?.status).toBe('blocked_max_cycles');
+    // Exactly one call: the tier guard rejects without a corrective retry.
+    expect(deepseekCalls).toBe(1);
   });
 
   it('marks the session as error when a reviewer returns empty text', async () => {

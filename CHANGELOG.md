@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.06.00] - 2026-07-05
+
+### Alterado
+
+- **Maestro AI — trava soberana de conteúdo aprovado (Plano B2 da equiparação com o maestro-app)**: novo módulo `content-lock` (port byte-exato de `editorial_content_lock.rs`). Uma revisão só pode alterar, remover, reordenar ou acrescentar blocos de texto (segmentados por linha em branco, IDs `B0001…`) que o relatório declare na seção `changed_blocks`, cada um com `protocol_basis` não-vazio; crescimento do número de blocos exige `change_type` split/addition e reordenação exige `change_type` reorder por bloco movido. Violações seguem o mesmo caminho de CONTRACT_VIOLATION com retry corretivo do Plano B1 (a trava roda antes do guard de tier, na ordem canônica). Igualdade de blocos por texto normalizado (whitespace canônico) — equivalente ao hash do desktop, documentado no plano.
+
 ## [v02.05.00] - 2026-07-05
 
 ### Alterado
