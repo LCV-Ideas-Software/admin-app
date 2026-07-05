@@ -289,6 +289,10 @@ function sanitizeAgent(value: unknown, fallback: ProviderKey): ProviderKey {
   if (normalized === 'google') return 'gemini';
   if (normalized === 'xai') return 'grok';
   if (normalized === 'sonar') return 'perplexity';
+  if (normalized === 'agy' || normalized === 'antigravity') return 'gemini';
+  if (normalized === 'deepseek-api') return 'deepseek';
+  if (normalized === 'grok-api') return 'grok';
+  if (normalized === 'perplexity-api') return 'perplexity';
   return fallback;
 }
 
@@ -859,15 +863,61 @@ function runtimeLimitExceeded(startedAtMs: number, maxRuntimeMinutes?: number | 
   return Date.now() - startedAtMs > Number(maxRuntimeMinutes) * 60_000;
 }
 
+// Rust char::is_whitespace / str::trim / split_whitespace use the Unicode
+// White_Space property, which differs from JS \s and String.trim(): it
+// INCLUDES U+0085 (NEL) and EXCLUDES U+FEFF (BOM/ZWNBSP). The parity port
+// must use this exact class, not \s.
+const RUST_WS_CLASS = '[\\t\\n\\u000B\\f\\r \\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]';
+const RUST_WS_RUN = new RegExp(`${RUST_WS_CLASS}+`, 'g');
+const RUST_WS_EDGES = new RegExp(`^${RUST_WS_CLASS}+|${RUST_WS_CLASS}+$`, 'g');
+
+function rustTrim(text: string): string {
+  return text.replace(RUST_WS_EDGES, '');
+}
+
+// Rust to_ascii_uppercase: only a-z are uppercased; Unicode case mappings
+// (e.g. 'ſ' -> 'S') must NOT apply.
+function asciiUppercase(text: string): string {
+  return text.replace(/[a-z]/g, (character) => character.toUpperCase());
+}
+
 function extractStatus(text: string): 'READY' | 'NOT_READY' {
-  const cleaned = text.replace(/^\s*<think>[\s\S]*?<\/think>\s*/i, '').trim();
-  const first = cleaned.split(/\r?\n/).find((line) => line.trim().length > 0) ?? '';
-  return /\bMAESTRO_STATUS\s*:\s*READY\b/i.test(first) ? 'READY' : 'NOT_READY';
+  // Desktop parity (editorial_io.rs extract_maestro_status): every line is
+  // scanned; the trimmed, ASCII-uppercased line must equal the marker exactly
+  // (single space after the colon); the first matching line decides.
+  for (const line of text.split(/\r?\n/)) {
+    const normalized = asciiUppercase(rustTrim(line));
+    if (normalized === 'MAESTRO_STATUS: READY') return 'READY';
+    if (normalized === 'MAESTRO_STATUS: NOT_READY') return 'NOT_READY';
+  }
+  return 'NOT_READY';
 }
 
 function extractTagged(text: string, tag: string): string | null {
-  const match = new RegExp(`<${tag}>\\s*([\\s\\S]*?)\\s*</${tag}>`, 'i').exec(text);
-  return match?.[1]?.trim() || null;
+  // Desktop parity (editorial_io.rs extract_tagged_block): resolve to the
+  // LAST complete <tag>..</tag> pair so a duplicated or echoed block yields
+  // the agent's final version instead of the echo. The Rust charset guard
+  // rejects only invalid characters — an empty tag name passes.
+  if (!/^[A-Za-z0-9_-]*$/.test(tag)) return null;
+  const open = `<${tag}>`;
+  const close = `</${tag}>`;
+  const closeAt = text.lastIndexOf(close);
+  if (closeAt < open.length) return null;
+  const openAt = text.lastIndexOf(open, closeAt - open.length);
+  if (openAt === -1) return null;
+  const value = rustTrim(text.slice(openAt + open.length, closeAt));
+  return value || null;
+}
+
+// Desktop parity (session_orchestration.rs normalized_editorial_text):
+// peripheral whitespace, line breaks and redundant internal whitespace are
+// cosmetic; punctuation and capitalization are substantive.
+function normalizedEditorialText(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split(RUST_WS_RUN).filter(Boolean).join(' ');
+}
+
+function isSubstantiveEditorialChange(before: string, after: string): boolean {
+  return normalizedEditorialText(before) !== normalizedEditorialText(after);
 }
 
 /**
@@ -1381,6 +1431,10 @@ export const maestroAiTestHooks = {
   buildProviderHttpRequest,
   publicApiHealthResult,
   validateRevisionGuard,
+  extractStatus,
+  extractTagged,
+  isSubstantiveEditorialChange,
+  sanitizeAgent,
   isBlockedAuditHost,
   extractUrls,
   checkOneLink,
@@ -1732,7 +1786,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             custody: 'unstructured_report_missing',
           });
         const revisedText = extractTagged(result.text, 'maestro_final_text');
-        const changedByReviewer = Boolean(revisedText && revisedText.trim() !== currentText.trim());
+        const changedByReviewer = Boolean(revisedText && isSubstantiveEditorialChange(currentText, revisedText));
         const candidateText = revisedText && changedByReviewer ? revisedText : currentText;
         const revisionGuardError = validateRevisionGuard(currentText, candidateText, status, revisionReport);
         if (revisionGuardError) {

@@ -532,6 +532,62 @@ describe('Maestro AI settings', () => {
   });
 });
 
+describe('Maestro AI desktop-parity parsing (Plan A)', () => {
+  it('extractStatus matches desktop exact-line semantics', () => {
+    const { extractStatus } = maestroAiTestHooks;
+    expect(extractStatus('intro line\nMAESTRO_STATUS: READY\nrest')).toBe('READY');
+    expect(extractStatus('maestro_status: ready')).toBe('READY');
+    expect(extractStatus('MAESTRO_STATUS : READY')).toBe('NOT_READY');
+    expect(extractStatus('prefix MAESTRO_STATUS: READY suffix')).toBe('NOT_READY');
+    expect(extractStatus('MAESTRO_STATUS: NOT_READY\nMAESTRO_STATUS: READY')).toBe('NOT_READY');
+    expect(extractStatus('no marker at all')).toBe('NOT_READY');
+  });
+
+  it('extractTagged resolves the LAST complete tag pair (desktop parity)', () => {
+    const { extractTagged } = maestroAiTestHooks;
+    expect(extractTagged('<t>first</t> and <t>second</t>', 't')).toBe('second');
+    expect(extractTagged('<t>  padded  </t>', 't')).toBe('padded');
+    expect(extractTagged('<t></t>', 't')).toBeNull();
+    expect(extractTagged('no tags', 't')).toBeNull();
+    expect(extractTagged('<t>x</t>', 'evil.*tag')).toBeNull();
+  });
+
+  it('isSubstantiveEditorialChange ignores whitespace-only differences (desktop parity)', () => {
+    const { isSubstantiveEditorialChange } = maestroAiTestHooks;
+    expect(isSubstantiveEditorialChange('a b', 'a\n\nb')).toBe(false);
+    expect(isSubstantiveEditorialChange('a  b', 'a b')).toBe(false);
+    expect(isSubstantiveEditorialChange('a b\r\n', 'a b')).toBe(false);
+    expect(isSubstantiveEditorialChange('a b.', 'a b')).toBe(true);
+    expect(isSubstantiveEditorialChange('A b', 'a b')).toBe(true);
+  });
+
+  it('mirrors Rust ASCII-uppercase and White_Space semantics exactly', () => {
+    const { extractStatus, extractTagged, isSubstantiveEditorialChange } = maestroAiTestHooks;
+    // Unicode uppercase must NOT apply: 'ſ' uppercases to 'S' in JS but
+    // not in Rust to_ascii_uppercase, so this line must not match the marker.
+    expect(extractStatus('maeſtro_status: ready')).toBe('NOT_READY');
+    // U+0085 (NEL) is Rust whitespace: trim strips it, the marker matches.
+    expect(extractStatus('MAESTRO_STATUS: READY')).toBe('READY');
+    // U+FEFF is NOT Rust whitespace: it survives trim and blocks the match.
+    expect(extractStatus('﻿MAESTRO_STATUS: READY')).toBe('NOT_READY');
+    // Rust charset guard does not reject an empty tag name.
+    expect(extractTagged('<>value</>', '')).toBe('value');
+    // U+0085 collapses as whitespace; U+FEFF is a regular character.
+    expect(isSubstantiveEditorialChange('ab', 'a b')).toBe(false);
+    expect(isSubstantiveEditorialChange('a﻿b', 'a b')).toBe(true);
+  });
+
+  it('sanitizeAgent honors the desktop alias table', () => {
+    const { sanitizeAgent } = maestroAiTestHooks;
+    expect(sanitizeAgent('agy', 'claude')).toBe('gemini');
+    expect(sanitizeAgent('antigravity', 'claude')).toBe('gemini');
+    expect(sanitizeAgent('deepseek-api', 'claude')).toBe('deepseek');
+    expect(sanitizeAgent('grok-api', 'claude')).toBe('grok');
+    expect(sanitizeAgent('perplexity-api', 'claude')).toBe('perplexity');
+    expect(sanitizeAgent('unknown', 'claude')).toBe('claude');
+  });
+});
+
 describe('Maestro AI autos/artifacts', () => {
   const session = {
     id: 'web-session-1',
