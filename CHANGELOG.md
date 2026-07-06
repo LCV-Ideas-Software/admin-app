@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.10.00] - 2026-07-06
+
+### Alterado
+
+- **Maestro AI — prior-reports feed, prompt canônico completo e resolução viva de modelos (Planos E/F da equiparação com o maestro-app)**: fecham o roadmap A–F. **(F1)** O prompt de revisão troca a seção de últimos 12 eventos JSON pelo feed canônico `Prior Serial Revision Reports` (port de `build_revision_history_block`): todos os turnos seriais anteriores em ordem cronológica, cada um com header `nome / papel / status`, referência de artefato e o `maestro_revision_report` truncado a 12.000 caracteres Unicode; turno sem report ganha o placeholder canônico de falha de contrato; turnos operacionais ficam de fora; o texto final nunca entra. Turnos de violação e de rejeição do tier guard entram com o report tentado. **(F2)** Language Contract ganha a regra canônica de citação por seção compacta (`§V.14`/`§11.7`) e o marcador de protocolo; Role Contract ganha os bullets canônicos de `SELF_REVIEW_BLOCKED`, do redator de fechamento (com o flag `Closing redactor turn:` alimentado pelo closure gating) e o header `Round turn:`; o Quality Gate ganha os bullets canônicos de justificação por mudança (passagem exata + requisito exato do protocolo + por que preservar seria inseguro + em dúvida, preserve). **(F3)** Resolução viva de modelos (port de `resolve_*_model`/`choose_preferred_model`): quando o operador não configurou um modelo explícito (diferente do default semeado), o motor consulta o endpoint `/models` do provider e escolhe o primeiro candidato canônico presente na lista viva (senão o primeiro listado; senão o fallback canônico), com cache por execução; Perplexity segue sem resolução viva (canônico). Corrigido drift do default do Grok (sufixo `-0309` inexistente no desktop). **(E)** Exceções adotadas e documentadas, sem mudança de código: `request_usd_per_1k`, `DEFAULT_RATES` semeadas, rejeição pré-start com <2 agentes e `DEFAULT_PROTOCOL` semeado permanecem no web. Desvios documentados em `docs/superpowers/plans/2026-07-06-maestro-ai-parity-plan-ef.md`.
+
 ## [v02.09.00] - 2026-07-06
 
 ### Alterado

@@ -218,7 +218,7 @@ const DEFAULT_MODELS: Record<ProviderKey, string> = {
   codex: 'gpt-5.5',
   gemini: 'gemini-2.5-pro',
   deepseek: 'deepseek-v4-pro',
-  grok: 'grok-4.20-multi-agent-0309',
+  grok: 'grok-4.20-multi-agent',
   perplexity: 'sonar-reasoning-pro',
 };
 
@@ -1844,6 +1844,40 @@ ${input.protocol_text}
 `;
 }
 
+// Canonical serial-turn record for the prior-reports feed (Plan F): the web
+// analogue of the desktop's EditorialAgentResult slice — one entry per
+// accepted/rejected serial turn, oldest first. Operational failures never
+// enter the list (is_operational_agent_result parity).
+type SerialTurnReport = {
+  name: string;
+  role: string;
+  status: string;
+  /** The turn's maestro_revision_report; null when the agent returned none. */
+  report: string | null;
+  /** Artifact reference — the D1 artifact id (desktop uses the file path). */
+  artifact: string;
+};
+
+/** Port of build_revision_history_block (editorial_prompts.rs:327-363): prior
+ *  revision REPORTS only (never the final text), each capped at 12,000 Unicode
+ *  chars, chronological, no count/total cap; a missing report becomes the
+ *  canonical contract-failure placeholder; an extracted-but-empty report skips
+ *  the turn. */
+function buildRevisionHistoryBlock(reports: SerialTurnReport[]): string {
+  let history = '';
+  for (const turn of reports) {
+    const extracted =
+      turn.report === null
+        ? `No complete maestro_revision_report block was returned by ${turn.name}. Treat this artifact as a contract failure, not as deliberative substance.`
+        : turn.report;
+    const report = extracted.trim();
+    if (!report) continue;
+    const capped = [...report].slice(0, 12_000).join('');
+    history += `\n### ${turn.name} / ${turn.role} / \`${turn.status}\`\n\nArtifact: \`${turn.artifact}\`\n\n\`\`\`text\n${capped}\n\`\`\`\n`;
+  }
+  return history.trim() ? history : 'No prior revision reports are recorded for this serial cycle.';
+}
+
 async function buildRevisionPrompt(args: {
   input: MaestroResolvedSessionInput;
   runId: string;
@@ -1851,29 +1885,35 @@ async function buildRevisionPrompt(args: {
   currentText: string;
   currentAuthor: ProviderKey;
   reviewer: ProviderKey;
-  history: SessionEvent[];
+  serialReports: SerialTurnReport[];
+  closingTurn: boolean;
 }): Promise<string> {
   const blockManifest = await formatBlockManifestForPrompt(args.currentText);
+  const revisionHistory = buildRevisionHistoryBlock(args.serialReports);
   return `# Maestro Editorial AI - Web/API Serial Review-Rewrite Turn
 
 Run: \`${args.runId}\`
-Turn: \`${args.turn}\`
+Round turn: \`${args.turn}\`
 Session: ${sanitizeText(args.input.title, 200)}
 
 ## Language Contract
 
-- Internal coordination, critique, changelog, and revision report MUST be written in en_US.
-- The operator-facing article inside <maestro_final_text> MUST be written in Brazilian Portuguese (pt_BR).
-- The editorial protocol is authoritative input, not output. Read and obey it, but do not quote, summarize, restate, or reproduce protocol text in the artifact.
+- Internal coordination, critique, changelog, retry diagnostics, JSON/report fields, and every non-user-facing agent message MUST be written in en_US.
+- The operator-facing article inside \`<maestro_final_text>\` MUST be written in Brazilian Portuguese (pt_BR).
+- Keep protocol markers exactly as specified.
+- The editorial protocol is authoritative input, not output. Read and obey it, but do not quote, summarize, restate, or reproduce protocol text in the artifact. Cite compact section IDs only, such as \`§V.14\` or \`§11.7\`.
 
 ## Role Contract
 
 - Current version author/curator: \`${args.currentAuthor}\`.
 - Current reviewer-reviser: \`${args.reviewer}\`.
+- Closing redactor turn: \`${args.closingTurn}\`.
 - You are not allowed to revise a version you just produced.
-- You must act as reviewer and reviser in one turn: inspect the current text, apply only authorized corrections, and return the complete current article only when custody changes.
-- A Maestro round is a full circular pass through every configured eligible AI agent. A new round can start only after custody has completed the full circle and returned to the original drafter.
-- The web engine validates links automatically after each draft/revision. Do not fabricate URLs. If a link cannot be verified from the provided context, mark it as [EVIDENCIA_PENDENTE] instead of inventing one.
+- If you are the current version author, return \`MAESTRO_STATUS: NOT_READY\`, set \`custody\` to \`"unchanged"\`, omit \`<maestro_final_text>\`, and state \`SELF_REVIEW_BLOCKED\`. This condition is a scheduler invariant violation, not an editorial turn.
+- The original redactor may act in the closing redactor turn only when the current version author is another peer. In that case, the original redactor reviews the completed peer circuit, may revise only issues raised by prior reviewers or concrete final-delivery blockers, and must preserve all approved content.
+- You must act as reviewer and reviser in one turn: inspect the current text, apply only authorized corrections, and return the complete current article.
+- A Maestro round is a full circular pass through all active AI agents. This call is one turn inside that round; do not call it a new round in your own report.
+- The web engine audits public links automatically when a text attempts finalization. Do not fabricate URLs. If a link cannot be verified from the provided context, mark it as [EVIDENCIA_PENDENTE] instead of inventing one.
 
 ## Sovereign Approved-Content Lock
 
@@ -1892,6 +1932,13 @@ If a concern is optional, stylistic, vague, or outside scope, mark it as OUT_OF_
 Codex and Claude are the strongest long-form writers in this system. Gemini is second. DeepSeek, Grok, and Perplexity are useful reviewers but must not flatten stronger prose.
 Preserve the strongest existing formulation unless a concrete editorial-protocol defect requires a narrow change.
 Do not reduce breadth, depth, articulation, nuance, reflexivity, or argumentative amplitude.
+Any deletion, compression, simplification, or structural narrowing must be justified in the report with:
+
+- the exact passage changed;
+- the exact protocol requirement;
+- why preserving the stronger formulation would be unsafe or incorrect.
+
+If you are unsure, preserve the passage and report the concern instead of rewriting it.
 
 ## Evidence and Bibliographic Integrity Gate
 
@@ -1953,11 +2000,8 @@ ${args.input.protocol_text}
 ${args.currentText}
 \`\`\`
 
-## Prior Session Events
-
-\`\`\`json
-${JSON.stringify(args.history.slice(-12), null, 2)}
-\`\`\`
+## Prior Serial Revision Reports
+${revisionHistory}
 `;
 }
 
@@ -2092,6 +2136,115 @@ interface ProviderCallOptions {
   timeoutMs?: number;
   /** Cooperative cancel check; enables retry waits + in-flight abort polling. */
   isCancelled?: () => Promise<boolean>;
+  /** Per-execution cache for live model resolution (documented web deviation:
+   *  the desktop resolves on every call; Workers budget subrequests). */
+  modelCache?: Map<ProviderKey, string>;
+}
+
+// ── Plan F: canonical live model resolution (port of resolve_*_model +
+// choose_preferred_model, provider_runners.rs:1184-1269 and the DeepSeek/Grok
+// variants). Perplexity has NO live resolution (canonical). Precedence in the
+// web: operator-configured model -> live candidate list -> first live model ->
+// canonical hardcoded fallback.
+const MODEL_RESOLUTION: Partial<
+  Record<
+    ProviderKey,
+    { endpoint: string; auth: 'bearer' | 'x-api-key' | 'query-key'; candidates: string[]; fallback: string }
+  >
+> = {
+  codex: {
+    endpoint: 'https://api.openai.com/v1/models',
+    auth: 'bearer',
+    candidates: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3', 'gpt-5.2', 'gpt-5', 'gpt-4.1'],
+    fallback: 'gpt-5.4',
+  },
+  claude: {
+    endpoint: 'https://api.anthropic.com/v1/models',
+    auth: 'x-api-key',
+    candidates: [
+      'claude-opus-4-7',
+      'claude-opus-4-1-20250805',
+      'claude-opus-4-20250514',
+      'claude-sonnet-4-20250514',
+      'claude-3-7-sonnet-latest',
+    ],
+    fallback: 'claude-opus-4-1-20250805',
+  },
+  gemini: {
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+    auth: 'query-key',
+    candidates: [
+      'gemini-3.1-pro-preview',
+      'gemini-3-pro-preview',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-1.5-pro',
+    ],
+    fallback: 'gemini-2.5-pro',
+  },
+  deepseek: {
+    endpoint: 'https://api.deepseek.com/models',
+    auth: 'bearer',
+    candidates: ['deepseek-v4-pro', 'deepseek-reasoner', 'deepseek-chat', 'deepseek-v4-flash'],
+    fallback: 'deepseek-reasoner',
+  },
+  grok: {
+    endpoint: 'https://api.x.ai/v1/models',
+    auth: 'bearer',
+    candidates: [
+      'grok-4.20-multi-agent',
+      'grok-4-latest',
+      'grok-4.3',
+      'grok-4.20-reasoning',
+      'grok-4.20',
+      'grok-4-1-fast',
+      'grok-4',
+    ],
+    fallback: 'grok-4.20-multi-agent',
+  },
+};
+
+/** Port of choose_preferred_model: first candidate present in the live list;
+ *  else the first live model; else the fallback. */
+function choosePreferredModel(models: string[], candidates: string[], fallback: string): string {
+  for (const candidate of candidates) {
+    if (models.includes(candidate)) return candidate;
+  }
+  return models[0] ?? fallback;
+}
+
+/** Resolve the model for a provider via its live /models endpoint. Any HTTP or
+ *  parse failure falls back to the canonical hardcoded default (desktop
+ *  parity). Perplexity (no live resolution) returns its default directly. */
+async function resolveProviderModel(agent: ProviderKey, apiKey: string): Promise<string> {
+  const resolution = MODEL_RESOLUTION[agent];
+  if (!resolution) return DEFAULT_MODELS[agent];
+  try {
+    const target =
+      resolution.auth === 'query-key'
+        ? `${resolution.endpoint}?key=${encodeURIComponent(apiKey)}`
+        : resolution.endpoint;
+    const headers: Record<string, string> = {};
+    if (resolution.auth === 'bearer') headers.authorization = `Bearer ${apiKey}`;
+    if (resolution.auth === 'x-api-key') {
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    }
+    const response = await fetchWithTimeout(target, { headers }, 15_000);
+    if (!response.ok) return resolution.fallback;
+    const payload = (await response.json()) as {
+      data?: Array<{ id?: string }>;
+      models?: Array<{ name?: string }>;
+    };
+    // OpenAI/Anthropic/DeepSeek/Grok list under data[].id; Gemini under
+    // models[].name with a "models/" prefix.
+    const ids = payload.data
+      ? payload.data.map((model) => String(model.id ?? '')).filter(Boolean)
+      : (payload.models ?? []).map((model) => String(model.name ?? '').replace(/^models\//, '')).filter(Boolean);
+    return choosePreferredModel(ids, resolution.candidates, resolution.fallback);
+  } catch {
+    return resolution.fallback;
+  }
 }
 
 async function callProvider(
@@ -2105,7 +2258,18 @@ async function callProvider(
 ): Promise<ProviderCallResult> {
   const apiKey = secretForAgent(env, agent);
   if (!apiKey) throw new Error(`${AGENT_LABELS[agent]} API key is not configured in admin-motor secrets.`);
-  const model = sanitizeText(models[agent], 120) || DEFAULT_MODELS[agent];
+  // Plan F precedence: an operator-configured model (anything other than the
+  // seeded default) wins; otherwise resolve live against the provider's
+  // /models list (canonical), memoized per execution via options.modelCache.
+  const configured = sanitizeText(models[agent], 120);
+  let model = configured && configured !== DEFAULT_MODELS[agent] ? configured : '';
+  if (!model) {
+    model = options?.modelCache?.get(agent) ?? '';
+    if (!model) {
+      model = await resolveProviderModel(agent, apiKey);
+      options?.modelCache?.set(agent, model);
+    }
+  }
   const system =
     systemOverride ??
     `You are ${AGENT_LABELS[agent]} inside Maestro Editorial AI. Internal coordination must be in en_US. Operator-facing deliverables must be in pt_BR. Follow the current Maestro role contract exactly.`;
@@ -2321,6 +2485,9 @@ export const maestroAiTestHooks = {
   remainingSessionMs,
   sessionTimeExhausted,
   fetchProviderWithRetry,
+  buildRevisionHistoryBlock,
+  choosePreferredModel,
+  resolveProviderModel,
   persistSession,
   runSession,
   sweepStaleSessions,
@@ -2473,7 +2640,11 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     const remaining = remainingSessionMs(timeAnchorMs, input.max_runtime_minutes);
     return remaining === null ? PROVIDER_TIMEOUT_MS : Math.max(1, Math.min(PROVIDER_TIMEOUT_MS, remaining));
   };
-  const callOptions = (): ProviderCallOptions => ({ timeoutMs: callTimeoutMs(), isCancelled });
+  // Plan F: per-execution live-model cache + the prior-reports feed list (the
+  // web analogue of the desktop's append-only EditorialAgentResult slice).
+  const modelCache = new Map<ProviderKey, string>();
+  const serialReports: SerialTurnReport[] = [];
+  const callOptions = (): ProviderCallOptions => ({ timeoutMs: callTimeoutMs(), isCancelled, modelCache });
   // Plan D (documented web deviation): the desktop re-runs the full release
   // audit (incl. HTTP) on every unchanged turn; on Workers that would multiply
   // subrequests past the platform budget, so within ONE execution the audit
@@ -2888,11 +3059,14 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             (await buildRevisionPrompt({
               input,
               runId: id,
-              turn: events.length + 1,
+              turn: roundTurnIndex + 1,
               currentText,
               currentAuthor,
               reviewer,
-              history: events,
+              serialReports,
+              // Canonical closing-turn flag: the configured lead closing the
+              // circuit (the scheduler only makes it eligible via closure gating).
+              closingTurn: reviewer === initialAgent && reviewer !== currentAuthor,
             })) + (correctiveRetryCount > 0 ? correctiveRetrySection(correctiveRetryCount) : '');
           const rates = input.rates?.[reviewer] ?? {};
           const projected = estimateCost(prompt, MAX_OUTPUT_TOKENS, rates);
@@ -3010,7 +3184,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             // stable-approval set.
             stableApprovals.clear();
             artifactTurn += 1;
-            await createArtifact(db, {
+            const violationArtifact = await createArtifact(db, {
               sessionId: id,
               cycle: round,
               turn: artifactTurn,
@@ -3030,6 +3204,15 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               costUsd: cost,
               model: result.model,
               previousArtifactId,
+            });
+            // Prior-reports feed (canonical): a violating turn enters with its
+            // attempted report (or the contract-failure placeholder when none).
+            serialReports.push({
+              name: AGENT_LABELS[reviewer],
+              role: 'review',
+              status: 'CONTRACT_VIOLATION',
+              report,
+              artifact: violationArtifact.id,
             });
             await pushEvent({
               at: nowIso(),
@@ -3073,7 +3256,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             // revision from a lower-tier reviewer is rejected and discarded; the
             // custody text and author stay unchanged and the session continues.
             artifactTurn += 1;
-            await createArtifact(db, {
+            const ratchetArtifact = await createArtifact(db, {
               sessionId: id,
               cycle: round,
               turn: artifactTurn,
@@ -3091,6 +3274,15 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               costUsd: cost,
               model: result.model,
               previousArtifactId,
+            });
+            // Prior-reports feed (canonical): the rejected turn's report still
+            // informs later reviewers.
+            serialReports.push({
+              name: AGENT_LABELS[reviewer],
+              role: 'review',
+              status: 'QUALITY_GUARD_REJECTED',
+              report,
+              artifact: ratchetArtifact.id,
             });
             await pushEvent({
               at: nowIso(),
@@ -3136,6 +3328,15 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             previousArtifactId,
           });
           previousArtifactId = artifact.id;
+          // Prior-reports feed (canonical): every accepted turn's report joins
+          // the chronological history fed to later reviewers.
+          serialReports.push({
+            name: AGENT_LABELS[reviewer],
+            role: 'review',
+            status: readyRejectedReason ? 'READY_REJECTED' : effectiveStatus,
+            report,
+            artifact: artifact.id,
+          });
           // Desktop parity: ReadyRejected turns do not count as valid round
           // agents; every other accepted turn feeds the closure gating. Any
           // accepted turn is a clean provider response: outage streak resets.
