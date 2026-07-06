@@ -82,7 +82,7 @@ const logRegistrarEvent = async (
       source: 'bigdata_db',
       fallbackUsed: false,
       ok: !errorMessage,
-      errorMessage,
+      ...(errorMessage !== undefined ? { errorMessage } : {}),
       metadata: {
         provider: 'cloudflare-registrar-api',
         request_id: trace.request_id,
@@ -121,7 +121,7 @@ const getSearchOptions = (request: Request) => {
 
   return {
     q,
-    limit: limitRaw == null || limitRaw === '' ? undefined : Number(limitRaw),
+    ...(limitRaw == null || limitRaw === '' ? {} : { limit: Number(limitRaw) }),
     extensions,
   };
 };
@@ -231,10 +231,10 @@ export async function onRequestPostRegistration(context: Context) {
     }>(context.request);
     const payload = await createCloudflareRegistrarRegistration(getEnv(context), {
       domain_name: String(body.domain_name ?? ''),
-      auto_renew: body.auto_renew,
-      privacy_mode: body.privacy_mode,
-      years: body.years,
-      contacts: body.contacts,
+      ...(body.auto_renew !== undefined ? { auto_renew: body.auto_renew } : {}),
+      ...(body.privacy_mode !== undefined ? { privacy_mode: body.privacy_mode } : {}),
+      ...(body.years !== undefined ? { years: body.years } : {}),
+      ...(body.contacts !== undefined ? { contacts: body.contacts } : {}),
     });
     await logRegistrarEvent(context, trace, {
       action: 'registrar-registration-create',

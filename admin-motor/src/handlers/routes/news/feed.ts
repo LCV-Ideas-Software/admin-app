@@ -40,13 +40,13 @@ function detectCharset(contentType: string | null, rawBytes: ArrayBuffer): strin
   // 1. Tentar extrair do Content-Type header
   if (contentType) {
     const match = contentType.match(/charset=([^\s;]+)/i);
-    if (match) return match[1].toLowerCase().replace(/['"]/g, '');
+    if (match?.[1]) return match[1].toLowerCase().replace(/['"]/g, '');
   }
 
   // 2. Tentar extrair do prólogo XML (peek nos primeiros 200 bytes como ASCII)
-  const peek = new TextDecoder('ascii', { fatal: false }).decode(rawBytes.slice(0, 200));
+  const peek = new TextDecoder('ascii', { fatal: false, ignoreBOM: false }).decode(rawBytes.slice(0, 200));
   const xmlMatch = peek.match(/encoding=["']([^"']+)["']/i);
-  if (xmlMatch) return xmlMatch[1].toLowerCase();
+  if (xmlMatch?.[1]) return xmlMatch[1].toLowerCase();
 
   return 'utf-8';
 }
@@ -77,6 +77,7 @@ function parseRSSFeed(xmlText: string, sourceName: string, _sourceId: string, ma
   for (const match of xmlText.matchAll(itemRegex)) {
     if (items.length >= maxItems) break;
     const block = match[1];
+    if (block === undefined) continue;
 
     const title = extractTag(block, 'title');
     const link = extractTag(block, 'link');
@@ -89,21 +90,21 @@ function parseRSSFeed(xmlText: string, sourceName: string, _sourceId: string, ma
     // Thumbnail: tenta múltiplas estratégias
     let thumbnail: string | null = null;
     const mediaMatch = block.match(/<media:content[^>]+url=["']([^"']+)["']/);
-    if (mediaMatch) thumbnail = mediaMatch[1];
+    if (mediaMatch?.[1]) thumbnail = mediaMatch[1];
 
     if (!thumbnail) {
       const mediaThumbMatch = block.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/);
-      if (mediaThumbMatch) thumbnail = mediaThumbMatch[1];
+      if (mediaThumbMatch?.[1]) thumbnail = mediaThumbMatch[1];
     }
 
     if (!thumbnail) {
       const enclosureMatch = block.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]+type=["']image\//);
-      if (enclosureMatch) thumbnail = enclosureMatch[1];
+      if (enclosureMatch?.[1]) thumbnail = enclosureMatch[1];
     }
 
     if (!thumbnail) {
       const descImgMatch = block.match(/<img[^>]+src=["']([^"']+)["']/);
-      if (descImgMatch) thumbnail = descImgMatch[1];
+      if (descImgMatch?.[1]) thumbnail = descImgMatch[1];
     }
 
     items.push({
@@ -126,12 +127,12 @@ function extractTag(block: string, tag: string): string {
   // Tenta com CDATA primeiro
   const cdataRegex = new RegExp(`<${tag}[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</${tag}>`, 'i');
   const cdataMatch = block.match(cdataRegex);
-  if (cdataMatch) return cdataMatch[1].trim();
+  if (cdataMatch) return (cdataMatch[1] ?? '').trim();
 
   // Sem CDATA
   const simpleRegex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i');
   const simpleMatch = block.match(simpleRegex);
-  if (simpleMatch) return simpleMatch[1].trim();
+  if (simpleMatch) return (simpleMatch[1] ?? '').trim();
 
   return '';
 }
@@ -188,10 +189,10 @@ async function fetchFeed(source: { id: string; name: string; url: string }, maxI
 
     let xml: string;
     try {
-      xml = new TextDecoder(charset, { fatal: false }).decode(buffer);
+      xml = new TextDecoder(charset, { fatal: false, ignoreBOM: false }).decode(buffer);
     } catch {
       // Fallback genérico se charset não suportado
-      xml = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+      xml = new TextDecoder('utf-8', { fatal: false, ignoreBOM: false }).decode(buffer);
     }
 
     return parseRSSFeed(xml, source.name, source.id, maxItems);

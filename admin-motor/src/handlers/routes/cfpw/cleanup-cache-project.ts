@@ -5,12 +5,17 @@ import {
   resolveCloudflarePwAccount,
 } from '../_lib/cfpw-api';
 
+type Env = {
+  CLOUDFLARE_PW?: string;
+  CLOUDFLARE_CACHE?: string;
+  CF_ACCOUNT_ID?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    CLOUDFLARE_PW?: string;
-    CLOUDFLARE_CACHE?: string;
-    CF_ACCOUNT_ID?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 

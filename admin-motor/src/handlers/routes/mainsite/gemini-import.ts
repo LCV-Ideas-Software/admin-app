@@ -14,16 +14,6 @@ interface Env {
   BIGDATA_DB?: D1Database;
 }
 
-interface D1Database {
-  prepare(query: string): {
-    bind(...values: unknown[]): {
-      run(): Promise<unknown>;
-      all<T = unknown>(): Promise<{ results: T[] }>;
-    };
-    run(): Promise<unknown>;
-  };
-}
-
 interface PagesContext<E = Env> {
   request: Request;
   env: E;
@@ -53,8 +43,9 @@ async function resolveModel(db: D1Database | undefined): Promise<string> {
       .prepare('SELECT payload FROM mainsite_settings WHERE id = ? LIMIT 1')
       .bind('mainsite/ai_models')
       .all<{ payload: string }>();
-    if (res.results && res.results.length > 0 && res.results[0].payload) {
-      const parsed = JSON.parse(res.results[0].payload) as { import?: string };
+    const firstRow = res.results && res.results.length > 0 ? res.results[0] : undefined;
+    if (firstRow?.payload) {
+      const parsed = JSON.parse(firstRow.payload) as { import?: string };
       if (parsed.import) return parsed.import;
     }
   } catch {

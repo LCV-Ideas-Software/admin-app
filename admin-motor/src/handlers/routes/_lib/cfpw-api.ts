@@ -153,7 +153,7 @@ const cloudflareRequest = async <T>(
       ...(hasContentTypeHeader || isFormDataBody ? {} : { 'Content-Type': 'application/json' }),
       ...(init?.headers ?? {}),
     },
-    body: init?.body,
+    ...(init?.body !== undefined ? { body: init.body } : {}),
   });
 
   const rawText = await response.text();
@@ -238,13 +238,14 @@ export const resolveCloudflarePwAccount = async (env: EnvWithCloudflarePwToken) 
   }
 
   const accounts = await listCloudflareAccounts(env);
-  if (accounts.length === 0) {
+  const firstAccount = accounts[0];
+  if (!firstAccount) {
     throw new Error('Nenhuma conta Cloudflare disponível para o token informado.');
   }
 
   return {
-    accountId: accounts[0].id,
-    accountName: accounts[0].name || null,
+    accountId: firstAccount.id,
+    accountName: firstAccount.name || null,
     source: 'auto-discovery' as const,
     accounts,
   };

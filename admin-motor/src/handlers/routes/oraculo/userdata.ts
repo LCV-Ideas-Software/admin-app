@@ -67,8 +67,8 @@ export const onRequestGet = async (context: HandlerContext) => {
       )
       .run();
 
-    const countRow = await db.prepare('SELECT COUNT(*) as total FROM oraculo_user_data').first();
-    const total = (countRow?.total ?? 0) as number;
+    const countRow = await db.prepare('SELECT COUNT(*) as total FROM oraculo_user_data').first<{ total?: number }>();
+    const total = countRow?.total ?? 0;
 
     const { results } = await db
       .prepare(

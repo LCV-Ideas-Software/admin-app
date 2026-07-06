@@ -83,7 +83,8 @@ function inferExtensionFromMagicBytes(bytes: Uint8Array): string | null {
 
   // AVIF: bytes 4..7 = "ftyp", bytes 8..11 in {"avif", "avis", "heic"}
   if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
-    const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+    // `bytes.length >= 12` no guard acima garante os índices 8..11; `?? 0` só satisfaz noUncheckedIndexedAccess.
+    const brand = String.fromCharCode(bytes[8] ?? 0, bytes[9] ?? 0, bytes[10] ?? 0, bytes[11] ?? 0);
     if (brand === 'avif' || brand === 'avis') return 'avif';
   }
 

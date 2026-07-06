@@ -118,7 +118,7 @@ async function verifyJwt(
     const parts = jwt.split('.');
     if (parts.length !== 3) return { valid: false, error: 'JWT malformado.' };
 
-    const [headerB64, payloadB64, signatureB64] = parts;
+    const [headerB64 = '', payloadB64 = '', signatureB64 = ''] = parts;
     const headerJson = JSON.parse(new TextDecoder().decode(base64UrlDecode(headerB64))) as {
       kid?: string;
       alg?: string;
@@ -175,7 +175,7 @@ async function verifyJwt(
 
     if (!isValid) return { valid: false, error: 'Assinatura JWT inválida.' };
 
-    return { valid: true, email: payloadJson.email };
+    return { valid: true, ...(payloadJson.email !== undefined ? { email: payloadJson.email } : {}) };
   } catch (err) {
     return { valid: false, error: `Erro na verificação JWT: ${(err as Error).message}` };
   }
@@ -232,7 +232,11 @@ async function validateCfAccessJwt(
       if (!result.valid) {
         console.warn(`[Auth] JWT inválido: ${result.error}`);
         if (enforcement === 'block') {
-          return { isAuthenticated: false, source: 'cloudflare-access', error: result.error };
+          return {
+            isAuthenticated: false,
+            source: 'cloudflare-access',
+            ...(result.error !== undefined ? { error: result.error } : {}),
+          };
         }
       } else if (result.email && cfAccessEmail && result.email !== cfAccessEmail) {
         const msg = `JWT email (${result.email}) não corresponde ao header CF-Access (${cfAccessEmail}).`;

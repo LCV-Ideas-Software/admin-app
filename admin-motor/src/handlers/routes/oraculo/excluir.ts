@@ -2,12 +2,14 @@
 
 import { DEFAULT_ADMIN_ACTOR, resolveAdminActorFromRequest } from '../_lib/admin-actor';
 
-interface DeleteBody {
+// Type alias (não interface) para ter index signature implícita
+// compatível com o parâmetro Record<string, unknown> de resolveAdminActorFromRequest.
+type DeleteBody = {
   id?: string;
   tipo?: string;
   adminActor?: string;
   adminEmail?: string;
-}
+};
 
 interface D1RunResult {
   meta?: {

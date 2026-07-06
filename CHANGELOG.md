@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.10.02] - 2026-07-06
+
+### Corrigido
+
+- **Baseline de typecheck do admin-motor zerado (243 → 0) e gate travado em zero**: por diretiva do operador ("nenhum erro pode passar"), todos os 243 erros estritos de TypeScript pré-existentes (strict + `exactOptionalPropertyTypes`, sem nenhum relaxamento de config) foram corrigidos na raiz em 49 arquivos: payloads JSON e contextos `data.env` tipados com formas estruturais honestas de campos opcionais (idioma da casa), interfaces locais que sombreavam os tipos globais de `@cloudflare/workers-types` removidas (com os casts que viraram identidade), guards de narrowing hoisted em consts (mesma expressão avaliada uma vez, comportamento preservado), spreads condicionais ou `| undefined` deliberado onde omitir a chave mudaria `Object.hasOwn`, e correções pontuais de chamadas/tipos (`first<T>()` tipado em vez de casts, args ignorados removidos, `IOptions` estendido localmente onde os @types atrasam em relação ao runtime verificado). Zero `any`, zero `@ts-ignore`/`@ts-expect-error`. O ratchet (`scripts/typecheck-admin-motor.mjs`) agora carrega baseline vazio: qualquer erro novo de TypeScript reprova o gate.
+
 ## [v02.10.01] - 2026-07-06
 
 ### Segurança

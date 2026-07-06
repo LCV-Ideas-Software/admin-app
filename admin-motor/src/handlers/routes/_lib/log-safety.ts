@@ -12,7 +12,7 @@ export function maskEmail(email: string): string {
     return '***';
   }
 
-  const [host, ...rest] = domainChunks;
+  const [host = '', ...rest] = domainChunks;
   const suffix = rest.length > 0 ? `.${rest.join('.')}` : '';
   return `${maskSegment(localPart)}@${maskSegment(host)}${suffix}`;
 }

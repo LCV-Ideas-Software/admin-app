@@ -1,9 +1,15 @@
-import type { D1Database } from '../../../../../functions/api/_lib/operational';
+import type { D1Database, D1PreparedStatement } from '../../../../../functions/api/_lib/operational';
 
 // Env: { BIGDATA_DB: D1Database } — via context.data?.env || context.env
 
+// O tipo compartilhado de D1Database só expõe prepare(); estende localmente
+// com a forma de batch() usada aqui (uma entrada de resultados por statement).
+type D1DatabaseWithBatch = D1Database & {
+  batch: (statements: D1PreparedStatement[]) => Promise<Array<{ results?: Array<Record<string, unknown>> }>>;
+};
+
 type Env = {
-  BIGDATA_DB?: D1Database;
+  BIGDATA_DB?: D1DatabaseWithBatch;
 };
 
 type Context = {
@@ -35,9 +41,9 @@ export const onRequestGet = async (context: Context) => {
 
       const [res, countRes] = await db.batch([stmt.bind(limit, offset), countStmt]);
 
-      const total = Number(countRes.results?.[0]?.c ?? 0);
+      const total = Number(countRes?.results?.[0]?.c ?? 0);
 
-      const items = (res.results ?? []).map((row: Record<string, unknown>) => {
+      const items = (res?.results ?? []).map((row: Record<string, unknown>) => {
         const prazoDias = Number(row.prazo_dias ?? 0);
         const aliquotaIr = prazoDias <= 180 ? 22.5 : prazoDias <= 360 ? 20 : prazoDias <= 720 ? 17.5 : 15;
         return {
@@ -61,9 +67,9 @@ export const onRequestGet = async (context: Context) => {
 
       const [res, countRes] = await db.batch([stmt.bind(limit, offset), countStmt]);
 
-      const total = Number(countRes.results?.[0]?.c ?? 0);
+      const total = Number(countRes?.results?.[0]?.c ?? 0);
 
-      const items = (res.results ?? []).map((row: Record<string, unknown>) => ({
+      const items = (res?.results ?? []).map((row: Record<string, unknown>) => ({
         id: row.id,
         criadoEm: row.created_at,
         dataCompra: row.data_compra,

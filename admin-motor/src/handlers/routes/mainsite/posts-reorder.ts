@@ -23,6 +23,9 @@ type MainsiteEnv = Context['env'] & {
 type MainsiteContext = {
   request: Request;
   env: MainsiteEnv;
+  data?: {
+    env?: MainsiteEnv;
+  };
 };
 
 const buildErrorResponse = (message: string, trace: Record<string, unknown>, status = 500) =>

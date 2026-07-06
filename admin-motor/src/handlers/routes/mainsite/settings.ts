@@ -14,6 +14,7 @@ import { createResponseTrace, type ResponseTrace } from '../../../../../function
 type D1PreparedStatement = {
   bind: (...values: Array<string | number | null>) => D1PreparedStatement;
   first: <T>() => Promise<T | null>;
+  all: <T>() => Promise<{ results?: T[] }>;
   run: () => Promise<unknown>;
 };
 
@@ -28,6 +29,9 @@ type MainsiteEnv = Context['env'] & {
 type MainsiteContext = {
   request: Request;
   env: MainsiteEnv;
+  data?: {
+    env?: MainsiteEnv;
+  };
 };
 
 type SettingRow = {
@@ -157,9 +161,10 @@ export async function onRequestGet(context: MainsiteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar settings públicos do MainSite';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const runtimeEnv = context.data?.env ?? context.env;
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mainsite',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -246,9 +251,10 @@ export async function onRequestPut(context: MainsiteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao salvar settings públicos do MainSite';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const runtimeEnv = context.data?.env ?? context.env;
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mainsite',
           source: 'bigdata_db',
           fallbackUsed: false,

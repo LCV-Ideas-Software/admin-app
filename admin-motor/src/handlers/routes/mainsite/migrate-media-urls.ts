@@ -21,7 +21,8 @@ const EXTERNAL_MEDIA_PATTERN = /https:\/\/mainsite-app\.lcv\.rio\.br\/api\/uploa
 const INTERNAL_MEDIA_PREFIX = '/api/mainsite/media/';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const db = (context.data?.env ?? context.env).BIGDATA_DB;
+  const resolvedEnv = ((context as { data?: { env?: Env } }).data?.env ?? context.env) as Env;
+  const db = resolvedEnv.BIGDATA_DB;
   if (!db) {
     return Response.json({ ok: false, error: 'BIGDATA_DB não configurado.' }, { status: 503 });
   }

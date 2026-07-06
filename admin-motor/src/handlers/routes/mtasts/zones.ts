@@ -2,11 +2,16 @@ import { listCloudflareZones } from '../_lib/cloudflare-api';
 import { logModuleOperationalEvent } from '../_lib/operational';
 import { createResponseTrace } from '../_lib/request-trace';
 
+type Env = {
+  BIGDATA_DB?: D1Database;
+  CLOUDFLARE_DNS?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    BIGDATA_DB?: D1Database;
-    CLOUDFLARE_DNS?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 
@@ -40,14 +45,15 @@ const toError = (message: string, trace: { request_id: string; timestamp: string
 
 export async function onRequestGet(context: Context) {
   const trace = createResponseTrace(context.request);
+  const runtimeEnv = context.data?.env ?? context.env;
   const startedAt = Date.now();
   console.debug('[mtasts/zones] request:start');
   try {
-    const payload = await listCloudflareZones(context.data?.env ?? context.env);
+    const payload = await listCloudflareZones(runtimeEnv);
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mtasts',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -78,9 +84,9 @@ export async function onRequestGet(context: Context) {
     const message = error instanceof Error ? error.message : 'Falha ao carregar zonas do MTA-STS';
     console.error('[mtasts/zones] request:error', { error: message });
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mtasts',
           source: 'bigdata_db',
           fallbackUsed: false,

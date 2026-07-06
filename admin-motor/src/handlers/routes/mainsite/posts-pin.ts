@@ -20,6 +20,9 @@ type MainsiteEnv = Context['env'] & {
 type MainsiteContext = {
   request: Request;
   env: MainsiteEnv;
+  data?: {
+    env?: MainsiteEnv;
+  };
 };
 
 type PinRow = {
@@ -112,9 +115,10 @@ export async function onRequestPost(context: MainsiteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao alternar fixação do post do MainSite';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const telemetryDb = (context.data?.env ?? context.env).BIGDATA_DB;
+    if (telemetryDb) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(telemetryDb, {
           module: 'mainsite',
           source: 'bigdata_db',
           fallbackUsed: false,

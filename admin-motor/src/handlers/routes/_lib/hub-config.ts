@@ -197,9 +197,9 @@ const validateCards = (cards: HubCard[]) => {
 
 const mapRowToCard = (row: HubConfigRow) =>
   sanitizeCard({
-    name: row.name,
-    description: row.description,
-    url: row.url,
+    ...(row.name !== undefined ? { name: row.name } : {}),
+    ...(row.description !== undefined ? { description: row.description } : {}),
+    ...(row.url !== undefined ? { url: row.url } : {}),
     icon: row.icon ?? '',
     badge: row.badge ?? '',
   });
@@ -351,7 +351,7 @@ export const logHubEvent = async (
     source: input.source,
     ok: input.ok,
     fallbackUsed: input.fallbackUsed,
-    errorMessage: input.errorMessage,
+    ...(input.errorMessage !== undefined ? { errorMessage: input.errorMessage } : {}),
     metadata: {
       action: input.action,
       ...(input.metadata ?? {}),

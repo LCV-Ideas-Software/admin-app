@@ -1,7 +1,10 @@
 import { resolveAdminActorFromRequest } from '../../../../../functions/api/_lib/admin-actor';
-import { type Context, toHeaders } from '../../../../../functions/api/_lib/astrologo-admin';
+import { type Context as BaseContext, type Env, toHeaders } from '../../../../../functions/api/_lib/astrologo-admin';
 import { logModuleOperationalEvent } from '../../../../../functions/api/_lib/operational';
 import { createResponseTrace } from '../../../../../functions/api/_lib/request-trace';
+
+// Middleware do runtime Pages pode injetar `data.env`; o tipo compartilhado não declara `data`.
+type Context = BaseContext & { data?: { env?: Env } };
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -32,9 +35,10 @@ export async function onRequestPost(context: Context) {
 
     await db.prepare('DELETE FROM astrologo_mapas WHERE id = ?').bind(id).run();
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const operationalDb = (context.data?.env ?? context.env).BIGDATA_DB;
+    if (operationalDb) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(operationalDb, {
           module: 'astrologo',
           source,
           fallbackUsed: false,
@@ -54,9 +58,10 @@ export async function onRequestPost(context: Context) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao excluir mapa do Astrólogo';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const operationalDb = (context.data?.env ?? context.env).BIGDATA_DB;
+    if (operationalDb) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(operationalDb, {
           module: 'astrologo',
           source,
           fallbackUsed: false,

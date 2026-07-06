@@ -258,7 +258,7 @@ const readSecretString = async (value: unknown): Promise<string> => {
 };
 
 const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotorEnv> => ({
-  BIGDATA_DB: env.BIGDATA_DB,
+  ...(env.BIGDATA_DB !== undefined ? { BIGDATA_DB: env.BIGDATA_DB } : {}),
   MEDIA_BUCKET: env.MEDIA_BUCKET,
   AI: env.AI,
   MAESTRO_OPENAI_API_KEY: await readSecretString(env.MAESTRO_OPENAI_API_KEY),
@@ -404,9 +404,9 @@ app.use('*', async (c, next) => {
   if (c.req.method.toUpperCase() === 'OPTIONS') return next();
   const env = c.get('runtimeEnv');
   const authCtx = await validatePutAuth(c.req.raw, resolveAdminBearerToken(env), {
-    teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
-    audience: env.CF_ACCESS_AUD,
-    enforcement: env.ENFORCE_JWT_VALIDATION,
+    ...(env.CF_ACCESS_TEAM_DOMAIN !== undefined ? { teamDomain: env.CF_ACCESS_TEAM_DOMAIN } : {}),
+    ...(env.CF_ACCESS_AUD !== undefined ? { audience: env.CF_ACCESS_AUD } : {}),
+    ...(env.ENFORCE_JWT_VALIDATION !== undefined ? { enforcement: env.ENFORCE_JWT_VALIDATION } : {}),
   });
   if (!authCtx.isAuthenticated) {
     return c.json({ ok: false, error: 'Unauthorized.' }, 401);

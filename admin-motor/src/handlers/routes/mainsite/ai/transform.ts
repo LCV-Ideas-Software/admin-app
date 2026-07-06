@@ -13,13 +13,6 @@ export interface Env {
   BIGDATA_DB?: D1Database;
 }
 
-interface D1Database {
-  prepare(query: string): {
-    bind(...values: unknown[]): { run(): Promise<unknown>; first<T>(): Promise<T | null> };
-    run(): Promise<unknown>;
-  };
-}
-
 /** Fallback usado quando BIGDATA_DB não retorna modelo configurado para 'chat'. */
 const FALLBACK_MODEL = 'gemini-2.5-pro';
 
@@ -97,7 +90,9 @@ async function estimateTokenCount(ai: GoogleGenAI, text: string, model: string):
 /**
  * Valida a entrada de tokens
  */
-function validateInputTokens(tokenCount: number) {
+function validateInputTokens(
+  tokenCount: number,
+): { shouldReject: true; status: number; error: string } | { shouldReject: false } {
   if (tokenCount > GEMINI_CONFIG.maxTokensInput) {
     return {
       shouldReject: true,
@@ -222,7 +217,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           });
 
           // Telemetria → ai_usage_logs (fire-and-forget)
-          logAiUsage(resolvedEnv.BIGDATA_DB as D1Database | undefined, {
+          logAiUsage(resolvedEnv.BIGDATA_DB, {
             module: 'mainsite',
             model: activeModel,
             input_tokens: usageMetadata.promptTokens,
@@ -270,7 +265,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     });
   } catch (error) {
     // Telemetria de erro
-    logAiUsage(resolvedEnv.BIGDATA_DB as D1Database | undefined, {
+    logAiUsage(resolvedEnv.BIGDATA_DB, {
       module: 'mainsite',
       model: activeModel,
       input_tokens: 0,

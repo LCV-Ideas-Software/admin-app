@@ -106,7 +106,7 @@ export const fetchLegacyAdminJson = async <T>(
   const response = await fetch(`${resolveBaseUrl(env)}${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
   if (!response.ok) {

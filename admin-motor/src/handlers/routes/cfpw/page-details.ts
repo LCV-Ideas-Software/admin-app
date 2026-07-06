@@ -7,12 +7,17 @@ import type { D1Database } from '../_lib/operational';
 import { logModuleOperationalEvent } from '../_lib/operational';
 import { createResponseTrace } from '../_lib/request-trace';
 
+type Env = {
+  BIGDATA_DB?: D1Database;
+  CLOUDFLARE_PW?: string;
+  CF_ACCOUNT_ID?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    BIGDATA_DB?: D1Database;
-    CLOUDFLARE_PW?: string;
-    CF_ACCOUNT_ID?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 
@@ -82,9 +87,10 @@ export async function onRequestGet(context: Context) {
       throw new Error(fatal);
     }
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const db = (context.data?.env ?? context.env).BIGDATA_DB;
+    if (db) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(db, {
           module: 'cfpw',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -120,9 +126,10 @@ export async function onRequestGet(context: Context) {
   } catch (error) {
     const message = error instanceof Error ? error.message : `Falha ao carregar detalhes do Pages ${projectName}.`;
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const db = (context.data?.env ?? context.env).BIGDATA_DB;
+    if (db) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(db, {
           module: 'cfpw',
           source: 'bigdata_db',
           fallbackUsed: false,

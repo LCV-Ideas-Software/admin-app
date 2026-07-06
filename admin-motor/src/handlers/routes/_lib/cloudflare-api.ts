@@ -206,7 +206,7 @@ export class CloudflareRequestError extends Error {
   readonly code: number | string | null;
   readonly apiMessage: string | null;
 
-  constructor(message: string, options: { status: number; code?: number | string; apiMessage?: string | null }) {
+  constructor(message: string, options: { status: number; code?: number | string | null; apiMessage?: string | null }) {
     super(message);
     this.name = 'CloudflareRequestError';
     this.status = options.status;
@@ -268,7 +268,7 @@ const cloudflareRequestPayload = async <T>(
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
-    body: init?.body,
+    ...(init?.body !== undefined ? { body: init.body } : {}),
   });
 
   const rawText = await response.text();
@@ -327,13 +327,14 @@ export const resolveCloudflareAccount = async (env: EnvWithCloudflareToken): Pro
   }
 
   const accounts = await listCloudflareAccounts(env);
-  if (accounts.length === 0) {
+  const firstAccount = accounts[0];
+  if (!firstAccount) {
     throw new Error('Nenhuma conta Cloudflare disponível para o token informado.');
   }
 
   return {
-    accountId: accounts[0].id,
-    accountName: accounts[0].name || null,
+    accountId: firstAccount.id,
+    accountName: firstAccount.name || null,
     source: 'auto-discovery',
     accounts,
   };

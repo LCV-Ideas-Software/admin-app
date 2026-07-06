@@ -1,6 +1,7 @@
 import { timingSafeEqual, webcrypto } from 'node:crypto';
 
-const cryptoWithPolyfill = globalThis.crypto ?? webcrypto;
+const globalWithCrypto = globalThis as typeof globalThis & { crypto?: Crypto };
+const cryptoWithPolyfill = globalWithCrypto.crypto ?? webcrypto;
 const subtleWithPolyfill = cryptoWithPolyfill.subtle as SubtleCrypto & {
   timingSafeEqual?: (left: BufferSource, right: BufferSource) => boolean;
 };
@@ -18,7 +19,7 @@ if (typeof subtleWithPolyfill.timingSafeEqual !== 'function') {
   };
 }
 
-if (!globalThis.crypto) {
+if (!globalWithCrypto.crypto) {
   Object.defineProperty(globalThis, 'crypto', {
     value: cryptoWithPolyfill,
     configurable: true,

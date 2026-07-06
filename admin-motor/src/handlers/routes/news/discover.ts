@@ -1444,7 +1444,7 @@ async function autoDetectRss(url: string): Promise<RssSuggestion[]> {
       const hrefMatch = tag.match(/href=["']([^"']+)["']/);
       const titleMatch = tag.match(/title=["']([^"']+)["']/);
 
-      if (!typeMatch || !hrefMatch) continue;
+      if (!typeMatch?.[1] || !hrefMatch?.[1]) continue;
       const type = typeMatch[1].toLowerCase();
       if (!type.includes('rss') && !type.includes('atom') && !type.includes('xml')) continue;
 
@@ -1455,7 +1455,7 @@ async function autoDetectRss(url: string): Promise<RssSuggestion[]> {
         feedUrl = `${parsed.protocol}//${parsed.host}/${feedUrl}`;
       }
 
-      const title = titleMatch ? titleMatch[1] : parsed.hostname.replace('www.', '');
+      const title = titleMatch?.[1] ?? parsed.hostname.replace('www.', '');
 
       results.push({
         id: `detected-${slugify(title)}-${results.length}`,

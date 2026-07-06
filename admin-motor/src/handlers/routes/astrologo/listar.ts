@@ -12,10 +12,10 @@ type Item = {
 };
 
 type LegacyMapa = {
-  id?: string;
-  nome?: string;
-  data_nascimento?: string;
-  analise_ia?: string | null;
+  id?: string | undefined;
+  nome?: string | undefined;
+  data_nascimento?: string | undefined;
+  analise_ia?: string | null | undefined;
   email?: string;
 };
 

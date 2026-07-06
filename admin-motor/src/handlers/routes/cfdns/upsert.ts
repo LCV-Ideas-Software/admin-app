@@ -5,11 +5,16 @@ import type { D1Database } from '../../../../../functions/api/_lib/operational';
 import { logModuleOperationalEvent } from '../../../../../functions/api/_lib/operational';
 import { createResponseTrace } from '../../../../../functions/api/_lib/request-trace';
 
+type Env = {
+  BIGDATA_DB?: D1Database;
+  CLOUDFLARE_DNS?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    BIGDATA_DB?: D1Database;
-    CLOUDFLARE_DNS?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 
@@ -65,6 +70,7 @@ const normalizeRecord = (record: UpsertPayload['record']): CloudflareDnsRecordIn
 
 export async function onRequestPost(context: Context) {
   const trace = createResponseTrace(context.request);
+  const env = context.data?.env ?? context.env;
 
   try {
     const body = (await context.request.json()) as UpsertPayload;
@@ -82,12 +88,12 @@ export async function onRequestPost(context: Context) {
     }
 
     const saved = recordId
-      ? await updateCloudflareDnsRecord(context.data?.env ?? context.env, zoneId, recordId, record)
-      : await createCloudflareDnsRecord(context.data?.env ?? context.env, zoneId, record);
+      ? await updateCloudflareDnsRecord(env, zoneId, recordId, record)
+      : await createCloudflareDnsRecord(env, zoneId, record);
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (env.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(env.BIGDATA_DB, {
           module: 'cfdns',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -122,9 +128,9 @@ export async function onRequestPost(context: Context) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao salvar registro DNS.';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (env.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(env.BIGDATA_DB, {
           module: 'cfdns',
           source: 'bigdata_db',
           fallbackUsed: false,

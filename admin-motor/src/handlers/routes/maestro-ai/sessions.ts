@@ -137,8 +137,8 @@ type MaestroArtifactRow = {
 
 type ProviderCallResult = {
   text: string;
-  inputTokens?: number;
-  outputTokens?: number;
+  inputTokens?: number | undefined;
+  outputTokens?: number | undefined;
   model: string;
 };
 
@@ -222,7 +222,10 @@ const DEFAULT_MODELS: Record<ProviderKey, string> = {
   perplexity: 'sonar-reasoning-pro',
 };
 
-const DEFAULT_RATES: Record<ProviderKey, ProviderRates> = {
+const DEFAULT_RATES: Record<
+  ProviderKey,
+  ProviderRates & { input_usd_per_million: number; output_usd_per_million: number }
+> = {
   claude: { input_usd_per_million: 5, output_usd_per_million: 25 },
   codex: { input_usd_per_million: 5, output_usd_per_million: 30 },
   gemini: { input_usd_per_million: 1.25, output_usd_per_million: 10 },
@@ -3543,7 +3546,8 @@ async function resolveStartRequest(
       title,
       prompt,
       protocol_text: protocolText,
-      initial_agent: activeAgents.includes(initialAgent) ? initialAgent : activeAgents[0],
+      // activeAgents.length >= 2 is enforced above, so index 0 always exists.
+      initial_agent: activeAgents.includes(initialAgent) ? initialAgent : (activeAgents[0] as ProviderKey),
       active_agents: activeAgents,
       initial_content: sanitizeText(body.initial_content, 120_000),
       max_cost_usd: maxCostUsd,
@@ -3572,6 +3576,7 @@ export async function handleMaestroAiSessionsGet(context: RequestContext, sessio
          ORDER BY updated_at DESC
          LIMIT 30`,
       )
+      .bind()
       .all<MaestroSessionRow>();
     return json({ ok: true, sessions: rows.results.map(publicSession) });
   } catch (error) {

@@ -12,17 +12,8 @@ import { toHeaders } from '../_lib/mainsite-admin';
 import { logModuleOperationalEvent } from '../_lib/operational';
 import { createResponseTrace } from '../_lib/request-trace';
 
-interface D1PreparedStatement {
-  bind: (...values: Array<unknown>) => D1PreparedStatement;
-  first: <T = unknown>() => Promise<T | null>;
-  all: <T = unknown>() => Promise<{ results?: T[] }>;
-  run: () => Promise<unknown>;
-}
-
-interface D1Database {
-  prepare: (query: string) => D1PreparedStatement;
-}
-
+// `D1Database` aqui é o tipo ambiente de @cloudflare/workers-types — necessário
+// para compatibilidade com o helper compartilhado logAiUsage (ai-telemetry).
 interface SummaryEnv {
   BIGDATA_DB?: D1Database;
   AI?: {
@@ -112,7 +103,8 @@ function extractJsonFromText(rawText: string): string {
   let str = rawText.trim();
   // Remover markdown ```json ... ``` fences
   const fenceMatch = str.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  if (fenceMatch) str = fenceMatch[1].trim();
+  const fenced = fenceMatch?.[1];
+  if (fenced !== undefined) str = fenced.trim();
   // Extrair objeto JSON { ... } se houver texto extra ao redor
   if (!str.startsWith('{')) {
     const objMatch = str.match(/\{[\s\S]*\}/);

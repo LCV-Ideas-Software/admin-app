@@ -14,11 +14,16 @@ type D1Database = {
   prepare: (query: string) => D1PreparedStatement;
 };
 
+type Env = {
+  BIGDATA_DB?: D1Database;
+  CLOUDFLARE_DNS?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    BIGDATA_DB?: D1Database;
-    CLOUDFLARE_DNS?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 
@@ -75,8 +80,9 @@ const normalizeTlsRptEmail = (value: unknown) => {
 
 export async function onRequestPost(context: Context) {
   const trace = createResponseTrace(context.request);
+  const runtimeEnv = context.data?.env ?? context.env;
 
-  if (!(context.data?.env ?? context.env).BIGDATA_DB) {
+  if (!runtimeEnv.BIGDATA_DB) {
     return toError('BIGDATA_DB não configurado no runtime.', trace, 503);
   }
 
@@ -96,18 +102,13 @@ export async function onRequestPost(context: Context) {
     const id = generateMtastsId();
 
     const [mtaStsDnsResult, tlsRptDnsResult] = await Promise.all([
-      upsertCloudflareTxtRecord(context.data?.env ?? context.env, zoneId, `_mta-sts.${domain}`, `v=STSv1; id=${id}`),
+      upsertCloudflareTxtRecord(runtimeEnv, zoneId, `_mta-sts.${domain}`, `v=STSv1; id=${id}`),
       tlsrptEmail
-        ? upsertCloudflareTxtRecord(
-            context.data?.env ?? context.env,
-            zoneId,
-            `_smtp._tls.${domain}`,
-            `v=TLSRPTv1; rua=mailto:${tlsrptEmail}`,
-          )
+        ? upsertCloudflareTxtRecord(runtimeEnv, zoneId, `_smtp._tls.${domain}`, `v=TLSRPTv1; rua=mailto:${tlsrptEmail}`)
         : Promise.resolve(null),
     ]);
 
-    await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+    await runtimeEnv.BIGDATA_DB.prepare(
       `
       INSERT INTO mtasts_mta_sts_policies (domain, policy_text, tlsrpt_email, updated_at)
       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -120,7 +121,7 @@ export async function onRequestPost(context: Context) {
       .bind(domain, policyText, tlsrptEmail)
       .run();
 
-    await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+    await runtimeEnv.BIGDATA_DB.prepare(
       `
       INSERT INTO mtasts_history (gerado_em, domain, data_criacao)
       VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -132,7 +133,7 @@ export async function onRequestPost(context: Context) {
       .run();
 
     try {
-      await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+      await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
         module: 'mtasts',
         source: 'bigdata_db',
         fallbackUsed: false,
@@ -173,9 +174,9 @@ export async function onRequestPost(context: Context) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha inesperada na orquestração MTA-STS';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mtasts',
           source: 'bigdata_db',
           fallbackUsed: false,

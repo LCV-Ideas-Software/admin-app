@@ -23,6 +23,9 @@ type MainsiteEnv = Context['env'] & {
 type MainsiteContext = {
   request: Request;
   env: MainsiteEnv;
+  data?: {
+    env?: MainsiteEnv;
+  };
 };
 
 type PostRow = {
@@ -266,9 +269,10 @@ export async function onRequestGet(context: MainsiteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar posts do MainSite';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const runtimeEnv = context.data?.env ?? context.env;
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mainsite',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -399,9 +403,10 @@ export async function onRequestPost(context: MainsiteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao criar post do MainSite';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const runtimeEnv = context.data?.env ?? context.env;
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mainsite',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -541,9 +546,10 @@ export async function onRequestPut(context: MainsiteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao atualizar post do MainSite';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const runtimeEnv = context.data?.env ?? context.env;
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mainsite',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -607,9 +613,10 @@ export async function onRequestDelete(context: MainsiteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao excluir post do MainSite';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    const runtimeEnv = context.data?.env ?? context.env;
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mainsite',
           source: 'bigdata_db',
           fallbackUsed: false,

@@ -3,11 +3,16 @@ import type { D1Database } from '../_lib/operational';
 import { logModuleOperationalEvent } from '../_lib/operational';
 import { createResponseTrace } from '../_lib/request-trace';
 
+type Env = {
+  BIGDATA_DB?: D1Database;
+  CLOUDFLARE_DNS?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    BIGDATA_DB?: D1Database;
-    CLOUDFLARE_DNS?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 
@@ -53,17 +58,19 @@ export async function onRequestGet(context: Context) {
     return toError('Parâmetro zoneId é obrigatório.', trace, 400);
   }
 
+  const env = context.data?.env ?? context.env;
+
   try {
-    const payload = await listCloudflareDnsRecords(context.data?.env ?? context.env, zoneId, {
+    const payload = await listCloudflareDnsRecords(env, zoneId, {
       page,
       perPage,
       type,
       search,
     });
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (env.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(env.BIGDATA_DB, {
           module: 'cfdns',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -96,9 +103,9 @@ export async function onRequestGet(context: Context) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao carregar registros DNS da zona.';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (env.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(env.BIGDATA_DB, {
           module: 'cfdns',
           source: 'bigdata_db',
           fallbackUsed: false,

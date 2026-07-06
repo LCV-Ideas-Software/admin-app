@@ -18,7 +18,11 @@ const headingAttributes = HEADING_TAGS.reduce<Record<string, string[]>>((acc, ta
   return acc;
 }, {});
 
-const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+// `allowedEmptyAttributes` existe no runtime (sanitize-html >= 2.8; instalado 2.17.x),
+// mas @types/sanitize-html 2.16.x ainda não a declara em IOptions.
+type SanitizeOptions = sanitizeHtml.IOptions & { allowedEmptyAttributes?: string[] };
+
+const SANITIZE_OPTIONS: SanitizeOptions = {
   allowedTags: [
     'a',
     'abbr',

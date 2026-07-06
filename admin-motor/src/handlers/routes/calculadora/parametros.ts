@@ -1,6 +1,7 @@
 import { resolveAdminActorFromRequest } from '../../../../../functions/api/_lib/admin-actor';
 import {
-  type Context,
+  type Context as BaseContext,
+  type Env,
   readLatestParams,
   SUPPORTED_ROUTES,
   toHeaders,
@@ -9,6 +10,9 @@ import {
 } from '../../../../../functions/api/_lib/calculadora-admin';
 import { logModuleOperationalEvent } from '../../../../../functions/api/_lib/operational';
 import { createResponseTrace } from '../../../../../functions/api/_lib/request-trace';
+
+// Middleware do runtime Pages pode injetar `data.env`; o tipo compartilhado não declara `data`.
+type Context = BaseContext & { data?: { env?: Env } };
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -24,7 +28,7 @@ export async function onRequestGet(context: Context) {
   const trace = createResponseTrace(context.request);
   const adminActor = resolveAdminActorFromRequest(context.request);
   const db = resolveParametrosDb(context);
-  const source = resolveOperationalSource(context);
+  const source = resolveOperationalSource();
 
   if (!db) {
     return json({ ok: false, error: 'Nenhum binding D1 disponível (BIGDATA_DB).', ...trace }, 503);
@@ -95,7 +99,7 @@ export async function onRequestPost(context: Context) {
   const env = context.env;
   const trace = createResponseTrace(context.request);
   const db = resolveParametrosDb(context);
-  const source = resolveOperationalSource(context);
+  const source = resolveOperationalSource();
 
   if (!db) {
     return json({ ok: false, error: 'Nenhum binding D1 disponível (BIGDATA_DB).', ...trace }, 503);

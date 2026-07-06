@@ -4,11 +4,16 @@ import type { D1Database } from '../../../../../functions/api/_lib/operational';
 import { logModuleOperationalEvent } from '../../../../../functions/api/_lib/operational';
 import { createResponseTrace } from '../../../../../functions/api/_lib/request-trace';
 
+type Env = {
+  BIGDATA_DB?: D1Database;
+  CLOUDFLARE_DNS?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    BIGDATA_DB?: D1Database;
-    CLOUDFLARE_DNS?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 
@@ -35,17 +40,18 @@ export async function onRequestDelete(context: Context) {
   const zoneId = String(url.searchParams.get('zoneId') ?? '').trim();
   const recordId = String(url.searchParams.get('recordId') ?? '').trim();
   const adminActor = resolveAdminActorFromRequest(context.request);
+  const env = context.data?.env ?? context.env;
 
   if (!zoneId || !recordId) {
     return toError('Parâmetros zoneId e recordId são obrigatórios.', trace, 400);
   }
 
   try {
-    await deleteCloudflareDnsRecord(context.data?.env ?? context.env, zoneId, recordId);
+    await deleteCloudflareDnsRecord(env, zoneId, recordId);
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (env.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(env.BIGDATA_DB, {
           module: 'cfdns',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -78,9 +84,9 @@ export async function onRequestDelete(context: Context) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao remover registro DNS.';
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (env.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(env.BIGDATA_DB, {
           module: 'cfdns',
           source: 'bigdata_db',
           fallbackUsed: false,

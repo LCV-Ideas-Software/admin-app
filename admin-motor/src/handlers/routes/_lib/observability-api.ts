@@ -61,7 +61,7 @@ const cloudflareObsRequest = async <T>(
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
-    body: init?.body,
+    ...(init?.body !== undefined ? { body: init.body } : {}),
   });
 
   const rawText = await response.text();

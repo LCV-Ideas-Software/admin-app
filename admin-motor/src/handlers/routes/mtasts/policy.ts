@@ -11,11 +11,16 @@ type PolicyResponse = {
   mxRecords: string[];
 };
 
+type Env = {
+  BIGDATA_DB?: D1Database;
+  CLOUDFLARE_DNS?: string;
+};
+
 type Context = {
   request: Request;
-  env: {
-    BIGDATA_DB?: D1Database;
-    CLOUDFLARE_DNS?: string;
+  env: Env;
+  data?: {
+    env?: Env;
   };
 };
 
@@ -63,6 +68,7 @@ const toError = (message: string, trace: { request_id: string; timestamp: string
 
 export async function onRequestGet(context: Context) {
   const trace = createResponseTrace(context.request);
+  const runtimeEnv = context.data?.env ?? context.env;
   const url = new URL(context.request.url);
   const domain = normalizeDomain(url.searchParams.get('domain'));
   const zoneId = String(url.searchParams.get('zoneId') ?? '').trim();
@@ -73,14 +79,14 @@ export async function onRequestGet(context: Context) {
   }
 
   try {
-    const dnsSnapshot = await getCloudflareDnsSnapshot(context.data?.env ?? context.env, domain, zoneId);
+    const dnsSnapshot = await getCloudflareDnsSnapshot(runtimeEnv, domain, zoneId);
 
     let savedPolicy: string | null = null;
     let savedEmail: string | null = null;
     let lastGeneratedId: string | null = null;
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
-      const policyRow = await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+    if (runtimeEnv.BIGDATA_DB) {
+      const policyRow = await runtimeEnv.BIGDATA_DB.prepare(
         `
         SELECT policy_text, tlsrpt_email
         FROM mtasts_mta_sts_policies
@@ -91,7 +97,7 @@ export async function onRequestGet(context: Context) {
         .bind(domain)
         .first<DbPolicyRow>();
 
-      const historyRow = await (context.data?.env ?? context.env).BIGDATA_DB.prepare(
+      const historyRow = await runtimeEnv.BIGDATA_DB.prepare(
         `
         SELECT gerado_em
         FROM mtasts_history
@@ -117,9 +123,9 @@ export async function onRequestGet(context: Context) {
       mxRecords: dnsSnapshot.mxRecords,
     };
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mtasts',
           source: 'bigdata_db',
           fallbackUsed: false,
@@ -156,9 +162,9 @@ export async function onRequestGet(context: Context) {
       error: message,
     });
 
-    if ((context.data?.env ?? context.env).BIGDATA_DB) {
+    if (runtimeEnv.BIGDATA_DB) {
       try {
-        await logModuleOperationalEvent((context.data?.env ?? context.env).BIGDATA_DB, {
+        await logModuleOperationalEvent(runtimeEnv.BIGDATA_DB, {
           module: 'mtasts',
           source: 'bigdata_db',
           fallbackUsed: false,

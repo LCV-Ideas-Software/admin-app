@@ -65,7 +65,7 @@ function parseCSV(csvText: string): ParseResult {
   const lines = clean.trim().split('\n');
   if (lines.length < 2) return { titulos: [], totalLines: lines.length, sampleRow: lines[0] ?? '' };
 
-  const sampleRow = lines[lines.length - 1];
+  const sampleRow = lines[lines.length - 1] ?? '';
 
   // Converter data BR (dd/mm/yyyy) para comparável (yyyymmdd)
   function dateKey(dataBR: string): string {
@@ -77,7 +77,7 @@ function parseCSV(csvText: string): ParseResult {
   let latestDateKey = '';
   let latestDateBR = '';
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(';');
+    const cols = (lines[i] ?? '').split(';');
     if (cols.length < 5) continue;
     const dataBase = cols[2]?.trim() ?? '';
     if (!dataBase?.includes('/')) continue;
@@ -93,10 +93,10 @@ function parseCSV(csvText: string): ParseResult {
   // Passo 2: coletar somente IPCA+ na data mais recente
   const results: TituloTD[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(';');
+    const cols = (lines[i] ?? '').split(';');
     if (cols.length < 5) continue;
 
-    const tipoTitulo = cols[0].trim();
+    const tipoTitulo = cols[0]?.trim() ?? '';
     const dataVencimento = cols[1]?.trim() ?? '';
     const dataBase = cols[2]?.trim() ?? '';
     const taxaCompra = parseFloat((cols[3] ?? '0').replace(',', '.'));
@@ -197,7 +197,7 @@ export const onRequestGet = async (context: Context) => {
       taxasValidas.length > 0
         ? Math.round((taxasValidas.reduce((s, t) => s + t.taxaCompra, 0) / taxasValidas.length) * 100) / 100
         : 0;
-    const dataRef = titulos[0].dataBase;
+    const dataRef = titulos[0]?.dataBase ?? '';
     const vencJson = JSON.stringify(titulos);
     const agora = new Date().toISOString();
 
