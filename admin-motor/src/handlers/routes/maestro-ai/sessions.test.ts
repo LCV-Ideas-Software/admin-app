@@ -633,6 +633,247 @@ describe('Maestro AI revision prompt teaches the block contract', () => {
   });
 });
 
+describe('Maestro AI release link audit (Plan D)', () => {
+  it('extractUrlCandidates follows the canonical regex, trim, dedup, sorted order and caps', () => {
+    const { extractUrlCandidates, countUniqueUrlCandidates } = maestroAiTestHooks;
+    // Canonical stop-set has no `}`; trailing trim is only . , ; :
+    const text =
+      'Veja https://zeta.example/a. e https://alpha.example/b, https://zeta.example/a; ' +
+      'markdown (https://mid.example/c) e https://brace.example/d}tail ' +
+      'e https://bang.example/e! fim';
+    const candidates = extractUrlCandidates(text);
+    const urls = candidates.map((c: { url: string }) => c.url);
+    // Sorted lexicographically (BTreeSet parity), deduped on the cleaned string.
+    expect(urls).toEqual([
+      'https://alpha.example/b',
+      'https://bang.example/e!',
+      'https://brace.example/d}tail',
+      'https://mid.example/c',
+      'https://zeta.example/a',
+    ]);
+    // Public candidates carry no rejection.
+    expect(candidates.every((c: { rejection: string | null }) => c.rejection === null)).toBe(true);
+    // Bracketed IPv6 stops at `]` and surfaces as an invalid (blocked) candidate.
+    const v6 = extractUrlCandidates('interno http://[::1]/admin aqui');
+    expect(v6.length).toBe(1);
+    expect(v6[0]?.url).toBe('http://[::1');
+    expect(v6[0]?.rejection).toMatch(/invalida/i);
+    // Blocked hosts surface with a rejection reason instead of being dropped.
+    const internal = extractUrlCandidates('http://localhost:8787/x e http://10.0.0.5/y');
+    expect(internal.map((c: { rejection: string | null }) => Boolean(c.rejection))).toEqual([true, true]);
+    // Candidate cap: 30 uniques; counter stops at 31.
+    const many = Array.from({ length: 35 }, (_v, i) => `https://cap${String(i).padStart(2, '0')}.example/`).join(' ');
+    expect(extractUrlCandidates(many).length).toBe(30);
+    expect(countUniqueUrlCandidates(many)).toBe(31);
+    expect(countUniqueUrlCandidates('sem links')).toBe(0);
+  });
+
+  it('isBlockedAuditHost covers the canonical deep-SSRF ranges (CGNAT, TEST-NETs, multicast, docs v6)', () => {
+    const { isBlockedAuditHost } = maestroAiTestHooks;
+    const blocked = [
+      '100.64.0.1',
+      '100.127.255.254', // CGNAT 100.64/10
+      '192.0.0.1', // RFC 6890
+      '192.0.2.7', // TEST-NET-1
+      '198.18.0.1',
+      '198.19.255.1', // benchmarking /15
+      '198.51.100.9', // TEST-NET-2
+      '203.0.113.20', // TEST-NET-3
+      '224.0.0.1',
+      '239.255.255.250',
+      '255.255.255.255', // multicast + reserved/broadcast
+      'ff02::1',
+      'ff05::2', // v6 multicast
+      '2001:db8::1', // v6 documentation
+      'localhost.localdomain',
+    ];
+    for (const host of blocked) {
+      expect(isBlockedAuditHost(host), host).toBe(true);
+    }
+    for (const host of [
+      '100.63.255.254',
+      '100.128.0.1',
+      '198.17.0.1',
+      '198.20.0.1',
+      '223.255.255.254',
+      '2001:db9::1',
+    ]) {
+      expect(isBlockedAuditHost(host), host).toBe(false);
+    }
+  });
+
+  it('hostResolvesToBlockedIp uses DoH and fails open on resolver errors', async () => {
+    const { hostResolvesToBlockedIp } = maestroAiTestHooks;
+    const dohCalls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        dohCalls.push(`${url.searchParams.get('name')}:${url.searchParams.get('type')}`);
+        if (url.hostname !== 'cloudflare-dns.com') throw new Error(`unexpected fetch ${url.hostname}`);
+        const name = url.searchParams.get('name');
+        if (name === 'rebind.example') {
+          return new Response(JSON.stringify({ Answer: [{ type: 1, data: '10.0.0.5' }] }), { status: 200 });
+        }
+        if (name === 'ula.example' && url.searchParams.get('type') === 'AAAA') {
+          return new Response(JSON.stringify({ Answer: [{ type: 28, data: 'fd00::1' }] }), { status: 200 });
+        }
+        if (name === 'down.example') throw new Error('doh outage');
+        return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+      }),
+    );
+    expect(await hostResolvesToBlockedIp('rebind.example')).toBe(true);
+    expect(await hostResolvesToBlockedIp('ula.example')).toBe(true);
+    expect(await hostResolvesToBlockedIp('public.example')).toBe(false);
+    // Fail-open on DoH outage (canonical pre-flight parity: Err => not blocked).
+    expect(await hostResolvesToBlockedIp('down.example')).toBe(false);
+    expect(dohCalls.some((c) => c.startsWith('rebind.example'))).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('probePublicUrl applies canonical tones: 2xx/3xx ok, 4xx incl 429 and 5xx error, 999 warn', async () => {
+    const { probePublicUrl } = maestroAiTestHooks;
+    const probe = async (status: number) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = new URL(String(input));
+          if (url.hostname === 'cloudflare-dns.com') {
+            return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+          }
+          // The Response constructor rejects statuses outside 200-599 (e.g. 999),
+          // so fake the minimal surface the probe reads.
+          return { status, headers: new Headers() } as unknown as Response;
+        }),
+      );
+      const row = await probePublicUrl('https://tone.example/x');
+      vi.unstubAllGlobals();
+      return row;
+    };
+    expect((await probe(204)).tone).toBe('ok');
+    expect((await probe(404)).tone).toBe('error');
+    expect((await probe(429)).tone).toBe('error');
+    expect((await probe(503)).tone).toBe('error');
+    const warn = await probe(999);
+    expect(warn.tone).toBe('warn');
+    expect(warn.ok).toBe(false);
+    // 3xx without a Location header is a final redirection status: canonical ok.
+    expect((await probe(302)).tone).toBe('ok');
+  });
+
+  it('probePublicUrl falls back HEAD->GET on 405/403 and on HEAD transport error, without retries', async () => {
+    const { probePublicUrl } = maestroAiTestHooks;
+    const methods: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        if (url.hostname === 'cloudflare-dns.com') {
+          return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+        }
+        methods.push(String(init?.method ?? 'GET'));
+        if (init?.method === 'HEAD') return new Response(null, { status: 405 });
+        return new Response(null, { status: 200 });
+      }),
+    );
+    const row = await probePublicUrl('https://m.example/x');
+    expect(row.tone).toBe('ok');
+    expect(methods).toEqual(['HEAD', 'GET']);
+    vi.unstubAllGlobals();
+
+    // HEAD transport error -> single GET fallback; GET transport error -> error tone.
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        if (url.hostname === 'cloudflare-dns.com') {
+          return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+        }
+        void init;
+        calls += 1;
+        throw new Error('ECONNRESET');
+      }),
+    );
+    const dead = await probePublicUrl('https://dead.example/x');
+    expect(dead.tone).toBe('error');
+    expect(calls).toBe(2); // HEAD + GET, no retry loop
+    vi.unstubAllGlobals();
+  });
+
+  it('probePublicUrl follows redirects up to 5 hops re-validating each hop, and blocks internal pivots', async () => {
+    const { probePublicUrl } = maestroAiTestHooks;
+    const targets: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        if (url.hostname === 'cloudflare-dns.com') {
+          return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+        }
+        targets.push(url.toString());
+        if (url.pathname === '/pivot') {
+          return new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest' } });
+        }
+        if (url.pathname.startsWith('/hop')) {
+          const hop = Number(url.pathname.replace('/hop', '') || 0);
+          return new Response(null, { status: 301, headers: { location: `https://chain.example/hop${hop + 1}` } });
+        }
+        return new Response(null, { status: 200 });
+      }),
+    );
+    // Redirect into an internal host: blocked, the internal target is never fetched.
+    const pivot = await probePublicUrl('https://chain.example/pivot');
+    expect(pivot.tone).toBe('blocked');
+    expect(targets.some((t) => t.includes('169.254.169.254'))).toBe(false);
+    // Endless chain: stops at the 5-hop cap; final 3xx is canonical ok.
+    targets.length = 0;
+    const looped = await probePublicUrl('https://chain.example/hop0');
+    expect(looped.tone).toBe('ok');
+    expect(targets.length).toBe(6); // initial + 5 followed hops
+    vi.unstubAllGlobals();
+  });
+
+  it('finalReleaseAuditFailure short-circuits bibliographic -> capacity -> HTTP with structured context', async () => {
+    const { finalReleaseAuditFailure } = maestroAiTestHooks;
+    // Stage 1: bibliographic blocker wins without any fetch.
+    const fetchSpy = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const biblio = await finalReleaseAuditFailure('Texto com [EVIDENCIA_PENDENTE] e https://x.example/');
+    expect(biblio?.context?.gate).toBe('bibliographic_integrity');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    // Stage 2: capacity (31 unique URLs) pauses before any fetch.
+    const many = Array.from({ length: 31 }, (_v, i) => `https://cap${String(i).padStart(2, '0')}.example/`).join(' ');
+    const capacity = await finalReleaseAuditFailure(`Texto limpo ${many}`);
+    expect(capacity?.context?.gate).toBe('link_audit_capacity');
+    expect(capacity?.context?.urls_found).toBe(31);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+    // Stage 3: HTTP audit fails on a 404 row; 999 (warn) does not fail.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        if (url.hostname === 'cloudflare-dns.com') {
+          return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+        }
+        if (url.hostname === 'missing.example') return new Response(null, { status: 404 });
+        if (url.hostname === 'weird.example') return { status: 999, headers: new Headers() } as unknown as Response;
+        return new Response(null, { status: 200 });
+      }),
+    );
+    const http = await finalReleaseAuditFailure(
+      'Texto https://ok.example/ https://missing.example/ https://weird.example/',
+    );
+    expect(http?.context?.gate).toBe('link_audit');
+    expect(http?.context?.failed).toBe(1);
+    expect(http?.context?.ok).toBe(1);
+    const clean = await finalReleaseAuditFailure('Texto https://ok.example/ https://weird.example/');
+    expect(clean).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('Maestro AI provider retry and time budget (Plan C)', () => {
   it('parseRetryAfterHeader handles delta-seconds, HTTP-date and absence', () => {
     const { parseRetryAfterHeader } = maestroAiTestHooks;
@@ -1377,48 +1618,270 @@ describe('runSession orchestrator', () => {
     expect(row?.current_text).toBe('Rascunho valido e completo.');
   });
 
-  it('blocks the session when a link is persistently 5xx (broken after retry)', async () => {
+  it('a broken link no longer kills the draft: the release audit rejects READY-unchanged at finalization (Plan D)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
-    vi.stubGlobal(
-      'fetch',
-      providerFetch({
-        claudeText: 'Rascunho com link https://example.com/artigo aqui.',
-        codexText: 'MAESTRO_STATUS: READY',
-        linkStatus: 503,
-      }),
-    );
-    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
-    vi.unstubAllGlobals();
-
-    expect(db.__sessions.get('run-1')?.status).toBe('blocked_link_audit');
-  });
-
-  it('blocks the session as blocked_link_audit on a genuinely broken link (404)', async () => {
-    const db = createInMemoryDb({ sessions: [runnableSession()] });
-    const fetchMock = providerFetch({
-      claudeText: 'Rascunho com link https://example.com/missing aqui.',
-      linkStatus: 404,
+    // Draft carries a 404 link. The draft itself proceeds (no per-draft audit);
+    // codex votes READY unchanged, which IS a finalization attempt -> the full
+    // release audit runs, fails on the link, and the vote is ReadyRejected.
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: 'Rascunho com link https://example.com/missing aqui.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'cloudflare-dns.com') {
+        return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+      }
+      return new Response('', { status: 404 });
     });
     vi.stubGlobal('fetch', fetchMock);
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
 
-    expect(db.__sessions.get('run-1')?.status).toBe('blocked_link_audit');
-    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
+    const row = db.__sessions.get('run-1');
+    // ReadyRejected forever (the link stays broken) -> serial turn cap.
+    expect(row?.status).toBe('paused_cycle_limit');
+    expect(row?.final_text ?? null).toBeNull();
+    const events = JSON.parse(String(row?.events_json)) as Array<{ message?: string }>;
+    expect(
+      events.some((event) =>
+        /READY rejected by release gate: final candidate failed link audit/.test(String(event.message)),
+      ),
+    ).toBe(true);
+    // The broken link WAS probed (finalization attempt), and the per-execution
+    // cache kept the HTTP audit to a single pass despite repeated votes.
+    const linkProbes = fetchMock.mock.calls.filter(([input]) => new URL(String(input)).hostname === 'example.com');
+    expect(linkProbes.length).toBeGreaterThanOrEqual(1);
+    expect(linkProbes.length).toBeLessThanOrEqual(2); // HEAD (+GET fallback at most)
   });
 
-  it('blocks the session when the draft contains an internal-host link, without ever fetching it', async () => {
+  it('pauses as paused_final_audit with durable structured context when a link dies between the vote and finalization', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
+    // The link is healthy (200) during the READY-unchanged vote's audit, then
+    // dies (404) when the finalization gate re-runs the audit FRESH (canonical:
+    // the desktop has no cache at the finalization call sites).
+    let linkProbes = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (hostOf(url) === 'api.anthropic.com') {
+      const url = new URL(String(input));
+      if (url.hostname === 'api.anthropic.com') {
         return new Response(
           JSON.stringify({
-            content: [{ type: 'text', text: 'Veja http://169.254.169.254/latest/meta e http://localhost:8787/admin' }],
+            content: [{ type: 'text', text: 'Rascunho com link https://example.com/artigo aqui.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'cloudflare-dns.com') {
+        return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+      }
+      linkProbes += 1;
+      return new Response('', { status: linkProbes === 1 ? 200 : 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('paused_final_audit');
+    expect(row?.final_text ?? null).toBeNull();
+    expect(String(row?.error)).toBe('final candidate failed link audit');
+    // The durable session event carries a machine-structured final_audit field
+    // (gate/reason/context) plus the audit rows, persisted in events_json.
+    const events = JSON.parse(String(row?.events_json)) as Array<{
+      message?: string;
+      link_audit?: unknown[];
+      final_audit?: { gate?: string; reason?: string; context?: Record<string, unknown> };
+    }>;
+    const pauseEvent = events.find((event) => event.final_audit?.gate === 'link_audit');
+    expect(pauseEvent).toBeDefined();
+    expect(pauseEvent?.final_audit?.reason).toBe('final candidate failed link audit');
+    expect(pauseEvent?.final_audit?.context?.urls_found).toBe(1);
+    expect(pauseEvent?.final_audit?.context?.failed).toBe(1);
+    expect(pauseEvent?.final_audit?.context?.rows).toBeUndefined(); // rows travel in link_audit
+    expect(Array.isArray(pauseEvent?.link_audit)).toBe(true);
+  });
+
+  it('records structured final_audit context on the durable turn event for the bibliographic gate', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchSpyTargets: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: 'Texto com marcador [EVIDENCIA_PENDENTE] ainda presente.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      fetchSpyTargets.push(url.hostname);
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    const events = JSON.parse(String(row?.events_json)) as Array<{
+      final_audit?: { gate?: string; reason?: string };
+    }>;
+    const rejected = events.find((event) => event.final_audit?.gate === 'bibliographic_integrity');
+    expect(rejected).toBeDefined();
+    expect(String(rejected?.final_audit?.reason)).toMatch(/bibliographic integrity gate/);
+    // Stage 1 short-circuits before any URL work: no audit fetches at all.
+    expect(fetchSpyTargets).toEqual([]);
+  });
+
+  it('records structured final_audit context on the durable turn event for the capacity gate, with zero fetches', async () => {
+    const manyLinks = Array.from({ length: 31 }, (_v, i) => `https://cap${String(i).padStart(2, '0')}.example/`).join(
+      ' ',
+    );
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const auditTargets: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: `Texto com muitos links: ${manyLinks}` }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      auditTargets.push(url.hostname);
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    const events = JSON.parse(String(row?.events_json)) as Array<{
+      final_audit?: { gate?: string; context?: Record<string, unknown> };
+    }>;
+    const rejected = events.find((event) => event.final_audit?.gate === 'link_audit_capacity');
+    expect(rejected).toBeDefined();
+    expect(rejected?.final_audit?.context?.urls_found).toBe(31);
+    expect(rejected?.final_audit?.context?.max_urls).toBe(30);
+    // Stage 2 short-circuits before the HTTP stage: no audit fetches at all.
+    expect(auditTargets).toEqual([]);
+  });
+
+  it('converges when the custody link is publicly reachable (release audit passes at finalization)', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const probed: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: 'Rascunho com link https://example.com/artigo aqui.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'cloudflare-dns.com') {
+        return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+      }
+      probed.push(url.hostname);
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('converged');
+    expect(row?.final_text).toBe('Rascunho com link https://example.com/artigo aqui.');
+    expect(probed).toContain('example.com');
+  });
+
+  it('rejects finalization of a custody text with internal-host links, without ever fetching them (Plan D SSRF)', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [
+              { type: 'text', text: 'Veja http://169.254.169.254/latest/meta e http://localhost:8787/admin agora.' },
+            ],
             usage: {},
           }),
           { status: 200 },
         );
+      }
+      if (url.hostname === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.hostname === 'cloudflare-dns.com') {
+        return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
       }
       return new Response('', { status: 200 });
     });
@@ -1426,12 +1889,14 @@ describe('runSession orchestrator', () => {
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
 
-    expect(db.__sessions.get('run-1')?.status).toBe('blocked_link_audit');
-    // The internal hosts were judged broken WITHOUT any outbound fetch to them.
+    const row = db.__sessions.get('run-1');
+    // Internal links are blocked rows in the release audit: finalization is
+    // rejected (ReadyRejected loop -> turn cap) and no final text is written.
+    expect(row?.status).toBe('paused_cycle_limit');
+    expect(row?.final_text ?? null).toBeNull();
+    // The internal hosts were judged blocked WITHOUT any outbound fetch to them.
     expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === '169.254.169.254')).toBe(false);
     expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'localhost')).toBe(false);
-    // ...and reviewers were never invoked.
-    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
   });
 
   it('stops cooperatively when the session is cancelled mid-run and skips remaining reviewers', async () => {
@@ -2186,78 +2651,45 @@ describe('fetchWithTimeout', () => {
   });
 });
 
-describe('checkOneLink (retry + bounded redirect follow)', () => {
-  it('treats a persistently 5xx link as broken (not a free pass)', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('', { status: 500 })),
-    );
-    const result = await maestroAiTestHooks.checkOneLink('https://example.com/x');
-    vi.unstubAllGlobals();
-    expect(result.ok).toBe(false);
-  });
+describe('probePublicUrl (canonical redirect follow to final status)', () => {
+  const withDoh = (handler: (url: URL) => Response | Promise<Response>) =>
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'cloudflare-dns.com') {
+        return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+      }
+      return handler(url);
+    });
 
-  it('passes a momentary 5xx that recovers on retry', async () => {
-    let calls = 0;
+  it('follows a public redirect to its final destination and reports a 404 as error', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
-        calls += 1;
-        return new Response('', { status: calls === 1 ? 503 : 200 });
-      }),
-    );
-    const result = await maestroAiTestHooks.checkOneLink('https://example.com/x');
-    vi.unstubAllGlobals();
-    expect(result.ok).toBe(true);
-  });
-
-  it('follows a public redirect to its final destination and reports a 404 as broken', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith('/start')) {
+      withDoh((url) => {
+        if (url.pathname === '/start') {
           return new Response('', { status: 301, headers: { location: 'https://example.com/missing' } });
         }
         return new Response('', { status: 404 });
       }),
     );
-    const result = await maestroAiTestHooks.checkOneLink('https://example.com/start');
+    const result = await maestroAiTestHooks.probePublicUrl('https://example.com/start');
     vi.unstubAllGlobals();
+    expect(result.tone).toBe('error');
     expect(result.ok).toBe(false);
   });
 
-  it('treats a 3xx with no Location header as broken (not reachable)', async () => {
+  it('treats a persistent 5xx as error with no retry (single probe)', async () => {
+    let probes = 0;
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('', { status: 302 })),
+      withDoh(() => {
+        probes += 1;
+        return new Response('', { status: 500 });
+      }),
     );
-    const result = await maestroAiTestHooks.checkOneLink('https://example.com/x');
+    const result = await maestroAiTestHooks.probePublicUrl('https://example.com/x');
     vi.unstubAllGlobals();
-    expect(result.ok).toBe(false);
-  });
-
-  it('treats an unresolving redirect chain (past the hop limit) as broken', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('', { status: 301, headers: { location: 'https://example.com/next' } })),
-    );
-    const result = await maestroAiTestHooks.checkOneLink('https://example.com/start');
-    vi.unstubAllGlobals();
-    expect(result.ok).toBe(false);
-  });
-
-  it('refuses to follow a redirect into an internal host and never fetches it', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (hostOf(url) === '169.254.169.254') return new Response('secret', { status: 200 });
-      return new Response('', { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' } });
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const result = await maestroAiTestHooks.checkOneLink('https://example.com/start');
-    vi.unstubAllGlobals();
-    expect(result.ok).toBe(false);
-    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === '169.254.169.254')).toBe(false);
+    expect(result.tone).toBe('error');
+    expect(probes).toBe(1); // canonical: no retry loop (HEAD only; 500 is decisive)
   });
 });
 
@@ -2302,43 +2734,27 @@ describe('maestro link-audit host safety (SSRF hardening)', () => {
     expect(maestroAiTestHooks.isBlockedAuditHost('::ffff:808:808')).toBe(false);
   });
 
-  it('never fetches an IPv4-mapped IPv6 loopback target', async () => {
-    const fetchMock = vi.fn();
+  it('runLinkAudit turns blocked/invalid candidates into failed rows WITHOUT any fetch', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'cloudflare-dns.com') {
+        return new Response(JSON.stringify({ Answer: [{ type: 1, data: '93.184.216.34' }] }), { status: 200 });
+      }
+      return new Response('', { status: 200 });
+    });
     vi.stubGlobal('fetch', fetchMock);
-    const result = await maestroAiTestHooks.checkOneLink('http://[::ffff:127.0.0.1]/');
-    vi.unstubAllGlobals();
-    expect(result.ok).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('flags a blocked-host URL as broken WITHOUT fetching it (audit failure, not silent omission)', async () => {
-    // extractUrls surfaces the blocked host so the audit can report it...
-    const urls = maestroAiTestHooks.extractUrls(
-      'See https://example.com/ok and http://169.254.169.254/meta and http://localhost:8787/admin',
+    // Internal hosts and a bracketed IPv6 literal (truncated at `]` by the
+    // canonical tokenizer -> invalid URL) all surface as blocked rows; the
+    // public link is probed and passes.
+    const audit = await maestroAiTestHooks.runLinkAudit(
+      'See https://example.com/ok and http://169.254.169.254/meta and http://localhost:8787/admin and http://[::ffff:127.0.0.1]/latest',
     );
-    expect(urls).toContain('https://example.com/ok');
-    expect(urls.some((u: string) => hostOf(u) === '169.254.169.254')).toBe(true);
-    // ...but checkOneLink rejects it as !ok and never performs a fetch.
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    const internal = await maestroAiTestHooks.checkOneLink('http://169.254.169.254/meta');
-    const localhost = await maestroAiTestHooks.checkOneLink('http://localhost:8787/admin');
     vi.unstubAllGlobals();
-    expect(internal.ok).toBe(false);
-    expect(localhost.ok).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('surfaces bracketed IPv6 URLs so internal IPv6 links are audited, not silently dropped', () => {
-    // The URL tokenizer must not truncate `http://[::ffff:127.0.0.1]/` at the
-    // bracket: an internal IPv6 literal has to reach checkOneLink as a real URL,
-    // otherwise isBlockedAuditHost is never consulted and the link is ignored.
-    const urls = maestroAiTestHooks.extractUrls(
-      'Veja http://[::ffff:127.0.0.1]/latest e http://[::1]/admin e https://example.com/ok',
-    );
-    const hosts = urls.map((u: string) => hostOf(u));
-    expect(hosts).toContain('[::ffff:7f00:1]'); // ::ffff:127.0.0.1 normalized by URL.hostname
-    expect(hosts).toContain('[::1]');
-    expect(urls).toContain('https://example.com/ok');
+    expect(audit.urlsFound).toBe(4);
+    expect(audit.checked).toBe(1);
+    expect(audit.ok).toBe(1);
+    expect(audit.failed).toBe(3);
+    const fetched = fetchMock.mock.calls.map(([input]) => new URL(String(input)).hostname);
+    expect(fetched.every((host) => host === 'cloudflare-dns.com' || host === 'example.com')).toBe(true);
   });
 });

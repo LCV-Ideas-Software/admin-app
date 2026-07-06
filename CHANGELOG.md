@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.09.00] - 2026-07-06
+
+### Alterado
+
+- **Maestro AI — release link audit canônico e SSRF profundo (Plano D da equiparação com o maestro-app)**: o audit de links sai dos turnos e assume o posicionamento canônico — roda **somente em tentativas de finalização** (convergência, voto READY sem mudança e NOT_READY sem mudança), como estágios 2-3 do release audit unificado: **integridade bibliográfica → capacidade (>30 URLs únicas pausa antes de qualquer fetch) → audit HTTP** (qualquer linha `error`/`blocked` pausa). Todos os estágios pausam como `paused_final_audit` com contexto estruturado (gate, contagens, linhas). Um link quebrado deixa de matar a sessão no meio do run — os audits por draft/retomada/revisão foram removidos (paridade; `blocked_link_audit` vira status legado retomável). **Regras HTTP canônicas**: timeout 15 s, User-Agent identificado, HEAD primeiro com fallback GET em 405/403 ou erro de transporte do HEAD, sem retries, redirects seguidos até 5 hops re-validando cada alvo, extração com regex/trim/dedup/ordem lexicográfica canônicos (scan 80 matches, 30 candidatas), classificação por tom: 2xx/3xx ok, 4xx (inclusive 429) e 5xx falham, códigos fora de 100-599 (ex.: 999) são `warn` e não falham; candidatas bloqueadas/inválidas viram linhas `blocked` sem nenhum fetch. **SSRF profundo**: faixas IPv4 completas (CGNAT 100.64/10, RFC 6890 192.0.0/24, TEST-NETs, benchmarking 198.18/15, multicast/reservado ≥224/8) e IPv6 (multicast ff00::/8, documentação 2001:db8::/32) somadas às já bloqueadas, `localhost.localdomain`, e **pre-flight DNS-over-HTTPS** (Cloudflare DoH, A+AAAA) que bloqueia domínios resolvendo para IP privado/reservado — aplicado ao alvo inicial e a cada hop de redirect (fail-open em indisponibilidade do resolver, paridade com o pre-flight canônico). Desvios web documentados no plano (`docs/superpowers/plans/2026-07-06-maestro-ai-parity-plan-d.md`): probing paralelo, cache do audit por execução, ausência do resolver connection-bound do desktop, hardening extra de hostnames.
+
 ## [v02.08.00] - 2026-07-06
 
 ### Adicionado
