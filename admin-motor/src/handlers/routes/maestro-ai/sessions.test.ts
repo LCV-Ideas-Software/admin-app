@@ -444,7 +444,7 @@ describe('Maestro AI settings', () => {
       codex: 'gpt-5.5',
       gemini: 'gemini-2.5-pro',
       deepseek: 'deepseek-v4-pro',
-      grok: 'grok-4.20-multi-agent-0309',
+      grok: 'grok-4.20-multi-agent',
       perplexity: 'sonar-reasoning-pro',
     });
     expect(JSON.stringify(payload)).not.toContain('secret-claude');
@@ -453,6 +453,7 @@ describe('Maestro AI settings', () => {
   it('saves API keys through Cloudflare Secret Store and not into D1 settings JSON', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (url.includes('/secrets?') && !init?.method) {
         return new Response(JSON.stringify({ success: true, result: [] }), { status: 200 });
       }
@@ -500,6 +501,7 @@ describe('Maestro AI settings', () => {
     }));
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (url.includes('/secrets') && !url.includes('/secrets/') && (!init?.method || init.method === 'GET')) {
         const page = new URL(url).searchParams.get('page');
         const result =
@@ -618,7 +620,8 @@ describe('Maestro AI revision prompt teaches the block contract', () => {
       currentText: '# Titulo\n\nCorpo do artigo em custodia.',
       currentAuthor: 'claude',
       reviewer: 'codex',
-      history: [],
+      serialReports: [],
+      closingTurn: false,
     });
     expect(prompt).toContain('## Current Text Block Manifest');
     expect(prompt).toContain('| block_id | kind | chars | sha256_12 | locked_by_default | excerpt |');
@@ -630,6 +633,128 @@ describe('Maestro AI revision prompt teaches the block contract', () => {
     expect(prompt).toContain('Missing evidence by itself is not a sufficient reason to pass the blocker forward.');
     expect(prompt).toContain('A text is not final-deliverable while it still depends on unresolved evidence markers');
     expect(prompt).toContain('MAESTRO_STATUS: NOT_READY with custody: "unchanged" is a contract violation');
+  });
+});
+
+describe('Maestro AI prior-reports feed, prompt sections and model resolution (Plan F)', () => {
+  const promptInput = {
+    title: 'Sessao',
+    prompt: 'Escreva.',
+    protocol_text: protocolText,
+    initial_agent: 'claude',
+    active_agents: ['claude', 'codex'],
+    initial_content: '',
+    max_cost_usd: 10,
+    max_runtime_minutes: null,
+    rates,
+    models: {},
+    max_cycles: 2,
+  } as Parameters<(typeof maestroAiTestHooks)['buildRevisionPrompt']>[0]['input'];
+
+  it('buildRevisionHistoryBlock formats prior reports canonically (cap, placeholder, skip, order, empty)', () => {
+    const { buildRevisionHistoryBlock } = maestroAiTestHooks;
+    // Empty history -> canonical fallback sentence.
+    expect(buildRevisionHistoryBlock([])).toBe('No prior revision reports are recorded for this serial cycle.');
+    const block = buildRevisionHistoryBlock([
+      {
+        name: 'Codex',
+        role: 'review',
+        status: 'NOT_READY',
+        report: 'reviewer: codex\ncustody: "revised"',
+        artifact: 'art-1',
+      },
+      { name: 'Claude', role: 'review', status: 'READY', report: null, artifact: 'art-2' },
+      { name: 'Gemini', role: 'review', status: 'READY', report: '   ', artifact: 'art-3' },
+    ]);
+    // Chronological order with the canonical header/artifact/fence shape.
+    expect(block).toContain('### Codex / review / `NOT_READY`');
+    expect(block).toContain('Artifact: `art-1`');
+    expect(block).toContain('```text\nreviewer: codex\ncustody: "revised"\n```');
+    // Missing report -> canonical contract-failure placeholder.
+    expect(block).toContain(
+      'No complete maestro_revision_report block was returned by Claude. Treat this artifact as a contract failure, not as deliberative substance.',
+    );
+    // Whitespace-only extracted report -> the turn is skipped entirely.
+    expect(block).not.toContain('Gemini');
+    expect(block.indexOf('Codex')).toBeLessThan(block.indexOf('Claude'));
+    // Per-report cap: 12,000 Unicode chars.
+    const long = buildRevisionHistoryBlock([
+      { name: 'Codex', role: 'review', status: 'READY', report: 'x'.repeat(15_000), artifact: 'a' },
+    ]);
+    const fenced = /```text\n(x+)\n```/.exec(long);
+    expect(fenced?.[1]?.length).toBe(12_000);
+  });
+
+  it('revision prompt carries the canonical sections: section-ID rule, closing redactor, quality justification, prior reports', async () => {
+    const prompt = await maestroAiTestHooks.buildRevisionPrompt({
+      input: promptInput,
+      runId: 'run-1',
+      turn: 2,
+      currentText: '# Titulo\n\nCorpo.',
+      currentAuthor: 'codex',
+      reviewer: 'claude',
+      serialReports: [
+        { name: 'Codex', role: 'review', status: 'NOT_READY', report: 'custody: "revised"', artifact: 'art-9' },
+      ],
+      closingTurn: true,
+    });
+    // Canonical Language Contract additions.
+    expect(prompt).toContain('Cite compact section IDs only, such as `§V.14` or `§11.7`.');
+    expect(prompt).toContain('Keep protocol markers exactly as specified.');
+    // Canonical Role Contract additions.
+    expect(prompt).toContain('Closing redactor turn: `true`.');
+    expect(prompt).toContain('state `SELF_REVIEW_BLOCKED`');
+    expect(prompt).toContain(
+      'The original redactor may act in the closing redactor turn only when the current version author is another peer.',
+    );
+    // Canonical header.
+    expect(prompt).toContain('Round turn: `2`');
+    // Canonical Quality gate justification bullets.
+    expect(prompt).toContain(
+      'Any deletion, compression, simplification, or structural narrowing must be justified in the report with:',
+    );
+    expect(prompt).toContain('- the exact passage changed;');
+    expect(prompt).toContain('why preserving the stronger formulation would be unsafe or incorrect');
+    expect(prompt).toContain('If you are unsure, preserve the passage and report the concern instead of rewriting it.');
+    // Prior reports replace the raw event feed.
+    expect(prompt).toContain('## Prior Serial Revision Reports');
+    expect(prompt).toContain('### Codex / review / `NOT_READY`');
+    expect(prompt).not.toContain('## Prior Session Events');
+  });
+
+  it('choosePreferredModel picks the first live candidate, else first live model, else the fallback', () => {
+    const { choosePreferredModel } = maestroAiTestHooks;
+    expect(choosePreferredModel(['a', 'gpt-5.4', 'gpt-5.5'], ['gpt-5.5', 'gpt-5.4'], 'fb')).toBe('gpt-5.5');
+    expect(choosePreferredModel(['a', 'gpt-5.4'], ['gpt-5.5', 'gpt-5.4'], 'fb')).toBe('gpt-5.4');
+    expect(choosePreferredModel(['other-1', 'other-2'], ['gpt-5.5'], 'fb')).toBe('other-1');
+    expect(choosePreferredModel([], ['gpt-5.5'], 'fb')).toBe('fb');
+  });
+
+  it('resolveProviderModel queries /models with canonical candidates, falls back on failure, and skips perplexity', async () => {
+    const { resolveProviderModel } = maestroAiTestHooks;
+    const endpoints: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        endpoints.push(url.toString());
+        if (url.hostname === 'api.openai.com') {
+          return new Response(JSON.stringify({ data: [{ id: 'gpt-5.3' }, { id: 'gpt-4.1' }] }), { status: 200 });
+        }
+        if (url.hostname === 'api.x.ai') throw new Error('network down');
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }),
+    );
+    // Candidate match: gpt-5.3 is the first canonical candidate present.
+    expect(await resolveProviderModel('codex', 'key')).toBe('gpt-5.3');
+    expect(endpoints.some((e) => e.includes('api.openai.com/v1/models'))).toBe(true);
+    // Endpoint failure -> canonical hardcoded fallback.
+    expect(await resolveProviderModel('grok', 'key')).toBe('grok-4.20-multi-agent');
+    // Perplexity has NO live resolution (canonical): no fetch, default returned.
+    endpoints.length = 0;
+    expect(await resolveProviderModel('perplexity', 'key')).toBe('sonar-reasoning-pro');
+    expect(endpoints).toEqual([]);
+    vi.unstubAllGlobals();
   });
 });
 
@@ -1313,6 +1438,9 @@ describe('runSession orchestrator', () => {
   }) =>
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      // Plan F live model resolution: serve /models probes an empty list so the
+      // canonical fallback model is used without touching turn-call counters.
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
         opts.onAnthropic?.();
         return new Response(
@@ -1363,6 +1491,7 @@ describe('runSession orchestrator', () => {
     // Override: anthropic returns empty ONLY for the draft (first anthropic call).
     let anthropicCalls = 0;
     const withEmptyFirstDraft = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(String(input)) === 'api.anthropic.com') {
         anthropicCalls += 1;
         if (anthropicCalls === 1) {
@@ -1418,6 +1547,7 @@ describe('runSession orchestrator', () => {
     const codexBodies: string[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
         return new Response(
           JSON.stringify({
@@ -1455,6 +1585,7 @@ describe('runSession orchestrator', () => {
     const codexBodies: string[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
         return new Response(
           JSON.stringify({
@@ -1495,6 +1626,7 @@ describe('runSession orchestrator', () => {
     let claudeReviewCalls = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
         claudeReviewCalls += 1;
         return new Response(
@@ -1564,6 +1696,7 @@ describe('runSession orchestrator', () => {
     let deepseekCalls = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
         return new Response(
           JSON.stringify({
@@ -1613,7 +1746,9 @@ describe('runSession orchestrator', () => {
     // failure that skips the turn; the third consecutive one pauses the session.
     expect(row?.status).toBe('paused_reviewer_outage');
     expect(String(row?.error)).toMatch(/consecutive reviewer turns failed/i);
-    expect(fetchMock.mock.calls.filter(([u]) => hostOf(u) === 'api.openai.com').length).toBe(3);
+    expect(
+      fetchMock.mock.calls.filter(([u]) => hostOf(u) === 'api.openai.com' && !String(u).includes('/models')).length,
+    ).toBe(3);
     // The custody text survives the pause for a later resume.
     expect(row?.current_text).toBe('Rascunho valido e completo.');
   });
@@ -1909,6 +2044,7 @@ describe('runSession orchestrator', () => {
     // The pre-turn check before deepseek must detect it and stop.
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
         return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Rascunho valido.' }], usage: {} }), {
           status: 200,
@@ -2011,6 +2147,7 @@ describe('runSession orchestrator', () => {
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
         return new Response(
           JSON.stringify({ content: [{ type: 'text', text: 'Rascunho valido e robusto.' }], usage: {} }),
@@ -2414,7 +2551,7 @@ describe('maestro provider request construction', () => {
     const request = maestroAiTestHooks.buildProviderHttpRequest(
       'grok',
       'xai-secret',
-      'grok-4.20-multi-agent-0309',
+      'grok-4.20-multi-agent',
       system,
       prompt,
     );
@@ -2422,7 +2559,7 @@ describe('maestro provider request construction', () => {
 
     expect(request.endpoint).toBe('https://api.x.ai/v1/responses');
     expect(request.init.headers).toMatchObject({ authorization: 'Bearer xai-secret' });
-    expect(body.model).toBe('grok-4.20-multi-agent-0309');
+    expect(body.model).toBe('grok-4.20-multi-agent');
     expect(body.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: prompt }] }]);
   });
 
