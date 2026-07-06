@@ -624,6 +624,53 @@ describe('Maestro AI revision prompt teaches the block contract', () => {
   });
 });
 
+describe('Maestro AI stable-approval convergence and reviewer selection (Plan B3)', () => {
+  it('hasAllIndependentApprovals requires every non-author agent in the stable set', () => {
+    const { hasAllIndependentApprovals } = maestroAiTestHooks;
+    const order = ['codex', 'deepseek', 'claude'];
+    expect(hasAllIndependentApprovals(order, 'claude', new Set())).toBe(false);
+    expect(hasAllIndependentApprovals(order, 'claude', new Set(['codex']))).toBe(false);
+    expect(hasAllIndependentApprovals(order, 'claude', new Set(['codex', 'deepseek']))).toBe(true);
+    // The author's own membership is irrelevant.
+    expect(hasAllIndependentApprovals(order, 'claude', new Set(['codex', 'deepseek', 'claude']))).toBe(true);
+    // No author yet (draft not produced) -> never converged.
+    expect(hasAllIndependentApprovals(order, null, new Set(['codex', 'deepseek', 'claude']))).toBe(false);
+  });
+
+  it('closingTurnHasRequiredPriorReviews gates the draft lead on the full peer circuit', () => {
+    const { closingTurnHasRequiredPriorReviews } = maestroAiTestHooks;
+    const order = ['codex', 'deepseek', 'claude'];
+    expect(closingTurnHasRequiredPriorReviews(order, 'claude', new Set())).toBe(false);
+    expect(closingTurnHasRequiredPriorReviews(order, 'claude', new Set(['codex']))).toBe(false);
+    expect(closingTurnHasRequiredPriorReviews(order, 'claude', new Set(['codex', 'deepseek']))).toBe(true);
+    // A lead-only roster has no required reviewers -> never closure-ready.
+    expect(closingTurnHasRequiredPriorReviews(['claude'], 'claude', new Set())).toBe(false);
+  });
+
+  it('selectSerialReviewerIndex prefers the eligible nominal slot and redraws otherwise', () => {
+    const { selectSerialReviewerIndex } = maestroAiTestHooks;
+    const order = ['codex', 'deepseek', 'claude'];
+    // Nominal eligible: not the author, not approved, not the gated lead.
+    expect(selectSerialReviewerIndex(order, 0, 'claude', 'claude', new Set(), new Set(), 0)).toBe(0);
+    // Nominal is the current author -> redraw among pending (deepseek only:
+    // claude is the lead and closure is not ready).
+    expect(selectSerialReviewerIndex(order, 0, 'codex', 'claude', new Set(), new Set(), 0)).toBe(1);
+    expect(selectSerialReviewerIndex(order, 0, 'codex', 'claude', new Set(), new Set(), 7)).toBe(1);
+    // Nominal already stable-approved -> redraw skips it.
+    expect(selectSerialReviewerIndex(order, 0, 'claude', 'claude', new Set(), new Set(['codex']), 0)).toBe(1);
+    // Lead becomes schedulable once every other peer is a valid round agent.
+    expect(
+      selectSerialReviewerIndex(order, 2, 'codex', 'claude', new Set(['codex', 'deepseek']), new Set(['deepseek']), 0),
+    ).toBe(2);
+    // Nothing pending -> null (caller treats the version as converged).
+    expect(
+      selectSerialReviewerIndex(order, 0, 'claude', 'claude', new Set(), new Set(['codex', 'deepseek']), 0),
+    ).toBeNull();
+    // Redraw uses seed % pending.length over the pending index list.
+    expect(selectSerialReviewerIndex(order, 2, 'claude', 'claude', new Set(), new Set(), 1)).toBe(1);
+  });
+});
+
 describe('Maestro AI serial turn contract (Plan B1)', () => {
   it('reportDeclaresCustodyValue mirrors JSON-first then scalar-scan semantics', () => {
     const { reportDeclaresCustodyValue } = maestroAiTestHooks;
@@ -1032,6 +1079,52 @@ describe('runSession orchestrator', () => {
     expect(db.__sessions.get('run-1')?.final_text).toBe('Rascunho valido e completo.');
   });
 
+  it('never lets NOT_READY-unchanged turns enable the closing redactor (closure gating lock)', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    let codexCalls = 0;
+    let claudeReviewCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (hostOf(url) === 'api.anthropic.com') {
+        claudeReviewCalls += 1;
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: 'Rascunho valido e completo.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        codexCalls += 1;
+        const text =
+          'MAESTRO_STATUS: NOT_READY' +
+          String.fromCharCode(10) +
+          '<maestro_revision_report>custody: "unchanged"' +
+          String.fromCharCode(10) +
+          'changes: []' +
+          String.fromCharCode(10) +
+          'pass-through objection without correction</maestro_revision_report>';
+        return new Response(JSON.stringify({ output_text: text, usage: { input_tokens: 10, output_tokens: 20 } }), {
+          status: 200,
+        });
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // The pass-through reviewer exhausts its corrective retries (4 calls),
+    // then every redraw re-selects it for one immediately-exhausted call
+    // (same canonical retry key), never counting as a valid round agent —
+    // so the closing redactor is NEVER scheduled and the serial turn cap
+    // ends the session. 4 + 7x1 = 11 calls across the 8 capped turns.
+    expect(codexCalls).toBe(11);
+    expect(claudeReviewCalls).toBe(1); // draft only — the lead never reviews
+    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cycle_limit');
+  });
+
   it('accepts READY with a substantive revision as a normal turn (desktop bans inversion)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
     const revised = 'Texto revisado, mais preciso e completo, sem marcadores pendentes.';
@@ -1044,11 +1137,12 @@ describe('runSession orchestrator', () => {
     vi.unstubAllGlobals();
 
     const row = db.__sessions.get('run-1');
-    // The revision is accepted and takes custody; the new version has not yet
-    // earned a full approval pass, so the single-cycle session does not converge.
+    // The revision is accepted and takes custody; the closing redactor then
+    // fails its contract until retries exhaust at the end of the round, so the
+    // circuit is incomplete (desktop PAUSED_ROUND_INCOMPLETE analog).
     expect(row?.current_text).toBe(revised);
     expect(row?.current_author).toBe('codex');
-    expect(row?.status).toBe('blocked_max_cycles');
+    expect(row?.status).toBe('blocked_round_incomplete');
   });
 
   it('rejects a lower-tier shrink revision and keeps custody unchanged (quality ratchet)', async () => {
@@ -1088,9 +1182,12 @@ describe('runSession orchestrator', () => {
 
     const row = db.__sessions.get('run-1');
     expect(row?.current_text).toBe(original.trim());
-    expect(row?.status).toBe('blocked_max_cycles');
-    // Exactly one call: the tier guard rejects without a corrective retry.
-    expect(deepseekCalls).toBe(1);
+    // The guard keeps rejecting the only pending reviewer until the serial
+    // turn cap fires (desktop PAUSED_EDITORIAL_CYCLE_LIMIT analog).
+    expect(row?.status).toBe('blocked_cycle_limit');
+    // Every turn re-selects deepseek (the gated lead is never eligible), and
+    // each rejection consumes one serial turn up to the cap of 8.
+    expect(deepseekCalls).toBe(8);
   });
 
   it('marks the session as error when a reviewer returns empty text', async () => {

@@ -1366,6 +1366,59 @@ function qualityGuardBlocksRevision(
   return beforeChars >= 400 && afterChars * 100 < beforeChars * 85;
 }
 
+// ── Plan B3: cumulative stable-approval convergence + reviewer selection ────
+// Ports of session_orchestration.rs 2595-2671. Convergence = every non-author
+// agent of the rotation is in the stable-approval set; the draft lead (closing
+// redactor) is schedulable only after every other peer completed a valid turn
+// this round; an ineligible nominal slot redraws pseudo-randomly among the
+// pending reviewers.
+
+function hasAllIndependentApprovals(
+  order: readonly string[],
+  currentAuthorKey: string | null,
+  stableApprovals: ReadonlySet<string>,
+): boolean {
+  if (currentAuthorKey === null) return false;
+  const required = order.filter((agent) => agent !== currentAuthorKey);
+  return required.length > 0 && required.every((agent) => stableApprovals.has(agent));
+}
+
+function closingTurnHasRequiredPriorReviews(
+  order: readonly string[],
+  draftLeadKey: string,
+  validRoundAgents: ReadonlySet<string>,
+): boolean {
+  const required = order.filter((agent) => agent !== draftLeadKey);
+  return required.length > 0 && required.every((agent) => validRoundAgents.has(agent));
+}
+
+function selectSerialReviewerIndex(
+  order: readonly string[],
+  nominalTurnIndex: number,
+  currentAuthorKey: string,
+  draftLeadKey: string,
+  validRoundAgents: ReadonlySet<string>,
+  stableApprovals: ReadonlySet<string>,
+  selectionSeed: number,
+): number | null {
+  if (order.length === 0) return null;
+  const nominalIndex = nominalTurnIndex % order.length;
+  const nominal = order[nominalIndex] as string;
+  const closureReady = closingTurnHasRequiredPriorReviews(order, draftLeadKey, validRoundAgents);
+  const nominalIsPending =
+    nominal !== currentAuthorKey && !stableApprovals.has(nominal) && (nominal !== draftLeadKey || closureReady);
+  if (nominalIsPending) return nominalIndex;
+  const pending: number[] = [];
+  order.forEach((agent, index) => {
+    if (agent !== currentAuthorKey && !stableApprovals.has(agent) && (agent !== draftLeadKey || closureReady)) {
+      pending.push(index);
+    }
+  });
+  if (pending.length === 0) return null;
+  const offset = selectionSeed % pending.length;
+  return pending[offset] ?? null;
+}
+
 // Desktop parity: the exact Mandatory Corrective Retry prompt section injected
 // on each corrective re-run of a contract-violating reviewer turn.
 function correctiveRetrySection(retryCount: number): string {
@@ -1936,6 +1989,9 @@ export const maestroAiTestHooks = {
   containsPromptOrProtocolEcho,
   validateSerialTurnOutput,
   qualityGuardBlocksRevision,
+  hasAllIndependentApprovals,
+  closingTurnHasRequiredPriorReviews,
+  selectSerialReviewerIndex,
   isBlockedAuditHost,
   extractUrls,
   checkOneLink,
@@ -2186,45 +2242,131 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       ...activeAgents.slice(0, activeAgents.indexOf(initialAgent)),
       initialAgent,
     ];
+    // ── Plan B3: desktop round/turn accounting and cumulative convergence ──
+    // READY-unchanged turns add the reviewer to stableApprovals; substantive
+    // changes, contract/lock violations and quality-guard blocks clear it.
+    // The session finalizes the moment every non-author agent of the rotation
+    // is in the set (mid-round capable), and a global serial-turn cap bounds
+    // deliberation. Resumable pause states arrive with Plan C; until then the
+    // pause analogs below are terminal web statuses.
     let converged = false;
     const maxCycles = Math.max(1, Math.min(5, Number(input.max_cycles || 2)));
-    for (let cycle = 1; cycle <= maxCycles && !converged; cycle += 1) {
-      let readyVotes = 0;
-      let eligibleVotes = 0;
-      let changedThisCycle = false;
-      for (const reviewer of order) {
-        if (reviewer === currentAuthor) continue;
-        // Cooperative cancellation: an operator cancel (or sweeper) flips the
-        // stored status to a terminal state; detect it between turns and stop
-        // without clobbering the terminal status the canceller already wrote.
-        const live = await loadSession(db, id);
-        if (live && live.status !== 'running') {
-          logMaestro('warn', 'session_interrupted', { session_id: id, status: live.status });
-          return;
-        }
-        if (runtimeLimitExceeded(startedAtMs, input.max_runtime_minutes)) {
-          await pushEvent({
-            at: nowIso(),
-            agent: reviewer,
-            role: 'revision',
-            status: 'blocked',
-            message: `Time guard blocked provider call before ${AGENT_LABELS[reviewer]}.`,
-          });
-          await persistSession(
-            db,
-            id,
-            { status: 'blocked_time', observed_cost_usd: observedCost },
-            { ifStatusIn: ['queued', 'running'] },
-          );
-          return;
-        }
-        eligibleVotes += 1;
+    const roundTurnCount = order.length;
+    const maxSerialTurns = Math.max(roundTurnCount * 4, roundTurnCount);
+    let round = 1;
+    let roundTurnIndex = 0;
+    let serialTurns = 0;
+    const validRoundAgents = new Set<string>();
+    const stableApprovals = new Set<string>();
+    for (;;) {
+      // Cooperative cancellation: an operator cancel (or sweeper) flips the
+      // stored status to a terminal state; detect it between turns and stop
+      // without clobbering the terminal status the canceller already wrote.
+      const live = await loadSession(db, id);
+      if (live && live.status !== 'running') {
+        logMaestro('warn', 'session_interrupted', { session_id: id, status: live.status });
+        return;
+      }
+      // Desktop parity: convergence is checked at the top of every iteration,
+      // so the session finalizes mid-round when the last approval lands.
+      if (hasAllIndependentApprovals(order, currentAuthor, stableApprovals)) {
+        converged = true;
+        break;
+      }
+      // Desktop parity (turn cap): serialTurns counts every iteration —
+      // including retries, skips and redraws — and hard-stops runaway
+      // deliberation at roundTurnCount * 4.
+      serialTurns += 1;
+      if (serialTurns > maxSerialTurns) {
+        await pushEvent({
+          at: nowIso(),
+          status: 'blocked',
+          message: `Serial turn cap reached (${maxSerialTurns}); session stopped without unanimity.`,
+        });
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'blocked_cycle_limit',
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+            error: `Serial turn cap of ${maxSerialTurns} turns reached without unanimity.`,
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
+      // Interim operator bound (documented deviation until Plan C): the
+      // desktop has no round cap, only the turn cap above; the operator's
+      // max_cycles setting is honored as an outer round bound meanwhile.
+      if (round > maxCycles) break;
+      const selectionSeed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+      const selectedIndex = selectSerialReviewerIndex(
+        order,
+        roundTurnIndex,
+        currentAuthor,
+        initialAgent,
+        validRoundAgents,
+        stableApprovals,
+        selectionSeed,
+      );
+      if (selectedIndex === null) {
+        // Desktop parity: an empty pending set means every schedulable peer
+        // has already approved the current version.
+        converged = true;
+        break;
+      }
+      const reviewer = order[selectedIndex] as ProviderKey;
+      if (selectedIndex !== roundTurnIndex % roundTurnCount) {
+        await pushEvent({
+          at: nowIso(),
+          agent: reviewer,
+          role: 'revision',
+          status: 'running',
+          message: 'Reviewer redrawn: nominal slot is the current author or already approved this version.',
+        });
+      }
+      roundTurnIndex = selectedIndex;
+      if (reviewer === currentAuthor) {
+        // Defensive scheduler invariant (desktop PAUSED_SELF_REVIEW_BLOCKED).
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'blocked_self_review',
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+            error: 'Scheduler invariant violation: selected reviewer is the current version author.',
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
+      if (runtimeLimitExceeded(startedAtMs, input.max_runtime_minutes)) {
+        await pushEvent({
+          at: nowIso(),
+          agent: reviewer,
+          role: 'revision',
+          status: 'blocked',
+          message: `Time guard blocked provider call before ${AGENT_LABELS[reviewer]}.`,
+        });
+        await persistSession(
+          db,
+          id,
+          { status: 'blocked_time', observed_cost_usd: observedCost },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
+      {
         let correctiveRetryCount = 0;
         // Desktop parity: a contract-violating turn is retried with the SAME
         // reviewer up to MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN times, with a
         // Mandatory Corrective Retry section appended to the prompt; exhaustion
-        // skips the turn instead of killing the session (full desktop round
-        // accounting arrives with Plan B3).
+        // skips the turn, and an exhausted turn at the end of the round pauses
+        // the circuit as blocked_round_incomplete.
         for (;;) {
           await pushEvent({
             at: nowIso(),
@@ -2233,8 +2375,8 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             status: 'running',
             message:
               correctiveRetryCount > 0
-                ? `Corrective retry ${correctiveRetryCount}/${MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN} started in cycle ${cycle}.`
-                : `Serial revision turn started in cycle ${cycle}.`,
+                ? `Corrective retry ${correctiveRetryCount}/${MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN} started in round ${round}.`
+                : `Serial revision turn started in round ${round}.`,
           });
           const prompt =
             (await buildRevisionPrompt({
@@ -2318,13 +2460,16 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             contractError = validateRevisionContentLock(currentText, revisedText, report ?? '');
           }
           if (contractError) {
-            const retryKey = `${cycle}:${order.indexOf(reviewer)}:${reviewer}:${currentText}`;
+            const retryKey = `${round}:${roundTurnIndex}:${reviewer}:${currentText}`;
             const retryCount = (correctiveRetryCounts.get(retryKey) ?? 0) + 1;
             correctiveRetryCounts.set(retryKey, retryCount);
+            // Desktop parity: any contract violation clears the cumulative
+            // stable-approval set.
+            stableApprovals.clear();
             artifactTurn += 1;
             await createArtifact(db, {
               sessionId: id,
-              cycle,
+              cycle: round,
               turn: artifactTurn,
               agent: reviewer,
               role: 'revision',
@@ -2364,6 +2509,24 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               status: 'blocked',
               message: 'Corrective retries exhausted; reviewer turn skipped without a vote.',
             });
+            roundTurnIndex += 1;
+            if (roundTurnIndex >= roundTurnCount) {
+              // Desktop parity: a round whose circuit cannot complete pauses
+              // instead of silently wrapping (PAUSED_ROUND_INCOMPLETE analog).
+              await persistSession(
+                db,
+                id,
+                {
+                  status: 'blocked_round_incomplete',
+                  current_author: currentAuthor,
+                  current_text: currentText,
+                  observed_cost_usd: observedCost,
+                  error: 'Corrective retries exhausted at the end of the round; review circuit incomplete.',
+                },
+                { ifStatusIn: ['queued', 'running'] },
+              );
+              return;
+            }
             break;
           }
           const changedByReviewer = Boolean(revisedText && isSubstantiveEditorialChange(currentText, revisedText));
@@ -2378,7 +2541,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             artifactTurn += 1;
             await createArtifact(db, {
               sessionId: id,
-              cycle,
+              cycle: round,
               turn: artifactTurn,
               agent: reviewer,
               role: 'revision',
@@ -2405,6 +2568,16 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               model: result.model,
             });
             await persistSession(db, id, { observed_cost_usd: observedCost });
+            // Desktop parity: the rejected revision clears the stable set and
+            // the turn does NOT count as a valid round agent.
+            stableApprovals.clear();
+            roundTurnIndex += 1;
+            if (roundTurnIndex >= roundTurnCount) {
+              round += 1;
+              roundTurnIndex = 0;
+              validRoundAgents.clear();
+              stableApprovals.clear();
+            }
             break;
           }
           const candidateText = revisedText && changedByReviewer ? revisedText : currentText;
@@ -2417,7 +2590,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           artifactTurn += 1;
           const artifact = await createArtifact(db, {
             sessionId: id,
-            cycle,
+            cycle: round,
             turn: artifactTurn,
             agent: reviewer,
             role: 'revision',
@@ -2458,12 +2631,20 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             );
             return;
           }
+          // Desktop parity: ReadyRejected turns do not count as valid round
+          // agents; every other accepted turn feeds the closure gating.
+          if (readyRejectedReason === null) validRoundAgents.add(reviewer);
           if (revisedText && changedByReviewer) {
+            // Substantive revision: custody transfers and the new version must
+            // earn a fresh full rotation of independent approvals.
             currentText = revisedText;
             currentAuthor = reviewer;
-            changedThisCycle = true;
+            stableApprovals.clear();
+          } else if (effectiveStatus === 'READY') {
+            stableApprovals.add(reviewer);
+          } else {
+            stableApprovals.clear();
           }
-          if (effectiveStatus === 'READY') readyVotes += 1;
           await pushEvent({
             at: nowIso(),
             agent: reviewer,
@@ -2487,12 +2668,44 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             current_text: currentText,
             observed_cost_usd: observedCost,
           });
+          roundTurnIndex += 1;
+          if (roundTurnIndex >= roundTurnCount) {
+            round += 1;
+            roundTurnIndex = 0;
+            validRoundAgents.clear();
+          }
           break;
         }
       }
-      converged = eligibleVotes > 0 && readyVotes === eligibleVotes && !changedThisCycle;
     }
 
+    if (converged) {
+      // Desktop parity (final release audit, bibliographic stage): a
+      // unanimous version that still carries evidence markers or lacunae is
+      // not deliverable. Capacity/HTTP stages arrive with Plan D.
+      const finalGateError = validateFinalReleaseCandidate(currentText);
+      if (finalGateError) {
+        await pushEvent({
+          at: nowIso(),
+          status: 'blocked',
+          message: `Final release audit failed: ${sanitizeText(finalGateError, 300)}`,
+        });
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'blocked_final_audit',
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+            events_json: JSON.stringify(events),
+            error: finalGateError,
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
+    }
     await pushEvent({
       at: nowIso(),
       status: 'finished',

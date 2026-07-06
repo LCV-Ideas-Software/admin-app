@@ -131,5 +131,9 @@ describe('Maestro AI approved-content lock (Plan B2)', () => {
     const sha12 = lines[2]?.split('|')[4]?.trim() ?? '';
     expect(sha12).toMatch(/^[0-9a-f]{12}$/);
     expect(await formatBlockManifestForPrompt('   ')).toBe('No editorial content blocks were detected.');
+    // Backslashes are escaped before pipes in the excerpt column, so a
+    // pre-existing backslash cannot merge with the pipe escape.
+    const tricky = await formatBlockManifestForPrompt('celula \\| com barra e pipe');
+    expect(tricky).toContain('celula \\\\\\| com barra e pipe');
   });
 });

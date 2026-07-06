@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v02.07.00] - 2026-07-06
+
+### Alterado
+
+- **Maestro AI — convergência canônica por aprovações estáveis, seleção com redraw e turn cap (Plano B3 da equiparação com o maestro-app)**: o loop de revisão abandona a recontagem por ciclos e adota a contabilidade do desktop. A convergência é cumulativa — turnos READY sem mudança substantiva somam o reviewer ao conjunto de aprovações estáveis; qualquer mudança substantiva, violação de contrato/trava ou rejeição do guard de tier zera o conjunto — e a sessão finaliza no instante em que todos os agentes não-autores aprovaram a versão corrente (inclusive no meio da rodada). A seleção de reviewer prefere o slot nominal e sorteia entre os pendentes quando ele é o autor, já aprovou, ou é o redator de fechamento antes do circuito completo (closure gating). Novo teto global de turnos seriais (4× o tamanho da rotação) encerra deliberação infinita como `blocked_cycle_limit`; exaustão de retries no fim da rodada encerra como `blocked_round_incomplete`; invariantes de auto-revisão encerram como `blocked_self_review`; e a convergência passa pelo gate bibliográfico final (`blocked_final_audit`) antes de gravar o texto final — análogos terminais dos estados pausáveis do desktop até o Plano C trazer retomada. Labels novos na interface.
+
+### Segurança
+
+- **Alerta CodeQL #63 (js/incomplete-sanitization, high)**: o excerto do manifest de blocos escapa barras invertidas antes de escapar pipes, eliminando a sanitização incompleta apontada; desvio cosmético consciente em relação ao desktop (que escapa apenas o pipe), restrito à coluna informativa do prompt.
+
 ## [v02.06.01] - 2026-07-05
 
 ### Corrigido
