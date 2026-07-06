@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.10.01] - 2026-07-06
+
+### Segurança
+
+- **Alerta CodeQL #64 (js/biased-cryptographic-random, high)**: o seed do redraw de seleção de reviewer deixa de vir de `crypto.getRandomValues` — o par CSPRNG+módulo era o que a query flagra. A fonte volta ao espírito canônico do desktop, que semeia de timestamp de relógio (fonte não-criptográfica) para uma decisão de mera equidade de escalonamento: `Math.random` com variabilidade sub-milissegundo (o análogo direto de `Date.now` repetiria dentro do loop). Nenhuma mudança na semântica de seleção; funções puras e testes de seed determinístico intactos.
+
 ## [v02.10.00] - 2026-07-06
 
 ### Alterado

@@ -2978,7 +2978,13 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       // desktop has no round cap, only the turn cap above; the operator's
       // max_cycles setting is honored as an outer round bound meanwhile.
       if (round > maxCycles) break;
-      const selectionSeed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+      // Scheduling-fairness seed for the redraw, NOT a cryptographic value: the
+      // desktop seeds from a wall-clock timestamp (session_orchestration.rs:864,
+      // timestamp_nanos % pending). Math.random keeps that non-cryptographic
+      // semantics with sub-millisecond variability (Date.now alone can repeat
+      // within a tight loop) and avoids pairing a CSPRNG with a biased modulo
+      // (CodeQL js/biased-cryptographic-random, alert #64).
+      const selectionSeed = Math.floor(Math.random() * 0x100000000);
       const selectedIndex = selectSerialReviewerIndex(
         order,
         roundTurnIndex,
