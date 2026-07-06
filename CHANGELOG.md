@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.08.00] - 2026-07-06
+
+### Adicionado
+
+- **Maestro AI — lifecycle retomável e resiliência operacional (Plano C da equiparação com o maestro-app)**: sessões deixam de morrer em falhas transitórias e limites. (1) **Retry canônico de provider** (`provider_retry.rs`): máximo de 2 tentativas; erro de rede re-tenta uma vez após 1500 ms; **somente HTTP 429 re-tenta** aguardando `Retry-After` (delta em segundos ou data HTTP; default 30 s; teto 120 s); demais statuses seguem para classificação normal. Esperas canceláveis com check cooperativo fatiado (5 s). (2) **Falha operacional de turno não mata a sessão**: o turno é pulado com evento, preservando as aprovações estáveis (só violações as limpam); **3 falhas consecutivas** (incluindo exaustões de retry corretivo, paridade canônica) escalam para `paused_reviewer_outage`; falha no fechamento da rodada pausa como `paused_round_incomplete`. (3) **Draft com fallback serial**: o lead rascunha primeiro; erro/rascunho vazio passa ao próximo agente ativo; todos falhando pausa como `paused_draft_unavailable`. (4) **Tempo canônico**: âncora em `created_at` no run inicial e em `now` na retomada; exaustão = restante < 2 s, checada antes do draft e de cada turno; timeout por chamada acoplado ao deadline (`min(120 s, restante)`). (5) **Custo por execução** (cost_scope canônico): o cap passa a valer por execução do runner via baseline — retomadas não herdam o gasto anterior no guard. (6) **Retomada real**: novo endpoint `POST /api/maestro-ai/sessions/:id/resume` + botão **Retomar** na interface; somente `converged` é terminal — a família `paused_*` (renomeada de `blocked_cost`/`blocked_time`/`blocked_cycle_limit`/`blocked_round_incomplete`/`blocked_self_review`/`blocked_final_audit` para `paused_cost_limit`/`paused_time_limit`/`paused_cycle_limit`/`paused_round_incomplete`/`paused_self_review`/`paused_final_audit`), `blocked_cancelled`, `blocked_max_cycles`, `blocked_link_audit` e `error` são retomáveis. A retomada recupera só texto/autor da custódia (aprovações e contabilidade de rodada recomeçam vazias, paridade com a recuperação limitada do desktop), pula a fase de draft e re-audita os links. (7) **Cancel abortivo**: chamadas HTTP de provider correm com `AbortController` + poller cooperativo (5 s) que aborta a chamada em voo quando o operador cancela. Desvios web documentados no plano (`docs/superpowers/plans/2026-07-06-maestro-ai-parity-plan-c.md`).
+
 ## [v02.07.00] - 2026-07-06
 
 ### Alterado

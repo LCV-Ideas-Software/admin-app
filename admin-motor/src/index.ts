@@ -64,6 +64,7 @@ import {
   handleMaestroAiArtifactsGet,
   handleMaestroAiSessionCancelPost,
   handleMaestroAiSessionContentPut,
+  handleMaestroAiSessionResumePost,
   handleMaestroAiSessionsGet,
   handleMaestroAiSessionsPost,
   handleMaestroAiSettingsGet,
@@ -548,6 +549,7 @@ app.get('/api/maestro-ai/sessions/:id/artifacts/:artifactId', (c) =>
 );
 app.put('/api/maestro-ai/sessions/:id/content', (c) => handleMaestroAiSessionContentPut(rc(c), c.req.param('id')));
 app.post('/api/maestro-ai/sessions/:id/cancel', (c) => handleMaestroAiSessionCancelPost(rc(c), c.req.param('id')));
+app.post('/api/maestro-ai/sessions/:id/resume', (c) => handleMaestroAiSessionResumePost(rc(c), c.req.param('id')));
 
 // ── mainsite comments admin ──
 app.get('/api/mainsite/comments/admin/all', (c) => handleCommentsAdminAll(re(c)));

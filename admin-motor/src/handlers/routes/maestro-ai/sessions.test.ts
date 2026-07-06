@@ -4,6 +4,7 @@ import {
   handleMaestroAiArtifactsGet,
   handleMaestroAiSessionCancelPost,
   handleMaestroAiSessionContentPut,
+  handleMaestroAiSessionResumePost,
   handleMaestroAiSessionsGet,
   handleMaestroAiSessionsPost,
   handleMaestroAiSettingsGet,
@@ -209,32 +210,40 @@ function createInMemoryDb(seed: { settings?: Partial<Row>; sessions?: Row[]; art
     store.set(String(values[0]), row);
   };
 
-  const applyUpdate = (table: 'maestro_ai_sessions' | 'maestro_ai_settings', query: string, values: unknown[]) => {
+  // Mirrors D1's meta.changes: returns the number of rows the UPDATE modified,
+  // so a losing CAS write reports 0 changes like the real database.
+  const applyUpdate = (
+    table: 'maestro_ai_sessions' | 'maestro_ai_settings',
+    query: string,
+    values: unknown[],
+  ): number => {
     const setMatch = /SET\s+([\s\S]+?)\s+WHERE/i.exec(query);
-    if (!setMatch) return;
+    if (!setMatch) return 0;
     const assignments = (setMatch[1] ?? '').split(',').map((part) => part.trim());
     const setCols = assignments.map((a) => (a.split('=')[0] ?? '').trim());
     if (table === 'maestro_ai_settings') {
       setCols.forEach((col, i) => {
         settings[col] = values[i];
       });
-      return;
+      return 1;
     }
     const id = String(values[setCols.length]);
     const row = sessions.get(id);
-    if (!row) return;
+    if (!row) return 0;
     // Honor an optional "AND status IN (?, ?)" CAS guard.
     if (/status\s+IN/i.test(query)) {
       const guardStatuses = values.slice(setCols.length + 1).map(String);
-      if (guardStatuses.length && !guardStatuses.includes(String(row.status))) return;
+      if (guardStatuses.length && !guardStatuses.includes(String(row.status))) return 0;
     }
     setCols.forEach((col, i) => {
       row[col] = values[i];
     });
+    return 1;
   };
 
   const makeStatement = (query: string, values: unknown[]) => ({
     run: async () => {
+      let changes = 1;
       if (/INSERT INTO maestro_ai_sessions/i.test(query)) applyInsert(sessionColumns, sessions, values);
       else if (/INSERT INTO maestro_ai_artifacts/i.test(query)) applyInsert(artifactColumns, artifacts, values);
       else if (/INSERT INTO maestro_ai_settings/i.test(query)) {
@@ -264,9 +273,9 @@ function createInMemoryDb(seed: { settings?: Partial<Row>; sessions?: Row[]; art
           models_json: values[7],
           updated_at: values[8],
         });
-      } else if (/UPDATE maestro_ai_sessions/i.test(query)) applyUpdate('maestro_ai_sessions', query, values);
-      else if (/UPDATE maestro_ai_settings/i.test(query)) applyUpdate('maestro_ai_settings', query, values);
-      return { success: true };
+      } else if (/UPDATE maestro_ai_sessions/i.test(query)) changes = applyUpdate('maestro_ai_sessions', query, values);
+      else if (/UPDATE maestro_ai_settings/i.test(query)) changes = applyUpdate('maestro_ai_settings', query, values);
+      return { success: true, meta: { changes } };
     },
     first: async <T>() => {
       if (/FROM maestro_ai_settings/i.test(query)) return settings as T;
@@ -624,6 +633,128 @@ describe('Maestro AI revision prompt teaches the block contract', () => {
   });
 });
 
+describe('Maestro AI provider retry and time budget (Plan C)', () => {
+  it('parseRetryAfterHeader handles delta-seconds, HTTP-date and absence', () => {
+    const { parseRetryAfterHeader } = maestroAiTestHooks;
+    expect(parseRetryAfterHeader(new Headers({ 'retry-after': '7' }))).toBe(7);
+    expect(parseRetryAfterHeader(new Headers({ 'retry-after': ' 12 ' }))).toBe(12);
+    const future = new Date(Date.now() + 45_000).toUTCString();
+    const parsed = parseRetryAfterHeader(new Headers({ 'retry-after': future }));
+    expect(parsed).toBeGreaterThanOrEqual(43);
+    expect(parsed).toBeLessThanOrEqual(46);
+    const past = new Date(Date.now() - 60_000).toUTCString();
+    expect(parseRetryAfterHeader(new Headers({ 'retry-after': past }))).toBe(0);
+    expect(parseRetryAfterHeader(new Headers())).toBeNull();
+    expect(parseRetryAfterHeader(new Headers({ 'retry-after': 'garbage' }))).toBeNull();
+  });
+
+  it('remainingSessionMs and sessionTimeExhausted mirror the canonical 2s cutoff', () => {
+    const { remainingSessionMs, sessionTimeExhausted } = maestroAiTestHooks;
+    expect(remainingSessionMs(Date.now(), null)).toBeNull();
+    expect(sessionTimeExhausted(Date.now(), null)).toBe(false);
+    const fresh = remainingSessionMs(Date.now(), 10);
+    expect(fresh).toBeGreaterThan(9 * 60_000);
+    expect(sessionTimeExhausted(Date.now(), 10)).toBe(false);
+    // Anchor 10 minutes in the past with a 10-minute budget: exhausted.
+    expect(remainingSessionMs(Date.now() - 10 * 60_000, 10)).toBe(0);
+    expect(sessionTimeExhausted(Date.now() - 10 * 60_000, 10)).toBe(true);
+    // 1.5s remaining is below the canonical < 2s cutoff.
+    expect(sessionTimeExhausted(Date.now() - 10 * 60_000 + 1_500, 10)).toBe(true);
+    expect(sessionTimeExhausted(Date.now() - 10 * 60_000 + 30_000, 10)).toBe(false);
+  });
+
+  it('fetchProviderWithRetry retries 429 with Retry-After and network errors once', async () => {
+    const { fetchProviderWithRetry } = maestroAiTestHooks;
+    const never = async () => false;
+    // 429 then 200: waits Retry-After (0s here) and returns the second response.
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        if (calls === 1) return new Response('slow down', { status: 429, headers: { 'retry-after': '0' } });
+        return new Response('ok', { status: 200 });
+      }),
+    );
+    const ok = await fetchProviderWithRetry('https://api.test/x', {}, 5_000, never);
+    expect(ok).not.toBe('cancelled');
+    expect((ok as Response).status).toBe(200);
+    expect(calls).toBe(2);
+    // Second 429 is returned as-is (max 2 attempts).
+    calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        return new Response('slow', { status: 429, headers: { 'retry-after': '0' } });
+      }),
+    );
+    const still429 = await fetchProviderWithRetry('https://api.test/x', {}, 5_000, never);
+    expect((still429 as Response).status).toBe(429);
+    expect(calls).toBe(2);
+    // 500 never retries.
+    calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        return new Response('boom', { status: 500 });
+      }),
+    );
+    const err500 = await fetchProviderWithRetry('https://api.test/x', {}, 5_000, never);
+    expect((err500 as Response).status).toBe(500);
+    expect(calls).toBe(1);
+    // Network error retries exactly once, then throws.
+    calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        throw new Error('ECONNRESET');
+      }),
+    );
+    await expect(fetchProviderWithRetry('https://api.test/x', {}, 5_000, never)).rejects.toThrow('ECONNRESET');
+    expect(calls).toBe(2);
+    // Cancellation during the 429 wait returns the sentinel.
+    calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        return new Response('slow', { status: 429, headers: { 'retry-after': '1' } });
+      }),
+    );
+    const cancelled = await fetchProviderWithRetry('https://api.test/x', {}, 5_000, async () => true);
+    expect(cancelled).toBe('cancelled');
+    expect(calls).toBe(1);
+    vi.unstubAllGlobals();
+  }, 30_000);
+
+  it('aborts an in-flight provider call when the session is cancelled (abortive cancel poller)', async () => {
+    const { fetchProviderWithRetry } = maestroAiTestHooks;
+    // A hung provider call that only settles when its AbortSignal fires.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+          }),
+      ),
+    );
+    let cancelled = false;
+    setTimeout(() => {
+      cancelled = true;
+    }, 1_000);
+    const startedAt = Date.now();
+    // 60s call timeout: without the abort poller this would hang for a minute.
+    const result = await fetchProviderWithRetry('https://api.test/x', {}, 60_000, async () => cancelled);
+    expect(result).toBe('cancelled');
+    // One poller tick (5s) after the 1s cancel flag: well under the call timeout.
+    expect(Date.now() - startedAt).toBeLessThan(20_000);
+    vi.unstubAllGlobals();
+  }, 30_000);
+});
 describe('Maestro AI stable-approval convergence and reviewer selection (Plan B3)', () => {
   it('hasAllIndependentApprovals requires every non-author agent in the stable set', () => {
     const { hasAllIndependentApprovals } = maestroAiTestHooks;
@@ -980,16 +1111,54 @@ describe('runSession orchestrator', () => {
     MAESTRO_OPENAI_API_KEY: 'k-codex',
   };
 
-  it('marks the session as error when the initial draft text is empty and never calls reviewers', async () => {
+  it('falls back to the next active agent when the initial draft text is empty (canonical draft fallback)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
-    const fetchMock = providerFetch({ claudeText: '   ' });
+    // Claude (lead) returns a blank draft; codex must take over as draft author.
+    const fetchMock = providerFetch({
+      claudeText:
+        'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found</maestro_revision_report>',
+      codexText: 'Texto de rascunho de fallback robusto e completo.',
+    });
+    // Override: anthropic returns empty ONLY for the draft (first anthropic call).
+    let anthropicCalls = 0;
+    const withEmptyFirstDraft = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (hostOf(String(input)) === 'api.anthropic.com') {
+        anthropicCalls += 1;
+        if (anthropicCalls === 1) {
+          return new Response(
+            JSON.stringify({ content: [{ type: 'text', text: '   ' }], usage: { input_tokens: 1, output_tokens: 1 } }),
+            { status: 200 },
+          );
+        }
+      }
+      return fetchMock(input, init);
+    });
+    vi.stubGlobal('fetch', withEmptyFirstDraft);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // codex drafted; claude (sole other reviewer) approved unchanged → converged.
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('converged');
+    expect(row?.current_author).toBe('codex');
+    expect(row?.final_text).toBe('Texto de rascunho de fallback robusto e completo.');
+    const events = JSON.parse(String(row?.events_json)) as Array<{ message?: string }>;
+    expect(events.some((event) => /Draft attempt failed/.test(String(event.message)))).toBe(true);
+  });
+
+  it('pauses as paused_draft_unavailable when every active agent fails to draft', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchMock = providerFetch({ claudeText: '   ', codexText: '   ' });
     vi.stubGlobal('fetch', fetchMock);
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
 
-    expect(db.__sessions.get('run-1')?.status).toBe('error');
-    expect(String(db.__sessions.get('run-1')?.error)).toMatch(/vazi|empty/i);
-    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('paused_draft_unavailable');
+    expect(String(row?.error)).toMatch(/failed to produce an initial draft/i);
+    // Both agents were tried for the draft.
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.anthropic.com')).toBe(true);
+    expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(true);
   });
 
   it('converges when the sole reviewer returns READY without changing custody', async () => {
@@ -1115,14 +1284,14 @@ describe('runSession orchestrator', () => {
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
 
-    // The pass-through reviewer exhausts its corrective retries (4 calls),
-    // then every redraw re-selects it for one immediately-exhausted call
-    // (same canonical retry key), never counting as a valid round agent —
-    // so the closing redactor is NEVER scheduled and the serial turn cap
-    // ends the session. 4 + 7x1 = 11 calls across the 8 capped turns.
-    expect(codexCalls).toBe(11);
+    // The pass-through reviewer exhausts its corrective retries (4 calls) and
+    // each redraw re-selects it for one immediately-exhausted call (same
+    // canonical retry key), never counting as a valid round agent — so the
+    // closing redactor is NEVER scheduled. Since Plan C each exhausted turn is
+    // an operational failure: the 3rd consecutive one escalates. 4 + 1 + 1 = 6.
+    expect(codexCalls).toBe(6);
     expect(claudeReviewCalls).toBe(1); // draft only — the lead never reviews
-    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cycle_limit');
+    expect(db.__sessions.get('run-1')?.status).toBe('paused_reviewer_outage');
   });
 
   it('accepts READY with a substantive revision as a normal turn (desktop bans inversion)', async () => {
@@ -1142,7 +1311,7 @@ describe('runSession orchestrator', () => {
     // circuit is incomplete (desktop PAUSED_ROUND_INCOMPLETE analog).
     expect(row?.current_text).toBe(revised);
     expect(row?.current_author).toBe('codex');
-    expect(row?.status).toBe('blocked_round_incomplete');
+    expect(row?.status).toBe('paused_round_incomplete');
   });
 
   it('rejects a lower-tier shrink revision and keeps custody unchanged (quality ratchet)', async () => {
@@ -1183,21 +1352,29 @@ describe('runSession orchestrator', () => {
     const row = db.__sessions.get('run-1');
     expect(row?.current_text).toBe(original.trim());
     // The guard keeps rejecting the only pending reviewer until the serial
-    // turn cap fires (desktop PAUSED_EDITORIAL_CYCLE_LIMIT analog).
-    expect(row?.status).toBe('blocked_cycle_limit');
+    // turn cap fires (desktop PAUSED_EDITORIAL_CYCLE_LIMIT analog). Ratchet
+    // rejections are clean provider responses, so no outage escalation fires.
+    expect(row?.status).toBe('paused_cycle_limit');
     // Every turn re-selects deepseek (the gated lead is never eligible), and
     // each rejection consumes one serial turn up to the cap of 8.
     expect(deepseekCalls).toBe(8);
   });
 
-  it('marks the session as error when a reviewer returns empty text', async () => {
+  it('escalates to paused_reviewer_outage after 3 consecutive empty reviewer turns (operational failures)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
-    vi.stubGlobal('fetch', providerFetch({ claudeText: 'Rascunho valido e completo.', codexText: '   ' }));
+    const fetchMock = providerFetch({ claudeText: 'Rascunho valido e completo.', codexText: '   ' });
+    vi.stubGlobal('fetch', fetchMock);
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
 
-    expect(db.__sessions.get('run-1')?.status).toBe('error');
-    expect(String(db.__sessions.get('run-1')?.error)).toMatch(/vazi|empty/i);
+    const row = db.__sessions.get('run-1');
+    // Canonical 3-strike: each empty reviewer response is an operational turn
+    // failure that skips the turn; the third consecutive one pauses the session.
+    expect(row?.status).toBe('paused_reviewer_outage');
+    expect(String(row?.error)).toMatch(/consecutive reviewer turns failed/i);
+    expect(fetchMock.mock.calls.filter(([u]) => hostOf(u) === 'api.openai.com').length).toBe(3);
+    // The custody text survives the pause for a later resume.
+    expect(row?.current_text).toBe('Rascunho valido e completo.');
   });
 
   it('blocks the session when a link is persistently 5xx (broken after retry)', async () => {
@@ -1548,6 +1725,184 @@ describe('session cancellation and sweeper', () => {
     expect(db.__sessions.get('queued-stale')?.status).toBe('error');
     expect(db.__sessions.get('fresh')?.status).toBe('running');
     expect(db.__sessions.get('done')?.status).toBe('converged');
+  });
+
+  describe('session resume (Plan C)', () => {
+    const pausedRow = (overrides: Partial<Row> = {}): Row =>
+      activeRow({
+        id: 'r-1',
+        status: 'paused_cost_limit',
+        current_author: 'claude',
+        current_text: 'Rascunho valido e completo.',
+        // Lifetime spend already exceeds the cap: only the per-execution cost
+        // baseline lets the resumed run proceed.
+        observed_cost_usd: 19.9,
+        max_cost_usd: 20,
+        error: 'Cost guard blocked provider call.',
+        ...overrides,
+      });
+
+    const resumeContext = (sessionId: string, db: ReturnType<typeof createInMemoryDb>) => {
+      const captured: Promise<unknown>[] = [];
+      return {
+        context: {
+          env: {
+            BIGDATA_DB: db,
+            MAESTRO_ANTHROPIC_API_KEY: 'k-claude',
+            MAESTRO_OPENAI_API_KEY: 'k-codex',
+          },
+          request: new Request(`https://admin.local/api/maestro-ai/sessions/${sessionId}/resume`, { method: 'POST' }),
+          waitUntil: (promise: Promise<unknown>) => {
+            captured.push(promise);
+          },
+        },
+        captured,
+      };
+    };
+
+    const reviewerFetch = () =>
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (hostOf(String(input)) === 'api.openai.com') {
+          return new Response(
+            JSON.stringify({
+              output_text:
+                'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              usage: { input_tokens: 10, output_tokens: 20 },
+            }),
+            { status: 200 },
+          );
+        }
+        if (hostOf(String(input)) === 'api.anthropic.com') {
+          throw new Error('draft must be skipped on resume');
+        }
+        return new Response('', { status: 200 });
+      });
+
+    it('resumes a paused_cost_limit session, skips the draft and converges under a fresh cost baseline', async () => {
+      const db = createInMemoryDb({ sessions: [pausedRow()] });
+      const fetchMock = reviewerFetch();
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      const row = db.__sessions.get('r-1');
+      // Draft skipped (anthropic never called), custody recovered, error
+      // cleared, and the per-execution baseline let the reviewer run despite
+      // lifetime spend at 19.9/20.
+      expect(row?.status).toBe('converged');
+      expect(row?.final_text).toBe('Rascunho valido e completo.');
+      expect(row?.error).toBeNull();
+      expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.anthropic.com')).toBe(false);
+    });
+
+    it('anchors the time budget at resume time, not created_at', async () => {
+      // created_at is 2 hours in the past with a 1-minute budget: a fresh-run
+      // anchor would exhaust immediately; the resume anchor must be `now`.
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({
+            status: 'paused_time_limit',
+            max_runtime_minutes: 1,
+            created_at: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+            error: 'Time guard blocked provider call.',
+          }),
+        ],
+      });
+      const fetchMock = reviewerFetch();
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      expect(db.__sessions.get('r-1')?.status).toBe('converged');
+    });
+
+    it('rejects a concurrent double-resume: the CAS loser gets 409 and never dispatches a second runner', async () => {
+      const db = createInMemoryDb({ sessions: [pausedRow()] });
+      // Race shape: handler B loaded the row while it was still paused, but
+      // handler A's CAS write landed first (row is already queued and A's
+      // runner dispatched). Serve B's first session SELECT from the stale
+      // paused snapshot; the stored row is already queued.
+      const staleRow = { ...(db.__sessions.get('r-1') as Row) };
+      const winnerRow = db.__sessions.get('r-1') as Row;
+      winnerRow.status = 'queued';
+      let staleServed = false;
+      const racedDb = {
+        ...db,
+        prepare(query: string) {
+          const statement = db.prepare(query);
+          if (!staleServed && /SELECT \* FROM maestro_ai_sessions/i.test(query)) {
+            staleServed = true;
+            return {
+              ...statement,
+              bind: (...values: unknown[]) => ({
+                ...statement.bind(...values),
+                first: async () => staleRow,
+              }),
+            };
+          }
+          return statement;
+        },
+      };
+      const fetchMock = reviewerFetch();
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', racedDb as unknown as ReturnType<typeof createInMemoryDb>);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      vi.unstubAllGlobals();
+
+      // The CAS write matched 0 rows (status is queued, not paused): the loser
+      // must return 409 and must NOT dispatch a second runSession.
+      expect(response.status).toBe(409);
+      expect(captured.length).toBe(0);
+      expect(db.__sessions.get('r-1')?.status).toBe('queued');
+    });
+
+    it('returns 409 for a converged session and for a still-active session', async () => {
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({ id: 'done', status: 'converged', final_text: 'Final.' }),
+          pausedRow({ id: 'live', status: 'running' }),
+        ],
+      });
+      const done = await handleMaestroAiSessionResumePost(resumeContext('done', db).context, 'done');
+      expect(done.status).toBe(409);
+      const live = await handleMaestroAiSessionResumePost(resumeContext('live', db).context, 'live');
+      expect(live.status).toBe(409);
+      expect(db.__sessions.get('done')?.status).toBe('converged');
+      expect(db.__sessions.get('live')?.status).toBe('running');
+    });
+
+    it('pauses a fresh run as paused_time_limit before any provider call when created_at already exhausts the budget', async () => {
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({
+            status: 'queued',
+            current_text: '',
+            current_author: null,
+            observed_cost_usd: 0,
+            max_runtime_minutes: 1,
+            created_at: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+            error: null,
+          }),
+        ],
+      });
+      const fetchMock = reviewerFetch();
+      vi.stubGlobal('fetch', fetchMock);
+      await maestroAiTestHooks.runSession(
+        db,
+        { BIGDATA_DB: db, MAESTRO_ANTHROPIC_API_KEY: 'k-claude', MAESTRO_OPENAI_API_KEY: 'k-codex' },
+        'r-1',
+      );
+      vi.unstubAllGlobals();
+
+      expect(db.__sessions.get('r-1')?.status).toBe('paused_time_limit');
+      expect(fetchMock.mock.calls.length).toBe(0);
+    });
   });
 });
 
