@@ -97,7 +97,11 @@ function classifyBlockKind(text: string): string {
 }
 
 function markdownTableExcerpt(text: string): string {
-  const compact = normalizeBlockText(text).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  // Escape backslashes BEFORE pipes so a pre-existing backslash cannot
+  // combine with the pipe escape (CodeQL js/incomplete-sanitization). The
+  // desktop escapes only the pipe; this is a deliberate cosmetic-only
+  // deviation confined to the informational prompt excerpt.
+  const compact = normalizeBlockText(text).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
   const characters = Array.from(compact);
   let excerpt = characters.slice(0, 96).join('');
   if (characters.length > 96) excerpt += '...';
