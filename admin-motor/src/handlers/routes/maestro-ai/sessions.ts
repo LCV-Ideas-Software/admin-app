@@ -174,6 +174,9 @@ type SessionEvent = {
   cost_usd?: number;
   model?: string;
   link_audit?: LinkAuditResult[];
+  /** Structured release-audit context (canonical audit_context), persisted in
+   *  events_json whenever a release-audit failure produces this event. */
+  final_audit?: { gate: string; reason: string; context: Record<string, unknown> };
 };
 
 type LinkAuditResult = {
@@ -181,6 +184,8 @@ type LinkAuditResult = {
   ok: boolean;
   status?: number;
   error?: string;
+  /** Canonical audit tone: ok | error | warn | blocked (warn fails nothing). */
+  tone?: string;
 };
 
 type ArtifactInput = {
@@ -1451,15 +1456,23 @@ function correctiveRetrySection(retryCount: number): string {
  * search content), so the auto-fetch must never reach internal infrastructure
  * (SSRF). Returns true when the host must NOT be fetched.
  */
-/** True when an IPv4 literal falls in a private / loopback / link-local / unspecified range. */
+/** True when an IPv4 literal falls in a blocked range (canonical link_audit.rs
+ *  table): this-network, RFC1918, loopback, CGNAT 100.64/10, link-local,
+ *  RFC6890 192.0.0/24, TEST-NETs, benchmarking 198.18/15, multicast/reserved. */
 function isPrivateIpv4(host: string): boolean {
   const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
   if (!ipv4) return false;
-  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  const [a, b, c] = [Number(ipv4[1]), Number(ipv4[2]), Number(ipv4[3])];
   if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
   if (a === 192 && b === 168) return true;
   if (a === 169 && b === 254) return true;
   if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
+  if (a === 198 && b === 51 && c === 100) return true;
+  if (a === 203 && b === 0 && c === 113) return true;
+  if (a >= 224) return true;
   return false;
 }
 
@@ -1487,7 +1500,9 @@ function isBlockedAuditHost(hostname: string): boolean {
     .toLowerCase()
     .replace(/^\[|\]$/g, '');
   if (!host) return true;
-  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === 'localhost' || host === 'localhost.localdomain' || host.endsWith('.localhost')) return true;
+  // Web hardening beyond the desktop list (documented deviation): `.internal`
+  // and bare single-label hosts are always internal from a Worker's egress.
   if (host.endsWith('.internal') || host.endsWith('.local')) return true;
   // Bare single-label hostnames (no dot) resolve to internal names.
   if (!host.includes('.') && !host.includes(':')) return true;
@@ -1497,11 +1512,14 @@ function isBlockedAuditHost(hostname: string): boolean {
     return isPrivateIpv4(host);
   }
 
-  // IPv6 loopback / unspecified / unique-local (fc00::/7) / link-local (fe80::/10).
+  // IPv6 loopback / unspecified / unique-local (fc00::/7) / link-local
+  // (fe80::/10) / multicast (ff00::/8) / documentation (2001:db8::/32).
   if (host.includes(':')) {
     if (host === '::1' || host === '::') return true;
     if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
     if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
+    if (/^ff[0-9a-f]{2}:/.test(host)) return true;
+    if (/^2001:0?db8:/.test(host)) return true;
     // IPv4-mapped / IPv4-compatible IPv6 (e.g. ::ffff:127.0.0.1): apply the
     // IPv4 private-range check to the embedded address.
     const embedded = embeddedIpv4FromIpv6(host);
@@ -1512,117 +1530,283 @@ function isBlockedAuditHost(hostname: string): boolean {
   return false;
 }
 
-function extractUrls(text: string): string[] {
-  const urls = new Set<string>();
-  // First alternative keeps a bracketed IPv6 host (e.g. http://[::ffff:127.0.0.1]/)
-  // intact so internal IPv6 literals still reach checkOneLink; without it the
-  // generic tokenizer stops at the closing `]` and the URL is dropped as malformed.
-  for (const match of text.matchAll(/https?:\/\/\[[0-9a-f:.]+\][^\s<>"')\]}]*|https?:\/\/[^\s<>"')\]}]+/gi)) {
-    const url = match[0].replace(/[.,;:!?]+$/g, '');
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
-      // Blocked (internal/private) hosts are NOT filtered out here: checkOneLink
-      // rejects them as broken WITHOUT fetching, so an internal URL in the
-      // content surfaces as an audit failure instead of being silently dropped.
-      urls.add(parsed.toString());
-    } catch {
-      // Ignore malformed candidates; the checker reports only concrete URLs.
-    }
+// ── Plan D: canonical release link audit (port of link_audit.rs) ──
+// The full audit (capacity + HTTP) runs only on finalization attempts:
+// convergence, READY-unchanged and NOT_READY-unchanged turns. Per-revision
+// audits were removed for parity — a broken link pauses the release, it no
+// longer kills the session mid-run.
+const LINK_AUDIT_MAX_UNIQUE_URLS = 30;
+const LINK_AUDIT_MAX_MATCHES = 80;
+const LINK_AUDIT_TIMEOUT_MS = 15_000;
+const LINK_AUDIT_MAX_REDIRECT_HOPS = 5;
+// Canonical extraction regex: stop-set is whitespace and < > " ' ) ] — no `}`.
+const LINK_AUDIT_URL_REGEX = /https?:\/\/[^\s<>"')\]]+/g;
+
+type LinkCandidate = { url: string; rejection: string | null };
+
+/** Canonical rejection reason for a non-public/invalid audit URL, or null. */
+function publicHttpUrlRejectionReason(value: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return 'URL invalida ou incompleta';
   }
-  return [...urls].slice(0, 40);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return 'somente links http:// ou https:// podem ser auditados';
+  }
+  if (!parsed.hostname) return 'link sem host/dominio';
+  if (isBlockedAuditHost(parsed.hostname)) {
+    return 'endereco local, privado ou reservado bloqueado por seguranca';
+  }
+  return null;
 }
 
-/** A 5xx or 429 may be momentary; everything else (e.g. 404) is decisive. */
-function isRetryableLinkStatus(status: number): boolean {
-  return status === 429 || status >= 500;
+/** Canonical extraction: first 80 matches scanned, trailing .,;: trimmed,
+ *  deduped on the cleaned string, capped at 30 candidates, sorted
+ *  lexicographically (BTreeSet parity). Rejected candidates are KEPT with a
+ *  rejection reason so they surface as blocked rows instead of vanishing. */
+function extractUrlCandidates(text: string): LinkCandidate[] {
+  const seen = new Set<string>();
+  const candidates: LinkCandidate[] = [];
+  let matches = 0;
+  for (const match of text.matchAll(LINK_AUDIT_URL_REGEX)) {
+    matches += 1;
+    if (matches > LINK_AUDIT_MAX_MATCHES) break;
+    const cleaned = match[0].replace(/[.,;:]+$/g, '');
+    if (!cleaned || seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    candidates.push({ url: cleaned, rejection: publicHttpUrlRejectionReason(cleaned) });
+    if (candidates.length >= LINK_AUDIT_MAX_UNIQUE_URLS) break;
+  }
+  return candidates.sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0));
 }
 
-type LinkAttempt = { ok: boolean; status?: number; error?: string; retryable: boolean };
+/** Canonical capacity counter: counts ALL unique cleaned URLs (including
+ *  blocked ones) across the first 80 matches, stopping at 31. */
+function countUniqueUrlCandidates(text: string): number {
+  const seen = new Set<string>();
+  let matches = 0;
+  for (const match of text.matchAll(LINK_AUDIT_URL_REGEX)) {
+    matches += 1;
+    if (matches > LINK_AUDIT_MAX_MATCHES) break;
+    const cleaned = match[0].replace(/[.,;:]+$/g, '');
+    if (cleaned) seen.add(cleaned);
+    if (seen.size > LINK_AUDIT_MAX_UNIQUE_URLS) break;
+  }
+  return seen.size;
+}
+
+/** DoH pre-flight (web analogue of the desktop's system-resolver pre-flight +
+ *  connection-bound resolver, which Workers cannot host): resolves A and AAAA
+ *  via Cloudflare DoH and blocks when ANY answer is in a blocked range.
+ *  Fails open on resolver errors (canonical parity: the fetch would fail to
+ *  connect anyway); the connection-bound anti-rebinding layer has no Workers
+ *  equivalent and is a documented deviation. */
+async function hostResolvesToBlockedIp(host: string): Promise<boolean> {
+  // IP literals are already range-checked lexically; DoH applies to names only.
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) || host.includes(':')) return false;
+  const lookups = ['A', 'AAAA'].map(async (type) => {
+    const endpoint = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`;
+    const response = await fetchWithTimeout(endpoint, { headers: { accept: 'application/dns-json' } }, 5_000);
+    if (!response.ok) return false;
+    const payload = (await response.json()) as { Answer?: Array<{ type?: number; data?: string }> };
+    return (payload.Answer ?? []).some((answer) => {
+      // Type 1 = A, 28 = AAAA; other records (CNAME etc) carry no address.
+      if (answer.type !== 1 && answer.type !== 28) return false;
+      return isBlockedAuditHost(String(answer.data ?? ''));
+    });
+  });
+  try {
+    const results = await Promise.all(lookups);
+    return results.some(Boolean);
+  } catch {
+    return false;
+  }
+}
+
+/** Full per-URL guard: lexical + DoH pre-flight. Returns a rejection reason or null. */
+async function auditTargetRejectionReason(target: URL): Promise<string | null> {
+  const lexical = publicHttpUrlRejectionReason(target.toString());
+  if (lexical) return lexical;
+  if (await hostResolvesToBlockedIp(target.hostname.toLowerCase())) {
+    return 'dominio resolve para IP privado/reservado bloqueado por seguranca';
+  }
+  return null;
+}
+
+/** One HTTP request with the canonical audit client settings. */
+async function auditFetch(target: string, method: 'HEAD' | 'GET'): Promise<Response> {
+  return fetchWithTimeout(
+    target,
+    {
+      method,
+      redirect: 'manual',
+      // Canonical UA is "Maestro Editorial AI/{version}"; the worker has no
+      // package-version binding, so the web port identifies itself as /web.
+      headers: { 'user-agent': 'Maestro Editorial AI/web' },
+    },
+    LINK_AUDIT_TIMEOUT_MS,
+  );
+}
+
+function linkAuditRow(
+  url: string,
+  status: number | undefined,
+  error: string | undefined,
+  tone: string,
+): LinkAuditResult {
+  return {
+    url: sanitizeText(url, 240),
+    ok: tone === 'ok',
+    ...(status !== undefined ? { status } : {}),
+    ...(error !== undefined ? { error: sanitizeText(error, 180) } : {}),
+    tone: sanitizeText(tone, 16),
+  };
+}
+
+/** Canonical tone for a final HTTP status: 2xx/3xx ok; 4xx/5xx error; anything
+ *  else (1xx, non-standard like 999) warn — counted in neither ok nor failed. */
+function toneForStatus(status: number): 'ok' | 'error' | 'warn' {
+  if (status >= 200 && status < 400) return 'ok';
+  if (status >= 400 && status < 600) return 'error';
+  return 'warn';
+}
 
 /**
- * One link-reachability attempt. Follows redirects MANUALLY (bounded) so a
- * public link that redirects into an internal host is never fetched (SSRF
- * pivot), while a public redirect chain is still followed to its final status
- * so a redirect that ends in a 404 is correctly reported as broken.
+ * Canonical probe: HEAD first; GET fallback on 405/403 or HEAD transport
+ * error; no retries. Redirects are followed manually up to 5 hops, re-running
+ * the full guard (lexical + DoH) on every hop; a hop into a blocked target is
+ * a `blocked` row. A chain still redirecting at the hop cap keeps its final
+ * 3xx status, which is canonically `ok`.
  */
-async function attemptLink(url: string, timeoutMs = 8000): Promise<LinkAttempt> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+async function probePublicUrl(url: string): Promise<LinkAuditResult> {
   const headOrGet = async (target: string): Promise<Response> => {
-    let res = await fetch(target, { method: 'HEAD', redirect: 'manual', signal: controller.signal });
-    if (res.status === 405 || res.status === 403) {
-      res = await fetch(target, { method: 'GET', redirect: 'manual', signal: controller.signal });
+    let response: Response;
+    try {
+      response = await auditFetch(target, 'HEAD');
+    } catch {
+      return auditFetch(target, 'GET');
     }
-    return res;
+    if (response.status === 405 || response.status === 403) {
+      return auditFetch(target, 'GET');
+    }
+    return response;
   };
   try {
     let current = url;
     let response = await headOrGet(current);
-    for (let hops = 0; response.status >= 300 && response.status < 400 && hops < 3; hops += 1) {
+    for (
+      let hops = 0;
+      response.status >= 300 && response.status < 400 && hops < LINK_AUDIT_MAX_REDIRECT_HOPS;
+      hops += 1
+    ) {
       const location = response.headers.get('location');
-      if (!location) break; // 3xx without Location — stop following; judged not-reachable by the 2xx check below.
+      if (!location) break; // 3xx without Location: final status, canonical ok.
       let target: URL;
       try {
         target = new URL(location, current);
       } catch {
-        return { ok: false, status: response.status, error: 'redirect invalido', retryable: false };
+        return linkAuditRow(url, response.status, 'redirect invalido', 'blocked');
       }
-      if (target.protocol !== 'http:' && target.protocol !== 'https:') {
-        return { ok: false, status: response.status, error: 'redirect nao-http', retryable: false };
-      }
-      if (isBlockedAuditHost(target.hostname)) {
-        return { ok: false, status: response.status, error: 'redirect para host bloqueado', retryable: false };
+      const rejection = await auditTargetRejectionReason(target);
+      if (rejection) {
+        return linkAuditRow(url, response.status, `redirect bloqueado: ${rejection}`, 'blocked');
       }
       current = target.toString();
       response = await headOrGet(current);
     }
-    // After resolving redirects ourselves, only a final 2xx confirms the link is
-    // reachable. A leftover 3xx (redirect without a Location header, or a chain
-    // still redirecting past the hop limit) is NOT confirmed and counts as broken.
-    const ok = response.status >= 200 && response.status < 300;
-    return { ok, status: response.status, retryable: !ok && isRetryableLinkStatus(response.status) };
+    return linkAuditRow(url, response.status, undefined, toneForStatus(response.status));
   } catch (error) {
+    return linkAuditRow(url, undefined, error instanceof Error ? error.message : String(error), 'error');
+  }
+}
+
+type LinkAuditAggregate = {
+  urlsFound: number;
+  checked: number;
+  ok: number;
+  failed: number;
+  rows: LinkAuditResult[];
+};
+
+/**
+ * Canonical run_link_audit: blocked/invalid candidates become `blocked` rows
+ * without any fetch; public candidates are probed. Desktop probes sequentially
+ * on a blocking client — the web probes in parallel (documented deviation for
+ * the Worker budget) but rows keep the canonical lexicographic order.
+ * `failed` counts error+blocked; `warn` rows count in neither ok nor failed.
+ */
+async function runLinkAudit(text: string): Promise<LinkAuditAggregate> {
+  const candidates = extractUrlCandidates(text);
+  const rows = await Promise.all(
+    candidates.map(async (candidate) => {
+      if (candidate.rejection) return linkAuditRow(candidate.url, undefined, candidate.rejection, 'blocked');
+      const dohRejection = await hostResolvesToBlockedIp(new URL(candidate.url).hostname.toLowerCase());
+      if (dohRejection) {
+        return linkAuditRow(
+          candidate.url,
+          undefined,
+          'dominio resolve para IP privado/reservado bloqueado por seguranca',
+          'blocked',
+        );
+      }
+      return probePublicUrl(candidate.url);
+    }),
+  );
+  const checked = candidates.filter((candidate) => candidate.rejection === null).length;
+  const ok = rows.filter((row) => row.tone === 'ok').length;
+  const failed = rows.filter((row) => row.tone === 'error' || row.tone === 'blocked').length;
+  return { urlsFound: candidates.length, checked, ok, failed, rows };
+}
+
+type FinalReleaseAuditFailure = {
+  reason: string;
+  context: Record<string, unknown> & { gate: string };
+};
+
+/**
+ * Canonical final_release_audit_failure: three short-circuiting stages —
+ * bibliographic integrity, link-audit capacity (> 30 unique URLs), HTTP link
+ * audit (failed > 0). All three funnel into the single paused_final_audit
+ * status (desktop PAUSED_FINAL_REFERENCE_AUDIT).
+ */
+async function finalReleaseAuditFailure(text: string): Promise<FinalReleaseAuditFailure | null> {
+  const bibliographicError = validateFinalReleaseCandidate(text);
+  if (bibliographicError) {
     return {
-      ok: false,
-      error: error instanceof Error ? sanitizeText(error.message, 240) : String(error),
-      retryable: true,
+      reason: bibliographicError,
+      context: { gate: 'bibliographic_integrity', policy: 'final_text_must_not_hide_unverified_references' },
     };
-  } finally {
-    clearTimeout(timer);
   }
-}
-
-async function checkOneLink(url: string): Promise<LinkAuditResult> {
-  // A blocked (internal/private/loopback) host is reported as broken WITHOUT any
-  // fetch — this is the single point that both prevents SSRF and surfaces an
-  // internal URL in the content as an audit failure (extractUrls no longer drops it).
-  try {
-    if (isBlockedAuditHost(new URL(url).hostname)) {
-      return { url, ok: false, error: 'host bloqueado' };
-    }
-  } catch {
-    return { url, ok: false, error: 'url invalida' };
+  const urlCount = countUniqueUrlCandidates(text);
+  if (urlCount > LINK_AUDIT_MAX_UNIQUE_URLS) {
+    return {
+      reason: 'final candidate exceeds link audit capacity',
+      context: {
+        gate: 'link_audit_capacity',
+        urls_found: urlCount,
+        max_urls: LINK_AUDIT_MAX_UNIQUE_URLS,
+        policy: 'final_text_must_not_contain_unaudited_public_links',
+      },
+    };
   }
-  // A single retry absorbs a momentary failure (timeout / network / 429 / 5xx)
-  // without giving a PERSISTENTLY broken link a free pass: if the retry also
-  // fails, the link is reported as broken and the session is blocked.
-  let attempt = await attemptLink(url);
-  if (!attempt.ok && attempt.retryable) {
-    attempt = await attemptLink(url);
+  const audit = await runLinkAudit(text);
+  if (audit.failed > 0) {
+    return {
+      reason: 'final candidate failed link audit',
+      context: {
+        gate: 'link_audit',
+        urls_found: audit.urlsFound,
+        checked: audit.checked,
+        ok: audit.ok,
+        failed: audit.failed,
+        rows: audit.rows,
+        policy: 'all_final_public_links_must_be_valid_before_release',
+      },
+    };
   }
-  return {
-    url,
-    ok: attempt.ok,
-    ...(attempt.status !== undefined ? { status: attempt.status } : {}),
-    ...(attempt.error !== undefined ? { error: attempt.error } : {}),
-  };
-}
-
-async function auditLinks(text: string): Promise<LinkAuditResult[]> {
-  const urls = extractUrls(text);
-  if (urls.length === 0) return [];
-  return Promise.all(urls.map((url) => checkOneLink(url)));
+  return null;
 }
 
 function buildDraftPrompt(input: MaestroResolvedSessionInput, runId: string): string {
@@ -2126,8 +2310,12 @@ export const maestroAiTestHooks = {
   closingTurnHasRequiredPriorReviews,
   selectSerialReviewerIndex,
   isBlockedAuditHost,
-  extractUrls,
-  checkOneLink,
+  extractUrlCandidates,
+  countUniqueUrlCandidates,
+  hostResolvesToBlockedIp,
+  probePublicUrl,
+  runLinkAudit,
+  finalReleaseAuditFailure,
   fetchWithTimeout,
   parseRetryAfterHeader,
   remainingSessionMs,
@@ -2286,6 +2474,26 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     return remaining === null ? PROVIDER_TIMEOUT_MS : Math.max(1, Math.min(PROVIDER_TIMEOUT_MS, remaining));
   };
   const callOptions = (): ProviderCallOptions => ({ timeoutMs: callTimeoutMs(), isCancelled });
+  // Plan D (documented web deviation): the desktop re-runs the full release
+  // audit (incl. HTTP) on every unchanged turn; on Workers that would multiply
+  // subrequests past the platform budget, so within ONE execution the audit
+  // result is cached per custody text.
+  const releaseAuditCache = new Map<string, FinalReleaseAuditFailure | null>();
+  const cachedFinalReleaseAuditFailure = async (text: string): Promise<FinalReleaseAuditFailure | null> => {
+    if (releaseAuditCache.has(text)) return releaseAuditCache.get(text) ?? null;
+    const failure = await finalReleaseAuditFailure(text);
+    releaseAuditCache.set(text, failure);
+    return failure;
+  };
+  // Machine-readable release-audit context for durable session events
+  // (canonical audit_context): rows are excluded from the summary because they
+  // travel in the event's own link_audit field.
+  const finalAuditEventField = (
+    failure: FinalReleaseAuditFailure,
+  ): { gate: string; reason: string; context: Record<string, unknown> } => {
+    const { rows: _rows, ...contextSummary } = failure.context;
+    return { gate: failure.context.gate, reason: failure.reason, context: contextSummary };
+  };
 
   try {
     logMaestro('info', 'session_started', { session_id: id, initial_agent: initialAgent, active_agents: activeAgents });
@@ -2298,40 +2506,20 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       return;
     }
     let currentText = '';
-    let currentLinkAudit: Awaited<ReturnType<typeof auditLinks>> = [];
     if (isResume) {
       // Canonical resume (limited recovery): custody text/author are restored,
       // the draft phase is skipped, and the review circuit restarts with empty
-      // approval/round accounting.
+      // approval/round accounting. Link auditing happens only at finalization
+      // attempts (Plan D canonical placement), not here.
       currentText = String(row.current_text);
       currentAuthor = sanitizeAgent(row.current_author ?? '', initialAgent);
-      currentLinkAudit = await auditLinks(currentText);
-      const brokenResumeLinks = currentLinkAudit.filter((result) => !result.ok);
       await pushEvent({
         at: nowIso(),
         agent: currentAuthor,
         role: 'draft',
-        status: brokenResumeLinks.length ? 'blocked' : 'running',
+        status: 'running',
         message: 'Session resumed: draft phase skipped, custody text recovered.',
-        link_audit: currentLinkAudit,
       });
-      if (brokenResumeLinks.length) {
-        await persistSession(
-          db,
-          id,
-          {
-            status: 'blocked_link_audit',
-            current_author: currentAuthor,
-            current_text: currentText,
-            observed_cost_usd: observedCost,
-            error: `Link audit blocked resumed custody text: ${brokenResumeLinks
-              .map((result) => `${result.url} (${result.status ?? result.error ?? 'invalid'})`)
-              .join('; ')}`,
-          },
-          { ifStatusIn: ['queued', 'running'] },
-        );
-        return;
-      }
       await persistSession(db, id, { status: 'running' }, { ifStatusIn: ['queued', 'running'] });
     } else {
       // Canonical draft fallback: the lead drafts first; an operational failure
@@ -2459,11 +2647,8 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       }
       currentText = draft.text;
       currentAuthor = draftAuthor;
-      currentLinkAudit = await auditLinks(currentText);
-      // M4: only a genuinely broken link (4xx other than 429) blocks the session.
-      // Transient failures (timeout / network / 429 / 5xx) must not terminate a
-      // paid session — they are logged but the run proceeds.
-      const brokenDraftLinks = currentLinkAudit.filter((result) => !result.ok);
+      // Plan D canonical placement: no per-draft link audit — links are audited
+      // only when a text attempts finalization (release audit stages 2-3).
       artifactTurn += 1;
       const draftArtifact = await createArtifact(db, {
         sessionId: id,
@@ -2471,16 +2656,16 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         turn: artifactTurn,
         agent: draftAuthor,
         role: 'draft',
-        status: brokenDraftLinks.length ? 'blocked' : 'ready',
+        status: 'ready',
         title: input.title,
         contentMd: currentText,
         revisionReport: JSON.stringify({
           reviewer: draftAuthor,
           role: 'initial_drafter',
-          status: brokenDraftLinks.length ? 'blocked' : 'ready',
+          status: 'ready',
           custody: 'created',
         }),
-        linkAudit: currentLinkAudit,
+        linkAudit: [],
         costUsd: draftCost,
         model: draft.model,
         previousArtifactId,
@@ -2490,31 +2675,11 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         at: nowIso(),
         agent: draftAuthor,
         role: 'draft',
-        status: brokenDraftLinks.length ? 'blocked' : 'ready',
-        message: brokenDraftLinks.length
-          ? `Initial draft produced with ${brokenDraftLinks.length} broken link(s).`
-          : 'Initial draft produced.',
+        status: 'ready',
+        message: 'Initial draft produced.',
         cost_usd: draftCost,
         model: draft.model,
-        link_audit: currentLinkAudit,
       });
-      if (brokenDraftLinks.length) {
-        await persistSession(
-          db,
-          id,
-          {
-            status: 'blocked_link_audit',
-            current_author: currentAuthor,
-            current_text: currentText,
-            observed_cost_usd: observedCost,
-            error: `Link audit blocked draft: ${brokenDraftLinks
-              .map((result) => `${result.url} (${result.status ?? result.error ?? 'invalid'})`)
-              .join('; ')}`,
-          },
-          { ifStatusIn: ['queued', 'running'] },
-        );
-        return;
-      }
       await persistSession(
         db,
         id,
@@ -2804,19 +2969,26 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           const revisedText = extractTagged(result.text, 'maestro_final_text');
           let effectiveStatus: 'READY' | 'NOT_READY' = status;
           let readyRejectedReason: string | null = null;
+          // Structured audit context (canonical audit_context) of the unchanged
+          // turn's release audit, propagated into the durable turn event.
+          let unchangedAuditFailure: FinalReleaseAuditFailure | null = null;
           let contractError = validateSerialTurnOutput(result.text, status, report, revisedText);
           if (!contractError && revisedText === null) {
-            // Desktop parity (unrevised-turn audit): a READY vote on a custody
-            // text that still fails the release gate is rewritten to NOT_READY
-            // without retry (ReadyRejected); NOT_READY without a corrective text
-            // is itself a contract violation and goes to corrective retry.
-            const custodyReleaseError = validateFinalReleaseCandidate(currentText);
-            if (status === 'READY' && custodyReleaseError) {
+            // Desktop parity (unrevised-turn audit): an unchanged turn is a
+            // finalization attempt, so it runs the FULL release audit
+            // (bibliographic -> capacity -> HTTP, Plan D). A READY vote on a
+            // custody text that fails is rewritten to NOT_READY without retry
+            // (ReadyRejected); NOT_READY without a corrective text takes the
+            // audit failure (or the unchanged-ban) to corrective retry.
+            const custodyReleaseFailure = await cachedFinalReleaseAuditFailure(currentText);
+            if (status === 'READY' && custodyReleaseFailure) {
               effectiveStatus = 'NOT_READY';
-              readyRejectedReason = custodyReleaseError;
+              readyRejectedReason = custodyReleaseFailure.reason;
+              unchangedAuditFailure = custodyReleaseFailure;
             } else if (status === 'NOT_READY') {
+              if (custodyReleaseFailure) unchangedAuditFailure = custodyReleaseFailure;
               contractError =
-                custodyReleaseError ??
+                custodyReleaseFailure?.reason ??
                 'NOT_READY unchanged is not a valid serial-review outcome: the reviewer must either return READY unchanged when no blocker remains, or return a revised complete text that resolves the concrete blocker.';
             }
           }
@@ -2864,6 +3036,14 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               message: `Reclassificado para CONTRACT_VIOLATION: ${sanitizeText(contractError, 300)}`,
               cost_usd: cost,
               model: result.model,
+              ...(unchangedAuditFailure
+                ? {
+                    final_audit: finalAuditEventField(unchangedAuditFailure),
+                    ...(unchangedAuditFailure.context.rows
+                      ? { link_audit: unchangedAuditFailure.context.rows as LinkAuditResult[] }
+                      : {}),
+                  }
+                : {}),
             });
             await persistSession(db, id, { observed_cost_usd: observedCost });
             if (retryCount <= MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN) {
@@ -2934,12 +3114,8 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             break;
           }
           const candidateText = revisedText && changedByReviewer ? revisedText : currentText;
-          // M4: re-audit only when the custody text actually changed. Unchanged
-          // text already passed the previous audit, so re-fetching its links only
-          // risks a transient failure killing an otherwise-valid session.
-          const linkAudit = changedByReviewer ? await auditLinks(candidateText) : currentLinkAudit;
-          if (changedByReviewer) currentLinkAudit = linkAudit;
-          const brokenLinks = linkAudit.filter((link) => !link.ok);
+          // Plan D canonical placement: revision turns carry no link audit —
+          // links are audited only when a text attempts finalization.
           artifactTurn += 1;
           const artifact = await createArtifact(db, {
             sessionId: id,
@@ -2947,43 +3123,16 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             turn: artifactTurn,
             agent: reviewer,
             role: 'revision',
-            status: brokenLinks.length ? 'blocked' : effectiveStatus.toLowerCase(),
+            status: effectiveStatus.toLowerCase(),
             title: input.title,
             contentMd: candidateText,
             revisionReport: report ?? '',
-            linkAudit,
+            linkAudit: [],
             costUsd: cost,
             model: result.model,
             previousArtifactId,
           });
           previousArtifactId = artifact.id;
-          if (brokenLinks.length) {
-            await pushEvent({
-              at: nowIso(),
-              agent: reviewer,
-              role: 'revision',
-              status: 'blocked',
-              message: `Automatic link audit blocked ${brokenLinks.length} broken link(s).`,
-              cost_usd: cost,
-              model: result.model,
-              link_audit: linkAudit,
-            });
-            await persistSession(
-              db,
-              id,
-              {
-                status: 'blocked_link_audit',
-                current_author: currentAuthor,
-                current_text: currentText,
-                observed_cost_usd: observedCost,
-                error: `Link audit blocked revision: ${brokenLinks
-                  .map((link) => `${link.url} (${link.status ?? link.error ?? 'invalid'})`)
-                  .join('; ')}`,
-              },
-              { ifStatusIn: ['queued', 'running'] },
-            );
-            return;
-          }
           // Desktop parity: ReadyRejected turns do not count as valid round
           // agents; every other accepted turn feeds the closure gating. Any
           // accepted turn is a clean provider response: outage streak resets.
@@ -3012,7 +3161,14 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
                 : 'Reviewer left custody unchanged.',
             cost_usd: cost,
             model: result.model,
-            link_audit: linkAudit,
+            ...(unchangedAuditFailure && readyRejectedReason
+              ? {
+                  final_audit: finalAuditEventField(unchangedAuditFailure),
+                  ...(unchangedAuditFailure.context.rows
+                    ? { link_audit: unchangedAuditFailure.context.rows as LinkAuditResult[] }
+                    : {}),
+                }
+              : {}),
           });
           // Do NOT re-assert status:'running' here. The session is already
           // 'running'; rewriting it would clobber a concurrent operator cancel
@@ -3035,15 +3191,34 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     }
 
     if (converged) {
-      // Desktop parity (final release audit, bibliographic stage): a
-      // unanimous version that still carries evidence markers or lacunae is
-      // not deliverable. Capacity/HTTP stages arrive with Plan D.
-      const finalGateError = validateFinalReleaseCandidate(currentText);
-      if (finalGateError) {
+      // Desktop parity (final release audit, all three canonical stages):
+      // bibliographic integrity -> link-audit capacity (> 30 unique URLs) ->
+      // HTTP link audit (any error/blocked row). A unanimous version that
+      // fails any stage is not deliverable and pauses for the operator.
+      // Canonical parity: the finalization gate re-runs the audit FRESH (the
+      // desktop has no cache here — a link that died between the last vote and
+      // finalization must still pause). The per-execution cache only serves
+      // the repeated unchanged-turn votes.
+      const finalGateFailure = await finalReleaseAuditFailure(currentText);
+      if (finalGateFailure) {
+        const auditRows = finalGateFailure.context.rows as LinkAuditResult[] | undefined;
+        // Canonical macro parity (pause_final_reference_audit!): the pause is
+        // logged with the FULL structured audit context, and the event carries
+        // a compact context summary (gate/policy/counts) plus the rows.
+        logMaestro('warn', 'session_final_reference_audit_blocked', {
+          session_id: id,
+          reason: finalGateFailure.reason,
+          audit: finalGateFailure.context,
+        });
         await pushEvent({
           at: nowIso(),
           status: 'blocked',
-          message: `Final release audit failed: ${sanitizeText(finalGateError, 300)}`,
+          message: `Final release audit failed (${finalGateFailure.context.gate}): ${sanitizeText(
+            finalGateFailure.reason,
+            300,
+          )}`,
+          final_audit: finalAuditEventField(finalGateFailure),
+          ...(auditRows ? { link_audit: auditRows } : {}),
         });
         await persistSession(
           db,
@@ -3054,7 +3229,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             current_text: currentText,
             observed_cost_usd: observedCost,
             events_json: JSON.stringify(events),
-            error: finalGateError,
+            error: finalGateFailure.reason,
           },
           { ifStatusIn: ['queued', 'running'] },
         );
