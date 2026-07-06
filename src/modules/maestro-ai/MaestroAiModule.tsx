@@ -205,18 +205,36 @@ const statusLabel: Record<string, string> = {
   queued: 'Na fila',
   running: 'Em execução',
   converged: 'Concluída',
-  blocked_cost: 'Bloqueada por custo',
-  blocked_time: 'Bloqueada por tempo',
+  paused_cost_limit: 'Pausada por custo',
+  paused_time_limit: 'Pausada por tempo',
   blocked_max_cycles: 'Sem unanimidade',
-  blocked_cycle_limit: 'Limite de turnos atingido',
-  blocked_round_incomplete: 'Rodada incompleta',
-  blocked_self_review: 'Auto-revisão bloqueada',
-  blocked_final_audit: 'Bloqueada na auditoria final',
+  paused_cycle_limit: 'Limite de turnos atingido',
+  paused_round_incomplete: 'Rodada incompleta',
+  paused_self_review: 'Auto-revisão bloqueada',
+  paused_final_audit: 'Pausada na auditoria final',
+  paused_reviewer_outage: 'Pausada por falha de revisor',
+  paused_draft_unavailable: 'Pausada sem rascunho inicial',
   blocked_revision_contract: 'Bloqueada por contrato',
   blocked_link_audit: 'Bloqueada por link inválido',
   blocked_cancelled: 'Cancelada',
   error: 'Erro',
 };
+
+// Mirror of the backend RESUMABLE_STATUSES: only converged is terminal.
+const RESUMABLE_STATUSES = new Set([
+  'paused_cost_limit',
+  'paused_time_limit',
+  'paused_cycle_limit',
+  'paused_round_incomplete',
+  'paused_final_audit',
+  'paused_self_review',
+  'paused_reviewer_outage',
+  'paused_draft_unavailable',
+  'blocked_cancelled',
+  'blocked_max_cycles',
+  'blocked_link_audit',
+  'error',
+]);
 
 function agentLabel(agent?: AgentKey | string | null): string {
   return AGENTS.find((item) => item.key === agent)?.label ?? String(agent || 'Maestro AI');
@@ -224,6 +242,10 @@ function agentLabel(agent?: AgentKey | string | null): string {
 
 function isRunning(status?: string): boolean {
   return status === 'queued' || status === 'running';
+}
+
+function isResumable(session?: { status?: string; final_text?: string | null } | null): boolean {
+  return Boolean(session?.status && RESUMABLE_STATUSES.has(session.status) && session.final_text == null);
 }
 
 function eventDate(value: string): string {
@@ -311,6 +333,7 @@ export function MaestroAiModule() {
   const [testingApis, setTestingApis] = useState(false);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [creatingPost, setCreatingPost] = useState(false);
   const [postEditorOpen, setPostEditorOpen] = useState(false);
   const [loadingArtifacts, setLoadingArtifacts] = useState(false);
@@ -626,6 +649,21 @@ export function MaestroAiModule() {
     }
   };
 
+  const resumeSession = async (sessionId: string) => {
+    setResuming(true);
+    try {
+      await readJson<{ ok: true; session: MaestroSession }>(
+        await fetch(`/api/maestro-ai/sessions/${encodeURIComponent(sessionId)}/resume`, { method: 'POST' }),
+      );
+      await loadSessions(true);
+      showNotification('Sessão retomada.', 'success');
+    } catch (error) {
+      showNotification(error instanceof Error ? error.message : 'Erro ao retomar sessão.', 'error');
+    } finally {
+      setResuming(false);
+    }
+  };
+
   const createMainSitePost = async (
     postTitle: string,
     author: string,
@@ -692,6 +730,16 @@ export function MaestroAiModule() {
               disabled={cancelling}
             >
               {cancelling ? <Loader2 size={14} className="spin" /> : <Ban size={14} />} Cancelar
+            </button>
+          )}
+          {selectedSession && isResumable(selectedSession) && (
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => void resumeSession(selectedSession.id)}
+              disabled={resuming}
+            >
+              {resuming ? <Loader2 size={14} className="spin" /> : <Play size={14} />} Retomar
             </button>
           )}
           <button type="button" className="ghost-button" onClick={() => void loadSessions()} disabled={loading}>

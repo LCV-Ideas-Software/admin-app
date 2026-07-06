@@ -833,9 +833,19 @@ function calculateObservedCost(result: ProviderCallResult, fallbackPrompt: strin
   return (inputTokens / 1_000_000) * inputRate + (outputTokens / 1_000_000) * outputRate + requestRate / 1000;
 }
 
-function runtimeLimitExceeded(startedAtMs: number, maxRuntimeMinutes?: number | null): boolean {
-  if (!Number.isFinite(Number(maxRuntimeMinutes)) || Number(maxRuntimeMinutes) <= 0) return false;
-  return Date.now() - startedAtMs > Number(maxRuntimeMinutes) * 60_000;
+// Canonical session time budget (editorial_inputs.rs:205-215 / session_orchestration.rs):
+// null = no limit; exhaustion is `remaining < 2s`, checked before the draft and
+// before every turn. The anchor is created_at on a fresh run and `now` on resume.
+const SESSION_TIME_EXHAUSTION_CUTOFF_MS = 2_000;
+
+function remainingSessionMs(anchorMs: number, maxRuntimeMinutes?: number | null): number | null {
+  if (!Number.isFinite(Number(maxRuntimeMinutes)) || Number(maxRuntimeMinutes) <= 0) return null;
+  return Math.max(0, anchorMs + Number(maxRuntimeMinutes) * 60_000 - Date.now());
+}
+
+function sessionTimeExhausted(anchorMs: number, maxRuntimeMinutes?: number | null): boolean {
+  const remaining = remainingSessionMs(anchorMs, maxRuntimeMinutes);
+  return remaining !== null && remaining < SESSION_TIME_EXHAUSTION_CUTOFF_MS;
 }
 
 // Rust char::is_whitespace / str::trim / split_whitespace use the Unicode
@@ -901,6 +911,9 @@ function isSubstantiveEditorialChange(before: string, after: string): boolean {
 // quoted/bare scalar scan with line/brace key-position rules).
 
 const MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN = 3;
+// Canonical escalation threshold: 3 consecutive operational turn failures pause
+// the session as paused_reviewer_outage (consecutive_reviewer_outage_rounds).
+const REVIEWER_OUTAGE_ESCALATION_THRESHOLD = 3;
 
 const RUST_WS_START = new RegExp(`^${RUST_WS_CLASS}+`);
 
@@ -1775,18 +1788,102 @@ async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit,
   timeoutMs = PROVIDER_TIMEOUT_MS,
+  externalSignal?: AbortSignal,
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onExternalAbort = () => controller.abort();
+  externalSignal?.addEventListener('abort', onExternalAbort);
+  if (externalSignal?.aborted) controller.abort();
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
+    if (externalSignal?.aborted) {
+      throw new ProviderCancelledError('Provider request aborted by session cancellation.', { cause: error });
+    }
     if (controller.signal.aborted) {
       throw new Error(`Provider request excedeu o tempo limite de ${Math.round(timeoutMs / 1000)}s.`, { cause: error });
     }
     throw error;
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener('abort', onExternalAbort);
+  }
+}
+
+// Canonical provider retry policy (provider_retry.rs): max 2 attempts; a network
+// error retries once after a 1500ms backoff; ONLY HTTP 429 retries, waiting
+// Retry-After (delta-seconds or HTTP-date, default 30s, cap 120s). Any other
+// status is returned as-is for normal classification. Waits are cancel-aware:
+// sliced sleeps (5s) polling the cooperative cancel check (web analogue of the
+// desktop CancellationToken).
+const PROVIDER_RETRY_MAX_ATTEMPTS = 2;
+const PROVIDER_RETRY_NETWORK_BACKOFF_MS = 1_500;
+const PROVIDER_RETRY_429_DEFAULT_SECS = 30;
+const PROVIDER_RETRY_429_CAP_SECS = 120;
+const CANCEL_POLL_SLICE_MS = 5_000;
+
+/** Web analogue of the desktop STOPPED_BY_USER interruption: the runner catches
+ *  this and returns silently without clobbering the canceller's terminal write. */
+class ProviderCancelledError extends Error {}
+
+function parseRetryAfterHeader(headers: Headers): number | null {
+  const value = headers.get('retry-after');
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  const dateMs = Date.parse(trimmed);
+  if (!Number.isNaN(dateMs)) return Math.max(0, Math.round((dateMs - Date.now()) / 1000));
+  return null;
+}
+
+/** Sleep for ms, polling isCancelled every slice. Returns true if cancelled mid-wait. */
+async function cancelAwareSleep(ms: number, isCancelled: () => Promise<boolean>): Promise<boolean> {
+  let waited = 0;
+  while (waited < ms) {
+    if (await isCancelled()) return true;
+    const step = Math.min(CANCEL_POLL_SLICE_MS, ms - waited);
+    await new Promise((resolve) => setTimeout(resolve, step));
+    waited += step;
+  }
+  return await isCancelled();
+}
+
+async function fetchProviderWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+  isCancelled: () => Promise<boolean>,
+): Promise<Response | 'cancelled'> {
+  for (let attempt = 1; ; attempt += 1) {
+    let response: Response;
+    // Abortive cancel (web analogue of the desktop CancellationToken): while the
+    // provider call is in flight, a poller watches the cooperative cancel check
+    // and aborts the request instead of letting it run to completion/timeout.
+    const cancelAbort = new AbortController();
+    const poller = setInterval(() => {
+      void isCancelled()
+        .then((cancelled) => {
+          if (cancelled) cancelAbort.abort();
+        })
+        .catch(() => {});
+    }, CANCEL_POLL_SLICE_MS);
+    try {
+      response = await fetchWithTimeout(input, init, timeoutMs, cancelAbort.signal);
+    } catch (error) {
+      if (error instanceof ProviderCancelledError) return 'cancelled';
+      if (attempt >= PROVIDER_RETRY_MAX_ATTEMPTS) throw error;
+      if (await cancelAwareSleep(PROVIDER_RETRY_NETWORK_BACKOFF_MS, isCancelled)) return 'cancelled';
+      continue;
+    } finally {
+      clearInterval(poller);
+    }
+    if (response.status !== 429 || attempt >= PROVIDER_RETRY_MAX_ATTEMPTS) return response;
+    const retryAfterSecs = Math.min(
+      parseRetryAfterHeader(response.headers) ?? PROVIDER_RETRY_429_DEFAULT_SECS,
+      PROVIDER_RETRY_429_CAP_SECS,
+    );
+    if (await cancelAwareSleep(retryAfterSecs * 1_000, isCancelled)) return 'cancelled';
   }
 }
 
@@ -1806,6 +1903,13 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
   }
 }
 
+interface ProviderCallOptions {
+  /** Per-call timeout, canonically min(120s, remaining session time). */
+  timeoutMs?: number;
+  /** Cooperative cancel check; enables retry waits + in-flight abort polling. */
+  isCancelled?: () => Promise<boolean>;
+}
+
 async function callProvider(
   env: MaestroAiEnv,
   agent: ProviderKey,
@@ -1813,6 +1917,7 @@ async function callProvider(
   models: Partial<Record<ProviderKey, string>>,
   maxOutputTokens = MAX_OUTPUT_TOKENS,
   systemOverride?: string,
+  options?: ProviderCallOptions,
 ): Promise<ProviderCallResult> {
   const apiKey = secretForAgent(env, agent);
   if (!apiKey) throw new Error(`${AGENT_LABELS[agent]} API key is not configured in admin-motor secrets.`);
@@ -1821,7 +1926,11 @@ async function callProvider(
     systemOverride ??
     `You are ${AGENT_LABELS[agent]} inside Maestro Editorial AI. Internal coordination must be in en_US. Operator-facing deliverables must be in pt_BR. Follow the current Maestro role contract exactly.`;
 
+  const timeoutMs = options?.timeoutMs ?? PROVIDER_TIMEOUT_MS;
   if (agent === 'gemini') {
+    // Documented web deviation: the Gemini SDK exposes no Response/AbortSignal,
+    // so this path keeps the deadline-coupled timeout but has no 429 retry or
+    // in-flight abort (the cooperative cancel checks around the call cover it).
     const ai = new GoogleGenAI({ apiKey });
     const response = await withTimeout(
       ai.models.generateContent({
@@ -1829,7 +1938,7 @@ async function callProvider(
         contents: `${system}\n\n${prompt}`,
         config: { temperature: 0.2, topP: 0.9, maxOutputTokens },
       }),
-      PROVIDER_TIMEOUT_MS,
+      timeoutMs,
       `${AGENT_LABELS[agent]} request`,
     );
     return {
@@ -1841,7 +1950,12 @@ async function callProvider(
   }
 
   const request = buildProviderHttpRequest(agent, apiKey, model, system, prompt, maxOutputTokens);
-  const response = await fetchWithTimeout(request.endpoint, request.init);
+  const response = options?.isCancelled
+    ? await fetchProviderWithRetry(request.endpoint, request.init, timeoutMs, options.isCancelled)
+    : await fetchWithTimeout(request.endpoint, request.init, timeoutMs);
+  if (response === 'cancelled') {
+    throw new ProviderCancelledError('Provider call cancelled by cooperative session cancellation.');
+  }
   const parsed = await parseProviderResponse(response);
 
   if (agent === 'claude') {
@@ -1975,6 +2089,25 @@ function publicApiHealthResult(
   };
 }
 
+// Plan C (canonical resume): only convergence is terminal — everything else can
+// be resumed. The runner re-validates every limit with a fresh per-execution
+// scope (cost baseline, `now` time anchor) and recovers only custody
+// text/author; approvals and round accounting restart empty.
+const RESUMABLE_STATUSES = new Set([
+  'paused_cost_limit',
+  'paused_time_limit',
+  'paused_cycle_limit',
+  'paused_round_incomplete',
+  'paused_final_audit',
+  'paused_self_review',
+  'paused_reviewer_outage',
+  'paused_draft_unavailable',
+  'blocked_cancelled',
+  'blocked_max_cycles',
+  'blocked_link_audit',
+  'error',
+]);
+
 export const maestroAiTestHooks = {
   buildProviderHttpRequest,
   buildRevisionPrompt,
@@ -1996,9 +2129,14 @@ export const maestroAiTestHooks = {
   extractUrls,
   checkOneLink,
   fetchWithTimeout,
+  parseRetryAfterHeader,
+  remainingSessionMs,
+  sessionTimeExhausted,
+  fetchProviderWithRetry,
   persistSession,
   runSession,
   sweepStaleSessions,
+  RESUMABLE_STATUSES,
 };
 
 async function parseProviderResponse(response: Response): Promise<ProviderResponsePayload> {
@@ -2044,13 +2182,17 @@ const PERSIST_COLUMNS: ReadonlyArray<keyof SessionPatch> = [
  * nullable column be set explicitly to null (the old `?? row.x` merge could
  * never persist null for final_text). Column names come from a fixed allowlist;
  * values are always bound.
+ *
+ * Returns whether the UPDATE modified a row (D1 meta.changes): a CAS-guarded
+ * write that lost the race reports false so callers can refuse follow-up
+ * actions (e.g. the resume handler must not dispatch a second runner).
  */
 async function persistSession(
   db: D1Database,
   id: string,
   patch: SessionPatch,
   opts: { ifStatusIn?: readonly string[] } = {},
-): Promise<void> {
+): Promise<boolean> {
   const assignments: string[] = [];
   const values: unknown[] = [];
   for (const column of PERSIST_COLUMNS) {
@@ -2059,7 +2201,7 @@ async function persistSession(
       values.push(patch[column]);
     }
   }
-  if (assignments.length === 0) return;
+  if (assignments.length === 0) return false;
   assignments.push('updated_at = ?');
   values.push(nowIso());
   let where = 'id = ?';
@@ -2071,10 +2213,13 @@ async function persistSession(
     where += ` AND status IN (${opts.ifStatusIn.map(() => '?').join(', ')})`;
     values.push(...opts.ifStatusIn);
   }
-  await db
+  const result = (await db
     .prepare(`UPDATE maestro_ai_sessions SET ${assignments.join(', ')} WHERE ${where}`)
     .bind(...values)
-    .run();
+    .run()) as { meta?: { changes?: number } } | undefined;
+  // D1 reports modified rows in meta.changes; a store that omits it (older
+  // mocks) is treated as applied to preserve unconditional-write semantics.
+  return (result?.meta?.changes ?? 1) > 0;
 }
 
 /** True when the runner must stop: the row is gone or no longer in a runnable
@@ -2123,7 +2268,24 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
   let artifactTurn = 0;
   let previousArtifactId: string | null = null;
   const correctiveRetryCounts = new Map<string, number>();
-  const startedAtMs = Date.now();
+  // ── Plan C: resumable lifecycle ──
+  // Resume detection (canonical limited recovery: custody text + author). A
+  // resumed run skips the draft phase and re-enters the review circuit.
+  const isResume = Boolean(row.current_text?.trim() && row.current_author);
+  // Canonical time anchor: created_at on a fresh run, `now` on resume.
+  const createdAtMs = Date.parse(row.created_at);
+  const timeAnchorMs = isResume || !Number.isFinite(createdAtMs) ? Date.now() : createdAtMs;
+  // Canonical cost_scope: the cost cap applies per runner execution, so a
+  // resumed run guards against (observed - baseline), not lifetime spend.
+  const costBaseline = observedCost;
+  // Canonical consecutive operational-outage counter (3-strike escalation).
+  let consecutiveOutages = 0;
+  const isCancelled = async () => runnerStopRequested(await loadSession(db, id));
+  const callTimeoutMs = () => {
+    const remaining = remainingSessionMs(timeAnchorMs, input.max_runtime_minutes);
+    return remaining === null ? PROVIDER_TIMEOUT_MS : Math.max(1, Math.min(PROVIDER_TIMEOUT_MS, remaining));
+  };
+  const callOptions = (): ProviderCallOptions => ({ timeoutMs: callTimeoutMs(), isCancelled });
 
   try {
     logMaestro('info', 'session_started', { session_id: id, initial_agent: initialAgent, active_agents: activeAgents });
@@ -2135,107 +2297,236 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       logMaestro('warn', 'session_interrupted', { session_id: id, status: preDraftLive?.status });
       return;
     }
-    const draftPrompt = buildDraftPrompt(input, id);
-    const draftRates = input.rates?.[initialAgent] ?? {};
-    const projectedDraftCost = estimateCost(draftPrompt, MAX_OUTPUT_TOKENS, draftRates);
-    if (!Number.isFinite(projectedDraftCost) || observedCost + projectedDraftCost > Number(input.max_cost_usd)) {
-      throw new Error(`Cost guard blocked initial draft before provider call (${AGENT_LABELS[initialAgent]}).`);
-    }
-    await pushEvent({
-      at: nowIso(),
-      agent: initialAgent,
-      role: 'draft',
-      status: 'running',
-      message: 'Draft call started.',
-    });
-    // Re-check immediately before the paid call: a cancel can land during the
-    // `await pushEvent` above, and the provider request must not run (cost) for a
-    // session that is no longer queued/running. This load is the last statement
-    // before callProvider, so no await can interpose a stale read.
-    const beforeCallLive = await loadSession(db, id);
-    if (runnerStopRequested(beforeCallLive)) {
-      logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeCallLive?.status });
-      return;
-    }
-    const draft = await callProvider(env, initialAgent, draftPrompt, input.models ?? {});
-    const draftCost = calculateObservedCost(draft, draftPrompt, draftRates);
-    observedCost += draftCost;
-    // Cooperative cancellation (post-draft): if the session was cancelled while
-    // the initial provider call was in flight, do not write the draft
-    // artifact/events for the now-cancelled session.
-    const postDraftLive = await loadSession(db, id);
-    if (runnerStopRequested(postDraftLive)) {
-      logMaestro('warn', 'session_interrupted', { session_id: id, status: postDraftLive?.status });
-      return;
-    }
-    let currentText = draft.text;
-    // M3: an empty provider response (e.g. a thinking-only completion) must not
-    // silently start a paid review chain over a blank text. Fail fast.
-    if (!currentText.trim()) {
-      throw new Error(`O provedor ${AGENT_LABELS[initialAgent]} retornou um rascunho vazio (texto em branco).`);
-    }
-    let currentLinkAudit = await auditLinks(currentText);
-    // M4: only a genuinely broken link (4xx other than 429) blocks the session.
-    // Transient failures (timeout / network / 429 / 5xx) must not terminate a
-    // paid session — they are logged but the run proceeds.
-    const brokenDraftLinks = currentLinkAudit.filter((result) => !result.ok);
-    artifactTurn += 1;
-    const draftArtifact = await createArtifact(db, {
-      sessionId: id,
-      cycle: 0,
-      turn: artifactTurn,
-      agent: initialAgent,
-      role: 'draft',
-      status: brokenDraftLinks.length ? 'blocked' : 'ready',
-      title: input.title,
-      contentMd: currentText,
-      revisionReport: JSON.stringify({
-        reviewer: initialAgent,
-        role: 'initial_drafter',
+    let currentText = '';
+    let currentLinkAudit: Awaited<ReturnType<typeof auditLinks>> = [];
+    if (isResume) {
+      // Canonical resume (limited recovery): custody text/author are restored,
+      // the draft phase is skipped, and the review circuit restarts with empty
+      // approval/round accounting.
+      currentText = String(row.current_text);
+      currentAuthor = sanitizeAgent(row.current_author ?? '', initialAgent);
+      currentLinkAudit = await auditLinks(currentText);
+      const brokenResumeLinks = currentLinkAudit.filter((result) => !result.ok);
+      await pushEvent({
+        at: nowIso(),
+        agent: currentAuthor,
+        role: 'draft',
+        status: brokenResumeLinks.length ? 'blocked' : 'running',
+        message: 'Session resumed: draft phase skipped, custody text recovered.',
+        link_audit: currentLinkAudit,
+      });
+      if (brokenResumeLinks.length) {
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'blocked_link_audit',
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+            error: `Link audit blocked resumed custody text: ${brokenResumeLinks
+              .map((result) => `${result.url} (${result.status ?? result.error ?? 'invalid'})`)
+              .join('; ')}`,
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
+      await persistSession(db, id, { status: 'running' }, { ifStatusIn: ['queued', 'running'] });
+    } else {
+      // Canonical draft fallback: the lead drafts first; an operational failure
+      // or empty draft falls through to the next active agent; cost/time
+      // exhaustion pauses; all agents failing pauses as draft-unavailable.
+      const draftPrompt = buildDraftPrompt(input, id);
+      const draftAgents = [initialAgent, ...activeAgents.filter((agent) => agent !== initialAgent)];
+      let draftAuthor: ProviderKey | null = null;
+      let draft: ProviderCallResult | null = null;
+      let draftCost = 0;
+      for (const draftAgent of draftAgents) {
+        if (sessionTimeExhausted(timeAnchorMs, input.max_runtime_minutes)) {
+          await pushEvent({
+            at: nowIso(),
+            agent: draftAgent,
+            role: 'draft',
+            status: 'blocked',
+            message: `Time guard blocked draft call before ${AGENT_LABELS[draftAgent]}.`,
+          });
+          await persistSession(
+            db,
+            id,
+            { status: 'paused_time_limit', observed_cost_usd: observedCost },
+            { ifStatusIn: ['queued', 'running'] },
+          );
+          return;
+        }
+        const draftRates = input.rates?.[draftAgent] ?? {};
+        const projectedDraftCost = estimateCost(draftPrompt, MAX_OUTPUT_TOKENS, draftRates);
+        if (
+          !Number.isFinite(projectedDraftCost) ||
+          observedCost - costBaseline + projectedDraftCost > Number(input.max_cost_usd)
+        ) {
+          await pushEvent({
+            at: nowIso(),
+            agent: draftAgent,
+            role: 'draft',
+            status: 'blocked',
+            message: `Cost guard blocked draft call before ${AGENT_LABELS[draftAgent]}.`,
+            cost_usd: projectedDraftCost,
+          });
+          await persistSession(
+            db,
+            id,
+            { status: 'paused_cost_limit', observed_cost_usd: observedCost },
+            { ifStatusIn: ['queued', 'running'] },
+          );
+          return;
+        }
+        await pushEvent({
+          at: nowIso(),
+          agent: draftAgent,
+          role: 'draft',
+          status: 'running',
+          message: draftAgent === initialAgent ? 'Draft call started.' : 'Draft fallback call started.',
+        });
+        // Re-check immediately before the paid call: a cancel can land during the
+        // `await pushEvent` above, and the provider request must not run (cost) for a
+        // session that is no longer queued/running. This load is the last statement
+        // before callProvider, so no await can interpose a stale read.
+        const beforeCallLive = await loadSession(db, id);
+        if (runnerStopRequested(beforeCallLive)) {
+          logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeCallLive?.status });
+          return;
+        }
+        try {
+          const attempt = await callProvider(
+            env,
+            draftAgent,
+            draftPrompt,
+            input.models ?? {},
+            MAX_OUTPUT_TOKENS,
+            undefined,
+            callOptions(),
+          );
+          draftCost = calculateObservedCost(attempt, draftPrompt, draftRates);
+          observedCost += draftCost;
+          // M3: an empty provider response (e.g. a thinking-only completion) is a
+          // draft failure, not a silent blank custody — fall through to the next agent.
+          if (!attempt.text.trim()) {
+            throw new Error(`O provedor ${AGENT_LABELS[draftAgent]} retornou um rascunho vazio (texto em branco).`);
+          }
+          draft = attempt;
+          draftAuthor = draftAgent;
+        } catch (error) {
+          if (error instanceof ProviderCancelledError) {
+            logMaestro('warn', 'session_interrupted', { session_id: id, reason: 'cancelled_during_draft' });
+            return;
+          }
+          await pushEvent({
+            at: nowIso(),
+            agent: draftAgent,
+            role: 'draft',
+            status: 'blocked',
+            message: `Draft attempt failed with ${AGENT_LABELS[draftAgent]}: ${sanitizeText(
+              error instanceof Error ? error.message : String(error),
+              300,
+            )}. Trying next active agent.`,
+          });
+          await persistSession(db, id, { observed_cost_usd: observedCost });
+          continue;
+        }
+        break;
+      }
+      if (!draft || !draftAuthor) {
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'paused_draft_unavailable',
+            observed_cost_usd: observedCost,
+            error: 'All active agents failed to produce an initial draft.',
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
+      // Cooperative cancellation (post-draft): if the session was cancelled while
+      // the initial provider call was in flight, do not write the draft
+      // artifact/events for the now-cancelled session.
+      const postDraftLive = await loadSession(db, id);
+      if (runnerStopRequested(postDraftLive)) {
+        logMaestro('warn', 'session_interrupted', { session_id: id, status: postDraftLive?.status });
+        return;
+      }
+      currentText = draft.text;
+      currentAuthor = draftAuthor;
+      currentLinkAudit = await auditLinks(currentText);
+      // M4: only a genuinely broken link (4xx other than 429) blocks the session.
+      // Transient failures (timeout / network / 429 / 5xx) must not terminate a
+      // paid session — they are logged but the run proceeds.
+      const brokenDraftLinks = currentLinkAudit.filter((result) => !result.ok);
+      artifactTurn += 1;
+      const draftArtifact = await createArtifact(db, {
+        sessionId: id,
+        cycle: 0,
+        turn: artifactTurn,
+        agent: draftAuthor,
+        role: 'draft',
         status: brokenDraftLinks.length ? 'blocked' : 'ready',
-        custody: 'created',
-      }),
-      linkAudit: currentLinkAudit,
-      costUsd: draftCost,
-      model: draft.model,
-      previousArtifactId,
-    });
-    previousArtifactId = draftArtifact.id;
-    await pushEvent({
-      at: nowIso(),
-      agent: initialAgent,
-      role: 'draft',
-      status: brokenDraftLinks.length ? 'blocked' : 'ready',
-      message: brokenDraftLinks.length
-        ? `Initial draft produced with ${brokenDraftLinks.length} broken link(s).`
-        : 'Initial draft produced.',
-      cost_usd: draftCost,
-      model: draft.model,
-      link_audit: currentLinkAudit,
-    });
-    if (brokenDraftLinks.length) {
+        title: input.title,
+        contentMd: currentText,
+        revisionReport: JSON.stringify({
+          reviewer: draftAuthor,
+          role: 'initial_drafter',
+          status: brokenDraftLinks.length ? 'blocked' : 'ready',
+          custody: 'created',
+        }),
+        linkAudit: currentLinkAudit,
+        costUsd: draftCost,
+        model: draft.model,
+        previousArtifactId,
+      });
+      previousArtifactId = draftArtifact.id;
+      await pushEvent({
+        at: nowIso(),
+        agent: draftAuthor,
+        role: 'draft',
+        status: brokenDraftLinks.length ? 'blocked' : 'ready',
+        message: brokenDraftLinks.length
+          ? `Initial draft produced with ${brokenDraftLinks.length} broken link(s).`
+          : 'Initial draft produced.',
+        cost_usd: draftCost,
+        model: draft.model,
+        link_audit: currentLinkAudit,
+      });
+      if (brokenDraftLinks.length) {
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'blocked_link_audit',
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+            error: `Link audit blocked draft: ${brokenDraftLinks
+              .map((result) => `${result.url} (${result.status ?? result.error ?? 'invalid'})`)
+              .join('; ')}`,
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
       await persistSession(
         db,
         id,
         {
-          status: 'blocked_link_audit',
+          status: 'running',
           current_author: currentAuthor,
           current_text: currentText,
           observed_cost_usd: observedCost,
-          error: `Link audit blocked draft: ${brokenDraftLinks
-            .map((result) => `${result.url} (${result.status ?? result.error ?? 'invalid'})`)
-            .join('; ')}`,
         },
         { ifStatusIn: ['queued', 'running'] },
       );
-      return;
     }
-    await persistSession(
-      db,
-      id,
-      { status: 'running', current_author: currentAuthor, current_text: currentText, observed_cost_usd: observedCost },
-      { ifStatusIn: ['queued', 'running'] },
-    );
 
     const order = [
       ...activeAgents.slice(activeAgents.indexOf(initialAgent) + 1),
@@ -2247,8 +2538,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     // changes, contract/lock violations and quality-guard blocks clear it.
     // The session finalizes the moment every non-author agent of the rotation
     // is in the set (mid-round capable), and a global serial-turn cap bounds
-    // deliberation. Resumable pause states arrive with Plan C; until then the
-    // pause analogs below are terminal web statuses.
+    // deliberation. Since Plan C the paused_* statuses are resumable.
     let converged = false;
     const maxCycles = Math.max(1, Math.min(5, Number(input.max_cycles || 2)));
     const roundTurnCount = order.length;
@@ -2258,6 +2548,54 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     let serialTurns = 0;
     const validRoundAgents = new Set<string>();
     const stableApprovals = new Set<string>();
+    // ── Plan C: operational turn failures (canonical 3-strike escalation) ──
+    // A provider/network/timeout failure or an exhausted corrective-retry turn
+    // does NOT kill the session: it skips the turn (stableApprovals PRESERVED —
+    // only violations clear it), and three consecutive operational failures
+    // escalate to paused_reviewer_outage. A clean turn resets the counter. A
+    // failure on the round's closing turn pauses as paused_round_incomplete.
+    const handleOperationalFailure = async (reviewer: ProviderKey, message: string): Promise<'stop' | 'skip'> => {
+      consecutiveOutages += 1;
+      await pushEvent({
+        at: nowIso(),
+        agent: reviewer,
+        role: 'revision',
+        status: 'blocked',
+        message: `Operational turn failure (${consecutiveOutages}/${REVIEWER_OUTAGE_ESCALATION_THRESHOLD}): ${sanitizeText(message, 300)}`,
+      });
+      if (consecutiveOutages >= REVIEWER_OUTAGE_ESCALATION_THRESHOLD) {
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'paused_reviewer_outage',
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+            error: `${REVIEWER_OUTAGE_ESCALATION_THRESHOLD} consecutive reviewer turns failed operationally; session paused for operator action.`,
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return 'stop';
+      }
+      roundTurnIndex += 1;
+      if (roundTurnIndex >= roundTurnCount) {
+        await persistSession(
+          db,
+          id,
+          {
+            status: 'paused_round_incomplete',
+            current_author: currentAuthor,
+            current_text: currentText,
+            observed_cost_usd: observedCost,
+            error: 'Operational failure at the end of the round; review circuit incomplete.',
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return 'stop';
+      }
+      return 'skip';
+    };
     for (;;) {
       // Cooperative cancellation: an operator cancel (or sweeper) flips the
       // stored status to a terminal state; detect it between turns and stop
@@ -2287,7 +2625,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           db,
           id,
           {
-            status: 'blocked_cycle_limit',
+            status: 'paused_cycle_limit',
             current_author: currentAuthor,
             current_text: currentText,
             observed_cost_usd: observedCost,
@@ -2334,7 +2672,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           db,
           id,
           {
-            status: 'blocked_self_review',
+            status: 'paused_self_review',
             current_author: currentAuthor,
             current_text: currentText,
             observed_cost_usd: observedCost,
@@ -2344,7 +2682,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         );
         return;
       }
-      if (runtimeLimitExceeded(startedAtMs, input.max_runtime_minutes)) {
+      if (sessionTimeExhausted(timeAnchorMs, input.max_runtime_minutes)) {
         await pushEvent({
           at: nowIso(),
           agent: reviewer,
@@ -2355,7 +2693,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         await persistSession(
           db,
           id,
-          { status: 'blocked_time', observed_cost_usd: observedCost },
+          { status: 'paused_time_limit', observed_cost_usd: observedCost },
           { ifStatusIn: ['queued', 'running'] },
         );
         return;
@@ -2366,7 +2704,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         // reviewer up to MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN times, with a
         // Mandatory Corrective Retry section appended to the prompt; exhaustion
         // skips the turn, and an exhausted turn at the end of the round pauses
-        // the circuit as blocked_round_incomplete.
+        // the circuit as paused_round_incomplete.
         for (;;) {
           await pushEvent({
             at: nowIso(),
@@ -2390,7 +2728,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             })) + (correctiveRetryCount > 0 ? correctiveRetrySection(correctiveRetryCount) : '');
           const rates = input.rates?.[reviewer] ?? {};
           const projected = estimateCost(prompt, MAX_OUTPUT_TOKENS, rates);
-          if (!Number.isFinite(projected) || observedCost + projected > Number(input.max_cost_usd)) {
+          if (!Number.isFinite(projected) || observedCost - costBaseline + projected > Number(input.max_cost_usd)) {
             await pushEvent({
               at: nowIso(),
               agent: reviewer,
@@ -2402,7 +2740,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             await persistSession(
               db,
               id,
-              { status: 'blocked_cost', observed_cost_usd: observedCost },
+              { status: 'paused_cost_limit', observed_cost_usd: observedCost },
               { ifStatusIn: ['queued', 'running'] },
             );
             return;
@@ -2415,7 +2753,31 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeReviewLive?.status });
             return;
           }
-          const result = await callProvider(env, reviewer, prompt, input.models ?? {});
+          let result: ProviderCallResult;
+          try {
+            result = await callProvider(
+              env,
+              reviewer,
+              prompt,
+              input.models ?? {},
+              MAX_OUTPUT_TOKENS,
+              undefined,
+              callOptions(),
+            );
+          } catch (error) {
+            if (error instanceof ProviderCancelledError) {
+              logMaestro('warn', 'session_interrupted', { session_id: id, reason: 'cancelled_during_review' });
+              return;
+            }
+            // Canonical operational turn failure: skip the turn instead of
+            // killing the session; three consecutive failures escalate.
+            const action = await handleOperationalFailure(
+              reviewer,
+              error instanceof Error ? error.message : String(error),
+            );
+            if (action === 'stop') return;
+            break;
+          }
           const cost = calculateObservedCost(result, prompt, rates);
           observedCost += cost;
           // Cooperative cancellation (post-call): if cancelled while the reviewer
@@ -2427,9 +2789,15 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             return;
           }
           // M3: an empty reviewer response is a provider failure, not a silent
-          // NOT_READY vote. Fail fast instead of recording a meaningless turn.
+          // NOT_READY vote — an operational turn failure, not a session error.
           if (!result.text.trim()) {
-            throw new Error(`O provedor ${AGENT_LABELS[reviewer]} retornou uma revisao vazia (texto em branco).`);
+            await persistSession(db, id, { observed_cost_usd: observedCost });
+            const action = await handleOperationalFailure(
+              reviewer,
+              `O provedor ${AGENT_LABELS[reviewer]} retornou uma revisao vazia (texto em branco).`,
+            );
+            if (action === 'stop') return;
+            break;
           }
           const status = extractStatus(result.text);
           const report = extractTagged(result.text, 'maestro_revision_report');
@@ -2502,31 +2870,14 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               correctiveRetryCount = retryCount;
               continue;
             }
-            await pushEvent({
-              at: nowIso(),
-              agent: reviewer,
-              role: 'revision',
-              status: 'blocked',
-              message: 'Corrective retries exhausted; reviewer turn skipped without a vote.',
-            });
-            roundTurnIndex += 1;
-            if (roundTurnIndex >= roundTurnCount) {
-              // Desktop parity: a round whose circuit cannot complete pauses
-              // instead of silently wrapping (PAUSED_ROUND_INCOMPLETE analog).
-              await persistSession(
-                db,
-                id,
-                {
-                  status: 'blocked_round_incomplete',
-                  current_author: currentAuthor,
-                  current_text: currentText,
-                  observed_cost_usd: observedCost,
-                  error: 'Corrective retries exhausted at the end of the round; review circuit incomplete.',
-                },
-                { ifStatusIn: ['queued', 'running'] },
-              );
-              return;
-            }
+            // Desktop parity: an exhausted corrective-retry turn is an
+            // operational failure — it feeds the same 3-strike escalation and
+            // pauses the circuit when it lands on the round's closing turn.
+            const action = await handleOperationalFailure(
+              reviewer,
+              'Corrective retries exhausted; reviewer turn skipped without a vote.',
+            );
+            if (action === 'stop') return;
             break;
           }
           const changedByReviewer = Boolean(revisedText && isSubstantiveEditorialChange(currentText, revisedText));
@@ -2569,7 +2920,9 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             });
             await persistSession(db, id, { observed_cost_usd: observedCost });
             // Desktop parity: the rejected revision clears the stable set and
-            // the turn does NOT count as a valid round agent.
+            // the turn does NOT count as a valid round agent. The provider
+            // itself responded, so the operational-outage streak resets.
+            consecutiveOutages = 0;
             stableApprovals.clear();
             roundTurnIndex += 1;
             if (roundTurnIndex >= roundTurnCount) {
@@ -2632,7 +2985,9 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             return;
           }
           // Desktop parity: ReadyRejected turns do not count as valid round
-          // agents; every other accepted turn feeds the closure gating.
+          // agents; every other accepted turn feeds the closure gating. Any
+          // accepted turn is a clean provider response: outage streak resets.
+          consecutiveOutages = 0;
           if (readyRejectedReason === null) validRoundAgents.add(reviewer);
           if (revisedText && changedByReviewer) {
             // Substantive revision: custody transfers and the new version must
@@ -2694,7 +3049,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           db,
           id,
           {
-            status: 'blocked_final_audit',
+            status: 'paused_final_audit',
             current_author: currentAuthor,
             current_text: currentText,
             observed_cost_usd: observedCost,
@@ -3151,6 +3506,43 @@ export async function handleMaestroAiSessionCancelPost(context: RequestContext, 
     return json({ ok: true, session: next ? publicSession(next) : null });
   } catch (error) {
     return json({ ok: false, error: error instanceof Error ? error.message : 'Erro ao cancelar Maestro AI.' }, 500);
+  }
+}
+
+export async function handleMaestroAiSessionResumePost(context: RequestContext, sessionId: string): Promise<Response> {
+  try {
+    const db = requireDb(context.env);
+    await ensureSchema(db);
+    const row = await loadSession(db, sessionId);
+    if (!row) return json({ ok: false, error: 'Sessao Maestro AI nao encontrada.' }, 404);
+    if (ACTIVE_SESSION_STATUSES.has(row.status)) {
+      return json({ ok: false, error: 'Sessao ainda ativa; nada a retomar.' }, 409);
+    }
+    if (!RESUMABLE_STATUSES.has(row.status) || row.final_text != null) {
+      return json({ ok: false, error: 'Sessao concluida; nada a retomar.' }, 409);
+    }
+    const events = parseJson<SessionEvent[]>(row.events_json, []);
+    events.push({ at: nowIso(), status: 'running', message: 'Sessao retomada pelo operador.' });
+    const applied = await persistSession(
+      db,
+      sessionId,
+      { status: 'queued', events_json: JSON.stringify(events), error: null },
+      { ifStatusIn: [row.status] },
+    );
+    if (!applied) {
+      // CAS lost: a concurrent resume/cancel changed the row after our read.
+      // The winner (if any) already dispatched a runner — do NOT dispatch another.
+      return json({ ok: false, error: 'Sessao mudou de estado durante a retomada; tente novamente.' }, 409);
+    }
+    const resumed = await loadSession(db, sessionId);
+    if (resumed?.status !== 'queued') {
+      return json({ ok: false, error: 'Sessao mudou de estado durante a retomada; tente novamente.' }, 409);
+    }
+    const runPromise = runSession(db, context.env, sessionId);
+    context.waitUntil?.(runPromise);
+    return json({ ok: true, session: publicSession(resumed) }, 202);
+  } catch (error) {
+    return json({ ok: false, error: error instanceof Error ? error.message : 'Erro ao retomar Maestro AI.' }, 500);
   }
 }
 
