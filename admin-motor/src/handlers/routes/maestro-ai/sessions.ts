@@ -2491,7 +2491,10 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
   const finalAuditEventField = (
     failure: FinalReleaseAuditFailure,
   ): { gate: string; reason: string; context: Record<string, unknown> } => {
-    const { rows: _rows, ...contextSummary } = failure.context;
+    const contextSummary: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(failure.context)) {
+      if (key !== 'rows') contextSummary[key] = value;
+    }
     return { gate: failure.context.gate, reason: failure.reason, context: contextSummary };
   };
 
