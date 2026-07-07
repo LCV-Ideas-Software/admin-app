@@ -61,7 +61,7 @@
     "@tiptap/suggestion": "^3.27.1",
     "@tiptap/y-tiptap": "^3.0.6",
     "dompurify": "^3.4.11",
-    "hono": "^4.12.27",
+    "hono": "^4.12.28",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.23.0",
     "mammoth": "^1.12.0",
