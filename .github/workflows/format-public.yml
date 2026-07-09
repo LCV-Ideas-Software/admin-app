@@ -29,6 +29,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Check public page formatting
         run: npm run format:public:check
+      - name: Lint application
+        run: npm run lint
     timeout-minutes: 15
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
