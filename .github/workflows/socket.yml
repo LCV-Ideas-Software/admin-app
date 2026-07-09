@@ -39,7 +39,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Socket CLI
-        run: python -m pip install --disable-pip-version-check --require-hashes -r .github/socketsecurity-requirements.txt
+        run: python -m pip install --disable-pip-version-check --require-hashes -r socketsecurity-requirements.txt
 
       - name: Validate Socket API key
         env:
