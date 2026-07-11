@@ -24,7 +24,14 @@ const mapa = {
   local_nascimento: 'São Paulo',
   dados_astronomica: null,
   dados_tropical: null,
-  dados_globais: null,
+  dados_globais: JSON.stringify({
+    tatwa: {
+      schemaVersion: '2.0.0',
+      principal: 'Akasha (Éter)',
+      sub: 'Vayu (Ar)',
+      calculationMode: 'fixed',
+    },
+  }),
   dados_posicionais_v2: JSON.stringify(dadosPosicionaisV2),
   analise_ia: null,
   created_at: '2026-07-11T15:30:45Z',
@@ -90,6 +97,12 @@ describe('AstrologoModule dados posicionais v2', () => {
     expect(within(regent).getByText(/#3 Sitael/)).toBeInTheDocument();
     expect(within(regent).getByText(/Quinário tropical da posição do Sol/)).toBeInTheDocument();
     expect(regent).toHaveClass('astro-regent-card');
+    const tatwaSection = screen.getByText('Forças Globais: Tatwas').closest('.field-group');
+    expect(tatwaSection).not.toBeNull();
+    expect(within(tatwaSection as HTMLElement).getByText('Akasha (Éter)')).toBeInTheDocument();
+    expect(within(tatwaSection as HTMLElement).getByText('Vayu (Ar)')).toBeInTheDocument();
+    expect(within(tatwaSection as HTMLElement).getByText('Ordem fixa — Akasha primeiro')).toBeInTheDocument();
+    expect(within(tatwaSection as HTMLElement).queryByText('fixed')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/\b(?:sun|moon|mercury|venus|mars|jupiter|saturn|uranus|neptune|pluto)\b/),
     ).not.toBeInTheDocument();

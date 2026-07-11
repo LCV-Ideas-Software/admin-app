@@ -23,6 +23,7 @@ import {
   parseDadosPosicionaisV2,
 } from '../../lib/astrological-position-v2';
 import { generateAstrologicalReport } from '../../lib/astrological-report';
+import { formatTatwaCalculationModePtBr, formatTatwaDurationPtBr, normalizeTatwa } from '../../lib/astrological-tatwa';
 import { useModuleConfig } from '../../lib/useModuleConfig';
 
 type MapaResumo = {
@@ -31,6 +32,8 @@ type MapaResumo = {
   dataNascimento: string;
   status: 'novo' | 'analisado' | 'indisponivel';
 };
+
+const formatSignNamePtBr = (value: string): string => (value === 'Ophiuchus' ? 'Ofiúco' : value);
 
 type ApiResponse = {
   ok: boolean;
@@ -632,6 +635,7 @@ export function AstrologoModule() {
     } catch {
       /* ignorar parsing errors */
     }
+    const tatwa = normalizeTatwa(globais);
 
     const nome = mapa.nome || mapa.query?.nome || 'Consulente';
     const dataNascimento = mapa.data_nascimento || mapa.query?.dataNascimento || '';
@@ -666,19 +670,48 @@ export function AstrologoModule() {
         {globais && (
           <div className="astro-section">
             <div className="form-grid">
-              <div className="field-group">
-                <label>Forças Globais: Tatwas</label>
-                <div className="astro-kv-list">
-                  <div className="astro-kv">
-                    <span className="astro-kv__label">Principal</span>
-                    <strong>{String(globais.tatwa?.principal || '')}</strong>
-                  </div>
-                  <div className="astro-kv">
-                    <span className="astro-kv__label">Sub-tatwa</span>
-                    <strong>{String(globais.tatwa?.sub || '')}</strong>
+              {tatwa && (
+                <div className="field-group">
+                  <label>Forças Globais: Tatwas</label>
+                  <div className="astro-kv-list">
+                    <div className="astro-kv">
+                      <span className="astro-kv__label">Principal</span>
+                      <strong>{tatwa.principal}</strong>
+                    </div>
+                    <div className="astro-kv">
+                      <span className="astro-kv__label">Subtatwa</span>
+                      <strong>{tatwa.sub}</strong>
+                    </div>
+                    <div className="astro-kv">
+                      <span className="astro-kv__label">Método</span>
+                      <strong>{formatTatwaCalculationModePtBr(tatwa)}</strong>
+                    </div>
+                    {tatwa.nearMainBoundary && tatwa.mainBoundaryMarginSec !== null && (
+                      <div className="astro-kv">
+                        <span className="astro-kv__label">Transição próxima</span>
+                        <strong>
+                          Margem de {formatTatwaDurationPtBr(tatwa.mainBoundaryMarginSec)}
+                          {tatwa.adjacent
+                            ? ` · Possibilidade adjacente: ${tatwa.adjacent.principal} / ${tatwa.adjacent.sub}`
+                            : ''}
+                        </strong>
+                      </div>
+                    )}
+                    {tatwa.subIsIndicative && (
+                      <div className="astro-kv">
+                        <span className="astro-kv__label">Precisão</span>
+                        <strong>Subtatwa indicativo e sensível ao horário registrado</strong>
+                      </div>
+                    )}
+                    {tatwa.provenanceAvailable && (
+                      <div className="astro-kv">
+                        <span className="astro-kv__label">Proveniência</span>
+                        <strong>Âncora astronômica registrada</strong>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
               <div className="field-group">
                 <label>Forças Globais: Numerologia</label>
                 <div className="astro-kv-list">
@@ -705,14 +738,14 @@ export function AstrologoModule() {
             <h5 className="astro-section__title astro-section__title--tropical">Módulo I: Astrológico Tropical</h5>
             {tropical.astrologia?.length > 0 && (
               <>
-                <label>Astrologia ({tropical.astrologia.length > 12 ? '13 Signos' : '12 Signos'})</label>
+                <label>Astrologia (12 signos)</label>
                 <div className="astro-grid astro-grid--4">
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {tropical.astrologia.map((a: any) => (
                     <div key={`trop-astro-${a.astro}`} className="astro-card">
                       <span className="astro-card__label">{a.astro}</span>
                       <span className="astro-card__value">
-                        {a.simbolo} {a.signo}
+                        {a.simbolo} {formatSignNamePtBr(a.signo)}
                       </span>
                     </div>
                   ))}
@@ -744,14 +777,14 @@ export function AstrologoModule() {
             </h5>
             {astronomica.astrologia?.length > 0 && (
               <>
-                <label>Astrologia ({astronomica.astrologia.length > 12 ? '13 Signos' : '12 Signos'})</label>
+                <label>Astrologia (13 constelações)</label>
                 <div className="astro-grid astro-grid--4">
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {astronomica.astrologia.map((a: any) => (
                     <div key={`ast-astro-${a.astro}`} className="astro-card">
                       <span className="astro-card__label">{a.astro}</span>
                       <span className="astro-card__value">
-                        {a.simbolo} {a.signo}
+                        {a.simbolo} {formatSignNamePtBr(a.signo)}
                       </span>
                     </div>
                   ))}

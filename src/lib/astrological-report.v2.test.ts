@@ -21,6 +21,103 @@ const legacyMapa = {
 };
 
 describe('astrological-report v2', () => {
+  it('identifica no texto e no HTML um Tatwa produzido pelo método atual', () => {
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      dados_globais: JSON.stringify({
+        tatwa: {
+          schemaVersion: '2.0.0',
+          principal: 'Akasha (Éter)',
+          sub: 'Vayu (Ar)',
+          calculationMode: 'fixed',
+          anchor: {
+            birthInstantUtc: '1993-05-21T00:12:00Z',
+            sunriseInstantUtc: '1993-05-20T09:20:43.155Z',
+            timeZoneIana: 'America/Sao_Paulo',
+            latitudeDeg: -22.90642,
+            longitudeDeg: -43.18223,
+          },
+        },
+      }),
+    });
+
+    expect(report.text).toContain('Principal: *Akasha (Éter)*');
+    expect(report.text).toContain('Subtatwa: *Vayu (Ar)*');
+    expect(report.text).toContain('Método: *Ordem fixa — Akasha primeiro*');
+    expect(report.html).toContain('Akasha (Éter)');
+    expect(report.html).toContain('Vayu (Ar)');
+    expect(report.html).toContain('Ordem fixa — Akasha primeiro');
+    expect(report.text).toContain('Proveniência: âncora astronômica registrada');
+    expect(report.html).toContain('Proveniência: âncora astronômica registrada');
+    expect(report.text).not.toContain('fixed');
+    expect(report.html).not.toContain('fixed');
+  });
+
+  it('identifica um Tatwa legado explicitamente marcado', () => {
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      dados_globais: JSON.stringify({
+        tatwa: {
+          principal: 'Vayu (Ar)',
+          sub: 'Vayu (Ar)',
+          calculationMode: 'legacy-rulingFirst',
+        },
+      }),
+    });
+
+    expect(report.text).toContain('Método: *Ordem pelo principal — Tatwa principal primeiro*');
+    expect(report.html).toContain('Ordem pelo principal — Tatwa principal primeiro');
+    expect(report.text).not.toContain('legacy-rulingFirst');
+    expect(report.html).not.toContain('legacy-rulingFirst');
+  });
+
+  it('identifica como legado inferido um Tatwa anterior ao marcador', () => {
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      dados_globais: JSON.stringify({
+        tatwa: {
+          principal: 'Tejas (Fogo)',
+          sub: 'Apas (Água)',
+        },
+      }),
+    });
+
+    expect(report.text).toContain('Método: *Registro legado — ordem pelo principal*');
+    expect(report.html).toContain('Registro legado — ordem pelo principal');
+    expect(report.text).toContain('O subtatwa é indicativo');
+    expect(report.html).toContain('O subtatwa é indicativo');
+  });
+
+  it('não converte um modo explícito desconhecido em legado', () => {
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      dados_globais: JSON.stringify({
+        tatwa: {
+          principal: 'Apas (Água)',
+          sub: 'Prithvi (Terra)',
+          calculationMode: 'future-mode',
+        },
+      }),
+    });
+
+    expect(report.text).toContain('Método: *Método de cálculo não identificado*');
+    expect(report.html).toContain('Método de cálculo não identificado');
+    expect(report.text).not.toContain('future-mode');
+    expect(report.html).not.toContain('future-mode');
+  });
+
+  it('ignora um Tatwa malformado sem impedir a geração do relatório', () => {
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      dados_globais: JSON.stringify({ tatwa: { principal: 'Akasha (Éter)' } }),
+    });
+
+    expect(report.text).not.toContain('*Tatwas:*');
+    expect(report.html).not.toContain('Forças Globais: Tatwas');
+    expect(report.text).toContain('Conteúdo legado preservado.');
+    expect(report.html).toContain('Conteúdo legado preservado.');
+  });
+
   it('acrescenta os dez planetas e a falange após o conteúdo legado, sem grau IAU interno', () => {
     const dadosPosicionaisV2 = createDadosPosicionaisV2Fixture();
     const report = generateAstrologicalReport({

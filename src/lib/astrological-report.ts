@@ -22,6 +22,12 @@ import {
   PLANET_LABEL_BY_ID,
   parseDadosPosicionaisV2,
 } from './astrological-position-v2';
+import {
+  formatTatwaCalculationModePtBr,
+  formatTatwaDurationPtBr,
+  type NormalizedTatwa,
+  normalizeTatwa,
+} from './astrological-tatwa';
 
 // ─── Types (paridade com astrologo-frontend) ──────────────────────
 interface AstroData {
@@ -35,13 +41,14 @@ interface UmbandaData {
   simbolo: string;
 }
 interface DadosGlobais {
-  tatwa: { principal: string; sub: string };
-  numerologia: { expressao: number; caminhoVida: number; vibracaoHora: number };
+  tatwa?: unknown;
+  numerologia?: { expressao: number; caminhoVida: number; vibracaoHora: number };
 }
 interface DadosSistema {
   astrologia: AstroData[];
   umbanda: UmbandaData[];
 }
+const formatSignNamePtBr = (value: string): string => (value === 'Ophiuchus' ? 'Ofiúco' : value);
 
 interface MapaDetalhado {
   id: string;
@@ -360,6 +367,7 @@ const renderPositionalHtml = (dados: DadosPosicionaisV2, boxShadow: string): str
 function gerarTextoRelatorio(
   mapa: MapaDetalhado,
   globais: DadosGlobais | null,
+  tatwa: NormalizedTatwa | null,
   tropical: DadosSistema | null,
   astronomica: DadosSistema | null,
   analiseIa: string | null,
@@ -376,24 +384,42 @@ function gerarTextoRelatorio(
     t += `*Data de nascimento informada — mapa legado:* ${formatarData(mapa.data_nascimento)}\n`;
   }
 
-  if (globais) {
+  if (tatwa || globais?.numerologia) {
     t += divider;
     t += `*🌬️ FORÇAS GLOBAIS*\n\n`;
-    t += `*Tatwas:*\n`;
-    t += `  • Principal: *${globais.tatwa.principal}*\n`;
-    t += `  • Sub-tatwa: *${globais.tatwa.sub}*\n\n`;
-    t += `*Numerologia:*\n`;
-    t += `  • Expressão: *${globais.numerologia.expressao}*\n`;
-    t += `  • Caminho da Vida: *${globais.numerologia.caminhoVida}*\n`;
-    t += `  • Vibração da Hora: *${globais.numerologia.vibracaoHora}*\n`;
+    if (tatwa) {
+      t += `*Tatwas:*\n`;
+      t += `  • Principal: *${tatwa.principal}*\n`;
+      t += `  • Subtatwa: *${tatwa.sub}*\n`;
+      t += `  • Método: *${formatTatwaCalculationModePtBr(tatwa)}*\n`;
+      if (tatwa.nearMainBoundary && tatwa.mainBoundaryMarginSec !== null) {
+        t += `  • Atenção: resultado próximo de uma transição (${formatTatwaDurationPtBr(tatwa.mainBoundaryMarginSec)}).\n`;
+        if (tatwa.adjacent) {
+          t += `  • Possibilidade adjacente: *${tatwa.adjacent.principal} / ${tatwa.adjacent.sub}*\n`;
+        }
+      }
+      if (tatwa.subIsIndicative) {
+        t += `  • O subtatwa é indicativo e sensível à precisão do horário registrado.\n`;
+      }
+      if (tatwa.provenanceAvailable) {
+        t += `  • Proveniência: âncora astronômica registrada pelo aplicativo de origem.\n`;
+      }
+      t += `\n`;
+    }
+    if (globais?.numerologia) {
+      t += `*Numerologia:*\n`;
+      t += `  • Expressão: *${globais.numerologia.expressao}*\n`;
+      t += `  • Caminho da Vida: *${globais.numerologia.caminhoVida}*\n`;
+      t += `  • Vibração da Hora: *${globais.numerologia.vibracaoHora}*\n`;
+    }
   }
 
   const blocoTexto = (dados: DadosSistema): string => {
     let texto = `\n*Astrologia:*\n`;
-    if (dados.astrologia[0]) texto += `  • ☀️ Sol: *${dados.astrologia[0].signo}*\n`;
-    if (dados.astrologia[1]) texto += `  • ⬆️ Ascendente: *${dados.astrologia[1].signo}*\n`;
-    if (dados.astrologia[2]) texto += `  • 🌙 Lua: *${dados.astrologia[2].signo}*\n`;
-    if (dados.astrologia[3]) texto += `  • 🔭 Meio do Céu: *${dados.astrologia[3].signo}*\n\n`;
+    if (dados.astrologia[0]) texto += `  • ☀️ Sol: *${formatSignNamePtBr(dados.astrologia[0].signo)}*\n`;
+    if (dados.astrologia[1]) texto += `  • ⬆️ Ascendente: *${formatSignNamePtBr(dados.astrologia[1].signo)}*\n`;
+    if (dados.astrologia[2]) texto += `  • 🌙 Lua: *${formatSignNamePtBr(dados.astrologia[2].signo)}*\n`;
+    if (dados.astrologia[3]) texto += `  • 🔭 Meio do Céu: *${formatSignNamePtBr(dados.astrologia[3].signo)}*\n\n`;
     texto += `*Umbanda:*\n`;
     if (dados.umbanda[0]) texto += `  • 👑 Coroa (Orixá Ancestral): *${dados.umbanda[0].orixa}*\n`;
     if (dados.umbanda[1]) texto += `  • 🌊 Adjuntó (Orixá de Frente): *${dados.umbanda[1].orixa}*\n`;
@@ -407,17 +433,17 @@ function gerarTextoRelatorio(
 
   if (tropical) {
     t += divider;
-    t += `*🌞 MÓDULO I: ASTROLÓGICO TROPICAL (A PERSONA)*\n`;
+    t += `*🌞 MÓDULO I: ASTROLÓGICO TROPICAL*\n`;
     t += blocoTexto(tropical);
   }
 
   t += divider;
-  t += `*✨ AGORA, A VERDADE OCULTA... ✨*\n\n`;
-  t += `_O módulo tropical acima revelou a sua máscara terrena (Persona). Desfaça a ilusão sazonal e contemple abaixo a sua *verdadeira assinatura estelar*._\n`;
+  t += `*✨ DUAS PERSPECTIVAS, UM MESMO NASCIMENTO ✨*\n\n`;
+  t += `_O módulo tropical organiza o zodíaco pelo ciclo sazonal; o resumo constelacional usa 13 faixas de referência aproximadas ao longo da eclíptica. Quando disponíveis, os dados posicionais detalhados fazem a classificação pelas regiões oficiais da IAU._\n`;
 
   if (astronomica) {
     t += divider;
-    t += `*⭐ MÓDULO II: ASTRONÔMICO CONSTELACIONAL (A ALMA)*\n`;
+    t += `*⭐ MÓDULO II: ASTRONÔMICO CONSTELACIONAL*\n`;
     t += blocoTexto(astronomica);
   }
 
@@ -445,6 +471,7 @@ function gerarTextoRelatorio(
 function gerarHtmlRelatorio(
   mapa: MapaDetalhado,
   globais: DadosGlobais | null,
+  tatwa: NormalizedTatwa | null,
   tropical: DadosSistema | null,
   astronomica: DadosSistema | null,
   analiseIa: string | null,
@@ -461,7 +488,7 @@ function gerarHtmlRelatorio(
         (a) => `
     <div style="background-color: #ffffff; padding: 12px; border-radius: 12px; border: 1px solid #f1f5f9; ${boxShadow} text-align: left;">
       <p style="font-size: 11px; color: #64748b; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">${a.astro}</p>
-      <p style="font-size: 15px; color: #1e293b; margin: 0; font-weight: bold;">${a.simbolo} ${a.signo}</p>
+      <p style="font-size: 15px; color: #1e293b; margin: 0; font-weight: bold;">${a.simbolo} ${formatSignNamePtBr(a.signo)}</p>
     </div>
   `,
       )
@@ -501,7 +528,7 @@ function gerarHtmlRelatorio(
       <div style="margin-top: 40px; padding-top: 40px; border-top: 1px solid ${borderTopColor};">
         <h2 style="font-size: 28px; font-weight: 900; color: ${titleColor}; margin: 0 0 32px 0;">${titulo}</h2>
         <div style="background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); padding: 32px; border-radius: 24px; border: 1px solid #ffffff; ${boxShadow} margin-bottom: 32px;">
-          <h3 style="font-size: 20px; font-weight: bold; color: #1e293b; margin: 0 0 24px 0; padding-bottom: 12px; border-bottom: 1px solid #dadce0;">I. Astrologia (${isTropical ? '12 Signos' : '13 Signos'})</h3>
+          <h3 style="font-size: 20px; font-weight: bold; color: #1e293b; margin: 0 0 24px 0; padding-bottom: 12px; border-bottom: 1px solid #dadce0;">I. Astrologia (${isTropical ? '12 signos' : '13 constelações'})</h3>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px;">
             ${blocoAstrologiaHtml(dadosAstrologia)}
           </div>
@@ -559,16 +586,41 @@ function gerarHtmlRelatorio(
       </div>
 
       ${
-        globais
+        tatwa || globais?.numerologia
           ? `
       <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px;">
+        ${
+          tatwa
+            ? `
         <div style="background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); padding: 24px; border-radius: 24px; border: 1px solid #ffffff; ${boxShadow}">
           <h3 style="font-size: 20px; font-weight: bold; color: #2563eb; margin: 0 0 16px 0; padding-bottom: 12px; border-bottom: 1px solid #dadce0;">🌬️ Forças Globais: Tatwas</h3>
           <div style="font-size: 16px; color: #334155;">
-            <div style="display: flex; justify-content: space-between; padding: 12px; background-color: #f8fafc; border-radius: 8px; margin-bottom: 8px;"><span>Principal</span> <strong style="color: #1e293b;">${globais.tatwa.principal}</strong></div>
-            <div style="display: flex; justify-content: space-between; padding: 12px; background-color: #f8fafc; border-radius: 8px;"><span>Sub-tatwa</span> <strong style="color: #1e293b;">${globais.tatwa.sub}</strong></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px; background-color: #f8fafc; border-radius: 8px; margin-bottom: 8px;"><span>Principal</span> <strong style="color: #1e293b;">${escapeHtml(tatwa.principal)}</strong></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px; background-color: #f8fafc; border-radius: 8px; margin-bottom: 8px;"><span>Subtatwa</span> <strong style="color: #1e293b;">${escapeHtml(tatwa.sub)}</strong></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px; background-color: #f8fafc; border-radius: 8px;"><span>Método</span> <strong style="color: #1e293b;">${escapeHtml(formatTatwaCalculationModePtBr(tatwa))}</strong></div>
+            ${
+              tatwa.nearMainBoundary && tatwa.mainBoundaryMarginSec !== null
+                ? `<div style="margin-top: 8px; padding: 10px 12px; background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; color: #92400e;"><strong>Atenção:</strong> resultado a ${formatTatwaDurationPtBr(tatwa.mainBoundaryMarginSec)} de uma transição.${tatwa.adjacent ? ` Possibilidade adjacente: ${escapeHtml(tatwa.adjacent.principal)} / ${escapeHtml(tatwa.adjacent.sub)}.` : ''}</div>`
+                : ''
+            }
+            ${
+              tatwa.subIsIndicative
+                ? '<div style="margin-top: 8px; padding: 10px 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; color: #475569;">O subtatwa é indicativo e sensível à precisão do horário registrado.</div>'
+                : ''
+            }
+            ${
+              tatwa.provenanceAvailable
+                ? '<div style="margin-top: 8px; padding: 10px 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46;">Proveniência: âncora astronômica registrada pelo aplicativo de origem.</div>'
+                : ''
+            }
           </div>
         </div>
+        `
+            : ''
+        }
+        ${
+          globais?.numerologia
+            ? `
         <div style="background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); padding: 24px; border-radius: 24px; border: 1px solid #ffffff; ${boxShadow}">
           <h3 style="font-size: 20px; font-weight: bold; color: #2563eb; margin: 0 0 16px 0; padding-bottom: 12px; border-bottom: 1px solid #dadce0;">#️⃣ Forças Globais: Numerologia</h3>
           <div style="font-size: 16px; color: #334155;">
@@ -577,6 +629,9 @@ function gerarHtmlRelatorio(
             <div style="display: flex; justify-content: space-between; padding: 12px; background-color: #f8fafc; border-radius: 8px;"><span>Hora</span> <strong style="color: #1e293b;">${globais.numerologia.vibracaoHora}</strong></div>
           </div>
         </div>
+        `
+            : ''
+        }
       </div>
       `
           : ''
@@ -588,8 +643,8 @@ function gerarHtmlRelatorio(
         <div style="position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(251, 146, 60, 0.2), rgba(99, 102, 241, 0.2), rgba(52, 211, 153, 0.2)); border-radius: 24px; filter: blur(20px);"></div>
         <div style="position: relative; background-color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); padding: 40px; border-radius: 24px; ${boxShadow}">
           <p style="font-size: 32px; margin: 0 0 12px 0;">✨</p>
-          <h3 style="font-size: 24px; font-weight: 900; color: #1a73e8; margin: 0 0 8px 0;">Agora, a Verdade Oculta!</h3>
-          <p style="font-size: 16px; color: #475569; margin: 0; max-width: 500px; margin-left: auto; margin-right: auto;">O módulo tropical acima revelou a sua <strong>máscara terrena (Persona)</strong>. Desfaça a ilusão sazonal e contemple abaixo a sua <strong>verdadeira assinatura estelar</strong>.</p>
+          <h3 style="font-size: 24px; font-weight: 900; color: #1a73e8; margin: 0 0 8px 0;">Duas perspectivas, um mesmo nascimento</h3>
+          <p style="font-size: 16px; color: #475569; margin: 0; max-width: 500px; margin-left: auto; margin-right: auto;">O módulo tropical organiza o zodíaco pelo ciclo sazonal. O resumo constelacional usa 13 faixas de referência aproximadas ao longo da eclíptica; quando disponíveis, os dados posicionais detalhados classificam pelas regiões oficiais da IAU.</p>
         </div>
       </div>
 
@@ -631,12 +686,13 @@ function gerarHtmlRelatorio(
 
 export function generateAstrologicalReport(mapa: MapaDetalhado): GeneratedReport {
   const globais = safeParseJson<DadosGlobais>(mapa.dados_globais);
+  const tatwa = normalizeTatwa(globais);
   const tropical = safeParseJson<DadosSistema>(mapa.dados_tropical);
   const astronomica = safeParseJson<DadosSistema>(mapa.dados_astronomica);
   const positional = parseDadosPosicionaisV2(mapa.dados_posicionais_v2 ?? mapa.dadosPosicionaisV2, mapa.id);
 
-  const htmlContent = gerarHtmlRelatorio(mapa, globais, tropical, astronomica, mapa.analise_ia, positional);
-  const textContent = gerarTextoRelatorio(mapa, globais, tropical, astronomica, mapa.analise_ia, positional);
+  const htmlContent = gerarHtmlRelatorio(mapa, globais, tatwa, tropical, astronomica, mapa.analise_ia, positional);
+  const textContent = gerarTextoRelatorio(mapa, globais, tatwa, tropical, astronomica, mapa.analise_ia, positional);
 
   // Summary from AI or fallback
   let summary: string;

@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [v02.12.00] - 2026-07-11
+
+### Adicionado
+
+- **Astrólogo — contrato Tatwa v2**: leitura defensiva de `calculationMode`, margens, possibilidade adjacente e proveniência, sem recalcular valores persistidos pelo `astrologo-app`.
+- **Perspectivas identificadas em pt-BR**: tela, relatório de texto, HTML e e-mail distinguem **Ordem fixa — Akasha primeiro**, **Ordem pelo principal — Tatwa principal primeiro**, registros legados inferidos e métodos desconhecidos.
+- **Comunicação de precisão**: mapas conhecidos informam que o subtatwa é indicativo; mapas próximos de uma transição mostram a margem e a combinação adjacente quando disponível.
+
+### Corrigido
+
+- Payload ausente, JSON malformado, par Tatwa inválido ou marcador desconhecido não derruba o detalhe nem é relabelado silenciosamente como legado.
+- Rótulo `Subtatwa`, capitalização brasileira e narrativa neutra entre os módulos Tropical e Astronômico foram uniformizados na tela e nos relatórios.
+
+### Preservado
+
+- `dados_globais` continua sendo consumido como JSON serializado em `TEXT`; nenhuma migração, alteração de tabela ou recomputação administrativa é necessária.
+
 ## [v02.11.00] - 2026-07-11
 
 ### Adicionado
