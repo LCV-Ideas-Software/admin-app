@@ -34,7 +34,15 @@ describe('astrological-report v2', () => {
     );
     expect(report.text).toContain('Sol: 12°20\'44" de Áries | Constelação IAU: Áries (Ari) | Casa Placidus 1');
     expect(report.text).toContain('Anjo #3: Sitael');
+    expect(report.text).toContain('ANJO REGENTE DO CONSULENTE');
+    expect(report.text).toContain('Anjo #3: Sitael');
+    expect(report.text).toContain('Critério: quinário tropical da posição do Sol');
     expect(report.text).toContain('Falange angélica');
+    expect(report.text).toContain('CÚSPIDES DAS 12 CASAS PLACIDUS');
+    expect(report.text).toContain('Casa 12: 0°00\'00" de Peixes');
+    expect(report.text).toContain('ÂNGULOS DO MAPA');
+    expect(report.text).toContain('Ascendente: 15°30\'00" de Áries');
+    expect(report.text).toContain('Meio do Céu: 15°15\'00" de Câncer');
     expect(report.text).toContain('Calculado em 11/07/2026 às 12:30:45 — Hora oficial de Brasília');
     expect(report.text).not.toMatch(/grau(?:s)? (?:na|dentro da) constelação/i);
 
@@ -42,7 +50,35 @@ describe('astrological-report v2', () => {
       report.html.indexOf('Posições planetárias e correspondências angélicas'),
     );
     expect(report.html).toContain('<bdi lang="he" dir="rtl">והו</bdi>');
+    expect(report.html).toContain('Anjo regente do consulente');
+    expect(report.html).toContain('Quinário tropical da posição do Sol');
+    expect(report.html).toContain('Cúspides das 12 Casas Placidus');
+    expect(report.html).toContain('Ângulos do mapa');
+    expect(report.html).toContain('#db2777');
+    expect(report.text).not.toMatch(/\b(?:sun|moon|mercury|venus|mars|jupiter|saturn|uranus|neptune|pluto)\b/);
+    expect(report.html).not.toMatch(/\b(?:sun|moon|mercury|venus|mars|jupiter|saturn|uranus|neptune|pluto)\b/);
+    expect(report.text).not.toMatch(/urn:astrologo|iau-roman|mayhem-shem|America\/Sao_Paulo/);
+    expect(report.html).not.toMatch(/urn:astrologo|iau-roman|mayhem-shem|America\/Sao_Paulo/);
     expect(report.html).not.toContain('5fc61d188c19097709c4674f756da5b2.jpg');
+  });
+
+  it('usa o instante v2 em Brasília no cabeçalho, sem exibir como nascimento o horário civil cru', () => {
+    const dadosPosicionaisV2 = createDadosPosicionaisV2Fixture();
+    dadosPosicionaisV2.birthContext.timeResolution.instantUtc = '2000-07-16T01:30:00Z';
+
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      id: dadosPosicionaisV2.calculationId,
+      data_nascimento: '2000-07-16',
+      hora_nascimento: '01:30',
+      dados_posicionais_v2: JSON.stringify(dadosPosicionaisV2),
+    });
+
+    expect(report.text).toContain('*Nascimento — Hora oficial de Brasília:* 15/07/2000 às 22:30:00');
+    expect(report.html).toContain('Nascimento — Hora oficial de Brasília');
+    expect(report.html).toContain('15/07/2000 às 22:30:00');
+    expect(report.text).not.toMatch(/16\/07\/2000 às 01:30|America\/Sao_Paulo/);
+    expect(report.html).not.toMatch(/16\/07\/2000 às 01:30|America\/Sao_Paulo/);
   });
 
   it('avisa em mapas legados que o horário não tem fuso verificável e não fabrica conversão', () => {
@@ -51,5 +87,20 @@ describe('astrological-report v2', () => {
     expect(report.text).toContain('Mapa legado: horário de nascimento sem fuso verificável');
     expect(report.html).toContain('Mapa legado: horário de nascimento sem fuso verificável');
     expect(report.text).not.toContain('Horário de nascimento em Brasília');
+    expect(report.text).not.toContain('10:00');
+    expect(report.html).not.toContain('10:00');
+  });
+
+  it('escapa no HTML todos os campos persistidos usados no cabeçalho do e-mail', () => {
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      nome: '<img src=x onerror=alert(1)>',
+      local_nascimento: '<script>alert(2)</script>',
+    });
+
+    expect(report.html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(report.html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
+    expect(report.html).not.toContain('<img src=x onerror=alert(1)>');
+    expect(report.html).not.toContain('<script>alert(2)</script>');
   });
 });

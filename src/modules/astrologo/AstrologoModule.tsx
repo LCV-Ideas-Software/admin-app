@@ -6,13 +6,14 @@
 import DOMPurify from 'dompurify';
 import { BrainCircuit, Loader2, Mail, RefreshCw, Search, Send, Sparkles, Telescope, Trash2, X } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
 import {
   type DadosPosicionaisV2,
   type DadosPosicionaisV2ParseResult,
-  formatBrazilianCivilDate,
+  deriveConsultantRulingAngel,
+  formatDegreeDmsTruncated,
   formatIauConstellation,
   formatInstantInBrasilia,
   formatPlacidusHouse,
@@ -83,6 +84,8 @@ const formatarData = (dataStr: string): string => {
 };
 
 const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }) => {
+  const panelTitleId = useId();
+
   if (result.status !== 'available') {
     const invalidPrefix = result.status === 'invalid' ? `Dados posicionais v2 inválidos (${result.reason}). ` : '';
     return (
@@ -97,21 +100,42 @@ const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }
   }
 
   const dados: DadosPosicionaisV2 = result.data;
+  const rulingPosition = deriveConsultantRulingAngel(dados);
+  const rulingAngel = rulingPosition.angelicQuinary.angel;
   const angelById = new Map(
     dados.positions.map((position) => [position.angelicQuinary.angel.id, position.angelicQuinary.angel]),
   );
 
   return (
-    <section className="astro-section" aria-labelledby={`positional-v2-${dados.calculationId}`}>
-      <h5 id={`positional-v2-${dados.calculationId}`} className="astro-section__title">
+    <section className="astro-section" aria-labelledby={panelTitleId}>
+      <h5 id={panelTitleId} className="astro-section__title">
         Posições planetárias e correspondências angélicas
       </h5>
       <p className="field-hint">
         A constelação IAU é uma região bidimensional do céu. O sistema não calcula nem exibe grau interno em
         constelações.
       </p>
+      <section className="astro-regent-card" aria-label="Anjo regente do consulente">
+        <div className="astro-regent-card__symbol" aria-hidden="true">
+          ☉
+        </div>
+        <div className="astro-regent-card__content">
+          <span className="astro-regent-card__eyebrow">Anjo regente do consulente</span>
+          <strong className="astro-regent-card__name">
+            #{rulingAngel.id} {rulingAngel.canonicalName}
+          </strong>
+          <bdi className="astro-regent-card__hebrew" lang="he" dir="rtl">
+            {rulingAngel.hebrewTriplet}
+          </bdi>
+          <span>
+            {rulingAngel.choir} · príncipe {rulingAngel.prince}
+          </span>
+          <span className="field-hint">{rulingAngel.qualitySummaryPtBr}</span>
+          <span className="astro-regent-card__criterion">Quinário tropical da posição do Sol</span>
+        </div>
+      </section>
       <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
-        <table aria-label="Posições planetárias v2" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="astro-positional-table" aria-label="Posições planetárias v2">
           <thead>
             <tr>
               <th scope="col" style={{ padding: '0.65rem', textAlign: 'left' }}>
@@ -137,7 +161,10 @@ const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }
               return (
                 <tr key={position.bodyId}>
                   <th scope="row" style={{ padding: '0.65rem', textAlign: 'left', verticalAlign: 'top' }}>
-                    {position.symbol} {position.displayNamePtBr}
+                    <span className={`astro-planet-icon astro-planet-icon--${position.bodyId}`} aria-hidden="true">
+                      {position.symbol}
+                    </span>{' '}
+                    {PLANET_LABEL_BY_ID[position.bodyId]}
                   </th>
                   <td style={{ padding: '0.65rem', verticalAlign: 'top' }}>{formatTropicalPosition(position)}</td>
                   <td style={{ padding: '0.65rem', verticalAlign: 'top' }}>{formatIauConstellation(position)}</td>
@@ -164,18 +191,70 @@ const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }
       </div>
 
       <h5 className="astro-section__title" style={{ marginTop: '1.5rem' }}>
+        Cúspides das 12 Casas Placidus
+      </h5>
+      {dados.houses.status === 'available' ? (
+        <ul className="astro-cusps-grid" aria-label="Cúspides das doze casas Placidus">
+          {dados.houses.cusps.map((cusp) => (
+            <li key={cusp.houseIndex1} className="astro-cusp-card">
+              <span className="astro-cusp-card__house">Casa {cusp.houseIndex1}</span>
+              <strong>
+                {formatDegreeDmsTruncated(cusp.tropical.degreeWithinSignDeg)} de {cusp.tropical.signNamePtBr}
+              </strong>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="field-hint" role="status">
+          Cúspides Placidus indisponíveis para este mapa.
+        </p>
+      )}
+
+      <h5 className="astro-section__title" style={{ marginTop: '1.5rem' }}>
+        Ângulos do mapa
+      </h5>
+      <ul className="astro-angles-list" aria-label="Ângulos do mapa">
+        {dados.angles.map((angle) => (
+          <li key={angle.angleId} className="astro-angle-card">
+            <span className="astro-angle-card__mark" aria-hidden="true">
+              {angle.angleId === 'ascendant' ? 'ASC' : 'MC'}
+            </span>
+            <span>
+              <strong>{angle.displayNamePtBr}</strong>
+              <small>
+                {formatDegreeDmsTruncated(angle.tropical.degreeWithinSignDeg)} de {angle.tropical.signNamePtBr}
+              </small>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <h5 className="astro-section__title" style={{ marginTop: '1.5rem' }}>
         Falange angélica dos dez planetas
       </h5>
-      <ul className="astro-kv-list">
+      <ul className="astro-falange-grid">
         {dados.aggregates.angelicFalange.map((group) => {
           const angel = angelById.get(group.angelId);
           return (
-            <li key={`falange-${group.angelId}`} className="astro-kv">
-              <strong>
+            <li key={`falange-${group.angelId}`} className="astro-falange-card">
+              <strong className="astro-falange-card__angel">
                 #{group.angelId} {angel?.canonicalName ?? 'Nome indisponível'}
               </strong>
-              <span>
-                {group.memberBodyIds.map((bodyId) => PLANET_LABEL_BY_ID[bodyId]).join(', ')} ({group.occurrenceCount})
+              <div className="astro-falange-card__members">
+                {group.memberBodyIds.map((bodyId) => {
+                  const position = dados.positions.find((candidate) => candidate.bodyId === bodyId);
+                  return (
+                    <span key={bodyId} className="astro-planet-chip">
+                      <span className={`astro-planet-icon astro-planet-icon--${bodyId}`} aria-hidden="true">
+                        {position?.symbol ?? ''}
+                      </span>
+                      {PLANET_LABEL_BY_ID[bodyId]}
+                    </span>
+                  );
+                })}
+              </div>
+              <span className="field-hint">
+                {group.occurrenceCount} {group.occurrenceCount === 1 ? 'planeta' : 'planetas'}
               </span>
             </li>
           );
@@ -183,59 +262,34 @@ const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }
       </ul>
 
       <h5 className="astro-section__title" style={{ marginTop: '1.5rem' }}>
-        Proveniência e política temporal
+        Como este mapa foi calculado
       </h5>
-      <div className="astro-kv-list">
+      <div className="astro-kv-list astro-provenance-list">
         <div className="astro-kv">
-          <span className="astro-kv__label">Contrato</span>
-          <strong>
-            {dados.schemaId} v{dados.schemaVersion} · cálculo {dados.calculationId}
-          </strong>
-        </div>
-        <div className="astro-kv">
-          <span className="astro-kv__label">Calculado</span>
+          <span className="astro-kv__label">Cálculo concluído</span>
           <strong>
             {formatInstantInBrasilia(dados.calculatedAtUtc)} — {dados.presentationPolicy.timeZoneLabel}
           </strong>
         </div>
         <div className="astro-kv">
-          <span className="astro-kv__label">Nascimento civil no local</span>
-          <strong>
-            {formatBrazilianCivilDate(dados.birthContext.civilInput.date)} às {dados.birthContext.civilInput.time} ·{' '}
-            {dados.birthContext.timeResolution.timeZoneIana} ({dados.birthContext.timeResolution.offsetAtBirth})
-          </strong>
-        </div>
-        <div className="astro-kv">
-          <span className="astro-kv__label">Instante em Brasília</span>
+          <span className="astro-kv__label">Nascimento — Hora oficial de Brasília</span>
           <strong>{formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc)}</strong>
         </div>
         <div className="astro-kv">
-          <span className="astro-kv__label">Efemérides</span>
-          <strong>
-            Astronomy Engine {dados.models.ephemeris.engineVersion} · SHA-256{' '}
-            <code>{dados.models.ephemeris.sourceSha256}</code>
-          </strong>
+          <span className="astro-kv__label">Posições planetárias</span>
+          <strong>Astronomy Engine {dados.models.ephemeris.engineVersion} · efemérides geocêntricas aparentes</strong>
         </div>
         <div className="astro-kv">
-          <span className="astro-kv__label">Casas</span>
-          <strong>
-            Swiss Ephemeris {dados.models.houses.engineVersion} · Placidus · WASM SHA-256{' '}
-            <code>{dados.models.houses.runtimeWasmSha256}</code>
-          </strong>
+          <span className="astro-kv__label">Casas astrológicas</span>
+          <strong>Swiss Ephemeris {dados.models.houses.engineVersion} · sistema Placidus</strong>
         </div>
         <div className="astro-kv">
-          <span className="astro-kv__label">Constelações IAU</span>
-          <strong>
-            {dados.models.astronomicalReal.methodId} · base SHA-256{' '}
-            <code>{dados.models.astronomicalReal.boundaryDatasetSha256}</code>
-          </strong>
+          <span className="astro-kv__label">Céu astronômico real</span>
+          <strong>Constelações delimitadas conforme as fronteiras oficiais da IAU</strong>
         </div>
         <div className="astro-kv">
-          <span className="astro-kv__label">Catálogo angélico</span>
-          <strong>
-            {dados.catalogs.angelic72.catalogId} v{dados.catalogs.angelic72.catalogVersion} · SHA-256{' '}
-            <code>{dados.catalogs.angelic72.catalogSha256}</code>
-          </strong>
+          <span className="astro-kv__label">Correspondências angélicas</span>
+          <strong>72 anjos distribuídos em quinários tropicais de 5 graus</strong>
         </div>
       </div>
     </section>
@@ -581,13 +635,18 @@ export function AstrologoModule() {
 
     const nome = mapa.nome || mapa.query?.nome || 'Consulente';
     const dataNascimento = mapa.data_nascimento || mapa.query?.dataNascimento || '';
-    const horaNascimento = mapa.hora_nascimento || mapa.query?.horaNascimento || '';
     const localNascimento = mapa.local_nascimento || mapa.query?.localNascimento || '';
     const analiseIa = mapa.analise_ia || mapa.analiseIa || '';
     const positional = parseDadosPosicionaisV2(
       mapa.dados_posicionais_v2 ?? mapa.dadosPosicionaisV2,
       typeof mapa.id === 'string' ? mapa.id : undefined,
     );
+    const nascimentoApresentado =
+      positional.status === 'available'
+        ? `${formatInstantInBrasilia(positional.data.birthContext.timeResolution.instantUtc)} — ${positional.data.presentationPolicy.timeZoneLabel}`
+        : dataNascimento
+          ? `${formatarData(dataNascimento)} — horário legado sem conversão verificável`
+          : 'Horário legado sem conversão verificável';
 
     return (
       <article
@@ -599,9 +658,7 @@ export function AstrologoModule() {
           <h4>
             <Sparkles size={16} /> Ficha Oculta: {nome}
           </h4>
-          <span>
-            {dataNascimento ? formatarData(dataNascimento) : ''} {horaNascimento ? `às ${horaNascimento}` : ''}
-          </span>
+          <span>{nascimentoApresentado}</span>
         </header>
 
         {localNascimento && <p className="field-hint astro-local-hint">{localNascimento}</p>}

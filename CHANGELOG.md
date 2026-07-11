@@ -2,15 +2,19 @@
 
 ## [Unreleased]
 
+## [v02.11.00] - 2026-07-11
+
 ### Adicionado
 
-- **Astrologo — dados posicionais v2**: leitura defensiva da nova coluna D1, tabela dos dez planetas, graus tropicais, constelação IAU sem grau interno, Casa Placidus, anjo por quinário, falange, cúspides e proveniência. Os mesmos dados passam a integrar os relatórios texto/HTML e o fluxo de e-mail.
+- **Astrologo — dados posicionais v2**: leitura defensiva da nova coluna D1, tabela dos dez planetas, graus tropicais, constelação IAU sem grau interno, Casa Placidus, anjo por quinário, falange, quadro das 12 cúspides, ângulos e proveniência. Os mesmos dados passam a integrar os relatórios texto/HTML e o fluxo de e-mail.
+- **Astrologo — Anjo Regente do Consulente e apresentação pt-BR**: o quinário do Sol tropical natal passa a ser destacado como regente nas telas, relatórios e e-mails, enquanto os demais planetas compõem a falange. IDs técnicos continuam em inglês apenas internamente; nomes, datas, horas e textos visíveis permanecem em português brasileiro.
 
 ### Corrigido
 
-- O detalhe e os relatórios formatam instantes com `pt-BR`, `America/Sao_Paulo` e ciclo de 24 horas; mapas legados mostram aviso de fuso não verificável.
+- O detalhe e os relatórios formatam instantes com `pt-BR`, `America/Sao_Paulo` e ciclo de 24 horas; horários civis de outros fusos e identificadores técnicos não vazam para a apresentação. Mapas legados omitem a hora impossível de converter com segurança e preservam o aviso de fuso não verificável.
+- Campos persistidos do consulente são escapados antes de compor o HTML do e-mail; ícones e chips planetários mantêm a paleta visual também no relatório enviado.
 - O relatório fica vinculado ao ID realmente carregado: uma falha ao abrir outro mapa invalida o conteúdo anterior e impede envio cruzado.
-- O parser v2 rejeita JSON adulterado, conjunto incompleto de planetas, incoerência longitude/signo/decanato/quinário/anjo, falange incompleta e `calculationId` diferente do mapa.
+- O parser v2 rejeita JSON adulterado, conjunto incompleto de planetas, incoerência longitude/signo/decanato/quinário/anjo, falange incompleta, cúspides ou ângulos ausentes/malformados/incoerentes e `calculationId` diferente do mapa.
 
 ## [v02.10.02] - 2026-07-06
 

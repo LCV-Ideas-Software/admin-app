@@ -12,7 +12,8 @@
 import {
   type DadosPosicionaisV2,
   type DadosPosicionaisV2ParseResult,
-  formatBrazilianCivilDate,
+  deriveConsultantRulingAngel,
+  formatDegreeDmsTruncated,
   formatIauConstellation,
   formatInstantInBrasilia,
   formatPlacidusHouse,
@@ -167,6 +168,22 @@ const escapeHtml = (value: string | number): string =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
+const PLANET_EMAIL_COLOR_BY_ID: Readonly<Record<keyof typeof PLANET_LABEL_BY_ID, string>> = Object.freeze({
+  sun: '#f59e0b',
+  moon: '#64748b',
+  mercury: '#0f766e',
+  venus: '#db2777',
+  mars: '#dc2626',
+  jupiter: '#7c3aed',
+  saturn: '#a16207',
+  uranus: '#0891b2',
+  neptune: '#2563eb',
+  pluto: '#9333ea',
+});
+
+const formatTropicalPoint = (degreeWithinSignDeg: number, signNamePtBr: string): string =>
+  `${formatDegreeDmsTruncated(degreeWithinSignDeg)} de ${signNamePtBr}`;
+
 const positionalWarning = (result: DadosPosicionaisV2ParseResult): string =>
   result.status === 'invalid'
     ? `Dados posicionais v2 indisponíveis (${result.reason}). ${LEGACY_TIME_WARNING}`
@@ -186,34 +203,61 @@ const renderFalangeText = (dados: DadosPosicionaisV2): string => {
 };
 
 const renderPositionalText = (dados: DadosPosicionaisV2): string => {
+  const rulingPosition = deriveConsultantRulingAngel(dados);
+  const rulingAngel = rulingPosition.angelicQuinary.angel;
   let text = '*🪐 POSIÇÕES PLANETÁRIAS E CORRESPONDÊNCIAS ANGÉLICAS*\n\n';
+  text += '*☀️ ANJO REGENTE DO CONSULENTE*\n';
+  text += `  • Anjo #${rulingAngel.id}: ${rulingAngel.canonicalName} (${rulingAngel.hebrewTriplet}) — ${rulingAngel.choir}; príncipe ${rulingAngel.prince}\n`;
+  text += `  • ${rulingAngel.qualitySummaryPtBr}\n`;
+  text += '  • Critério: quinário tropical da posição do Sol\n\n';
   for (const position of dados.positions) {
     const angel = position.angelicQuinary.angel;
-    text += `  • ${position.symbol} ${position.displayNamePtBr}: ${formatTropicalPosition(position)} | Constelação IAU: ${formatIauConstellation(position)} | ${formatPlacidusHouse(position)}\n`;
+    text += `  • ${position.symbol} ${PLANET_LABEL_BY_ID[position.bodyId]}: ${formatTropicalPosition(position)} | Constelação IAU: ${formatIauConstellation(position)} | ${formatPlacidusHouse(position)}\n`;
     text += `    Anjo #${angel.id}: ${angel.canonicalName} (${angel.hebrewTriplet}) — ${angel.choir}; príncipe ${angel.prince}\n`;
   }
 
   text += '\n*Falange angélica (dez planetas):*\n';
   text += `${renderFalangeText(dados)}\n`;
+
+  text += '\n*🏛️ CÚSPIDES DAS 12 CASAS PLACIDUS*\n';
+  if (dados.houses.status === 'available') {
+    for (const cusp of dados.houses.cusps) {
+      text += `  • Casa ${cusp.houseIndex1}: ${formatTropicalPoint(cusp.tropical.degreeWithinSignDeg, cusp.tropical.signNamePtBr)}\n`;
+    }
+  } else {
+    text += '  • Cúspides indisponíveis para este mapa.\n';
+  }
+
+  text += '\n*📐 ÂNGULOS DO MAPA*\n';
+  if (dados.angles.length > 0) {
+    for (const angle of dados.angles) {
+      text += `  • ${angle.displayNamePtBr}: ${formatTropicalPoint(angle.tropical.degreeWithinSignDeg, angle.tropical.signNamePtBr)}\n`;
+    }
+  } else {
+    text += '  • Ângulos indisponíveis para este mapa.\n';
+  }
+
   text += '\n*Proveniência e política temporal:*\n';
-  text += `  • Esquema: ${dados.schemaId} v${dados.schemaVersion}; cálculo ${dados.calculationId}\n`;
+  text += `  • Versão do contrato posicional: ${dados.schemaVersion}\n`;
   text += `  • Calculado em ${formatInstantInBrasilia(dados.calculatedAtUtc)} — ${dados.presentationPolicy.timeZoneLabel}\n`;
-  text += `  • Nascimento civil informado: ${formatBrazilianCivilDate(dados.birthContext.civilInput.date)} às ${dados.birthContext.civilInput.time}, fuso ${dados.birthContext.timeResolution.timeZoneIana} (${dados.birthContext.timeResolution.offsetAtBirth})\n`;
-  text += `  • Instante de nascimento exibido em Brasília: ${formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc)}\n`;
+  text += `  • Nascimento em ${formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc)} — ${dados.presentationPolicy.timeZoneLabel}\n`;
   text += `  • Efemérides: Astronomy Engine ${dados.models.ephemeris.engineVersion}; SHA-256 ${dados.models.ephemeris.sourceSha256}\n`;
   text += `  • Casas: Swiss Ephemeris ${dados.models.houses.engineVersion}, Placidus; WASM SHA-256 ${dados.models.houses.runtimeWasmSha256}\n`;
-  text += `  • Constelações IAU: ${dados.models.astronomicalReal.methodId}; base SHA-256 ${dados.models.astronomicalReal.boundaryDatasetSha256}\n`;
-  text += `  • Catálogo angélico: ${dados.catalogs.angelic72.catalogId} v${dados.catalogs.angelic72.catalogVersion}; SHA-256 ${dados.catalogs.angelic72.catalogSha256}\n`;
+  text += `  • Base das constelações IAU: SHA-256 ${dados.models.astronomicalReal.boundaryDatasetSha256}\n`;
+  text += `  • Catálogo dos 72 anjos: versão ${dados.catalogs.angelic72.catalogVersion}; SHA-256 ${dados.catalogs.angelic72.catalogSha256}\n`;
   return text;
 };
 
 const renderPositionalHtml = (dados: DadosPosicionaisV2, boxShadow: string): string => {
+  const rulingPosition = deriveConsultantRulingAngel(dados);
+  const rulingAngel = rulingPosition.angelicQuinary.angel;
   const rows = dados.positions
     .map((position) => {
       const angel = position.angelicQuinary.angel;
+      const planetColor = PLANET_EMAIL_COLOR_BY_ID[position.bodyId];
       return `
         <tr>
-          <th scope="row" style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top;">${escapeHtml(position.symbol)} ${escapeHtml(position.displayNamePtBr)}</th>
+          <th scope="row" style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top;"><span style="display: inline-block; min-width: 1.35em; font-size: 24px; line-height: 1; color: ${planetColor};">${escapeHtml(position.symbol)}</span> ${escapeHtml(PLANET_LABEL_BY_ID[position.bodyId])}</th>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">${escapeHtml(formatTropicalPosition(position))}</td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">${escapeHtml(formatIauConstellation(position))}</td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">${escapeHtml(formatPlacidusHouse(position))}</td>
@@ -230,18 +274,54 @@ const renderPositionalHtml = (dados: DadosPosicionaisV2, boxShadow: string): str
   const angelById = new Map(
     dados.positions.map((position) => [position.angelicQuinary.angel.id, position.angelicQuinary.angel]),
   );
+  const positionById = new Map(dados.positions.map((position) => [position.bodyId, position]));
   const falange = dados.aggregates.angelicFalange
     .map((group) => {
       const angel = angelById.get(group.angelId);
-      const members = group.memberBodyIds.map((bodyId) => PLANET_LABEL_BY_ID[bodyId]).join(', ');
-      return `<li><strong>#${group.angelId}${angel ? ` ${escapeHtml(angel.canonicalName)}` : ''}</strong>: ${escapeHtml(members)} (${group.occurrenceCount})</li>`;
+      const members = group.memberBodyIds
+        .map((bodyId) => {
+          const position = positionById.get(bodyId);
+          return `<span style="display: inline-block; margin: 3px 4px 3px 0; padding: 5px 9px; border: 1px solid #e2e8f0; border-radius: 999px; background-color: #ffffff; color: #334155; font-size: 12px; font-weight: 700;"><span style="display: inline-block; margin-right: 4px; font-size: 18px; line-height: 1; color: ${PLANET_EMAIL_COLOR_BY_ID[bodyId]};">${escapeHtml(position?.symbol ?? '✦')}</span>${escapeHtml(PLANET_LABEL_BY_ID[bodyId])}</span>`;
+        })
+        .join('');
+      return `<li style="margin: 0 0 10px 0; padding: 12px; border: 1px solid #ddd6fe; border-radius: 12px; background-color: #faf8ff;"><strong style="display: block; margin-bottom: 5px; color: #4c1d95;">#${group.angelId}${angel ? ` ${escapeHtml(angel.canonicalName)}` : ''}</strong><div>${members}</div><span style="font-size: 11px; color: #64748b;">${group.occurrenceCount} ${group.occurrenceCount === 1 ? 'planeta' : 'planetas'}</span></li>`;
     })
     .join('');
+
+  const cusps =
+    dados.houses.status === 'available'
+      ? dados.houses.cusps
+          .map(
+            (cusp) =>
+              `<li style="padding: 9px 11px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;"><strong style="color: #334155;">Casa ${cusp.houseIndex1}</strong><br><span style="font-size: 12px; color: #64748b;">${escapeHtml(formatTropicalPoint(cusp.tropical.degreeWithinSignDeg, cusp.tropical.signNamePtBr))}</span></li>`,
+          )
+          .join('')
+      : '<li style="color: #64748b;">Cúspides indisponíveis para este mapa.</li>';
+
+  const angles =
+    dados.angles.length > 0
+      ? dados.angles
+          .map(
+            (angle) =>
+              `<li style="padding: 12px; border: 1px solid #bfdbfe; border-radius: 12px; background-color: #eff6ff;"><strong style="color: #1e3a8a;">${escapeHtml(angle.displayNamePtBr)}</strong><br><span style="font-size: 12px; color: #475569;">${escapeHtml(formatTropicalPoint(angle.tropical.degreeWithinSignDeg, angle.tropical.signNamePtBr))}</span></li>`,
+          )
+          .join('')
+      : '<li style="color: #64748b;">Ângulos indisponíveis para este mapa.</li>';
 
   return `
     <section style="margin-top: 60px; padding: 32px; background-color: rgba(255, 255, 255, 0.85); border-radius: 24px; border: 1px solid #cbd5e1; ${boxShadow}">
       <h2 style="font-size: 26px; color: #334155; margin: 0 0 12px 0;">🪐 Posições planetárias e correspondências angélicas</h2>
       <p style="font-size: 13px; color: #475569; margin: 0 0 20px 0;">A constelação IAU é uma região bidimensional do céu; por isso, este relatório não atribui grau interno à constelação.</p>
+      <section aria-label="Anjo regente do consulente" style="display: flex; gap: 18px; align-items: center; margin: 22px 0; padding: 22px; color: #312e81; background: linear-gradient(135deg, #fffbeb, #eef2ff); border: 1px solid #fbbf24; border-radius: 18px;">
+        <span style="font-size: 46px; line-height: 1; color: #f59e0b;">☉</span>
+        <div>
+          <p style="margin: 0 0 5px; color: #92400e; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Anjo regente do consulente</p>
+          <p style="margin: 0 0 5px; font-size: 22px; font-weight: 900;">#${rulingAngel.id} ${escapeHtml(rulingAngel.canonicalName)} <bdi lang="he" dir="rtl">${escapeHtml(rulingAngel.hebrewTriplet)}</bdi></p>
+          <p style="margin: 0 0 4px; font-size: 13px;">${escapeHtml(rulingAngel.choir)} · príncipe ${escapeHtml(rulingAngel.prince)}</p>
+          <p style="margin: 0 0 8px; font-size: 13px; color: #475569;">${escapeHtml(rulingAngel.qualitySummaryPtBr)}</p>
+          <p style="margin: 0; font-size: 11px; font-weight: 700; color: #6d28d9;">Quinário tropical da posição do Sol</p>
+        </div>
+      </section>
       <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <thead>
@@ -257,17 +337,20 @@ const renderPositionalHtml = (dados: DadosPosicionaisV2, boxShadow: string): str
         </table>
       </div>
       <h3 style="font-size: 18px; color: #334155; margin: 28px 0 8px 0;">Falange angélica dos dez planetas</h3>
-      <ul style="color: #334155; line-height: 1.6;">${falange}</ul>
+      <ul style="margin: 0; padding: 0; color: #334155; line-height: 1.6; list-style: none;">${falange}</ul>
+      <h3 style="font-size: 18px; color: #334155; margin: 28px 0 8px 0;">Cúspides das 12 Casas Placidus</h3>
+      <ul style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none;">${cusps}</ul>
+      <h3 style="font-size: 18px; color: #334155; margin: 28px 0 8px 0;">Ângulos do mapa</h3>
+      <ul style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none;">${angles}</ul>
       <h3 style="font-size: 18px; color: #334155; margin: 28px 0 8px 0;">Proveniência e política temporal</h3>
       <ul style="font-size: 12px; color: #475569; line-height: 1.6; overflow-wrap: anywhere;">
-        <li>Esquema ${escapeHtml(dados.schemaId)} v${escapeHtml(dados.schemaVersion)}; cálculo ${escapeHtml(dados.calculationId)}</li>
+        <li>Versão do contrato posicional: ${escapeHtml(dados.schemaVersion)}</li>
         <li>Calculado em ${escapeHtml(formatInstantInBrasilia(dados.calculatedAtUtc))} — ${escapeHtml(dados.presentationPolicy.timeZoneLabel)}</li>
-        <li>Nascimento civil informado: ${escapeHtml(formatBrazilianCivilDate(dados.birthContext.civilInput.date))} às ${escapeHtml(dados.birthContext.civilInput.time)}, fuso ${escapeHtml(dados.birthContext.timeResolution.timeZoneIana)} (${escapeHtml(dados.birthContext.timeResolution.offsetAtBirth)})</li>
-        <li>Instante de nascimento exibido em Brasília: ${escapeHtml(formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc))}</li>
+        <li>Nascimento em ${escapeHtml(formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc))} — ${escapeHtml(dados.presentationPolicy.timeZoneLabel)}</li>
         <li>Efemérides: Astronomy Engine ${escapeHtml(dados.models.ephemeris.engineVersion)}; SHA-256 ${escapeHtml(dados.models.ephemeris.sourceSha256)}</li>
         <li>Casas: Swiss Ephemeris ${escapeHtml(dados.models.houses.engineVersion)}, Placidus; WASM SHA-256 ${escapeHtml(dados.models.houses.runtimeWasmSha256)}</li>
-        <li>Constelações IAU: ${escapeHtml(dados.models.astronomicalReal.methodId)}; base SHA-256 ${escapeHtml(dados.models.astronomicalReal.boundaryDatasetSha256)}</li>
-        <li>Catálogo angélico: ${escapeHtml(dados.catalogs.angelic72.catalogId)} v${escapeHtml(dados.catalogs.angelic72.catalogVersion)}; SHA-256 ${escapeHtml(dados.catalogs.angelic72.catalogSha256)}</li>
+        <li>Base das constelações IAU: SHA-256 ${escapeHtml(dados.models.astronomicalReal.boundaryDatasetSha256)}</li>
+        <li>Catálogo dos 72 anjos: versão ${escapeHtml(dados.catalogs.angelic72.catalogVersion)}; SHA-256 ${escapeHtml(dados.catalogs.angelic72.catalogSha256)}</li>
       </ul>
     </section>`;
 };
@@ -287,8 +370,11 @@ function gerarTextoRelatorio(
   let t = `*🌌 DIAGNÓSTICO ASTROLÓGICO E ESOTÉRICO 🌌*\n\n`;
   t += `*Consulente:* ${mapa.nome}\n`;
   if (mapa.local_nascimento) t += `*Local:* ${mapa.local_nascimento}\n`;
-  if (mapa.data_nascimento)
-    t += `*Nascimento:* ${formatarData(mapa.data_nascimento)} às ${mapa.hora_nascimento ?? '??:??'}\n`;
+  if (positional.status === 'available') {
+    t += `*Nascimento — Hora oficial de Brasília:* ${formatInstantInBrasilia(positional.data.birthContext.timeResolution.instantUtc)}\n`;
+  } else if (mapa.data_nascimento) {
+    t += `*Data de nascimento informada — mapa legado:* ${formatarData(mapa.data_nascimento)}\n`;
+  }
 
   if (globais) {
     t += divider;
@@ -433,8 +519,16 @@ function gerarHtmlRelatorio(
   // Sanitize IA analysis for email
   const analiseSanitizada = analiseIa ? sanitizeForEmail(analiseIa) : '';
 
-  const dataNasc = mapa.data_nascimento ? formatarData(mapa.data_nascimento) : '';
-  const horaNasc = mapa.hora_nascimento ?? '';
+  const nascimentoApresentado =
+    positional.status === 'available'
+      ? formatInstantInBrasilia(positional.data.birthContext.timeResolution.instantUtc)
+      : mapa.data_nascimento
+        ? formatarData(mapa.data_nascimento)
+        : '';
+  const nascimentoLabel =
+    positional.status === 'available'
+      ? 'Nascimento — Hora oficial de Brasília'
+      : 'Data de nascimento informada — mapa legado';
 
   const html = `
   <!DOCTYPE html>
@@ -459,9 +553,9 @@ function gerarHtmlRelatorio(
       </header>
 
       <div style="background-color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 32px; border-radius: 24px; border: 1px solid #ffffff; ${boxShadow} text-align: center; margin-bottom: 40px;">
-        <h2 style="font-size: 24px; font-weight: 800; color: #1e293b; margin: 0 0 8px 0;">${mapa.nome}</h2>
-        ${mapa.local_nascimento ? `<p style="font-size: 16px; color: #475569; margin: 0;">${mapa.local_nascimento}</p>` : ''}
-        ${dataNasc ? `<p style="font-size: 16px; color: #475569; margin: 0;">${dataNasc}${horaNasc ? ` às ${horaNasc}` : ''}</p>` : ''}
+        <h2 style="font-size: 24px; font-weight: 800; color: #1e293b; margin: 0 0 8px 0;">${escapeHtml(mapa.nome)}</h2>
+        ${mapa.local_nascimento ? `<p style="font-size: 16px; color: #475569; margin: 0;">${escapeHtml(mapa.local_nascimento)}</p>` : ''}
+        ${nascimentoApresentado ? `<p style="font-size: 12px; color: #64748b; margin: 10px 0 2px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;">${escapeHtml(nascimentoLabel)}</p><p style="font-size: 16px; color: #475569; margin: 0;">${escapeHtml(nascimentoApresentado)}</p>` : ''}
       </div>
 
       ${

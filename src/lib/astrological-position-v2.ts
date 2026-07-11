@@ -26,6 +26,21 @@ export const PLANET_BODY_IDS = [
 
 export type PlanetBodyId = (typeof PLANET_BODY_IDS)[number];
 
+const TROPICAL_SIGNS = [
+  { id: 'aries', namePtBr: 'Áries' },
+  { id: 'taurus', namePtBr: 'Touro' },
+  { id: 'gemini', namePtBr: 'Gêmeos' },
+  { id: 'cancer', namePtBr: 'Câncer' },
+  { id: 'leo', namePtBr: 'Leão' },
+  { id: 'virgo', namePtBr: 'Virgem' },
+  { id: 'libra', namePtBr: 'Libra' },
+  { id: 'scorpio', namePtBr: 'Escorpião' },
+  { id: 'sagittarius', namePtBr: 'Sagitário' },
+  { id: 'capricorn', namePtBr: 'Capricórnio' },
+  { id: 'aquarius', namePtBr: 'Aquário' },
+  { id: 'pisces', namePtBr: 'Peixes' },
+] as const;
+
 export interface TropicalProjectionV2 {
   readonly status: 'available';
   readonly sign: {
@@ -356,6 +371,45 @@ const isFalangeGroup = (value: unknown): value is FalangeGroup =>
   isIntegerInRange(value.occurrenceCount, 1, 10) &&
   value.occurrenceCount === value.memberBodyIds.length;
 
+const isTropicalSummaryForLongitude = (value: unknown, longitudeDeg: number): boolean => {
+  if (!isRecord(value) || !isFiniteNumber(longitudeDeg) || longitudeDeg < 0 || longitudeDeg >= 360) return false;
+  if (!isFiniteNumber(value.degreeWithinSignDeg) || value.degreeWithinSignDeg < 0 || value.degreeWithinSignDeg >= 30)
+    return false;
+
+  const signIndex0 = Math.floor(longitudeDeg / 30);
+  const expectedSign = TROPICAL_SIGNS[signIndex0];
+  if (!expectedSign) return false;
+
+  return (
+    value.signId === expectedSign.id &&
+    value.signNamePtBr === expectedSign.namePtBr &&
+    nearlyEqual(value.degreeWithinSignDeg, longitudeDeg - signIndex0 * 30)
+  );
+};
+
+const isCanonicalCusp = (value: unknown, index0: number): boolean =>
+  isRecord(value) &&
+  value.houseIndex1 === index0 + 1 &&
+  isFiniteNumber(value.eclipticLongitudeDeg) &&
+  isTropicalSummaryForLongitude(value.tropical, value.eclipticLongitudeDeg);
+
+const CANONICAL_ANGLES = [
+  { angleId: 'ascendant', displayNamePtBr: 'Ascendente' },
+  { angleId: 'midheaven', displayNamePtBr: 'Meio do Céu' },
+] as const;
+
+const isCanonicalAngle = (value: unknown, index0: number): boolean => {
+  const expected = CANONICAL_ANGLES[index0];
+  return (
+    expected !== undefined &&
+    isRecord(value) &&
+    value.angleId === expected.angleId &&
+    value.displayNamePtBr === expected.displayNamePtBr &&
+    isFiniteNumber(value.eclipticLongitudeDeg) &&
+    isTropicalSummaryForLongitude(value.tropical, value.eclipticLongitudeDeg)
+  );
+};
+
 const isDadosPosicionaisV2 = (value: unknown): value is DadosPosicionaisV2 => {
   if (!isRecord(value)) return false;
   if (!isRecord(value.targetSet) || !isRecord(value.birthContext) || !isRecord(value.presentationPolicy)) return false;
@@ -441,18 +495,24 @@ const isDadosPosicionaisV2 = (value: unknown): value is DadosPosicionaisV2 => {
     return false;
   }
 
-  if (!isRecord(value.houses) || value.houses.systemId !== 'placidus') return false;
+  if (!Array.isArray(value.angles) || !isRecord(value.houses) || value.houses.systemId !== 'placidus') return false;
   if (value.houses.status === 'available') {
-    if (!Array.isArray(value.houses.cusps)) return false;
+    if (
+      !Array.isArray(value.houses.cusps) ||
+      value.houses.cusps.length !== 12 ||
+      !value.houses.cusps.every(isCanonicalCusp) ||
+      value.angles.length !== CANONICAL_ANGLES.length ||
+      !value.angles.every(isCanonicalAngle)
+    ) {
+      return false;
+    }
   } else if (value.houses.status !== 'unavailable' || value.houses.reasonCode !== 'PLACIDUS_UNAVAILABLE') {
+    return false;
+  } else if (Object.hasOwn(value.houses, 'cusps') || value.angles.length !== 0) {
     return false;
   }
 
-  if (
-    !Array.isArray(value.angles) ||
-    !Array.isArray(value.aggregates.angelicFalange) ||
-    !Array.isArray(value.diagnostics)
-  ) {
+  if (!Array.isArray(value.aggregates.angelicFalange) || !Array.isArray(value.diagnostics)) {
     return false;
   }
   if (!value.aggregates.angelicFalange.every(isFalangeGroup)) return false;
@@ -518,6 +578,19 @@ export function formatBrazilianCivilDate(date: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) return date;
   return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+/**
+ * O anjo regente natal segue a posição tropical do Sol. A função
+ * deliberadamente não consulta data civil, falange agregada ou ordem do array:
+ * a identidade semântica `bodyId: sun` é a única fonte de verdade.
+ */
+export function deriveConsultantRulingAngel(dados: DadosPosicionaisV2): PlanetPositionV2 {
+  const solarPosition = dados.positions.find((position) => position.bodyId === 'sun');
+  if (!solarPosition) {
+    throw new Error('Posição tropical do Sol ausente no contrato posicional v2.');
+  }
+  return solarPosition;
 }
 
 export function formatDegreeDmsTruncated(value: number): string {

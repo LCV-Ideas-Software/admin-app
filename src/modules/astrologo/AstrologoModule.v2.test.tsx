@@ -15,11 +15,12 @@ vi.mock('../../lib/useModuleConfig', () => ({
 }));
 
 const dadosPosicionaisV2 = createDadosPosicionaisV2Fixture();
+dadosPosicionaisV2.birthContext.timeResolution.instantUtc = '2000-07-16T01:30:00Z';
 const mapa = {
   id: dadosPosicionaisV2.calculationId,
   nome: 'Consulente V2',
-  data_nascimento: '2000-07-15',
-  hora_nascimento: '10:00',
+  data_nascimento: '2000-07-16',
+  hora_nascimento: '01:30',
   local_nascimento: 'São Paulo',
   dados_astronomica: null,
   dados_tropical: null,
@@ -85,6 +86,22 @@ describe('AstrologoModule dados posicionais v2', () => {
       expect(within(row).getAllByRole('cell')[1]).toHaveTextContent(/^Áries \(Ari\)$/);
     }
     expect(screen.getByText(/Falange angélica/)).toBeInTheDocument();
+    const regent = screen.getByRole('region', { name: 'Anjo regente do consulente' });
+    expect(within(regent).getByText(/#3 Sitael/)).toBeInTheDocument();
+    expect(within(regent).getByText(/Quinário tropical da posição do Sol/)).toBeInTheDocument();
+    expect(regent).toHaveClass('astro-regent-card');
+    expect(
+      screen.queryByText(/\b(?:sun|moon|mercury|venus|mars|jupiter|saturn|uranus|neptune|pluto)\b/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('15/07/2000 às 22:30:00 — Hora oficial de Brasília')).toBeInTheDocument();
+    expect(screen.queryByText(/16\/07\/2000 às 01:30/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/America\/Sao_Paulo/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/urn:astrologo|iau-roman|mayhem-shem/)).not.toBeInTheDocument();
+    const cusps = screen.getByRole('list', { name: 'Cúspides das doze casas Placidus' });
+    expect(within(cusps).getAllByRole('listitem')).toHaveLength(12);
+    const angles = screen.getByRole('list', { name: 'Ângulos do mapa' });
+    expect(within(angles).getByText(/Ascendente/)).toBeInTheDocument();
+    expect(within(angles).getByText(/Meio do Céu/)).toBeInTheDocument();
     expect(screen.getByText(/11\/07\/2026 às 12:30:45/)).toBeInTheDocument();
     expect(screen.getByText(/Astronomy Engine 2\.1\.19/)).toBeInTheDocument();
     expect(screen.getByText(/Swiss Ephemeris 2\.10\.03/)).toBeInTheDocument();

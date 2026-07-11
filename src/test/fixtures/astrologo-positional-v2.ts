@@ -27,6 +27,8 @@ const SIGN_FIXTURES = [
   ['scorpio', 'Escorpião'],
   ['sagittarius', 'Sagitário'],
   ['capricorn', 'Capricórnio'],
+  ['aquarius', 'Aquário'],
+  ['pisces', 'Peixes'],
 ] as const;
 
 export const createDadosPosicionaisV2Fixture = () => ({
@@ -105,15 +107,16 @@ export const createDadosPosicionaisV2Fixture = () => ({
   houses: {
     systemId: 'placidus',
     status: 'available',
-    cusps: Array.from({ length: 12 }, (_, index) => ({
-      houseIndex1: index + 1,
-      eclipticLongitudeDeg: index * 30,
-      tropical: {
-        signId: 'aries',
-        signNamePtBr: 'Áries',
-        degreeWithinSignDeg: 0,
-      },
-    })),
+    cusps: Array.from({ length: 12 }, (_, index) => {
+      const sign = SIGN_FIXTURES[index];
+      if (!sign) throw new Error(`Signo de cúspide ausente para o índice ${index}.`);
+      const [signId, signNamePtBr] = sign;
+      return {
+        houseIndex1: index + 1,
+        eclipticLongitudeDeg: index * 30,
+        tropical: { signId, signNamePtBr, degreeWithinSignDeg: 0 },
+      };
+    }),
   },
   angles: [
     {

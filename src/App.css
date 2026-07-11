@@ -2628,6 +2628,294 @@ input[type="color"]:focus-visible {
   color: #202124;
 }
 
+/* Dados posicionais v2: hierarquia visual planetária e angélica */
+.astro-positional-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #dbe3f0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.astro-positional-table thead {
+  background: linear-gradient(90deg, rgba(254, 243, 199, 0.78), rgba(224, 231, 255, 0.78));
+}
+
+.astro-positional-table tbody tr:nth-child(even) {
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.astro-positional-table tbody tr:hover {
+  background: rgba(238, 242, 255, 0.9);
+}
+
+.astro-planet-icon {
+  display: inline-flex;
+  min-width: 1.45em;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.45rem;
+  line-height: 1;
+  font-weight: 800;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.16));
+}
+
+.astro-planet-icon--sun {
+  color: #f59e0b;
+}
+.astro-planet-icon--moon {
+  color: #64748b;
+}
+.astro-planet-icon--mercury {
+  color: #0f766e;
+}
+.astro-planet-icon--venus {
+  color: #db2777;
+}
+.astro-planet-icon--mars {
+  color: #dc2626;
+}
+.astro-planet-icon--jupiter {
+  color: #7c3aed;
+}
+.astro-planet-icon--saturn {
+  color: #a16207;
+}
+.astro-planet-icon--uranus {
+  color: #0891b2;
+}
+.astro-planet-icon--neptune {
+  color: #2563eb;
+}
+.astro-planet-icon--pluto {
+  color: #9333ea;
+}
+
+.astro-regent-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 18px 0 22px;
+  padding: 20px;
+  border: 1px solid #fbbf24;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(238, 242, 255, 0.96));
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.1);
+}
+
+.astro-regent-card__symbol {
+  flex: 0 0 auto;
+  font-size: clamp(3rem, 6vw, 4.4rem);
+  line-height: 1;
+  color: #f59e0b;
+  filter: drop-shadow(0 3px 6px rgba(245, 158, 11, 0.26));
+}
+
+.astro-regent-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.astro-regent-card__eyebrow {
+  color: #92400e;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.astro-regent-card__name {
+  color: #312e81;
+  font-size: 1.35rem;
+}
+
+.astro-regent-card__hebrew {
+  color: #6d28d9;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.astro-regent-card__criterion {
+  margin-top: 3px;
+  color: #6d28d9;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.astro-falange-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.astro-falange-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(245, 243, 255, 0.9));
+  box-shadow: 0 2px 7px rgba(76, 29, 149, 0.07);
+}
+
+.astro-falange-card__angel {
+  color: #4c1d95;
+}
+
+.astro-falange-card__members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.astro-cusps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.astro-cusp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #bae6fd;
+  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(240, 249, 255, 0.95), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 2px 6px rgba(3, 105, 161, 0.07);
+}
+
+.astro-cusp-card__house {
+  color: #0369a1;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.astro-cusp-card strong {
+  color: #0f172a;
+  font-size: 0.84rem;
+}
+
+.astro-angles-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.astro-angle-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(238, 242, 255, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.astro-angle-card__mark {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  font-size: 0.72rem;
+  font-weight: 900;
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.22);
+}
+
+.astro-angle-card > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.astro-angle-card strong {
+  color: #312e81;
+}
+
+.astro-angle-card small {
+  color: #475569;
+  font-size: 0.78rem;
+}
+
+.astro-provenance-list .astro-kv {
+  gap: 18px;
+}
+
+.astro-provenance-list .astro-kv strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.astro-planet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.astro-planet-chip .astro-planet-icon {
+  min-width: 1.1em;
+  font-size: 1.15rem;
+}
+
+@media (max-width: 640px) {
+  .astro-regent-card {
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .astro-regent-card__symbol {
+    font-size: 3rem;
+  }
+
+  .astro-cusps-grid,
+  .astro-angles-list,
+  .astro-falange-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .astro-angle-card {
+    min-width: 0;
+  }
+
+  .astro-provenance-list .astro-kv {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .astro-provenance-list .astro-kv strong {
+    text-align: left;
+  }
+}
+
 /* Síntese do Mestre (IA) — dark text on light background */
 .astro-ia-content {
   font-size: 0.85rem;
