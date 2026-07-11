@@ -15,6 +15,7 @@ type AstrologoMapa = {
   dados_astronomica?: string | null;
   dados_tropical?: string | null;
   dados_globais?: string | null;
+  dados_posicionais_v2?: string | null;
   analise_ia?: string | null;
   created_at?: string | null;
 };
@@ -58,6 +59,7 @@ export async function onRequestPost(context: Context) {
         dados_astronomica,
         dados_tropical,
         dados_globais,
+        dados_posicionais_v2,
         analise_ia,
         created_at
       FROM astrologo_mapas

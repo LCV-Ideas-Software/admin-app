@@ -1,0 +1,92 @@
+/*
+ * Copyright © 2026 LCV Ideas & Software
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NotificationProvider } from '../../components/Notification';
+import { createDadosPosicionaisV2Fixture } from '../../test/fixtures/astrologo-positional-v2';
+import { AstrologoModule } from './AstrologoModule';
+
+vi.mock('../../lib/useModuleConfig', () => ({
+  useModuleConfig: () => [{ modeloSintese: '' }, vi.fn(), false],
+}));
+
+const dadosPosicionaisV2 = createDadosPosicionaisV2Fixture();
+const mapa = {
+  id: dadosPosicionaisV2.calculationId,
+  nome: 'Consulente V2',
+  data_nascimento: '2000-07-15',
+  hora_nascimento: '10:00',
+  local_nascimento: 'São Paulo',
+  dados_astronomica: null,
+  dados_tropical: null,
+  dados_globais: null,
+  dados_posicionais_v2: JSON.stringify(dadosPosicionaisV2),
+  analise_ia: null,
+  created_at: '2026-07-11T15:30:45Z',
+};
+
+const jsonResponse = (payload: unknown): Response => ({ ok: true, json: async () => payload }) as unknown as Response;
+
+describe('AstrologoModule dados posicionais v2', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.startsWith('/api/astrologo/listar?')) {
+          return jsonResponse({
+            ok: true,
+            total: 1,
+            filtros: { nome: '', dataInicial: '', dataFinal: '', email: '' },
+            items: [
+              {
+                id: mapa.id,
+                nome: mapa.nome,
+                dataNascimento: '15/07/2000',
+                status: 'analisado',
+              },
+            ],
+          });
+        }
+        if (url === '/api/astrologo/ler') return jsonResponse({ ok: true, mapa });
+        throw new Error(`Fetch inesperado no teste: ${url}`);
+      }),
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('mostra a tabela de dez planetas, falange e proveniência em horário de Brasília', async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationProvider>
+        <AstrologoModule />
+      </NotificationProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Atualizar arquivo' }));
+    const row = (await screen.findByText(mapa.nome)).closest('li');
+    expect(row).not.toBeNull();
+    await user.click(within(row as HTMLElement).getByRole('button', { name: 'Ler detalhes' }));
+
+    const table = await screen.findByRole('table', { name: 'Posições planetárias v2' });
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(11);
+    expect(within(table).getByText('12°20\'44" de Áries')).toBeInTheDocument();
+    expect(within(table).getAllByText('Áries (Ari)')).toHaveLength(10);
+    for (const row of rows.slice(1)) {
+      expect(within(row).getAllByRole('cell')[1]).toHaveTextContent(/^Áries \(Ari\)$/);
+    }
+    expect(screen.getByText(/Falange angélica/)).toBeInTheDocument();
+    expect(screen.getByText(/11\/07\/2026 às 12:30:45/)).toBeInTheDocument();
+    expect(screen.getByText(/Astronomy Engine 2\.1\.19/)).toBeInTheDocument();
+    expect(screen.getByText(/Swiss Ephemeris 2\.10\.03/)).toBeInTheDocument();
+  });
+});

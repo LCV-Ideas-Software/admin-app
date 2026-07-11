@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Adicionado
+
+- **Astrologo — dados posicionais v2**: leitura defensiva da nova coluna D1, tabela dos dez planetas, graus tropicais, constelação IAU sem grau interno, Casa Placidus, anjo por quinário, falange, cúspides e proveniência. Os mesmos dados passam a integrar os relatórios texto/HTML e o fluxo de e-mail.
+
+### Corrigido
+
+- O detalhe e os relatórios formatam instantes com `pt-BR`, `America/Sao_Paulo` e ciclo de 24 horas; mapas legados mostram aviso de fuso não verificável.
+- O relatório fica vinculado ao ID realmente carregado: uma falha ao abrir outro mapa invalida o conteúdo anterior e impede envio cruzado.
+- O parser v2 rejeita JSON adulterado, conjunto incompleto de planetas, incoerência longitude/signo/decanato/quinário/anjo, falange incompleta e `calculationId` diferente do mapa.
+
 ## [v02.10.02] - 2026-07-06
 
 ### Corrigido

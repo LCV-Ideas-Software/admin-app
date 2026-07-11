@@ -9,6 +9,18 @@ import type { FormEvent } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
+import {
+  type DadosPosicionaisV2,
+  type DadosPosicionaisV2ParseResult,
+  formatBrazilianCivilDate,
+  formatIauConstellation,
+  formatInstantInBrasilia,
+  formatPlacidusHouse,
+  formatTropicalPosition,
+  LEGACY_TIME_WARNING,
+  PLANET_LABEL_BY_ID,
+  parseDadosPosicionaisV2,
+} from '../../lib/astrological-position-v2';
 import { generateAstrologicalReport } from '../../lib/astrological-report';
 import { useModuleConfig } from '../../lib/useModuleConfig';
 
@@ -42,11 +54,19 @@ type MapaDetalhado = {
   dados_astronomica: string | null;
   dados_tropical: string | null;
   dados_globais: string | null;
+  dados_posicionais_v2?: string | null;
+  dadosPosicionaisV2?: unknown;
   analise_ia: string | null;
   created_at: string | null;
 };
 
 type ConfirmDelete = { show: boolean; id: string; nome: string };
+
+type RelatorioDoMapa = {
+  mapaId: string;
+  html: string;
+  text: string;
+};
 
 // Allowlist restrita: só tags estruturais/semânticas. Sem `style` — evita exfiltração via
 // background-image: url(...) caso a síntese do Gemini seja influenciada por prompt-injection.
@@ -60,6 +80,166 @@ const formatarData = (dataStr: string): string => {
   if (!dataStr) return '';
   const p = dataStr.split('-');
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dataStr;
+};
+
+const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }) => {
+  if (result.status !== 'available') {
+    const invalidPrefix = result.status === 'invalid' ? `Dados posicionais v2 inválidos (${result.reason}). ` : '';
+    return (
+      <div className="astro-section" role="status" style={{ borderColor: '#fdba74', background: '#fff7ed' }}>
+        <h5 className="astro-section__title">Dados posicionais v2 indisponíveis</h5>
+        <p className="field-hint" style={{ color: '#9a3412' }}>
+          {invalidPrefix}
+          {LEGACY_TIME_WARNING}
+        </p>
+      </div>
+    );
+  }
+
+  const dados: DadosPosicionaisV2 = result.data;
+  const angelById = new Map(
+    dados.positions.map((position) => [position.angelicQuinary.angel.id, position.angelicQuinary.angel]),
+  );
+
+  return (
+    <section className="astro-section" aria-labelledby={`positional-v2-${dados.calculationId}`}>
+      <h5 id={`positional-v2-${dados.calculationId}`} className="astro-section__title">
+        Posições planetárias e correspondências angélicas
+      </h5>
+      <p className="field-hint">
+        A constelação IAU é uma região bidimensional do céu. O sistema não calcula nem exibe grau interno em
+        constelações.
+      </p>
+      <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+        <table aria-label="Posições planetárias v2" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th scope="col" style={{ padding: '0.65rem', textAlign: 'left' }}>
+                Planeta
+              </th>
+              <th scope="col" style={{ padding: '0.65rem', textAlign: 'left' }}>
+                Grau tropical
+              </th>
+              <th scope="col" style={{ padding: '0.65rem', textAlign: 'left' }}>
+                Constelação IAU
+              </th>
+              <th scope="col" style={{ padding: '0.65rem', textAlign: 'left' }}>
+                Casa
+              </th>
+              <th scope="col" style={{ padding: '0.65rem', textAlign: 'left' }}>
+                Anjo do quinário tropical
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {dados.positions.map((position) => {
+              const angel = position.angelicQuinary.angel;
+              return (
+                <tr key={position.bodyId}>
+                  <th scope="row" style={{ padding: '0.65rem', textAlign: 'left', verticalAlign: 'top' }}>
+                    {position.symbol} {position.displayNamePtBr}
+                  </th>
+                  <td style={{ padding: '0.65rem', verticalAlign: 'top' }}>{formatTropicalPosition(position)}</td>
+                  <td style={{ padding: '0.65rem', verticalAlign: 'top' }}>{formatIauConstellation(position)}</td>
+                  <td style={{ padding: '0.65rem', verticalAlign: 'top' }}>{formatPlacidusHouse(position)}</td>
+                  <td style={{ padding: '0.65rem', verticalAlign: 'top' }}>
+                    <strong>
+                      #{angel.id} {angel.canonicalName}
+                    </strong>{' '}
+                    <bdi lang="he" dir="rtl">
+                      {angel.hebrewTriplet}
+                    </bdi>
+                    <br />
+                    <span className="field-hint">
+                      {angel.choir} · príncipe {angel.prince}
+                    </span>
+                    <br />
+                    <span className="field-hint">{angel.qualitySummaryPtBr}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <h5 className="astro-section__title" style={{ marginTop: '1.5rem' }}>
+        Falange angélica dos dez planetas
+      </h5>
+      <ul className="astro-kv-list">
+        {dados.aggregates.angelicFalange.map((group) => {
+          const angel = angelById.get(group.angelId);
+          return (
+            <li key={`falange-${group.angelId}`} className="astro-kv">
+              <strong>
+                #{group.angelId} {angel?.canonicalName ?? 'Nome indisponível'}
+              </strong>
+              <span>
+                {group.memberBodyIds.map((bodyId) => PLANET_LABEL_BY_ID[bodyId]).join(', ')} ({group.occurrenceCount})
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <h5 className="astro-section__title" style={{ marginTop: '1.5rem' }}>
+        Proveniência e política temporal
+      </h5>
+      <div className="astro-kv-list">
+        <div className="astro-kv">
+          <span className="astro-kv__label">Contrato</span>
+          <strong>
+            {dados.schemaId} v{dados.schemaVersion} · cálculo {dados.calculationId}
+          </strong>
+        </div>
+        <div className="astro-kv">
+          <span className="astro-kv__label">Calculado</span>
+          <strong>
+            {formatInstantInBrasilia(dados.calculatedAtUtc)} — {dados.presentationPolicy.timeZoneLabel}
+          </strong>
+        </div>
+        <div className="astro-kv">
+          <span className="astro-kv__label">Nascimento civil no local</span>
+          <strong>
+            {formatBrazilianCivilDate(dados.birthContext.civilInput.date)} às {dados.birthContext.civilInput.time} ·{' '}
+            {dados.birthContext.timeResolution.timeZoneIana} ({dados.birthContext.timeResolution.offsetAtBirth})
+          </strong>
+        </div>
+        <div className="astro-kv">
+          <span className="astro-kv__label">Instante em Brasília</span>
+          <strong>{formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc)}</strong>
+        </div>
+        <div className="astro-kv">
+          <span className="astro-kv__label">Efemérides</span>
+          <strong>
+            Astronomy Engine {dados.models.ephemeris.engineVersion} · SHA-256{' '}
+            <code>{dados.models.ephemeris.sourceSha256}</code>
+          </strong>
+        </div>
+        <div className="astro-kv">
+          <span className="astro-kv__label">Casas</span>
+          <strong>
+            Swiss Ephemeris {dados.models.houses.engineVersion} · Placidus · WASM SHA-256{' '}
+            <code>{dados.models.houses.runtimeWasmSha256}</code>
+          </strong>
+        </div>
+        <div className="astro-kv">
+          <span className="astro-kv__label">Constelações IAU</span>
+          <strong>
+            {dados.models.astronomicalReal.methodId} · base SHA-256{' '}
+            <code>{dados.models.astronomicalReal.boundaryDatasetSha256}</code>
+          </strong>
+        </div>
+        <div className="astro-kv">
+          <span className="astro-kv__label">Catálogo angélico</span>
+          <strong>
+            {dados.catalogs.angelic72.catalogId} v{dados.catalogs.angelic72.catalogVersion} · SHA-256{' '}
+            <code>{dados.catalogs.angelic72.catalogSha256}</code>
+          </strong>
+        </div>
+      </div>
+    </section>
+  );
 };
 
 // Configs (D1-persisted via useModuleConfig)
@@ -108,17 +288,20 @@ export function AstrologoModule() {
   const [email, setEmail] = useState('');
   const [items, setItems] = useState<MapaResumo[]>([]);
   const [selectedMapa, setSelectedMapa] = useState<MapaDetalhado | null>(null);
-  const [nomeConsulente, setNomeConsulente] = useState('');
-  const [relatorioHtml, setRelatorioHtml] = useState('');
-  const [relatorioTexto, setRelatorioTexto] = useState('');
+  const [relatorio, setRelatorio] = useState<RelatorioDoMapa | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete | null>(null);
   const [emailModalMapaId, setEmailModalMapaId] = useState<string | null>(null);
   const [emailModalInput, setEmailModalInput] = useState('');
 
   const disabled = useMemo(() => loading, [loading]);
 
-  const handleReadMapa = async (id: string) => {
+  const handleReadMapa = async (id: string): Promise<boolean> => {
     setLoadingMapaId(id);
+    // Invalida imediatamente todo estado derivado do mapa anterior. Uma leitura
+    // malsucedida nunca pode deixar um relatório antigo disponível para envio.
+    setEmailModalMapaId(null);
+    setSelectedMapa(null);
+    setRelatorio(null);
     try {
       const response = await fetch('/api/astrologo/ler', {
         method: 'POST',
@@ -140,24 +323,26 @@ export function AstrologoModule() {
         throw new Error(payload.error ?? 'Falha ao ler mapa do Astrólogo.');
       }
 
-      // Limpar estado dependente do mapa anterior antes de definir o novo
-      setEmailModalMapaId(null);
-      setNomeConsulente(payload.mapa.nome);
-
-      setSelectedMapa(payload.mapa);
-
-      // Auto-generate astrological reports
-      try {
-        const report = generateAstrologicalReport(payload.mapa);
-        setRelatorioHtml(report.html);
-        setRelatorioTexto(report.text);
-      } catch {
-        showNotification('Aviso: falha ao gerar relatório automático, preencha manualmente.', 'info');
+      if (payload.mapa.id !== id) {
+        throw new Error('A API retornou um mapa diferente do registro solicitado.');
       }
 
+      // Auto-generate astrological reports
+      let report: ReturnType<typeof generateAstrologicalReport>;
+      try {
+        report = generateAstrologicalReport(payload.mapa);
+      } catch {
+        showNotification('Não foi possível gerar o relatório deste mapa.', 'error');
+        return false;
+      }
+
+      setSelectedMapa(payload.mapa);
+      setRelatorio({ mapaId: payload.mapa.id, html: report.html, text: report.text });
       showNotification(withTrace('Mapa carregado com detalhes completos.', payload), 'success');
+      return true;
     } catch {
       showNotification('Não foi possível carregar os detalhes do mapa.', 'error');
+      return false;
     } finally {
       setLoadingMapaId(null);
     }
@@ -181,18 +366,28 @@ export function AstrologoModule() {
   };
 
   /** Open email modal for a specific mapa (loads its data first if not already selected) */
-  const handleOpenEmailModal = async (id: string, nome: string) => {
-    // If this record isn't already loaded, load it first
-    if (!selectedMapa || selectedMapa.id !== id) {
-      await handleReadMapa(id);
+  const handleOpenEmailModal = async (id: string) => {
+    // O mapa selecionado e o relatório precisam pertencer ao mesmo registro.
+    if (!selectedMapa || selectedMapa.id !== id || !relatorio || relatorio.mapaId !== id) {
+      const loaded = await handleReadMapa(id);
+      if (!loaded) return;
     }
-    setNomeConsulente(nome);
     setEmailModalInput('');
     setEmailModalMapaId(id);
   };
 
   /** Send email using the simple modal (only asks for email address) */
   const handleSendEmailFromModal = async () => {
+    const mapa = selectedMapa;
+    const report = relatorio;
+    const mapaId = emailModalMapaId;
+
+    if (!mapaId || !mapa || mapa.id !== mapaId || !report || report.mapaId !== mapaId) {
+      setEmailModalMapaId(null);
+      showNotification('Envio bloqueado: o relatório não corresponde ao mapa selecionado.', 'error');
+      return;
+    }
+
     const email = emailModalInput.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       showNotification('Informe um e-mail válido.', 'error');
@@ -208,10 +403,11 @@ export function AstrologoModule() {
           'X-Admin-Actor': adminActor,
         },
         body: JSON.stringify({
+          mapaId,
           emailDestino: email,
-          nomeConsulente,
-          relatorioHtml,
-          relatorioTexto,
+          nomeConsulente: mapa.nome,
+          relatorioHtml: report.html,
+          relatorioTexto: report.text,
           adminActor,
         }),
       });
@@ -388,6 +584,10 @@ export function AstrologoModule() {
     const horaNascimento = mapa.hora_nascimento || mapa.query?.horaNascimento || '';
     const localNascimento = mapa.local_nascimento || mapa.query?.localNascimento || '';
     const analiseIa = mapa.analise_ia || mapa.analiseIa || '';
+    const positional = parseDadosPosicionaisV2(
+      mapa.dados_posicionais_v2 ?? mapa.dadosPosicionaisV2,
+      typeof mapa.id === 'string' ? mapa.id : undefined,
+    );
 
     return (
       <article
@@ -528,6 +728,8 @@ export function AstrologoModule() {
             <div className="astro-ia-content" dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(analiseIa) }} />
           </div>
         )}
+
+        <PositionalV2Panel result={positional} />
       </article>
     );
   };
@@ -709,7 +911,7 @@ export function AstrologoModule() {
                         <button
                           type="button"
                           className="ghost-button"
-                          onClick={() => void handleOpenEmailModal(item.id, item.nome)}
+                          onClick={() => void handleOpenEmailModal(item.id)}
                           disabled={loadingMapaId === item.id || deletingMapaId === item.id || sendingEmail}
                         >
                           <Mail size={16} />
@@ -841,7 +1043,7 @@ export function AstrologoModule() {
                     </button>
                     <span className="badge badge-em-implantacao">{selectedUser.email}</span>
                     <span className="field-hint">
-                      Atualizado em {new Date(selectedUser.atualizadoEm).toLocaleString('pt-BR')}
+                      Atualizado em {formatInstantInBrasilia(selectedUser.atualizadoEm)} — Hora oficial de Brasília
                     </span>
                     <button
                       type="button"
@@ -875,7 +1077,7 @@ export function AstrologoModule() {
           ) : (
             <ul className="result-list astro-akashico-scroll">
               {userData.map((row) => {
-                const dt = new Date(row.atualizadoEm).toLocaleString('pt-BR');
+                const dt = formatInstantInBrasilia(row.atualizadoEm);
                 let preview: string;
                 try {
                   const d = JSON.parse(row.dadosJson);
@@ -907,7 +1109,7 @@ export function AstrologoModule() {
                         <strong>{row.email}</strong>
                       </div>
                       <div className="post-row-meta">
-                        <span>{dt}</span>
+                        <span>{dt} — Hora oficial de Brasília</span>
                         <span className="badge badge-em-implantacao">{preview}</span>
                       </div>
                     </div>

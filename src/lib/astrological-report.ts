@@ -9,6 +9,19 @@
  * faithfully reproducing the original Oráculo Celestial layout.
  */
 
+import {
+  type DadosPosicionaisV2,
+  type DadosPosicionaisV2ParseResult,
+  formatBrazilianCivilDate,
+  formatIauConstellation,
+  formatInstantInBrasilia,
+  formatPlacidusHouse,
+  formatTropicalPosition,
+  LEGACY_TIME_WARNING,
+  PLANET_LABEL_BY_ID,
+  parseDadosPosicionaisV2,
+} from './astrological-position-v2';
+
 // ─── Types (paridade com astrologo-frontend) ──────────────────────
 interface AstroData {
   astro: string;
@@ -38,6 +51,8 @@ interface MapaDetalhado {
   dados_astronomica: string | null;
   dados_tropical: string | null;
   dados_globais: string | null;
+  dados_posicionais_v2?: string | null;
+  dadosPosicionaisV2?: unknown;
   analise_ia: string | null;
   created_at: string | null;
 }
@@ -144,6 +159,119 @@ const sanitizeForEmail = (html: string): string => {
   return parsed.body.innerHTML;
 };
 
+const escapeHtml = (value: string | number): string =>
+  String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+const positionalWarning = (result: DadosPosicionaisV2ParseResult): string =>
+  result.status === 'invalid'
+    ? `Dados posicionais v2 indisponíveis (${result.reason}). ${LEGACY_TIME_WARNING}`
+    : LEGACY_TIME_WARNING;
+
+const renderFalangeText = (dados: DadosPosicionaisV2): string => {
+  const angelById = new Map(
+    dados.positions.map((position) => [position.angelicQuinary.angel.id, position.angelicQuinary.angel]),
+  );
+  return dados.aggregates.angelicFalange
+    .map((group) => {
+      const angel = angelById.get(group.angelId);
+      const members = group.memberBodyIds.map((bodyId) => PLANET_LABEL_BY_ID[bodyId]).join(', ');
+      return `  • Anjo #${group.angelId}${angel ? ` ${angel.canonicalName}` : ''}: ${members} (${group.occurrenceCount})`;
+    })
+    .join('\n');
+};
+
+const renderPositionalText = (dados: DadosPosicionaisV2): string => {
+  let text = '*🪐 POSIÇÕES PLANETÁRIAS E CORRESPONDÊNCIAS ANGÉLICAS*\n\n';
+  for (const position of dados.positions) {
+    const angel = position.angelicQuinary.angel;
+    text += `  • ${position.symbol} ${position.displayNamePtBr}: ${formatTropicalPosition(position)} | Constelação IAU: ${formatIauConstellation(position)} | ${formatPlacidusHouse(position)}\n`;
+    text += `    Anjo #${angel.id}: ${angel.canonicalName} (${angel.hebrewTriplet}) — ${angel.choir}; príncipe ${angel.prince}\n`;
+  }
+
+  text += '\n*Falange angélica (dez planetas):*\n';
+  text += `${renderFalangeText(dados)}\n`;
+  text += '\n*Proveniência e política temporal:*\n';
+  text += `  • Esquema: ${dados.schemaId} v${dados.schemaVersion}; cálculo ${dados.calculationId}\n`;
+  text += `  • Calculado em ${formatInstantInBrasilia(dados.calculatedAtUtc)} — ${dados.presentationPolicy.timeZoneLabel}\n`;
+  text += `  • Nascimento civil informado: ${formatBrazilianCivilDate(dados.birthContext.civilInput.date)} às ${dados.birthContext.civilInput.time}, fuso ${dados.birthContext.timeResolution.timeZoneIana} (${dados.birthContext.timeResolution.offsetAtBirth})\n`;
+  text += `  • Instante de nascimento exibido em Brasília: ${formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc)}\n`;
+  text += `  • Efemérides: Astronomy Engine ${dados.models.ephemeris.engineVersion}; SHA-256 ${dados.models.ephemeris.sourceSha256}\n`;
+  text += `  • Casas: Swiss Ephemeris ${dados.models.houses.engineVersion}, Placidus; WASM SHA-256 ${dados.models.houses.runtimeWasmSha256}\n`;
+  text += `  • Constelações IAU: ${dados.models.astronomicalReal.methodId}; base SHA-256 ${dados.models.astronomicalReal.boundaryDatasetSha256}\n`;
+  text += `  • Catálogo angélico: ${dados.catalogs.angelic72.catalogId} v${dados.catalogs.angelic72.catalogVersion}; SHA-256 ${dados.catalogs.angelic72.catalogSha256}\n`;
+  return text;
+};
+
+const renderPositionalHtml = (dados: DadosPosicionaisV2, boxShadow: string): string => {
+  const rows = dados.positions
+    .map((position) => {
+      const angel = position.angelicQuinary.angel;
+      return `
+        <tr>
+          <th scope="row" style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top;">${escapeHtml(position.symbol)} ${escapeHtml(position.displayNamePtBr)}</th>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">${escapeHtml(formatTropicalPosition(position))}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">${escapeHtml(formatIauConstellation(position))}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">${escapeHtml(formatPlacidusHouse(position))}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+            <strong>#${angel.id} ${escapeHtml(angel.canonicalName)}</strong>
+            <bdi lang="he" dir="rtl">${escapeHtml(angel.hebrewTriplet)}</bdi><br>
+            <span style="font-size: 12px; color: #475569;">${escapeHtml(angel.choir)} · príncipe ${escapeHtml(angel.prince)}</span><br>
+            <span style="font-size: 12px; color: #64748b;">${escapeHtml(angel.qualitySummaryPtBr)}</span>
+          </td>
+        </tr>`;
+    })
+    .join('');
+
+  const angelById = new Map(
+    dados.positions.map((position) => [position.angelicQuinary.angel.id, position.angelicQuinary.angel]),
+  );
+  const falange = dados.aggregates.angelicFalange
+    .map((group) => {
+      const angel = angelById.get(group.angelId);
+      const members = group.memberBodyIds.map((bodyId) => PLANET_LABEL_BY_ID[bodyId]).join(', ');
+      return `<li><strong>#${group.angelId}${angel ? ` ${escapeHtml(angel.canonicalName)}` : ''}</strong>: ${escapeHtml(members)} (${group.occurrenceCount})</li>`;
+    })
+    .join('');
+
+  return `
+    <section style="margin-top: 60px; padding: 32px; background-color: rgba(255, 255, 255, 0.85); border-radius: 24px; border: 1px solid #cbd5e1; ${boxShadow}">
+      <h2 style="font-size: 26px; color: #334155; margin: 0 0 12px 0;">🪐 Posições planetárias e correspondências angélicas</h2>
+      <p style="font-size: 13px; color: #475569; margin: 0 0 20px 0;">A constelação IAU é uma região bidimensional do céu; por isso, este relatório não atribui grau interno à constelação.</p>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="background-color: #e2e8f0;">
+              <th scope="col" style="padding: 10px; text-align: left;">Planeta</th>
+              <th scope="col" style="padding: 10px; text-align: left;">Tropical</th>
+              <th scope="col" style="padding: 10px; text-align: left;">Constelação IAU</th>
+              <th scope="col" style="padding: 10px; text-align: left;">Casa</th>
+              <th scope="col" style="padding: 10px; text-align: left;">Anjo do quinário tropical</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <h3 style="font-size: 18px; color: #334155; margin: 28px 0 8px 0;">Falange angélica dos dez planetas</h3>
+      <ul style="color: #334155; line-height: 1.6;">${falange}</ul>
+      <h3 style="font-size: 18px; color: #334155; margin: 28px 0 8px 0;">Proveniência e política temporal</h3>
+      <ul style="font-size: 12px; color: #475569; line-height: 1.6; overflow-wrap: anywhere;">
+        <li>Esquema ${escapeHtml(dados.schemaId)} v${escapeHtml(dados.schemaVersion)}; cálculo ${escapeHtml(dados.calculationId)}</li>
+        <li>Calculado em ${escapeHtml(formatInstantInBrasilia(dados.calculatedAtUtc))} — ${escapeHtml(dados.presentationPolicy.timeZoneLabel)}</li>
+        <li>Nascimento civil informado: ${escapeHtml(formatBrazilianCivilDate(dados.birthContext.civilInput.date))} às ${escapeHtml(dados.birthContext.civilInput.time)}, fuso ${escapeHtml(dados.birthContext.timeResolution.timeZoneIana)} (${escapeHtml(dados.birthContext.timeResolution.offsetAtBirth)})</li>
+        <li>Instante de nascimento exibido em Brasília: ${escapeHtml(formatInstantInBrasilia(dados.birthContext.timeResolution.instantUtc))}</li>
+        <li>Efemérides: Astronomy Engine ${escapeHtml(dados.models.ephemeris.engineVersion)}; SHA-256 ${escapeHtml(dados.models.ephemeris.sourceSha256)}</li>
+        <li>Casas: Swiss Ephemeris ${escapeHtml(dados.models.houses.engineVersion)}, Placidus; WASM SHA-256 ${escapeHtml(dados.models.houses.runtimeWasmSha256)}</li>
+        <li>Constelações IAU: ${escapeHtml(dados.models.astronomicalReal.methodId)}; base SHA-256 ${escapeHtml(dados.models.astronomicalReal.boundaryDatasetSha256)}</li>
+        <li>Catálogo angélico: ${escapeHtml(dados.catalogs.angelic72.catalogId)} v${escapeHtml(dados.catalogs.angelic72.catalogVersion)}; SHA-256 ${escapeHtml(dados.catalogs.angelic72.catalogSha256)}</li>
+      </ul>
+    </section>`;
+};
+
 // ─── Text Report (WhatsApp-style) ────────────────────────────────
 
 function gerarTextoRelatorio(
@@ -152,6 +280,7 @@ function gerarTextoRelatorio(
   tropical: DadosSistema | null,
   astronomica: DadosSistema | null,
   analiseIa: string | null,
+  positional: DadosPosicionaisV2ParseResult,
 ): string {
   const divider = `\n${'─'.repeat(28)}\n`;
 
@@ -214,6 +343,13 @@ function gerarTextoRelatorio(
   }
 
   t += divider;
+  if (positional.status === 'available') {
+    t += renderPositionalText(positional.data);
+  } else {
+    t += `*⚠️ DADOS POSICIONAIS V2 INDISPONÍVEIS*\n\n${positionalWarning(positional)}\n`;
+  }
+
+  t += divider;
   t += `✨ _Gerado via Oráculo Celestial — Admin LCV_ ✨`;
   return t;
 }
@@ -226,6 +362,7 @@ function gerarHtmlRelatorio(
   tropical: DadosSistema | null,
   astronomica: DadosSistema | null,
   analiseIa: string | null,
+  positional: DadosPosicionaisV2ParseResult,
 ): string {
   const fontFamily =
     "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;";
@@ -301,7 +438,7 @@ function gerarHtmlRelatorio(
 
   const html = `
   <!DOCTYPE html>
-  <html lang="pt-br">
+  <html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -375,6 +512,16 @@ function gerarHtmlRelatorio(
           : ''
       }
 
+      ${
+        positional.status === 'available'
+          ? renderPositionalHtml(positional.data, boxShadow)
+          : `
+      <section style="margin-top: 60px; padding: 24px; background-color: #fff7ed; border-radius: 16px; border: 1px solid #fdba74; ${boxShadow}">
+        <h2 style="font-size: 20px; color: #9a3412; margin: 0 0 8px 0;">⚠️ Dados posicionais v2 indisponíveis</h2>
+        <p style="font-size: 14px; color: #7c2d12; margin: 0;">${escapeHtml(positionalWarning(positional))}</p>
+      </section>`
+      }
+
       <footer style="text-align: center; margin-top: 60px; padding-top: 20px; border-top: 1px solid #dde4ee;">
         <p style="font-size: 12px; color: #64748b; margin: 0;">Gerado via Oráculo Celestial — Admin LCV</p>
       </footer>
@@ -392,9 +539,10 @@ export function generateAstrologicalReport(mapa: MapaDetalhado): GeneratedReport
   const globais = safeParseJson<DadosGlobais>(mapa.dados_globais);
   const tropical = safeParseJson<DadosSistema>(mapa.dados_tropical);
   const astronomica = safeParseJson<DadosSistema>(mapa.dados_astronomica);
+  const positional = parseDadosPosicionaisV2(mapa.dados_posicionais_v2 ?? mapa.dadosPosicionaisV2, mapa.id);
 
-  const htmlContent = gerarHtmlRelatorio(mapa, globais, tropical, astronomica, mapa.analise_ia);
-  const textContent = gerarTextoRelatorio(mapa, globais, tropical, astronomica, mapa.analise_ia);
+  const htmlContent = gerarHtmlRelatorio(mapa, globais, tropical, astronomica, mapa.analise_ia, positional);
+  const textContent = gerarTextoRelatorio(mapa, globais, tropical, astronomica, mapa.analise_ia, positional);
 
   // Summary from AI or fallback
   let summary: string;
