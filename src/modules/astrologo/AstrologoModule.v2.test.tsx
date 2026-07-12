@@ -44,6 +44,19 @@ const mapa = {
   synastry_run_v1: JSON.stringify(createSynastryRunV1Fixture(dadosPosicionaisV2.calculationId)),
   synastry_subjects: { A: 'Consulente V2', B: 'Pessoa B' },
   locality_map_v1: JSON.stringify(createLocalityMapV1Fixture(dadosPosicionaisV2.calculationId)),
+  ai_analysis_job: {
+    status: 'running',
+    phase: 'analyzing',
+    progress: { completed: 3, total: 8 },
+    tokens: { input: 12500, output: 3400 },
+    error: null,
+    createdAtUtc: '2026-07-12T20:00:00Z',
+    updatedAtUtc: '2026-07-12T20:05:00Z',
+    completedAtUtc: null,
+    capability_hash: 'não pode aparecer',
+    plan_json: 'não pode aparecer',
+    fixed_prompt_prefix: 'não pode aparecer',
+  },
   analise_ia: null,
   created_at: '2026-07-11T15:30:45Z',
 };
@@ -141,6 +154,13 @@ describe('AstrologoModule dados posicionais v2', () => {
     expect(within(synastry).getByText('Consulente V2 nas casas de Pessoa B')).toBeInTheDocument();
     expect(within(synastry).getByText('Pessoa B nas casas de Consulente V2')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Mapa planetário de localidade' })).toBeInTheDocument();
+    const aiJob = screen.getByRole('region', { name: 'Estado operacional da análise por IA' });
+    expect(within(aiJob).getByText('Em processamento')).toBeInTheDocument();
+    expect(within(aiJob).getByText('Análise das partes')).toBeInTheDocument();
+    expect(within(aiJob).getByText('3 de 8 etapas (38%)')).toBeInTheDocument();
+    expect(within(aiJob).getByText('15.900')).toBeInTheDocument();
+    expect(within(aiJob).getByText('12/07/2026 às 17:00:00')).toBeInTheDocument();
+    expect(within(aiJob).queryByText(/não pode aparecer/)).not.toBeInTheDocument();
     expect(screen.queryByText(/fixed-by-aspect|planet:sun|POSITION_V2_0/)).not.toBeInTheDocument();
   });
 });

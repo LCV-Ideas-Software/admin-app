@@ -16,12 +16,13 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release: **v02.14.00**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+**Status.** Stable. Current release: **v02.14.01**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 The version history at a glance:
 
 | Release         | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`v02.14.01`** | **Astrólogo — análise extensa reentrante.** A migration 018 persiste jobs e etapas ordenadas com SHA-256 da capability, leases expiráveis, progresso, tokens, payloads/resultados JSON, cascade e no máximo uma execução ativa por mapa. O preflight 3.0 verifica o DDL integral e o índice único parcial, `astrologo/analisar-etapa` recebe bucket próprio e o Arquivo Akáshico mostra somente estado operacional seguro, em pt-BR e hora de Brasília.                                                                                                                                                                |
 | **`v02.14.00`** | **Astrólogo — propriedade segura de mapas salvos.** A migration 017 adiciona claims SHA-256 para o primeiro salvamento, backfill histórico somente quando o proprietário é inequívoco e bucket `astrologo/auth-read`; o preflight 2.0 do deploy reconcilia e verifica essas garantias de forma idempotente.                                                                                                                                                                                                                                                                                                                                                                           |
 | **`v02.13.00`** | **Astrólogo — artefatos avançados no admin.** Análises natais, trânsitos, sinastrias e mapas planetários de localidade persistidos ganham paridade entre tela, relatório e e-mail, com validação fail-closed dos vínculos run/artefato, apresentação pt-BR e hora de Brasília. O mapa usa Natural Earth 1:110m local e carrega o gráfico sob demanda.                                                                                                                                                                                                                                                                                                                                 |
 | **`v02.12.00`** | **Astrólogo — paridade Tatwa v2.** O admin identifica ordem fixa, ordem pelo principal e mapas legados, exibe incerteza e proveniência e mantém tela, relatório e e-mail integralmente em pt-BR, sem recalcular dados canônicos.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -168,9 +169,10 @@ Replace `00000000-0000-0000-0000-000000000000` in:
 ### 4. Apply schema
 
 Apply migrations 001 through 014 once, run the versioned Astrólogo preflight,
-then apply migrations 015 and 016. The preflight inspects
-`PRAGMA table_info(astrologo_mapas)` and adds `email` only when absent; this is
-required because older runtimes created that column on demand.
+then apply migrations 015 and 016. Run the preflight again after those explicit
+migrations. The first pass adds legacy `astrologo_mapas.email` only when absent;
+the final pass materializes and verifies the idempotent contracts from migrations
+017 and 018, including durable AI-analysis jobs and steps.
 
 ```bash
 for f in $(git ls-files 'db/migrations/*.sql' | sort); do
@@ -181,6 +183,7 @@ done
 node scripts/reconcile-astrologo-schema.mjs --remote --database example_db
 npx wrangler d1 execute example_db --remote --file db/migrations/015_bigdata_astrologo_schema_regularization.sql
 npx wrangler d1 execute example_db --remote --file db/migrations/016_bigdata_astrologo_advanced_charts.sql
+node scripts/reconcile-astrologo-schema.mjs --remote --database example_db
 ```
 
 The canonical Astrólogo schema, rollout order, verification queries, and the

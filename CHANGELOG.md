@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [v02.14.01] - 2026-07-12
+
+### Adicionado
+
+- **Análise extensa reentrante**: a migration `018` cria `astrologo_ai_analysis_jobs` e `astrologo_ai_analysis_steps`, permitindo que planejamento, análise, redução e síntese sobrevivam entre requisições HTTP curtas, em vez de manter toda a cadeia Gemini dentro da mesma conexão.
+- **Unidades ordenadas e retomáveis**: cada etapa tem identidade estável, ordem, tipo, estado, tentativas, lease expirável, payload e resultado JSON próprios. A chave composta `(job_id, step_key)`, a ordem única por job e o cascade vinculam cada fragmento ao trabalho e ao mapa de origem.
+- **Progresso e custo persistentes**: o job conserva plano leve, prefixo fixo do prompt, fase, contadores de etapas, tokens, resultado final, expiração e diagnóstico de falha. A autorização pública usa somente o SHA-256 minúsculo da capability; o segredo não é persistido.
+- **Acompanhamento no Arquivo Akáshico**: o detalhe do mapa mostra a execução mais recente com estado, fase em português, progresso, tokens de entrada e saída, erro e instantes na hora oficial de Brasília.
+
+### Segurança e operação
+
+- **Uma chamada Gemini por requisição**: `astrologo/analisar-etapa` recebe policy própria de 240 requisições por 60 minutos, sem compartilhar o bucket do antigo endpoint monolítico. O limite configurado pelo operador é preservado por `INSERT OR IGNORE`.
+- **Preflight idempotente 3.0**: o reconciliador materializa tabelas, constraints, índices, cascade e policy da migration `018`, verifica as definições canônicas após a aplicação e falha fechado diante de objetos homônimos incompatíveis.
+- **Contrato DDL integral e exclusão mútua**: o preflight exige todas as colunas usadas pelo repositório, inclusive erros e timestamps das etapas, e verifica o índice único parcial que permite no máximo um job `queued` ou `running` por mapa.
+- **Leases recuperáveis**: jobs e etapas registram proprietário e expiração do lease, possibilitando retomada segura depois de interrupção do navegador, Worker ou provedor, sem repetir uma etapa já concluída.
+- **Projeção administrativa mínima**: a consulta seleciona somente metadados operacionais. `capability_hash`, `plan_json`, prefixo do prompt, payloads e resultados intermediários não saem do D1 nem entram na resposta do admin.
+
+### Preservado
+
+- Configuração da IA, Arquivo Akáshico, contratos astrológicos, relatórios, e-mail, localização pt-BR e garantias das migrations `015` a `017` permanecem inalterados.
+
 ## [v02.14.00] - 2026-07-12
 
 ### Adicionado

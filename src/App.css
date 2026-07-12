@@ -2509,6 +2509,170 @@ input[type="color"]:focus-visible {
   color: #1a73e8;
 }
 
+.astro-ai-job {
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.88), rgba(240, 253, 250, 0.78));
+}
+
+.astro-ai-job__heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.astro-ai-job__heading .astro-section__title,
+.astro-ai-job__heading .field-hint {
+  margin: 0;
+}
+
+.astro-ai-job__heading .field-hint {
+  margin-top: 5px;
+  max-width: 72ch;
+}
+
+.astro-ai-job__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: #4338ca;
+  background: linear-gradient(135deg, #e0e7ff, #ccfbf1);
+  box-shadow: 0 7px 18px rgba(67, 56, 202, 0.15);
+}
+
+.astro-ai-job__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #a5b4fc;
+  border-radius: 999px;
+  color: #3730a3;
+  background: #eef2ff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.astro-ai-job__status--running {
+  border-color: #67e8f9;
+  color: #155e75;
+  background: #ecfeff;
+}
+
+.astro-ai-job__status--completed {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.astro-ai-job__status--failed,
+.astro-ai-job__status--cancelled {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.astro-ai-job__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.astro-ai-job__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(165, 180, 252, 0.65);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.astro-ai-job__metric > span {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.astro-ai-job__metric strong {
+  color: #1e1b4b;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.astro-ai-job__metric small {
+  color: #64748b;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.astro-ai-job__error {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #991b1b;
+  background: #fff1f2;
+  overflow-wrap: anywhere;
+}
+
+.astro-ai-job__error span {
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+[data-theme="dark"] .astro-ai-job {
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.72), rgba(15, 23, 42, 0.88));
+}
+
+[data-theme="dark"] .astro-ai-job__metric {
+  border-color: rgba(129, 140, 248, 0.42);
+  background: rgba(15, 23, 42, 0.72);
+}
+
+[data-theme="dark"] .astro-ai-job__metric strong {
+  color: #e0e7ff;
+}
+
+[data-theme="dark"] .astro-ai-job__metric > span,
+[data-theme="dark"] .astro-ai-job__metric small {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .astro-ai-job__error {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.32);
+}
+
+@media (max-width: 640px) {
+  .astro-ai-job__heading {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .astro-ai-job__icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .astro-ai-job__status {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .astro-ai-job__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .astro-grid {
   display: grid;
   gap: 8px;

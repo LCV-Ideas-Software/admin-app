@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import {
+  ASTROLOGO_ANALYSIS_INDEXES,
+  ASTROLOGO_ANALYZE_STEP_POLICY_SQL,
   ASTROLOGO_AUTH_READ_POLICY_SQL,
   ASTROLOGO_SAVE_CLAIM_INDEX_SQL,
   ASTROLOGO_SAVED_MAPS_BACKFILL_SQL,
@@ -33,6 +35,105 @@ const prepareVersionedBaseline = () => {
 };
 
 describe('canonical Astrologo BIGDATA_DB migrations', () => {
+  it('creates durable reentrant AI jobs and ordered leased steps with cascading ownership', () => {
+    const db = prepareVersionedBaseline();
+    db.exec(migration('015_bigdata_astrologo_schema_regularization.sql'));
+    db.exec(migration('016_bigdata_astrologo_advanced_charts.sql'));
+    db.exec(migration('017_astrologo_saved_map_claims.sql'));
+    const migration018 = migration('018_astrologo_reentrant_ai_analysis.sql');
+    expect(normalizeSql(migration018)).toContain(normalizeSql(ASTROLOGO_ANALYZE_STEP_POLICY_SQL));
+    db.exec(migration018);
+    expect(() => db.exec(migration018)).not.toThrow();
+
+    db.prepare('INSERT INTO astrologo_mapas (id, nome) VALUES (?, ?)').run('map-analysis', 'Pessoa');
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO astrologo_ai_analysis_jobs
+           (id, capability_hash, mapa_id, plan_json, fixed_prompt_prefix, expires_at)
+           VALUES (?, ?, ?, '{}', 'prefixo fixo', '2026-07-13T00:00:00Z')`,
+        )
+        .run('job-invalid', 'not-a-sha', 'map-analysis'),
+    ).toThrow();
+    db.prepare(
+      `INSERT INTO astrologo_ai_analysis_jobs
+       (id, capability_hash, mapa_id, plan_json, fixed_prompt_prefix, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'job-valid',
+      HASH_A,
+      'map-analysis',
+      JSON.stringify({ model: 'gemini', limits: {}, plan: [], mode: 'fragmented' }),
+      'prefixo fixo',
+      '2026-07-13T00:00:00Z',
+    );
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO astrologo_ai_analysis_jobs
+           (id, capability_hash, mapa_id, plan_json, fixed_prompt_prefix, expires_at)
+           VALUES ('job-concurrent', ?, ?, '{}', 'prefixo fixo', '2026-07-13T00:00:00Z')`,
+        )
+        .run(HASH_B, 'map-analysis'),
+    ).toThrow();
+    db.prepare(
+      `INSERT INTO astrologo_ai_analysis_steps
+       (job_id, step_key, ordinal, kind, payload_json)
+       VALUES (?, 'natal', 0, 'fragment', '{}')`,
+    ).run('job-valid');
+
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO astrologo_ai_analysis_steps
+           (job_id, step_key, ordinal, kind, payload_json)
+           VALUES (?, 'duplicada', 0, 'fragment', '{}')`,
+        )
+        .run('job-valid'),
+    ).toThrow();
+    expect(tableIndexes(db, 'astrologo_ai_analysis_jobs')).toEqual(
+      expect.arrayContaining([
+        'idx_astrologo_ai_analysis_jobs_capability_hash',
+        'idx_astrologo_ai_analysis_jobs_active_mapa',
+        'idx_astrologo_ai_analysis_jobs_mapa_status',
+        'idx_astrologo_ai_analysis_jobs_expires_at',
+      ]),
+    );
+    expect(tableIndexes(db, 'astrologo_ai_analysis_steps')).toEqual(
+      expect.arrayContaining([
+        'idx_astrologo_ai_analysis_steps_job_ordinal',
+        'idx_astrologo_ai_analysis_steps_job_status_ordinal',
+      ]),
+    );
+    expect(Object.keys(ASTROLOGO_ANALYSIS_INDEXES)).toHaveLength(6);
+    expect(
+      db
+        .prepare('SELECT max_requests, window_minutes FROM astrologo_rate_limit_policies WHERE route = ?')
+        .get('astrologo/analisar-etapa'),
+    ).toEqual({ max_requests: 240, window_minutes: 60 });
+
+    db.prepare("UPDATE astrologo_ai_analysis_jobs SET status = 'completed', phase = 'completed' WHERE id = ?").run(
+      'job-valid',
+    );
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO astrologo_ai_analysis_jobs
+           (id, capability_hash, mapa_id, plan_json, fixed_prompt_prefix, expires_at)
+           VALUES ('job-next', ?, ?, '{}', 'prefixo fixo', '2026-07-13T00:00:00Z')`,
+        )
+        .run(HASH_B, 'map-analysis'),
+    ).not.toThrow();
+
+    db.prepare('DELETE FROM astrologo_mapas WHERE id = ?').run('map-analysis');
+    expect(db.prepare('SELECT id FROM astrologo_ai_analysis_jobs WHERE id = ?').get('job-valid')).toBeUndefined();
+    expect(db.prepare('SELECT id FROM astrologo_ai_analysis_jobs WHERE id = ?').get('job-next')).toBeUndefined();
+    expect(
+      db.prepare('SELECT step_key FROM astrologo_ai_analysis_steps WHERE job_id = ?').get('job-valid'),
+    ).toBeUndefined();
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+  });
+
   it('adds save claims, backfills only unambiguous historical ownership, and separates authenticated reads', () => {
     const db = prepareVersionedBaseline();
     db.exec(migration('015_bigdata_astrologo_schema_regularization.sql'));

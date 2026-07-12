@@ -27,28 +27,31 @@ salva pelo operador nunca é sobrescrita.
    materializar a coluna com `TEXT DEFAULT ''` quando ela estiver ausente.
 3. Aplicar `015_bigdata_astrologo_schema_regularization.sql` uma única vez.
 4. Aplicar `016_bigdata_astrologo_advanced_charts.sql` uma única vez.
-5. Aplicar `017_astrologo_saved_map_claims.sql` uma única vez **ou** executar o
-   reconciliador v2 do deploy, que materializa o mesmo contrato sem repetir o
-   `ALTER TABLE` quando a coluna já existe:
+5. Aplicar `017_astrologo_saved_map_claims.sql` e
+   `018_astrologo_reentrant_ai_analysis.sql` uma única vez **ou** executar o
+   reconciliador v3 do deploy, que materializa os mesmos contratos sem repetir
+   o `ALTER TABLE` quando a coluna já existe nem substituir tabelas ou policies
+   já canônicas:
 
    ```bash
    node scripts/reconcile-astrologo-schema.mjs --remote --database bigdata_db
    ```
 
 6. Publicar o `admin-app` e confirmar o preflight. Somente depois publicar o
-   `astrologo-app` que escreve ou exige `save_claim_hash`.
+   `astrologo-app` que escreve ou exige `save_claim_hash` e os jobs reentrantes.
 
 O reconciliador v1.0.0 consulta `PRAGMA table_info(astrologo_mapas)`. Ele adiciona a
 coluna `email` somente quando ausente, confirma o resultado e falha fechado se a
 tabela base não existir. A migration 015 adiciona `data_analise`, que estava
 ausente no schema remoto verificado antes desta mudança.
 
-O workflow de deploy executa o reconciliador v2 antes do Admin Motor. Ele não
-reaplica cegamente a migration 017: inspeciona o DDL, adiciona somente colunas
-ausentes, executa o backfill idempotente, semeia a policy com `INSERT OR IGNORE`,
-cria o índice com `IF NOT EXISTS` e verifica novamente todas as garantias. Uma
-coluna ou um índice homônimo com definição incompatível faz o deploy falhar
-fechado. As migrations 015 e 016 continuam sendo operações explícitas e únicas.
+O workflow de deploy executa o reconciliador v3 antes do Admin Motor. Ele não
+reaplica cegamente as migrations 017 e 018: inspeciona o DDL, adiciona somente
+colunas ausentes, executa o backfill idempotente, cria tabelas e índices apenas
+quando ausentes, semeia policies com `INSERT OR IGNORE` e verifica novamente
+todas as garantias. Coluna, tabela ou índice homônimo com definição incompatível
+faz o deploy falhar fechado. As migrations 015 e 016 continuam sendo operações
+explícitas e únicas.
 
 ## Migration 015
 
@@ -137,6 +140,71 @@ O seed de `astrologo/auth-read` usa `INSERT OR IGNORE`: 60/15 é o padrão de um
 instalação sem policy, enquanto limites já configurados pelo operador permanecem
 intocados.
 
+## Migration 018
+
+A análise extensa deixa de depender de uma conexão HTTP única. A migration 018
+persiste uma máquina de estados reentrante em duas entidades:
+
+- `astrologo_ai_analysis_jobs`: autorização por `capability_hash`, mapa de origem,
+  estado e fase, lease expirável, progresso, tokens, plano leve em JSON, prefixo
+  fixo do prompt, resultado final, expiração e diagnóstico;
+- `astrologo_ai_analysis_steps`: unidades ordenadas pertencentes ao job, com tipo,
+  estado, tentativas, lease, payload, resultado e tokens próprios.
+
+`capability_hash` é o SHA-256 hexadecimal minúsculo da capability entregue ao
+cliente. O bearer em texto puro não entra no D1. O índice é único, de modo que
+uma capability identifica no máximo um job. `mapa_id` referencia
+`astrologo_mapas(id)` e usa `ON DELETE CASCADE`; a chave composta
+`(job_id, step_key)` e a FK com cascade impedem etapas órfãs. A ordem também é
+única dentro do job. Um índice único parcial sobre `mapa_id`, restrito aos
+estados `queued` e `running`, impede duas execuções ativas simultâneas para o
+mesmo mapa sem bloquear o histórico de jobs terminais.
+
+Estados canônicos do job:
+
+- `status`: `queued`, `running`, `completed`, `failed` ou `cancelled`;
+- `phase`: `planning`, `analyzing`, `reducing`, `synthesizing`, `completed` ou
+  `failed`.
+
+Estados das etapas são `pending`, `running`, `completed` e `failed`; os tipos são
+`direct`, `fragment`, `reduction` e `synthesis`. `plan_json` registra modelo,
+limites, plano leve e modo escolhidos no início do job. `fixed_prompt_prefix`
+preserva separadamente a instrução integral que deve acompanhar cada chamada,
+sem duplicá-la nos payloads das etapas.
+
+Cada chamada a `astrologo/analisar-etapa` adquire no máximo uma etapa elegível,
+realiza no máximo uma chamada Gemini, persiste o resultado e devolve o estado
+atual. Se a conexão, o navegador, o Worker ou o provedor cair, outro request pode
+retomar um lease expirado. Uma etapa `completed` nunca volta a ser elegível. A
+policy inicial da rota é 240 requisições por 60 minutos e usa `INSERT OR IGNORE`,
+preservando limites ajustados pelo operador.
+
+Índices canônicos dão suporte à autorização por capability, listagem por mapa e
+estado, limpeza por expiração e seleção determinística da próxima etapa:
+
+- `idx_astrologo_ai_analysis_jobs_capability_hash`;
+- `idx_astrologo_ai_analysis_jobs_active_mapa` (único e parcial para `queued` e
+  `running`);
+- `idx_astrologo_ai_analysis_jobs_mapa_status`;
+- `idx_astrologo_ai_analysis_jobs_expires_at`;
+- `idx_astrologo_ai_analysis_steps_job_ordinal`;
+- `idx_astrologo_ai_analysis_steps_job_status_ordinal`.
+
+No detalhe do Arquivo Akáshico, o admin consulta somente a execução mais recente
+do mapa e projeta `status`, `phase`, progresso, tokens, erro e timestamps. A UI
+traduz estados e fases para pt-BR e converte instantes UTC para
+`America/Sao_Paulo`. A consulta SQL deliberadamente não seleciona
+`capability_hash`, `plan_json`, `fixed_prompt_prefix`, payloads ou resultados das
+etapas. O código de erro é limitado a um identificador curto; a presença de
+detalhes técnicos gera somente uma mensagem fixa, sem devolver o texto bruto.
+Campos sensíveis nunca integram a resposta administrativa nem o HTML.
+
+O preflight v3 compara também todas as colunas consumidas pelo repositório. Nos
+jobs isso inclui erros e conclusão; nas etapas inclui ordem com `CHECK >= 0`,
+erros, início e conclusão, além de estado, tentativas, leases, JSONs e tokens. Um
+objeto homônimo incompleto não é aceito como canônico. O índice parcial ativo é
+verificado por nome, unicidade, coluna e predicado exato.
+
 ## Consumo administrativo dos contratos v1
 
 O `admin-app/Astrólogo` reidrata quatro contratos produzidos e persistidos pelo
@@ -171,24 +239,20 @@ Arquivo Akáshico, relatório textual/HTML e e-mail. A camada visível usa pt-BR
 empacotada e renderizada localmente; o módulo gráfico é carregado sob demanda,
 sem tiles ou transmissão de dados natais a um provedor cartográfico.
 
-## Compatibilidade com a análise extensa v02.22.00
+## Compatibilidade com a análise extensa reentrante
 
-O `astrologo-app` pode distribuir uma análise extensa em unidades semânticas
-dentro de uma única requisição, mas fragmentos e notas intermediárias não são
-persistidos nesta versão. Somente depois de validar cobertura integral e montar
-todos os HTMLs o produtor atualiza `astrologo_mapas.analise_ia`. Portanto:
+Os jobs da migration 018 são infraestrutura transitória e durável de execução;
+não substituem `astrologo_ai_analyses`, que continua sendo o envelope canônico
+dos resultados especializados. Fragmentos, reduções e leases permanecem nas
+tabelas de job até a expiração. Somente após cobertura integral e síntese válida
+o produtor grava o resultado final sanitizado no contrato já consumido pelo
+Arquivo Akáshico.
 
-- `astrologo_ai_analyses` não recebe um novo tipo ou estado;
-- o admin continua lendo o mesmo resultado final já sanitizado;
-- falha ou truncamento de uma etapa não substitui uma análise completa anterior.
-
-A análise em partes, isoladamente, não persiste fragmentos nem exige uma entidade
-de IA adicional. Entretanto, a reidratação pública autenticada que fornece o
-mapa e seus quatro contratos depende explicitamente da migration 017 para prova
-de propriedade inicial e separação do rate limit de leitura. Autorização por
-sessão e proprietário pertence ao endpoint público; o admin mantém sua própria
-fronteira administrativa e não aceita o envelope público como substituto dos
-validadores canônicos existentes.
+Uma falha intermediária conserva o progresso retomável e não substitui uma
+análise completa anterior. O admin continua exibindo apenas resultados finais
+canônicos, nunca payloads de prompt nem notas parciais. A autorização pública por
+capability e proprietário pertence aos endpoints do `astrologo-app`; a fronteira
+administrativa não aceita esse bearer como substituto do Cloudflare Access.
 
 ## Verificação
 
@@ -197,7 +261,18 @@ PRAGMA table_info(astrologo_mapas);
 PRAGMA index_list(astrologo_mapas);
 PRAGMA table_info(admin_module_configs);
 PRAGMA foreign_key_list(astrologo_synastry_runs);
+PRAGMA table_info(astrologo_ai_analysis_jobs);
+PRAGMA table_info(astrologo_ai_analysis_steps);
+PRAGMA foreign_key_list(astrologo_ai_analysis_jobs);
+PRAGMA foreign_key_list(astrologo_ai_analysis_steps);
+PRAGMA index_list(astrologo_ai_analysis_jobs);
+PRAGMA index_list(astrologo_ai_analysis_steps);
 PRAGMA foreign_key_check;
+
+SELECT name, sql
+FROM sqlite_master
+WHERE type = 'index'
+  AND name = 'idx_astrologo_ai_analysis_jobs_active_mapa';
 
 SELECT module_key,
        json_type(config_json, '$.modeloSintese') AS modelo_sintese_type
@@ -206,7 +281,8 @@ WHERE module_key = 'astrologo-config';
 
 SELECT route, enabled, max_requests, window_minutes
 FROM astrologo_rate_limit_policies
-WHERE route = 'astrologo/auth-read';
+WHERE route IN ('astrologo/auth-read', 'astrologo/analisar-etapa')
+ORDER BY route;
 ```
 
 Na interface, rótulos permanecem em pt-BR e horários são exibidos em

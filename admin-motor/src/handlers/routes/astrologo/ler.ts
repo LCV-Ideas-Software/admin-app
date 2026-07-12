@@ -35,6 +35,20 @@ type ArtifactRow = {
   secondary_subject_name?: string | null;
 };
 
+type AnalysisJobRow = {
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  phase: 'planning' | 'analyzing' | 'reducing' | 'synthesizing' | 'completed' | 'failed';
+  completed_steps: number;
+  total_steps: number;
+  input_tokens: number;
+  output_tokens: number;
+  error_code: string | null;
+  has_error_detail: number;
+  created_at_utc: string;
+  updated_at_utc: string;
+  completed_at_utc: string | null;
+};
+
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -56,6 +70,45 @@ const artifactMetadata = (artifact: ArtifactRow | null) =>
         updatedAt: artifact.updated_at,
       }
     : null;
+
+const ANALYSIS_JOB_STATUSES = new Set(['queued', 'running', 'completed', 'failed', 'cancelled']);
+const ANALYSIS_JOB_PHASES = new Set(['planning', 'analyzing', 'reducing', 'synthesizing', 'completed', 'failed']);
+
+const analysisJobMetadata = (job: AnalysisJobRow | null) => {
+  if (
+    !job ||
+    !ANALYSIS_JOB_STATUSES.has(job.status) ||
+    !ANALYSIS_JOB_PHASES.has(job.phase) ||
+    typeof job.created_at_utc !== 'string' ||
+    typeof job.updated_at_utc !== 'string'
+  ) {
+    return null;
+  }
+  const errorCode =
+    typeof job.error_code === 'string' && /^[A-Z0-9_.:-]{1,80}$/i.test(job.error_code) ? job.error_code : null;
+  return {
+    status: job.status,
+    phase: job.phase,
+    progress: {
+      completed: Math.max(0, Number(job.completed_steps) || 0),
+      total: Math.max(0, Number(job.total_steps) || 0),
+    },
+    tokens: {
+      input: Math.max(0, Number(job.input_tokens) || 0),
+      output: Math.max(0, Number(job.output_tokens) || 0),
+    },
+    error:
+      errorCode || Number(job.has_error_detail) === 1
+        ? {
+            code: errorCode,
+            detail: Number(job.has_error_detail) === 1 ? 'Detalhes técnicos registrados no servidor.' : null,
+          }
+        : null,
+    createdAtUtc: job.created_at_utc,
+    updatedAtUtc: job.updated_at_utc,
+    completedAtUtc: job.completed_at_utc,
+  };
+};
 
 export async function onRequestPost(context: Context) {
   const trace = createResponseTrace(context.request);
@@ -106,6 +159,7 @@ export async function onRequestPost(context: Context) {
     let transitArtifact: ArtifactRow | null = null;
     let synastryArtifact: ArtifactRow | null = null;
     let localityArtifact: ArtifactRow | null = null;
+    let analysisJob: AnalysisJobRow | null = null;
     try {
       natalArtifact = await db
         .prepare(
@@ -249,6 +303,37 @@ export async function onRequestPost(context: Context) {
       // Compatibilidade com bancos legados ainda sem as tabelas de localidade.
     }
 
+    try {
+      analysisJob = await db
+        .prepare(
+          `
+        SELECT
+          status,
+          phase,
+          completed_steps,
+          total_steps,
+          input_tokens,
+          output_tokens,
+          error_code,
+          CASE WHEN error_detail IS NULL THEN 0 ELSE 1 END AS has_error_detail,
+          strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS created_at_utc,
+          strftime('%Y-%m-%dT%H:%M:%SZ', updated_at) AS updated_at_utc,
+          CASE
+            WHEN completed_at IS NULL THEN NULL
+            ELSE strftime('%Y-%m-%dT%H:%M:%SZ', completed_at)
+          END AS completed_at_utc
+        FROM astrologo_ai_analysis_jobs
+        WHERE mapa_id = ?
+        ORDER BY datetime(created_at) DESC, rowid DESC
+        LIMIT 1
+      `,
+        )
+        .bind(id)
+        .first<AnalysisJobRow>();
+    } catch {
+      // Compatibilidade com bancos legados ainda sem a migration 018.
+    }
+
     const hydratedMapa = {
       ...mapa,
       natal_chart_analysis_v1: natalArtifact?.payload_json ?? null,
@@ -267,6 +352,7 @@ export async function onRequestPost(context: Context) {
         : null,
       locality_map_v1: localityArtifact?.payload_json ?? null,
       locality_map_artifact: artifactMetadata(localityArtifact),
+      ai_analysis_job: analysisJobMetadata(analysisJob),
     };
 
     const operationalDb = (context.data?.env ?? context.env).BIGDATA_DB;

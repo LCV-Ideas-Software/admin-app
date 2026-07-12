@@ -46,6 +46,17 @@ type MapaResumo = {
   status: 'novo' | 'analisado' | 'indisponivel';
 };
 
+type AiAnalysisJobOperational = {
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  phase: 'planning' | 'analyzing' | 'reducing' | 'synthesizing' | 'completed' | 'failed';
+  progress: { completed: number; total: number };
+  tokens: { input: number; output: number };
+  error: { code: string | null; detail: string | null } | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  completedAtUtc: string | null;
+};
+
 const formatSignNamePtBr = (value: string): string => (value === 'Ophiuchus' ? 'Ofiúco' : value);
 
 type ApiResponse = {
@@ -83,6 +94,8 @@ type MapaDetalhado = {
   synastrySubjects?: unknown;
   locality_map_v1?: string | null;
   localityMapV1?: unknown;
+  ai_analysis_job?: AiAnalysisJobOperational | null;
+  aiAnalysisJob?: AiAnalysisJobOperational | null;
   analise_ia: string | null;
   created_at: string | null;
 };
@@ -107,6 +120,142 @@ const formatarData = (dataStr: string): string => {
   if (!dataStr) return '';
   const p = dataStr.split('-');
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dataStr;
+};
+
+const STATUS_ANALISE_IA_PT_BR: Record<AiAnalysisJobOperational['status'], string> = {
+  queued: 'Na fila',
+  running: 'Em processamento',
+  completed: 'Concluída',
+  failed: 'Falhou',
+  cancelled: 'Cancelada',
+};
+
+const FASE_ANALISE_IA_PT_BR: Record<AiAnalysisJobOperational['phase'], string> = {
+  planning: 'Planejamento',
+  analyzing: 'Análise das partes',
+  reducing: 'Consolidação intermediária',
+  synthesizing: 'Síntese final',
+  completed: 'Concluída',
+  failed: 'Falha',
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const parseAiAnalysisJobOperational = (value: unknown): AiAnalysisJobOperational | null => {
+  const job = asRecord(value);
+  const progress = asRecord(job?.progress);
+  const tokens = asRecord(job?.tokens);
+  if (
+    !job ||
+    !progress ||
+    !tokens ||
+    typeof job.status !== 'string' ||
+    !Object.hasOwn(STATUS_ANALISE_IA_PT_BR, job.status) ||
+    typeof job.phase !== 'string' ||
+    !Object.hasOwn(FASE_ANALISE_IA_PT_BR, job.phase) ||
+    typeof progress.completed !== 'number' ||
+    !Number.isFinite(progress.completed) ||
+    typeof progress.total !== 'number' ||
+    !Number.isFinite(progress.total) ||
+    typeof tokens.input !== 'number' ||
+    !Number.isFinite(tokens.input) ||
+    typeof tokens.output !== 'number' ||
+    !Number.isFinite(tokens.output) ||
+    typeof job.createdAtUtc !== 'string' ||
+    typeof job.updatedAtUtc !== 'string' ||
+    (job.completedAtUtc !== null && typeof job.completedAtUtc !== 'string')
+  ) {
+    return null;
+  }
+  const error = asRecord(job.error);
+  return {
+    status: job.status as AiAnalysisJobOperational['status'],
+    phase: job.phase as AiAnalysisJobOperational['phase'],
+    progress: { completed: progress.completed, total: progress.total },
+    tokens: { input: tokens.input, output: tokens.output },
+    error:
+      error &&
+      (error.code === null || typeof error.code === 'string') &&
+      (error.detail === null || typeof error.detail === 'string')
+        ? { code: error.code, detail: error.detail }
+        : null,
+    createdAtUtc: job.createdAtUtc,
+    updatedAtUtc: job.updatedAtUtc,
+    completedAtUtc: job.completedAtUtc,
+  };
+};
+
+const integerPtBr = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+
+const AiAnalysisJobPanel = ({ job }: { job: AiAnalysisJobOperational }) => {
+  const completed = Math.max(0, job.progress.completed);
+  const total = Math.max(0, job.progress.total);
+  const percentage = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+  const inputTokens = Math.max(0, job.tokens.input);
+  const outputTokens = Math.max(0, job.tokens.output);
+
+  return (
+    <section className="astro-section astro-ai-job" aria-label="Estado operacional da análise por IA">
+      <div className="astro-ai-job__heading">
+        <span className="astro-ai-job__icon" aria-hidden="true">
+          <BrainCircuit size={22} />
+        </span>
+        <div>
+          <h5 className="astro-section__title">Processamento da análise por IA</h5>
+          <p className="field-hint">
+            Execução mais recente. Somente metadados operacionais são exibidos; instruções e dados intermediários
+            permanecem protegidos.
+          </p>
+        </div>
+        <span className={`astro-ai-job__status astro-ai-job__status--${job.status}`}>
+          {STATUS_ANALISE_IA_PT_BR[job.status]}
+        </span>
+      </div>
+
+      <div className="astro-ai-job__grid">
+        <div className="astro-ai-job__metric">
+          <span>Fase atual</span>
+          <strong>{FASE_ANALISE_IA_PT_BR[job.phase]}</strong>
+        </div>
+        <div className="astro-ai-job__metric">
+          <span>Progresso</span>
+          <strong>{total > 0 ? `${completed} de ${total} etapas (${percentage}%)` : 'Aguardando planejamento'}</strong>
+        </div>
+        <div className="astro-ai-job__metric">
+          <span>Tokens processados</span>
+          <strong>{integerPtBr.format(inputTokens + outputTokens)}</strong>
+          <small>
+            {integerPtBr.format(inputTokens)} de entrada · {integerPtBr.format(outputTokens)} de saída
+          </small>
+        </div>
+        <div className="astro-ai-job__metric">
+          <span>Iniciada em</span>
+          <strong>{formatInstantInBrasilia(job.createdAtUtc)}</strong>
+          <small>Hora oficial de Brasília</small>
+        </div>
+        <div className="astro-ai-job__metric">
+          <span>Última atualização</span>
+          <strong>{formatInstantInBrasilia(job.updatedAtUtc)}</strong>
+          <small>Hora oficial de Brasília</small>
+        </div>
+        {job.completedAtUtc && (
+          <div className="astro-ai-job__metric">
+            <span>Finalizada em</span>
+            <strong>{formatInstantInBrasilia(job.completedAtUtc)}</strong>
+            <small>Hora oficial de Brasília</small>
+          </div>
+        )}
+      </div>
+
+      {job.error && (
+        <div className="astro-ai-job__error" role="alert">
+          <strong>Erro registrado{job.error.code ? ` — ${job.error.code}` : ''}</strong>
+          {job.error.detail && <span>{job.error.detail}</span>}
+        </div>
+      )}
+    </section>
+  );
 };
 
 const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }) => {
@@ -661,6 +810,7 @@ export function AstrologoModule() {
     const dataNascimento = mapa.data_nascimento || mapa.query?.dataNascimento || '';
     const localNascimento = mapa.local_nascimento || mapa.query?.localNascimento || '';
     const analiseIa = mapa.analise_ia || mapa.analiseIa || '';
+    const analysisJob = parseAiAnalysisJobOperational(mapa.ai_analysis_job ?? mapa.aiAnalysisJob);
     const positional = parseDadosPosicionaisV2(
       mapa.dados_posicionais_v2 ?? mapa.dadosPosicionaisV2,
       typeof mapa.id === 'string' ? mapa.id : undefined,
@@ -851,6 +1001,8 @@ export function AstrologoModule() {
             )}
           </div>
         )}
+
+        {analysisJob && <AiAnalysisJobPanel job={analysisJob} />}
 
         {analiseIa && (
           <div className="astro-section">

@@ -7,6 +7,73 @@ vi.mock('../../../../../functions/api/_lib/operational', () => ({
 import { onRequestPost } from './ler.ts';
 
 describe('astrologo ler', () => {
+  it('returns only safe operational metadata from the latest reentrant AI job', async () => {
+    const queries: string[] = [];
+    const db = {
+      prepare(query: string) {
+        queries.push(query);
+        return {
+          bind(id: string) {
+            expect(id).toBe('mapa-job-001');
+            return {
+              async first() {
+                if (query.includes('FROM astrologo_ai_analysis_jobs')) {
+                  return {
+                    status: 'running',
+                    phase: 'analyzing',
+                    completed_steps: 3,
+                    total_steps: 8,
+                    input_tokens: 12500,
+                    output_tokens: 3400,
+                    error_code: null,
+                    has_error_detail: 0,
+                    created_at_utc: '2026-07-12T20:00:00Z',
+                    updated_at_utc: '2026-07-12T20:05:00Z',
+                    completed_at_utc: null,
+                  };
+                }
+                if (query.includes('FROM astrologo_artifacts')) return null;
+                return { id, nome: 'Consulente em análise' };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    const response = await onRequestPost({
+      request: new Request('https://admin.lcv.app.br/api/astrologo/ler', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-admin-actor': 'admin@app.lcv' },
+        body: JSON.stringify({ id: 'mapa-job-001' }),
+      }),
+      env: { BIGDATA_DB: db },
+    } as never);
+    const payload = (await response.json()) as {
+      mapa: {
+        ai_analysis_job: {
+          status: string;
+          phase: string;
+          progress: { completed: number; total: number };
+          tokens: { input: number; output: number };
+        };
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(payload.mapa.ai_analysis_job).toEqual(
+      expect.objectContaining({
+        status: 'running',
+        phase: 'analyzing',
+        progress: { completed: 3, total: 8 },
+        tokens: { input: 12500, output: 3400 },
+      }),
+    );
+    const jobQuery = queries.find((query) => query.includes('FROM astrologo_ai_analysis_jobs')) ?? '';
+    expect(jobQuery).not.toMatch(/capability_hash|plan_json|fixed_prompt_prefix|payload_json|result_json/i);
+    expect(JSON.stringify(payload.mapa.ai_analysis_job)).not.toMatch(/capability|prompt|payload|planJson/i);
+  });
+
   it('seleciona e devolve o JSON posicional v2 sem transformá-lo', async () => {
     const dadosPosicionaisV2 = JSON.stringify({
       schemaId: 'urn:astrologo:dados-posicionais',
