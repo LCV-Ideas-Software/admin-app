@@ -22,25 +22,33 @@ salva pelo operador nunca é sobrescrita.
 ## Ordem obrigatória
 
 1. Aplicar as migrations 001 a 014.
-2. Executar o reconciliador versionado:
+2. Em banco legado, confirmar que `astrologo_mapas.email` existe antes da
+   migration 015. Essa foi a função do preflight v1; instalações novas devem
+   materializar a coluna com `TEXT DEFAULT ''` quando ela estiver ausente.
+3. Aplicar `015_bigdata_astrologo_schema_regularization.sql` uma única vez.
+4. Aplicar `016_bigdata_astrologo_advanced_charts.sql` uma única vez.
+5. Aplicar `017_astrologo_saved_map_claims.sql` uma única vez **ou** executar o
+   reconciliador v2 do deploy, que materializa o mesmo contrato sem repetir o
+   `ALTER TABLE` quando a coluna já existe:
 
    ```bash
    node scripts/reconcile-astrologo-schema.mjs --remote --database bigdata_db
    ```
 
-3. Aplicar `015_bigdata_astrologo_schema_regularization.sql` uma única vez.
-4. Aplicar `016_bigdata_astrologo_advanced_charts.sql` uma única vez.
-5. Verificar o schema antes de publicar qualquer produtor.
+6. Publicar o `admin-app` e confirmar o preflight. Somente depois publicar o
+   `astrologo-app` que escreve ou exige `save_claim_hash`.
 
 O reconciliador v1.0.0 consulta `PRAGMA table_info(astrologo_mapas)`. Ele adiciona a
 coluna `email` somente quando ausente, confirma o resultado e falha fechado se a
 tabela base não existir. A migration 015 adiciona `data_analise`, que estava
 ausente no schema remoto verificado antes desta mudança.
 
-O workflow de deploy também executa o reconciliador antes do Admin Motor. Isso
-protege bancos novos e não repete o `ALTER TABLE` em bancos já regularizados.
-As migrations 015 e 016 continuam sendo operações explícitas e únicas; o
-workflow não as reaplica automaticamente.
+O workflow de deploy executa o reconciliador v2 antes do Admin Motor. Ele não
+reaplica cegamente a migration 017: inspeciona o DDL, adiciona somente colunas
+ausentes, executa o backfill idempotente, semeia a policy com `INSERT OR IGNORE`,
+cria o índice com `IF NOT EXISTS` e verifica novamente todas as garantias. Uma
+coluna ou um índice homônimo com definição incompatível faz o deploy falhar
+fechado. As migrations 015 e 016 continuam sendo operações explícitas e únicas.
 
 ## Migration 015
 
@@ -103,17 +111,43 @@ mesmo batch D1: cria o run como `processing`, cria o artefato com o respectivo
 `ready` ou `partial`. Essa ordem satisfaz as FKs cíclicas de propriedade sem
 expor um resultado pronto incompleto.
 
+## Migration 017
+
+A reidratação autenticada de mapas salvos introduz um contrato persistente novo:
+
+- `astrologo_mapas.save_claim_hash`: SHA-256 hexadecimal minúsculo de 64
+  caracteres ou `NULL`; o segredo em texto puro permanece no navegador que
+  calculou o mapa e o hash é apagado quando o primeiro proprietário é associado;
+- `idx_astrologo_mapas_unclaimed_save_claim`: índice parcial que contém somente
+  claims ainda ativos (`save_claim_hash IS NOT NULL`);
+- policy `astrologo/auth-read`: bucket inicial de 60 requisições por 15 minutos
+  para `session-retrieve` e `session-map-artifacts`, separado do bucket
+  `astrologo/auth` usado por operações mutáveis.
+
+O backfill lê apenas associações já registradas em
+`astrologo_user_data.dados_json.mapasSalvos`, normaliza e-mails com
+`lower(trim(email))` e preenche `astrologo_mapas.email` somente quando o mesmo
+mapa possui exatamente um proprietário distinto. Ele preserva qualquer e-mail
+já gravado, deixa conflitos sem proprietário e ignora JSON malformado, listas de
+formato inesperado e itens sem um `id` textual. Por isso o reconciliador pode
+repeti-lo sem transferir propriedade nem depender de IDs recém-enviados pelo
+navegador.
+
+O seed de `astrologo/auth-read` usa `INSERT OR IGNORE`: 60/15 é o padrão de uma
+instalação sem policy, enquanto limites já configurados pelo operador permanecem
+intocados.
+
 ## Consumo administrativo dos contratos v1
 
 O `admin-app/Astrólogo` reidrata quatro contratos produzidos e persistidos pelo
 `astrologo-app`; o admin nunca recalcula posições, aspectos, casas ou linhas:
 
-| Resultado administrativo | `artifact_type` | `schema_id` | Versão |
-| --- | --- | --- | --- |
-| Análise natal | `natal_chart_analysis` | `urn:astrologo:natal-chart-analysis` | `1.0.0` |
-| Trânsitos | `transit_result` | `urn:astrologo:transit-run` | `1.0.0` |
-| Sinastria | `synastry_result` | `urn:astrologo:synastry-run` | `1.0.0` |
-| Mapa planetário de localidade | `locality_map` | `urn:astrologo:locality-map` | `1.0.0` |
+| Resultado administrativo      | `artifact_type`        | `schema_id`                          | Versão  |
+| ----------------------------- | ---------------------- | ------------------------------------ | ------- |
+| Análise natal                 | `natal_chart_analysis` | `urn:astrologo:natal-chart-analysis` | `1.0.0` |
+| Trânsitos                     | `transit_result`       | `urn:astrologo:transit-run`          | `1.0.0` |
+| Sinastria                     | `synastry_result`      | `urn:astrologo:synastry-run`         | `1.0.0` |
+| Mapa planetário de localidade | `locality_map`         | `urn:astrologo:locality-map`         | `1.0.0` |
 
 A análise natal é elegível somente como artefato `ready` associado ao mapa
 consultado. Para trânsitos, sinastria e localidade, a leitura é fail-closed e
@@ -137,10 +171,30 @@ Arquivo Akáshico, relatório textual/HTML e e-mail. A camada visível usa pt-BR
 empacotada e renderizada localmente; o módulo gráfico é carregado sob demanda,
 sem tiles ou transmissão de dados natais a um provedor cartográfico.
 
+## Compatibilidade com a análise extensa v02.22.00
+
+O `astrologo-app` pode distribuir uma análise extensa em unidades semânticas
+dentro de uma única requisição, mas fragmentos e notas intermediárias não são
+persistidos nesta versão. Somente depois de validar cobertura integral e montar
+todos os HTMLs o produtor atualiza `astrologo_mapas.analise_ia`. Portanto:
+
+- `astrologo_ai_analyses` não recebe um novo tipo ou estado;
+- o admin continua lendo o mesmo resultado final já sanitizado;
+- falha ou truncamento de uma etapa não substitui uma análise completa anterior.
+
+A análise em partes, isoladamente, não persiste fragmentos nem exige uma entidade
+de IA adicional. Entretanto, a reidratação pública autenticada que fornece o
+mapa e seus quatro contratos depende explicitamente da migration 017 para prova
+de propriedade inicial e separação do rate limit de leitura. Autorização por
+sessão e proprietário pertence ao endpoint público; o admin mantém sua própria
+fronteira administrativa e não aceita o envelope público como substituto dos
+validadores canônicos existentes.
+
 ## Verificação
 
 ```sql
 PRAGMA table_info(astrologo_mapas);
+PRAGMA index_list(astrologo_mapas);
 PRAGMA table_info(admin_module_configs);
 PRAGMA foreign_key_list(astrologo_synastry_runs);
 PRAGMA foreign_key_check;
@@ -149,6 +203,10 @@ SELECT module_key,
        json_type(config_json, '$.modeloSintese') AS modelo_sintese_type
 FROM admin_module_configs
 WHERE module_key = 'astrologo-config';
+
+SELECT route, enabled, max_requests, window_minutes
+FROM astrologo_rate_limit_policies
+WHERE route = 'astrologo/auth-read';
 ```
 
 Na interface, rótulos permanecem em pt-BR e horários são exibidos em

@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
+import {
+  ASTROLOGO_AUTH_READ_POLICY_SQL,
+  ASTROLOGO_SAVE_CLAIM_INDEX_SQL,
+  ASTROLOGO_SAVED_MAPS_BACKFILL_SQL,
+} from '../../scripts/lib/astrologo-schema-reconciler.mjs';
 
 const root = process.cwd();
 const migration = (name) => readFileSync(`${root}/db/migrations/${name}`, 'utf8');
@@ -16,6 +21,7 @@ const tableIndexes = (db, table) =>
     .map((row) => row.name);
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
+const normalizeSql = (value) => value.replaceAll(/\s+/g, '').replaceAll(';', '').toLowerCase();
 
 const prepareVersionedBaseline = () => {
   const db = new DatabaseSync(':memory:');
@@ -27,6 +33,62 @@ const prepareVersionedBaseline = () => {
 };
 
 describe('canonical Astrologo BIGDATA_DB migrations', () => {
+  it('adds save claims, backfills only unambiguous historical ownership, and separates authenticated reads', () => {
+    const db = prepareVersionedBaseline();
+    db.exec(migration('015_bigdata_astrologo_schema_regularization.sql'));
+    db.exec(migration('016_bigdata_astrologo_advanced_charts.sql'));
+    db.prepare('INSERT INTO astrologo_mapas (id, nome, email) VALUES (?, ?, NULL)').run('map-historical', 'Pessoa');
+    db.prepare('INSERT INTO astrologo_mapas (id, nome, email) VALUES (?, ?, NULL)').run('map-conflict', 'Conflito');
+    db.prepare('INSERT INTO astrologo_mapas (id, nome, email) VALUES (?, ?, ?)').run(
+      'map-owned',
+      'Proprietário existente',
+      'owner@example.com',
+    );
+    db.prepare('INSERT INTO astrologo_user_data (id, email, dados_json) VALUES (?, ?, ?)').run(
+      'user-a',
+      'Pessoa@Example.com',
+      JSON.stringify({
+        mapasSalvos: [{ id: 'map-historical' }, { id: 'map-conflict' }, { id: 'map-owned' }, 'entrada-legada-inválida'],
+      }),
+    );
+    db.prepare('INSERT INTO astrologo_user_data (id, email, dados_json) VALUES (?, ?, ?)').run(
+      'user-b',
+      'outra@example.com',
+      JSON.stringify({ mapasSalvos: [{ id: 'map-conflict' }] }),
+    );
+
+    const migration017 = migration('017_astrologo_saved_map_claims.sql');
+    const normalizedMigration = normalizeSql(migration017);
+    expect(normalizedMigration).toContain(normalizeSql(ASTROLOGO_SAVED_MAPS_BACKFILL_SQL));
+    expect(normalizedMigration).toContain(normalizeSql(ASTROLOGO_AUTH_READ_POLICY_SQL));
+    expect(normalizedMigration).toContain(normalizeSql(ASTROLOGO_SAVE_CLAIM_INDEX_SQL));
+    db.exec(migration017);
+
+    expect(tableColumns(db, 'astrologo_mapas')).toContain('save_claim_hash');
+    expect(db.prepare('SELECT email FROM astrologo_mapas WHERE id = ?').get('map-historical').email).toBe(
+      'pessoa@example.com',
+    );
+    expect(db.prepare('SELECT email FROM astrologo_mapas WHERE id = ?').get('map-conflict').email).toBeNull();
+    expect(db.prepare('SELECT email FROM astrologo_mapas WHERE id = ?').get('map-owned').email).toBe(
+      'owner@example.com',
+    );
+    expect(
+      db
+        .prepare('SELECT max_requests, window_minutes FROM astrologo_rate_limit_policies WHERE route = ?')
+        .get('astrologo/auth-read'),
+    ).toEqual({ max_requests: 60, window_minutes: 15 });
+    expect(() =>
+      db.prepare('UPDATE astrologo_mapas SET save_claim_hash = ? WHERE id = ?').run('not-a-hash', 'map-historical'),
+    ).toThrow();
+    expect(() =>
+      db.prepare('UPDATE astrologo_mapas SET save_claim_hash = ? WHERE id = ?').run('A'.repeat(64), 'map-historical'),
+    ).toThrow();
+    expect(() =>
+      db.prepare('UPDATE astrologo_mapas SET save_claim_hash = ? WHERE id = ?').run(HASH_A, 'map-historical'),
+    ).not.toThrow();
+    expect(tableIndexes(db, 'astrologo_mapas')).toContain('idx_astrologo_mapas_unclaimed_save_claim');
+  });
+
   it('regularizes the runtime-created schema and canonical module config', () => {
     const db = prepareVersionedBaseline();
     db.exec(migration('015_bigdata_astrologo_schema_regularization.sql'));

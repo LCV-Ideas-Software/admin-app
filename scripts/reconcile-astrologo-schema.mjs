@@ -5,8 +5,9 @@ import { createRequire } from 'node:module';
 import process from 'node:process';
 import {
   ASTROLOGO_SCHEMA_PREFLIGHT_VERSION,
-  planAstrologoMapasReconciliation,
-  reconcileAstrologoMapasSchema,
+  inspectAstrologoSchema,
+  planAstrologoSchemaReconciliation,
+  reconcileAstrologoSchema,
 } from './lib/astrologo-schema-reconciler.mjs';
 
 const args = new Set(process.argv.slice(2));
@@ -52,22 +53,49 @@ const runD1 = (sql) => {
   }
 };
 
-const inspect = async () => {
-  const response = runD1('PRAGMA table_info(astrologo_mapas);');
+const readRows = (sql, failureMessage) => {
+  const response = runD1(sql);
   const first = Array.isArray(response) ? response[0] : null;
   if (!first?.success || !Array.isArray(first.results)) {
-    throw new Error('Não foi possível ler PRAGMA table_info(astrologo_mapas).');
+    throw new Error(failureMessage);
   }
   return first.results;
 };
 
+const inspect = async () => {
+  const tableInfoRows = readRows(
+    'PRAGMA table_info(astrologo_mapas);',
+    'Não foi possível ler PRAGMA table_info(astrologo_mapas).',
+  );
+  const tableRows = readRows(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'astrologo_mapas';",
+    'Não foi possível ler o DDL de astrologo_mapas.',
+  );
+  const indexRows = readRows(
+    "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'astrologo_mapas';",
+    'Não foi possível ler os índices de astrologo_mapas.',
+  );
+  const policyRows = readRows(
+    `SELECT route, enabled, max_requests, window_minutes
+     FROM astrologo_rate_limit_policies
+     WHERE route = 'astrologo/auth-read';`,
+    'Não foi possível ler a policy astrologo/auth-read.',
+  );
+  return inspectAstrologoSchema({
+    tableInfoRows,
+    tableSql: tableRows[0]?.sql,
+    indexRows,
+    authReadPolicy: policyRows[0] ?? null,
+  });
+};
+
 if (dryRun) {
-  const planned = planAstrologoMapasReconciliation(await inspect());
+  const planned = planAstrologoSchemaReconciliation(await inspect());
   console.log(
     JSON.stringify({ ok: true, preflightVersion: ASTROLOGO_SCHEMA_PREFLIGHT_VERSION, dryRun: true, planned }, null, 2),
   );
 } else {
-  const result = await reconcileAstrologoMapasSchema({
+  const result = await reconcileAstrologoSchema({
     inspect,
     execute: async (statement) => {
       const response = runD1(`${statement};`);

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [v02.14.00] - 2026-07-12
+
+### Adicionado
+
+- **Prova de propriedade no primeiro salvamento**: a migration `017` acrescenta `astrologo_mapas.save_claim_hash`, restrito a SHA-256 hexadecimal minúsculo, para que um mapa ainda sem proprietário só seja associado ao primeiro usuário mediante o segredo emitido no cálculo.
+- **Backfill histórico inequívoco**: associações já presentes em `astrologo_user_data.dados_json.mapasSalvos` preenchem o e-mail do mapa somente quando existe exatamente um proprietário normalizado; conflitos, entradas malformadas e mapas já associados permanecem intocados.
+- **Leituras autenticadas com bucket próprio**: `astrologo/auth-read` nasce com 60 requisições por 15 minutos, separando reidratação e leitura de artefatos das operações de autenticação mutáveis.
+
+### Segurança e operação
+
+- **Preflight idempotente 2.0**: o reconciliador executado pelo deploy do admin agora materializa e verifica todas as garantias da migration `017` antes do Admin Motor: coluna com `CHECK`, backfill seguro, policy de leitura e índice parcial para claims ativos. Definições incompatíveis fazem o deploy falhar fechado.
+- **Configuração do operador preservada**: o seed da policy usa `INSERT OR IGNORE`; limites já personalizados para `astrologo/auth-read` não são sobrescritos.
+- **Análise extensa sem fragmentos persistidos**: a análise em partes continua consolidando somente o HTML final em `astrologo_mapas.analise_ia`, mas a reidratação autenticada que a antecede depende explicitamente da migration `017`.
+
 ## [v02.13.00] - 2026-07-12
 
 ### Adicionado
