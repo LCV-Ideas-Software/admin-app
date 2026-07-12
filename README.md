@@ -16,12 +16,13 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release: **v02.12.00**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+**Status.** Stable. Current release: **v02.13.00**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 The version history at a glance:
 
 | Release         | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`v02.13.00`** | **Astrólogo — artefatos avançados no admin.** Análises natais, trânsitos, sinastrias e mapas planetários de localidade persistidos ganham paridade entre tela, relatório e e-mail, com validação fail-closed dos vínculos run/artefato, apresentação pt-BR e hora de Brasília. O mapa usa Natural Earth 1:110m local e carrega o gráfico sob demanda. |
 | **`v02.12.00`** | **Astrólogo — paridade Tatwa v2.** O admin identifica ordem fixa, ordem pelo principal e mapas legados, exibe incerteza e proveniência e mantém tela, relatório e e-mail integralmente em pt-BR, sem recalcular dados canônicos. |
 | **`v02.11.00`** | **Astrólogo — dados posicionais e angelologia v2.** O admin passa a ler e validar os dez planetas, graus, Casas Placidus, 12 cúspides, ângulos, constelações IAU, falange e Anjo Regente solar; tela, relatórios e e-mails usam apresentação pt-BR, hora oficial de Brasília, ícones coloridos e HTML escapado. |
 | **`v02.02.07`** | **Registrar lock/privacy controls + reliability pass.** CF DNS gains in-app transfer-lock and WHOIS-privacy toggles for registered domains through the legacy `PUT /registrar/domains` endpoint, bounded post-registration workflow polling that stops on terminal/`action_required`/`blocked` states with visual highlighting of those states, and reliability fixes: `domain-check` now skips malformed entries instead of failing the whole batch, the registrations list paginates to completion, Cloudflare `429` rate-limits surface as `429` instead of `502`, and missing-workflow detection keys on HTTP `404`.                                                              |
@@ -47,7 +48,7 @@ Operator-only Cloudflare Access-protected dashboard with these modules:
 
 1. **Maestro AI** — web editorial orchestration module with one continuous screen made of two complete sections (`Sessão` and `Configurações`), reusing the MainSite PostEditor and storing provider credentials only through Cloudflare Secret Store.
 2. **MainSite** — post editor (Tiptap) with Gemini-assisted import + AI summaries (OG/JSON-LD), comments + ratings moderation, settings, theme/disclaimer panels.
-3. **Astrólogo** — consulta astrológica, Tatwas versionados, síntese Gemini e envio de relatório por e-mail; o admin exibe os dados canônicos e nunca os recalcula.
+3. **Astrólogo** — consulta astrológica, Tatwas versionados, análise natal, trânsitos, sinastria, mapa planetário de localidade, síntese Gemini e envio de relatório por e-mail; o admin exibe os contratos canônicos persistidos e nunca os recalcula.
 4. **Calculadora** — admin parameters and observability for a financial calculator app (PTAX/IPCA cache, rate-limit policies, backtest spot vs. PTAX, audit log).
 5. **Oráculo** — financial oracle records (LCI/CDB IPCA+ + Tesouro Direto) with cascade delete + per-user data lookup.
 6. **CF DNS / CF P&W** — Cloudflare DNS records CRUD, Cloudflare Registrar search/check/register and registered-domain controls, plus Pages/Workers project lifecycle (create, settings, observability, deployments cleanup) directly via Cloudflare API.
@@ -165,11 +166,25 @@ Replace `00000000-0000-0000-0000-000000000000` in:
 
 ### 4. Apply schema
 
+Apply migrations 001 through 014 once, run the versioned Astrólogo preflight,
+then apply migrations 015 and 016. The preflight inspects
+`PRAGMA table_info(astrologo_mapas)` and adds `email` only when absent; this is
+required because older runtimes created that column on demand.
+
 ```bash
-for f in db/migrations/*.sql; do
+for f in $(git ls-files 'db/migrations/*.sql' | sort); do
+  [[ "$f" == *"/015_"* ]] && break
   npx wrangler d1 execute example_db --remote --file "$f"
 done
+
+node scripts/reconcile-astrologo-schema.mjs --remote --database example_db
+npx wrangler d1 execute example_db --remote --file db/migrations/015_bigdata_astrologo_schema_regularization.sql
+npx wrangler d1 execute example_db --remote --file db/migrations/016_bigdata_astrologo_advanced_charts.sql
 ```
+
+The canonical Astrólogo schema, rollout order, verification queries, and the
+`astrologo-config/modeloSintese` contract are documented in
+[`docs/astrologo-bigdata-schema.md`](docs/astrologo-bigdata-schema.md).
 
 ### 5. Configure Cloudflare Access
 

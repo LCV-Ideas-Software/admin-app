@@ -31,25 +31,9 @@ interface RequestContext {
 
 const TABLE = 'admin_module_configs';
 
-async function ensureTable(db: D1Database): Promise<void> {
-  await db
-    .prepare(
-      `
-    CREATE TABLE IF NOT EXISTS ${TABLE} (
-      module_key TEXT PRIMARY KEY,
-      config_json TEXT NOT NULL,
-      updated_at TEXT DEFAULT (datetime('now'))
-    )
-  `,
-    )
-    .run();
-}
-
 export async function onRequestGet(ctx: RequestContext): Promise<Response> {
   const db = ctx.env.BIGDATA_DB;
   if (!db) return Response.json({ ok: false, error: 'BIGDATA_DB não configurada.' }, { status: 500 });
-
-  await ensureTable(db);
 
   const url = new URL(ctx.request.url);
   const moduleKey = url.searchParams.get('module');
@@ -72,8 +56,6 @@ export async function onRequestGet(ctx: RequestContext): Promise<Response> {
 export async function onRequestPost(ctx: RequestContext): Promise<Response> {
   const db = ctx.env.BIGDATA_DB;
   if (!db) return Response.json({ ok: false, error: 'BIGDATA_DB não configurada.' }, { status: 500 });
-
-  await ensureTable(db);
 
   let body: { module?: string; config?: Record<string, unknown> };
   try {

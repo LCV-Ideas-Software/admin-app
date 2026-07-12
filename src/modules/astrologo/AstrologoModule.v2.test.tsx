@@ -7,7 +7,13 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../../components/Notification';
+import { createLocalityMapV1Fixture } from '../../test/fixtures/astrologo-locality-map-v1';
+import { createNatalChartAnalysisV1Fixture } from '../../test/fixtures/astrologo-natal-analysis-v1';
 import { createDadosPosicionaisV2Fixture } from '../../test/fixtures/astrologo-positional-v2';
+import {
+  createSynastryRunV1Fixture,
+  createTransitRunV1Fixture,
+} from '../../test/fixtures/astrologo-transit-synastry-v1';
 import { AstrologoModule } from './AstrologoModule';
 
 vi.mock('../../lib/useModuleConfig', () => ({
@@ -33,6 +39,11 @@ const mapa = {
     },
   }),
   dados_posicionais_v2: JSON.stringify(dadosPosicionaisV2),
+  natal_chart_analysis_v1: JSON.stringify(createNatalChartAnalysisV1Fixture(dadosPosicionaisV2.calculationId)),
+  transit_run_v1: JSON.stringify(createTransitRunV1Fixture(dadosPosicionaisV2.calculationId)),
+  synastry_run_v1: JSON.stringify(createSynastryRunV1Fixture(dadosPosicionaisV2.calculationId)),
+  synastry_subjects: { A: 'Consulente V2', B: 'Pessoa B' },
+  locality_map_v1: JSON.stringify(createLocalityMapV1Fixture(dadosPosicionaisV2.calculationId)),
   analise_ia: null,
   created_at: '2026-07-11T15:30:45Z',
 };
@@ -118,5 +129,18 @@ describe('AstrologoModule dados posicionais v2', () => {
     expect(screen.getByText(/11\/07\/2026 às 12:30:45/)).toBeInTheDocument();
     expect(screen.getByText(/Astronomy Engine 2\.1\.19/)).toBeInTheDocument();
     expect(screen.getByText(/Swiss Ephemeris 2\.10\.03/)).toBeInTheDocument();
+    const aspects = screen.getByRole('region', { name: 'Aspectos natais' });
+    expect(within(aspects).getByText('Sextil')).toBeInTheDocument();
+    expect(within(aspects).getByText(/Sol.*Lua/)).toBeInTheDocument();
+    expect(within(aspects).getByText('Exato')).toBeInTheDocument();
+    const houses = screen.getByRole('region', { name: 'Análise das casas' });
+    expect(within(houses).getByText(/12°00'00" dentro da Casa 1/)).toBeInTheDocument();
+    expect(within(houses).getAllByText(/não foi estimado pelas cúspides/i)).toHaveLength(9);
+    expect(screen.getByRole('region', { name: 'Céu atual e trânsitos' })).toBeInTheDocument();
+    const synastry = screen.getByRole('region', { name: 'Sinastria' });
+    expect(within(synastry).getByText('Consulente V2 nas casas de Pessoa B')).toBeInTheDocument();
+    expect(within(synastry).getByText('Pessoa B nas casas de Consulente V2')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Mapa planetário de localidade' })).toBeInTheDocument();
+    expect(screen.queryByText(/fixed-by-aspect|planet:sun|POSITION_V2_0/)).not.toBeInTheDocument();
   });
 });

@@ -73,39 +73,7 @@ const toInt = (value: unknown, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-export const ensureRateLimitTables = async (db: D1Database) => {
-  await db
-    .prepare(
-      `
-    CREATE TABLE IF NOT EXISTS astrologo_rate_limit_policies (
-      route TEXT PRIMARY KEY,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      max_requests INTEGER NOT NULL,
-      window_minutes INTEGER NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `,
-    )
-    .run();
-
-  await db
-    .prepare(
-      `
-    CREATE TABLE IF NOT EXISTS astrologo_api_rate_limits (
-      key TEXT PRIMARY KEY,
-      route TEXT NOT NULL,
-      window_start INTEGER NOT NULL,
-      request_count INTEGER NOT NULL DEFAULT 0,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `,
-    )
-    .run();
-};
-
 export const ensureDefaultPolicies = async (db: D1Database) => {
-  await ensureRateLimitTables(db);
-
   for (const route of SUPPORTED_ROUTES) {
     const policy = DEFAULT_POLICIES[route];
     await db

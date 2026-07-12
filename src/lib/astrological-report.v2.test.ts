@@ -4,7 +4,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { createLocalityMapV1Fixture } from '../test/fixtures/astrologo-locality-map-v1';
+import { createNatalChartAnalysisV1Fixture } from '../test/fixtures/astrologo-natal-analysis-v1';
 import { createDadosPosicionaisV2Fixture } from '../test/fixtures/astrologo-positional-v2';
+import { createSynastryRunV1Fixture, createTransitRunV1Fixture } from '../test/fixtures/astrologo-transit-synastry-v1';
 import { generateAstrologicalReport } from './astrological-report';
 
 const legacyMapa = {
@@ -157,6 +160,69 @@ describe('astrological-report v2', () => {
     expect(report.text).not.toMatch(/urn:astrologo|iau-roman|mayhem-shem|America\/Sao_Paulo/);
     expect(report.html).not.toMatch(/urn:astrologo|iau-roman|mayhem-shem|America\/Sao_Paulo/);
     expect(report.html).not.toContain('5fc61d188c19097709c4674f756da5b2.jpg');
+  });
+
+  it('propaga aspectos natais e casas para o relatório de texto e HTML do e-mail', () => {
+    const natal = createNatalChartAnalysisV1Fixture();
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      id: natal.source.calculationId,
+      natal_chart_analysis_v1: JSON.stringify(natal),
+    });
+
+    expect(report.text).toContain('ASPECTOS NATAIS');
+    expect(report.text).toContain('Sol — Sextil — Lua');
+    expect(report.text).toContain('Exato');
+    expect(report.text).toContain('ANÁLISE DAS CASAS');
+    expect(report.text).toContain('Sol: 12°00\'00" dentro da Casa 1');
+    expect(report.text).toContain('não foi estimado pelas cúspides');
+    expect(report.html).toContain('Aspectos natais');
+    expect(report.html).toContain('Análise das casas');
+    expect(report.html).not.toMatch(/fixed-by-aspect|planet:sun|POSITION_V2_0/);
+  });
+
+  it('propaga trânsitos e sinastria recíproca com cautelas e formatos brasileiros', () => {
+    const transit = createTransitRunV1Fixture();
+    const synastry = createSynastryRunV1Fixture(transit.source.natal.calculationId);
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      id: transit.source.natal.calculationId,
+      transit_run_v1: JSON.stringify(transit),
+      synastry_run_v1: JSON.stringify(synastry),
+      synastry_subjects: { A: 'João Antônio', B: 'Leonardo Cardozo' },
+    });
+
+    expect(report.text).toContain('CÉU ATUAL E TRÂNSITOS');
+    expect(report.text).toContain('12/07/2026 às 12:00:00');
+    expect(report.text).toContain('Sol em trânsito e Lua natal');
+    expect(report.text).toContain('constelação IAU Áries, sem grau interno definido');
+    expect(report.text).toContain('Exatidão comprovada');
+    expect(report.text).toContain('SINASTRIA');
+    expect(report.text).toContain('João Antônio nas casas de Leonardo Cardozo');
+    expect(report.text).toContain('Leonardo Cardozo nas casas de João Antônio');
+    expect(report.text).toContain('não determina o destino da relação');
+    expect(report.html).toContain('Céu atual e trânsitos');
+    expect(report.html).toContain('Sinastria');
+    expect(report.html).toContain('Constelação IAU: Áries — grau interno não definido');
+    expect(report.html).not.toMatch(/astrologo-transit-major-v1|A:sun|recipient-placidus|compatibilidade/i);
+  });
+
+  it('propaga a localidade com EQJ para EQD, Natural Earth, Brasília e cautela de não relocação', () => {
+    const locality = createLocalityMapV1Fixture();
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      id: locality.source.calculationId,
+      locality_map_v1: JSON.stringify(locality),
+    });
+
+    expect(report.text).toContain('MAPA PLANETÁRIO DE LOCALIDADE');
+    expect(report.text).toContain('20/05/1993 às 21:12:00');
+    expect(report.text).toContain('EQJ/J2000 → EQD verdadeiro da data');
+    expect(report.text).toContain('Natural Earth 1:110m');
+    expect(report.text).toContain('não recomenda mudança');
+    expect(report.html).toContain('Mapa planetário de localidade');
+    expect(report.html).toContain('Hora oficial de Brasília');
+    expect(report.html).not.toMatch(/raio de influência|recomenda-se mudar/i);
   });
 
   it('usa o instante v2 em Brasília no cabeçalho, sem exibir como nascimento o horário civil cru', () => {

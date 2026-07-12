@@ -9,6 +9,8 @@ import type { FormEvent } from 'react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
+import { parseLocalityMapV1 } from '../../lib/astrological-locality-map-v1';
+import { parseNatalChartAnalysisV1 } from '../../lib/astrological-natal-analysis-v1';
 import {
   type DadosPosicionaisV2,
   type DadosPosicionaisV2ParseResult,
@@ -23,8 +25,19 @@ import {
   parseDadosPosicionaisV2,
 } from '../../lib/astrological-position-v2';
 import { generateAstrologicalReport } from '../../lib/astrological-report';
+import { normalizeSynastrySubjectNames, parseSynastryRunV1 } from '../../lib/astrological-synastry-run-v1';
 import { formatTatwaCalculationModePtBr, formatTatwaDurationPtBr, normalizeTatwa } from '../../lib/astrological-tatwa';
+import { parseTransitRunV1 } from '../../lib/astrological-transit-run-v1';
+import {
+  ASTROLOGO_CONFIG_MODEL_FIELD,
+  ASTROLOGO_CONFIG_MODULE_KEY,
+  type AstroConfig,
+  DEFAULT_ASTROLOGO_CONFIG,
+} from '../../lib/astrologo-config';
 import { useModuleConfig } from '../../lib/useModuleConfig';
+import { LocalityMapPanel } from './LocalityMapPanel';
+import { NatalChartAnalysisPanel } from './NatalChartAnalysisPanel';
+import { SynastryRunPanel, TransitRunPanel } from './TransitSynastryPanels';
 
 type MapaResumo = {
   id: string;
@@ -60,6 +73,16 @@ type MapaDetalhado = {
   dados_globais: string | null;
   dados_posicionais_v2?: string | null;
   dadosPosicionaisV2?: unknown;
+  natal_chart_analysis_v1?: string | null;
+  natalChartAnalysisV1?: unknown;
+  transit_run_v1?: string | null;
+  transitRunV1?: unknown;
+  synastry_run_v1?: string | null;
+  synastryRunV1?: unknown;
+  synastry_subjects?: unknown;
+  synastrySubjects?: unknown;
+  locality_map_v1?: string | null;
+  localityMapV1?: unknown;
   analise_ia: string | null;
   created_at: string | null;
 };
@@ -300,10 +323,7 @@ const PositionalV2Panel = ({ result }: { result: DadosPosicionaisV2ParseResult }
 };
 
 // Configs (D1-persisted via useModuleConfig)
-export interface AstroConfig {
-  modeloSintese?: string;
-}
-const DEFAULT_CONFIG: AstroConfig = { modeloSintese: '' };
+export type { AstroConfig } from '../../lib/astrologo-config';
 export interface GeminiModelItem {
   id: string;
   displayName: string;
@@ -314,7 +334,7 @@ export interface GeminiModelItem {
 export function AstrologoModule() {
   const { showNotification } = useNotification();
   const [activeTab, setActiveTab] = useState<'registros' | 'usuarios' | 'configuracoes'>('registros');
-  const [config, saveConfig] = useModuleConfig<AstroConfig>('astrologo-config', DEFAULT_CONFIG, {
+  const [config, saveConfig] = useModuleConfig<AstroConfig>(ASTROLOGO_CONFIG_MODULE_KEY, DEFAULT_ASTROLOGO_CONFIG, {
     onSaveSuccess: () => showNotification('Configuração salva.', 'success'),
     onSaveError: (err) => showNotification(`Erro ao salvar configuração: ${err}`, 'error'),
   });
@@ -645,6 +665,27 @@ export function AstrologoModule() {
       mapa.dados_posicionais_v2 ?? mapa.dadosPosicionaisV2,
       typeof mapa.id === 'string' ? mapa.id : undefined,
     );
+    const natalAnalysis = parseNatalChartAnalysisV1(
+      mapa.natal_chart_analysis_v1 ?? mapa.natalChartAnalysisV1,
+      typeof mapa.id === 'string' ? mapa.id : undefined,
+    );
+    const transitRun = parseTransitRunV1(
+      mapa.transit_run_v1 ?? mapa.transitRunV1,
+      typeof mapa.id === 'string' ? mapa.id : undefined,
+    );
+    const synastrySubjects = normalizeSynastrySubjectNames(
+      mapa.synastry_subjects ?? mapa.synastrySubjects,
+      mapa.nome || 'Pessoa A',
+      'Pessoa B',
+    );
+    const synastryRun = parseSynastryRunV1(
+      mapa.synastry_run_v1 ?? mapa.synastryRunV1,
+      synastrySubjects.primaryCalculationId ?? (typeof mapa.id === 'string' ? mapa.id : undefined),
+    );
+    const localityMap = parseLocalityMapV1(
+      mapa.locality_map_v1 ?? mapa.localityMapV1,
+      typeof mapa.id === 'string' ? mapa.id : undefined,
+    );
     const nascimentoApresentado =
       positional.status === 'available'
         ? `${formatInstantInBrasilia(positional.data.birthContext.timeResolution.instantUtc)} — ${positional.data.presentationPolicy.timeZoneLabel}`
@@ -820,6 +861,10 @@ export function AstrologoModule() {
         )}
 
         <PositionalV2Panel result={positional} />
+        <NatalChartAnalysisPanel result={natalAnalysis} />
+        <TransitRunPanel result={transitRun} />
+        <SynastryRunPanel result={synastryRun} subjects={synastrySubjects} />
+        <LocalityMapPanel result={localityMap} />
       </article>
     );
   };
@@ -1245,7 +1290,7 @@ export function AstrologoModule() {
             <legend>Seleção de Parâmetros</legend>
             <div className="form-grid">
               {renderModelSelect('Modelo de Síntese Astrológica', 'model-sintese', config.modeloSintese, (v) =>
-                handleSaveConfig({ modeloSintese: v }),
+                handleSaveConfig({ [ASTROLOGO_CONFIG_MODEL_FIELD]: v }),
               )}
             </div>
           </fieldset>

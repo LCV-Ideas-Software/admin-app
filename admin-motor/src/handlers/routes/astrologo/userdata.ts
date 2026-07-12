@@ -52,21 +52,6 @@ export const onRequestGet = async (context: HandlerContext) => {
     const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 200);
     const offset = Number(url.searchParams.get('offset') ?? 0);
 
-    // Garantir tabela existe
-    await db
-      .prepare(
-        `
-      CREATE TABLE IF NOT EXISTS astrologo_user_data (
-        id TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        dados_json TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-      )
-    `,
-      )
-      .run();
-
     const countRow = await db.prepare('SELECT COUNT(*) as total FROM astrologo_user_data').first<{ total?: number }>();
     const total = countRow?.total ?? 0;
 
@@ -156,12 +141,7 @@ export const onRequestDelete = async (context: HandlerContext) => {
     const tokenResult = await db.prepare('DELETE FROM astrologo_auth_tokens WHERE email = ?').bind(email).run();
     deletedCounts.tokens = getChanges(tokenResult);
 
-    // 6. Safety net
-    try {
-      await db.prepare(`ALTER TABLE astrologo_mapas ADD COLUMN email TEXT DEFAULT ''`).run();
-    } catch {
-      /* exists */
-    }
+    // 6. Safety net por e-mail; a coluna é garantida pelo preflight versionado.
     await db.prepare('DELETE FROM astrologo_mapas WHERE email = ?').bind(email).run();
 
     // 7. Deletar o registro principal de astrologo_user_data

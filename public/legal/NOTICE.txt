@@ -2,5 +2,16 @@ Copyright © 2026 LCV Ideas & Software
 
 AVISOS DE TERCEIROS (THIRD-PARTY NOTICES)
 -----------------------------------------
-Este repositório pode conter dependências ou componentes de terceiros distribuídos sob licenças compatíveis (ex: Apache License 2.0). 
-Detalhes na tabela THIRDPARTY.md.
+Este repositório contém dependências e componentes de terceiros distribuídos
+sob licenças compatíveis. Inventário, links de origem e textos aplicáveis estão
+em THIRDPARTY.md.
+
+A cartografia local usa d3-geo 3.1.1 (ISC; inclui código GeographicLib sob MIT),
+suas dependências transitivas d3-array 3.2.4 e internmap 2.0.3 (ISC),
+topojson-client 3.1.0 (ISC), sua dependência transitiva commander 2.20.3 (MIT) e
+world-atlas 2.0.2 (ISC). O mapa-base 1:110m deriva do Natural Earth 4.1.0, cujos
+dados são disponibilizados em domínio público. "Natural Earth" indica apenas a
+proveniência dos dados e não constitui endosso.
+
+As definições @types/d3-geo 3.1.0 e @types/topojson-client 3.1.5 são
+distribuídas sob a licença MIT, com copyright da Microsoft Corporation.

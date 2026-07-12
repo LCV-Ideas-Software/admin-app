@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [v02.13.00] - 2026-07-12
+
+### Adicionado
+
+- **Astrólogo — paridade administrativa dos artefatos avançados**: o Arquivo Akáshico passa a reidratar e apresentar, sem recalcular, os contratos persistidos de análise natal, trânsitos, sinastria e mapa planetário de localidade. Os mesmos dados integram a tela detalhada, o relatório e o e-mail.
+- **Mapa planetário de localidade local**: a visualização usa a base Natural Earth 1:110m empacotada no aplicativo, sem tiles nem chamadas a provedores cartográficos externos. O módulo gráfico é carregado sob demanda para não aumentar o custo inicial das demais telas.
+- **Ajuda contextual para leigos**: Aspectos natais, Análise das casas, Céu atual e trânsitos, Sinastria e Mapa planetário de localidade recebem botões “Saiba mais” com diálogos acessíveis, metodologia, distinções entre as medidas e limites interpretativos.
+
+### Segurança e integridade
+
+- Contratos, versões, estados e vínculos recíprocos entre cada run e seu artefato de resultado são validados de forma estrita. Payload ausente, legado, malformado, incompleto ou sem vínculo coerente não é apresentado como resultado canônico.
+- A interface diferencia constelação IAU de signo tropical e não inventa grau interno para uma área constelacional bidimensional. Trânsitos, aspectos e mapas de localidade permanecem descritivos, sem prometer eventos nem substituir decisões profissionais.
+
+### Persistência e operação
+
+- As migrations `015` e `016` formalizam o schema antes criado parcialmente em runtime: configuração canônica da IA, dados do Arquivo Akáshico, artefatos tipados, execuções de trânsitos, sinastria e localidade, análises da IA, ativos renderizados e itens salvos. O preflight versionado reconcilia bancos legados sem recriar schema durante requisições.
+- Um trigger de privacidade remove o mapa técnico do segundo sujeito quando o mapa primário de uma sinastria é excluído, evitando que dados pessoais sem proprietário permaneçam órfãos após o cascade dos runs e artefatos.
+- As políticas iniciais de rate limit cobrem também trânsitos, sinastria e localidade; `INSERT OR IGNORE` preserva escolhas e limites já configurados no banco.
+
+### Localização
+
+- Textos, nomes, datas e horas visíveis permanecem em português brasileiro, com instantes apresentados na hora oficial de Brasília (`America/Sao_Paulo`). Identificadores técnicos continuam em inglês apenas nos contratos internos.
+
 ## [v02.12.00] - 2026-07-11
 
 ### Adicionado

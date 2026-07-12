@@ -187,6 +187,13 @@ jobs:
           done
         env:
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+      - name: Reconcile Astrologo schema preflight
+        run: node scripts/reconcile-astrologo-schema.mjs --remote --config wrangler.json
+        working-directory: ./
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
       - name: Deploy Admin Motor
         run: npx --registry=https://registry.npmjs.org/ wrangler@${WRANGLER_VERSION} deploy --config admin-motor/wrangler.json
         working-directory: ./

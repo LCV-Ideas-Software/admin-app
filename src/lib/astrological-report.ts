@@ -10,6 +10,21 @@
  */
 
 import {
+  renderLocalityMapHtml,
+  renderLocalityMapText,
+  renderSynastryRunHtml,
+  renderSynastryRunText,
+  renderTransitRunHtml,
+  renderTransitRunText,
+} from './astrological-advanced-report';
+import { parseLocalityMapV1 } from './astrological-locality-map-v1';
+import {
+  formatNatalAspectPhasePtBr,
+  mundaneDegreeUnavailablePtBr,
+  type NatalChartAnalysisV1ParseResult,
+  parseNatalChartAnalysisV1,
+} from './astrological-natal-analysis-v1';
+import {
   type DadosPosicionaisV2,
   type DadosPosicionaisV2ParseResult,
   deriveConsultantRulingAngel,
@@ -22,12 +37,14 @@ import {
   PLANET_LABEL_BY_ID,
   parseDadosPosicionaisV2,
 } from './astrological-position-v2';
+import { normalizeSynastrySubjectNames, parseSynastryRunV1 } from './astrological-synastry-run-v1';
 import {
   formatTatwaCalculationModePtBr,
   formatTatwaDurationPtBr,
   type NormalizedTatwa,
   normalizeTatwa,
 } from './astrological-tatwa';
+import { parseTransitRunV1 } from './astrological-transit-run-v1';
 
 // ─── Types (paridade com astrologo-frontend) ──────────────────────
 interface AstroData {
@@ -61,6 +78,16 @@ interface MapaDetalhado {
   dados_globais: string | null;
   dados_posicionais_v2?: string | null;
   dadosPosicionaisV2?: unknown;
+  natal_chart_analysis_v1?: string | null;
+  natalChartAnalysisV1?: unknown;
+  transit_run_v1?: string | null;
+  transitRunV1?: unknown;
+  synastry_run_v1?: string | null;
+  synastryRunV1?: unknown;
+  synastry_subjects?: unknown;
+  synastrySubjects?: unknown;
+  locality_map_v1?: string | null;
+  localityMapV1?: unknown;
   analise_ia: string | null;
   created_at: string | null;
 }
@@ -362,6 +389,103 @@ const renderPositionalHtml = (dados: DadosPosicionaisV2, boxShadow: string): str
     </section>`;
 };
 
+const formatDecimalPtBr = (value: number, maximumFractionDigits = 2): string =>
+  new Intl.NumberFormat('pt-BR', { maximumFractionDigits }).format(value);
+
+const renderNatalAnalysisText = (result: NatalChartAnalysisV1ParseResult): string => {
+  if (result.status === 'legacy') return '';
+  if (result.status === 'invalid') {
+    return `*⚠️ ANÁLISE NATAL AVANÇADA INDISPONÍVEL*\n\nO artefato natal não passou pela validação defensiva; nenhum valor foi recalculado pelo Admin.\n`;
+  }
+
+  const data = result.data;
+  const pointNames = new Map(data.points.map((point) => [`${point.kind}:${point.id}`, point.displayNamePtBr]));
+  let text = '*🪐 ASPECTOS NATAIS*\n\n';
+  text += '_Aspectos são relações angulares; o orbe mede a distância até o ângulo exato._\n';
+  if (data.aspects.length === 0) {
+    text += '  • Nenhum aspecto do perfil maior versionado foi registrado.\n';
+  } else {
+    for (const aspect of data.aspects) {
+      const pointA = pointNames.get(`${aspect.pointA.kind}:${aspect.pointA.id}`) ?? 'Ponto indisponível';
+      const pointB = pointNames.get(`${aspect.pointB.kind}:${aspect.pointB.id}`) ?? 'Ponto indisponível';
+      text += `  • ${pointA} — ${aspect.displayNamePtBr} — ${pointB}: orbe ${formatDecimalPtBr(aspect.orbDeg)}°; ${formatNatalAspectPhasePtBr(aspect.phase)}; intensidade geométrica ${formatDecimalPtBr(aspect.intensityPercent, 1)}%\n`;
+    }
+  }
+
+  text += '\n*🏠 ANÁLISE DAS CASAS*\n\n';
+  text += '_O grau mundano mede o semiarco dentro da Casa Placidus e não é a longitude tropical._\n';
+  for (const house of data.houseOccupancies) {
+    const label = PLANET_LABEL_BY_ID[house.bodyId];
+    if (house.occupancy.status === 'available' && house.mundaneDegreeWithinHouse.status === 'available') {
+      text += `  • ${label}: ${formatDegreeDmsTruncated(house.mundaneDegreeWithinHouse.degreeWithinHouseDeg)} dentro da Casa ${house.occupancy.houseIndex1}\n`;
+    } else if (house.occupancy.status === 'available') {
+      text += `  • ${label}: Casa ${house.occupancy.houseIndex1} — ${mundaneDegreeUnavailablePtBr(house)}\n`;
+    } else {
+      text += `  • ${label}: ${mundaneDegreeUnavailablePtBr(house)}\n`;
+    }
+  }
+  return text;
+};
+
+const renderNatalAnalysisHtml = (result: NatalChartAnalysisV1ParseResult, boxShadow: string): string => {
+  if (result.status === 'legacy') return '';
+  if (result.status === 'invalid') {
+    return `
+      <section style="margin-top: 36px; padding: 24px; background-color: #fff7ed; border-radius: 16px; border: 1px solid #fdba74; ${boxShadow}">
+        <h2 style="font-size: 20px; color: #9a3412; margin: 0 0 8px 0;">Análise natal avançada indisponível</h2>
+        <p style="font-size: 14px; color: #7c2d12; margin: 0;">O artefato natal não passou pela validação defensiva; nenhum valor foi recalculado pelo Admin.</p>
+      </section>`;
+  }
+
+  const data = result.data;
+  const pointNames = new Map(data.points.map((point) => [`${point.kind}:${point.id}`, point.displayNamePtBr]));
+  const aspectRows = data.aspects.length
+    ? data.aspects
+        .map((aspect) => {
+          const pointA = pointNames.get(`${aspect.pointA.kind}:${aspect.pointA.id}`) ?? 'Ponto indisponível';
+          const pointB = pointNames.get(`${aspect.pointB.kind}:${aspect.pointB.id}`) ?? 'Ponto indisponível';
+          return `<tr>
+            <th scope="row" style="padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0;">${escapeHtml(pointA)} e ${escapeHtml(pointB)}</th>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;"><strong>${escapeHtml(aspect.displayNamePtBr)}</strong></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(formatDecimalPtBr(aspect.orbDeg))}°</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(formatNatalAspectPhasePtBr(aspect.phase))}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(formatDecimalPtBr(aspect.intensityPercent, 1))}%</td>
+          </tr>`;
+        })
+        .join('')
+    : '<tr><td colspan="5" style="padding: 12px; color: #64748b;">Nenhum aspecto do perfil maior versionado foi registrado.</td></tr>';
+  const houseCards = data.houseOccupancies
+    .map((house) => {
+      const label = PLANET_LABEL_BY_ID[house.bodyId];
+      const point = data.points.find((candidate) => candidate.kind === 'planet' && candidate.id === house.bodyId);
+      const houseLabel =
+        house.occupancy.status === 'available' ? `Casa ${house.occupancy.houseIndex1}` : 'Casa indisponível';
+      const degree =
+        house.occupancy.status === 'available' && house.mundaneDegreeWithinHouse.status === 'available'
+          ? `${formatDegreeDmsTruncated(house.mundaneDegreeWithinHouse.degreeWithinHouseDeg)} dentro da Casa ${house.occupancy.houseIndex1}`
+          : mundaneDegreeUnavailablePtBr(house);
+      return `<li style="padding: 14px; border: 1px solid #bfdbfe; border-radius: 14px; background-color: #f8fafc; list-style: none;">
+        <strong style="display: block; color: #1e3a8a; margin-bottom: 5px;"><span style="font-size: 20px; color: ${PLANET_EMAIL_COLOR_BY_ID[house.bodyId]};">${escapeHtml(point?.symbol ?? '')}</span> ${escapeHtml(label)}</strong>
+        <span style="display: block; color: #475569; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px;">${escapeHtml(houseLabel)}</span>
+        <span style="color: #334155; font-size: 13px;">${escapeHtml(degree)}</span>
+      </li>`;
+    })
+    .join('');
+
+  return `
+    <section style="margin-top: 36px; padding: 32px; background-color: rgba(255, 255, 255, 0.85); border-radius: 24px; border: 1px solid #c4b5fd; ${boxShadow}">
+      <h2 style="font-size: 24px; color: #5b21b6; margin: 0 0 8px 0;">🪐 Aspectos natais</h2>
+      <p style="font-size: 13px; color: #475569; margin: 0 0 18px 0;">Aspectos são relações angulares. O orbe mostra quanto a relação se afasta do ângulo exato.</p>
+      <div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead><tr style="background-color: #ede9fe;"><th style="padding: 10px; text-align: left;">Pontos</th><th style="padding: 10px; text-align: left;">Aspecto</th><th style="padding: 10px; text-align: left;">Orbe</th><th style="padding: 10px; text-align: left;">Fase</th><th style="padding: 10px; text-align: left;">Intensidade</th></tr></thead>
+        <tbody>${aspectRows}</tbody>
+      </table></div>
+      <h2 style="font-size: 24px; color: #075985; margin: 32px 0 8px 0;">🏠 Análise das casas</h2>
+      <p style="font-size: 13px; color: #475569; margin: 0 0 18px 0;">O grau mundano mede o semiarco dentro da Casa Placidus; não é a longitude tropical e não é estimado pelas cúspides.</p>
+      <ul style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 0; padding: 0;">${houseCards}</ul>
+    </section>`;
+};
+
 // ─── Text Report (WhatsApp-style) ────────────────────────────────
 
 function gerarTextoRelatorio(
@@ -372,6 +496,8 @@ function gerarTextoRelatorio(
   astronomica: DadosSistema | null,
   analiseIa: string | null,
   positional: DadosPosicionaisV2ParseResult,
+  natalAnalysis: NatalChartAnalysisV1ParseResult,
+  advancedText: string,
 ): string {
   const divider = `\n${'─'.repeat(28)}\n`;
 
@@ -437,6 +563,17 @@ function gerarTextoRelatorio(
     t += blocoTexto(tropical);
   }
 
+  const natalText = renderNatalAnalysisText(natalAnalysis);
+  if (natalText) {
+    t += divider;
+    t += natalText;
+  }
+
+  if (advancedText) {
+    t += divider;
+    t += advancedText;
+  }
+
   t += divider;
   t += `*✨ DUAS PERSPECTIVAS, UM MESMO NASCIMENTO ✨*\n\n`;
   t += `_O módulo tropical organiza o zodíaco pelo ciclo sazonal; o resumo constelacional usa 13 faixas de referência aproximadas ao longo da eclíptica. Quando disponíveis, os dados posicionais detalhados fazem a classificação pelas regiões oficiais da IAU._\n`;
@@ -476,6 +613,8 @@ function gerarHtmlRelatorio(
   astronomica: DadosSistema | null,
   analiseIa: string | null,
   positional: DadosPosicionaisV2ParseResult,
+  natalAnalysis: NatalChartAnalysisV1ParseResult,
+  advancedHtml: string,
 ): string {
   const fontFamily =
     "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;";
@@ -671,6 +810,10 @@ function gerarHtmlRelatorio(
       </section>`
       }
 
+      ${renderNatalAnalysisHtml(natalAnalysis, boxShadow)}
+
+      ${advancedHtml}
+
       <footer style="text-align: center; margin-top: 60px; padding-top: 20px; border-top: 1px solid #dde4ee;">
         <p style="font-size: 12px; color: #64748b; margin: 0;">Gerado via Oráculo Celestial — Admin LCV</p>
       </footer>
@@ -690,9 +833,50 @@ export function generateAstrologicalReport(mapa: MapaDetalhado): GeneratedReport
   const tropical = safeParseJson<DadosSistema>(mapa.dados_tropical);
   const astronomica = safeParseJson<DadosSistema>(mapa.dados_astronomica);
   const positional = parseDadosPosicionaisV2(mapa.dados_posicionais_v2 ?? mapa.dadosPosicionaisV2, mapa.id);
+  const natalAnalysis = parseNatalChartAnalysisV1(mapa.natal_chart_analysis_v1 ?? mapa.natalChartAnalysisV1, mapa.id);
+  const transitRun = parseTransitRunV1(mapa.transit_run_v1 ?? mapa.transitRunV1, mapa.id);
+  const synastrySubjects = normalizeSynastrySubjectNames(
+    mapa.synastry_subjects ?? mapa.synastrySubjects,
+    mapa.nome || 'Pessoa A',
+    'Pessoa B',
+  );
+  const synastryRun = parseSynastryRunV1(
+    mapa.synastry_run_v1 ?? mapa.synastryRunV1,
+    synastrySubjects.primaryCalculationId ?? mapa.id,
+  );
+  const localityMap = parseLocalityMapV1(mapa.locality_map_v1 ?? mapa.localityMapV1, mapa.id);
+  const advancedText = [
+    renderTransitRunText(transitRun),
+    renderSynastryRunText(synastryRun, synastrySubjects),
+    renderLocalityMapText(localityMap),
+  ]
+    .filter(Boolean)
+    .join(`\n${'─'.repeat(28)}\n`);
+  const advancedSectionShadow = 'box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);';
+  const advancedHtml = `${renderTransitRunHtml(transitRun, advancedSectionShadow)}${renderSynastryRunHtml(synastryRun, synastrySubjects, advancedSectionShadow)}${renderLocalityMapHtml(localityMap, advancedSectionShadow)}`;
 
-  const htmlContent = gerarHtmlRelatorio(mapa, globais, tatwa, tropical, astronomica, mapa.analise_ia, positional);
-  const textContent = gerarTextoRelatorio(mapa, globais, tatwa, tropical, astronomica, mapa.analise_ia, positional);
+  const htmlContent = gerarHtmlRelatorio(
+    mapa,
+    globais,
+    tatwa,
+    tropical,
+    astronomica,
+    mapa.analise_ia,
+    positional,
+    natalAnalysis,
+    advancedHtml,
+  );
+  const textContent = gerarTextoRelatorio(
+    mapa,
+    globais,
+    tatwa,
+    tropical,
+    astronomica,
+    mapa.analise_ia,
+    positional,
+    natalAnalysis,
+    advancedText,
+  );
 
   // Summary from AI or fallback
   let summary: string;
