@@ -10,6 +10,18 @@ const OBSOLETE_POSITIONAL_FALLBACK = /Dados posicionais v2 indisponíveis para e
 const INTERNAL_ANALYSIS_DETAIL =
   /(?:\b(?:schema(?:Id|Version)?|profile(?:Id|Version)?|calculationId|payload(?:Sha256)?|sourceRef|methodId|targetSetId|latitudeDeg|longitudeDeg)\b|vers[aã]o do contrato|contrato posicional|perfil (?:metodol[oó]gico|versionado)|dados (?:posicionais v\d+|can[oô]nicos)|\b(?:EQJ|EQD|GAST|J2000|WASM|D1)\b|SHA-?256|Astronomy Engine|Swiss Ephemeris|Cloudflare|Wrangler|\b(?:modelo|provedor|SDK) (?:Gemini|Claude)\b|\b(?:Gemini|Claude) (?:API|SDK|modelo)\b|\b(?:endpoint|worker)\b|urn:astrologo|astrologo-[a-z0-9.-]+-v\d+|DADOS_[A-Z0-9_]+)/iu;
 
+type AnalysisDomParser = new () => {
+  parseFromString(
+    input: string,
+    type: string,
+  ): {
+    body: {
+      innerHTML: string;
+      querySelectorAll(selector: string): Iterable<{ textContent: string | null; remove(): void }>;
+    };
+  };
+};
+
 export const stripInternalDetailBlocksWithoutDom = (input: string): string => {
   const blockPattern = /<(p|li|h[1-6])\b[^>]*>[\s\S]*?<\/\1\s*>/giu;
   if (!/<(?:p|li|h[1-6])\b/iu.test(input)) {
@@ -34,11 +46,12 @@ export const stripInternalDetailBlocksWithoutDom = (input: string): string => {
 };
 
 const stripInternalDetailBlocks = (input: string): string => {
-  if (typeof DOMParser === 'undefined' || !/<(?:p|li|h[1-6])\b/iu.test(input)) {
+  const DomParser = (globalThis as unknown as { DOMParser?: AnalysisDomParser }).DOMParser;
+  if (!DomParser || !/<(?:p|li|h[1-6])\b/iu.test(input)) {
     return stripInternalDetailBlocksWithoutDom(input);
   }
 
-  const parsed = new DOMParser().parseFromString(input, 'text/html');
+  const parsed = new DomParser().parseFromString(input, 'text/html');
   for (const node of parsed.body.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6')) {
     if (INTERNAL_ANALYSIS_DETAIL.test(node.textContent ?? '')) node.remove();
   }

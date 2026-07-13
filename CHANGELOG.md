@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.14.06] - 2026-07-12
+
+### Corrigido
+
+- **Compatibilidade entre navegador e Worker** — a limpeza de detalhes internos detecta o parser HTML em tempo de execução sem exigir tipos DOM no motor administrativo, preservando o fallback seguro fora do navegador.
+
 ## [v02.14.05] - 2026-07-12
 
 ### Corrigido
