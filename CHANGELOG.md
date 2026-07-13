@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v02.14.04] - 2026-07-12
+
+### Corrigido
+
+- **Lock Python do Socket Security** — a dependência direta passa a ser declarada em `socketsecurity-requirements.in`, e o lock hashado é recompilado integralmente com todas as dependências transitivas exigidas pela versão `2.4.20`.
+- **Dependabot seguro para Python** — as atualizações ficam restritas à dependência direta `socketsecurity`; o par entrada/lock permite regeneração coerente e evita PRs parciais que falhem em `pip --require-hashes`.
+
 ## [v02.14.03] - 2026-07-12
 
 ### Corrigido

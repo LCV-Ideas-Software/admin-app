@@ -164,4 +164,6 @@ updates:
     commit-message:
       prefix: 'deps'
       include: 'scope'
+    allow:
+      - dependency-name: 'socketsecurity'
     open-pull-requests-limit: 10
