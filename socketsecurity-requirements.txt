@@ -186,9 +186,9 @@ smmap==5.0.3 \
     --hash=sha256:4d9debb8b99007ae47165abc08670bd74cb74b5227dda7f643eccc4e9eb5642c \
     --hash=sha256:c106e05d5a61449cf6ba9a1e650227ecfb141590d2a98412103ff35d89fc7b2f
     # via gitdb
-socketdev==3.1.0 \
-    --hash=sha256:a9534189d50c9f6c39e802280cc2317f830dd0c9970677e8cde843a69daa84ed \
-    --hash=sha256:e9245916d423952aba4f0018bea2bca28740530ec30308089c48dddb2133e38a
+socketdev==3.3.0 \
+    --hash=sha256:3d60bd4ac3201e9d581b1fe02bf2e6aef1b90c13ae75d15a8664aa9ef966734e \
+    --hash=sha256:513c045ce42bdd6cc2bb66a527f5863e0c399e56dbdcb1832cd5d94a5fb1a5e4
     # via socketsecurity
 socketsecurity==2.2.90 \
     --hash=sha256:a06798d2d8c24465fd75b53105cb6ad1022d37c2c4771a85a0fb2466bce3d11d \
