@@ -30,7 +30,10 @@ const mapaA = {
   dados_astronomica: null,
   dados_tropical: null,
   dados_globais: null,
-  analise_ia: `<p>Antes ⟦ASTROLOGO_PAYLOAD:legacy.query:${'f'.repeat(64)}⟧ depois.</p>`,
+  analise_ia: [
+    `<p>Antes ⟦ASTROLOGO_PAYLOAD:legacy.query:${'f'.repeat(64)}⟧ depois.</p>`,
+    '<p>Versão do contrato posicional: 2.0.0; perfil metodológico astrologo-natal-major-v1; EQJ/J2000.</p>',
+  ].join(''),
   created_at: '2026-07-11T12:00:00Z',
 };
 
@@ -170,7 +173,7 @@ describe('AstrologoModule email report ownership', () => {
     });
   });
 
-  it('não exibe sentinelas internas presentes em uma análise histórica', async () => {
+  it('não exibe sentinelas nem metadados internos presentes em uma análise histórica', async () => {
     const user = userEvent.setup();
     render(
       <NotificationProvider>
@@ -185,5 +188,6 @@ describe('AstrologoModule email report ownership', () => {
 
     expect(await screen.findByText(/Antes\s+depois\./)).toBeInTheDocument();
     expect(screen.queryByText(/ASTROLOGO_PAYLOAD/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/contrato posicional|perfil metodológico|EQJ|J2000/iu)).not.toBeInTheDocument();
   });
 });

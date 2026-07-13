@@ -1,4 +1,4 @@
-import { type LocalityMapV1ParseResult, localityAvailabilityPtBr } from './astrological-locality-map-v1';
+import type { LocalityLineV1, LocalityMapV1ParseResult } from './astrological-locality-map-v1';
 import { formatDegreeDmsTruncated, formatInstantInBrasilia, PLANET_LABEL_BY_ID } from './astrological-position-v2';
 import {
   type SynastryRunV1ParseResult,
@@ -25,18 +25,23 @@ const exactitudePtBr = (exactitude: TransitExactitudeV1): string => {
   if (exactitude.status === 'available') {
     return `Exatidão comprovada em ${formatInstantInBrasilia(exactitude.exactAtUtc)}`;
   }
-  if (exactitude.reasonCode === 'HORIZON_ZERO_NO_SEARCH') return 'Exatidão não pesquisada: horizonte zero.';
+  if (exactitude.reasonCode === 'HORIZON_ZERO_NO_SEARCH') return 'Momento exato não pesquisado nesta leitura.';
   if (exactitude.reasonCode === 'NO_EXACTITUDE_WITHIN_HORIZON') {
     return 'Exatidão não encontrada dentro do horizonte.';
   }
-  if (exactitude.reasonCode === 'EXACT_SEARCH_UNAVAILABLE') return 'Exatidão não comprovada pelo provedor.';
-  return 'Exatidão não comprovada: a resposta do provedor foi rejeitada.';
+  return 'Momento exato não disponível.';
+};
+
+const localityAvailabilityForConsultantPtBr = (line: LocalityLineV1): string => {
+  if (line.availability.status === 'available') return 'Disponível';
+  if (line.availability.status === 'partial') return 'Disponível em parte do trajeto';
+  return 'Indisponível';
 };
 
 export const renderTransitRunText = (result: TransitRunV1ParseResult): string => {
   if (result.status === 'legacy') return '';
   if (result.status === 'invalid') {
-    return '*⚠️ CÉU ATUAL INDISPONÍVEL*\n\nO artefato não passou pela validação defensiva; nenhum valor foi recalculado pelo Admin.\n';
+    return '*⚠️ CÉU ATUAL INDISPONÍVEL*\n\nNão foi possível apresentar esta seção no relatório.\n';
   }
   const data = result.data;
   const transitNames = new Map(
@@ -47,9 +52,8 @@ export const renderTransitRunText = (result: TransitRunV1ParseResult): string =>
     '*🌌 CÉU ATUAL E TRÂNSITOS*',
     '',
     `*Referência:* ${formatInstantInBrasilia(data.request.referenceInstantUtc)} — ${data.presentationPolicy.timeZoneLabel}`,
-    `*Horizonte:* até ${formatInstantInBrasilia(data.request.horizonEndInstantUtc)} (${data.request.horizonDays} dia(s) UTC)`,
+    `*Horizonte:* até ${formatInstantInBrasilia(data.request.horizonEndInstantUtc)}`,
     '_Leitura simbólica; não é uma previsão inevitável de acontecimentos._',
-    '_A classificação astronômica usa regiões IAU bidimensionais; grau interno em constelação não é definido._',
     '',
     '*Posições no instante de referência:*',
   ];
@@ -60,14 +64,14 @@ export const renderTransitRunText = (result: TransitRunV1ParseResult): string =>
         : 'Casa natal indisponível';
     const astronomicalReal =
       position.astronomicalReal.status === 'available'
-        ? `constelação IAU ${position.astronomicalReal.constellation.namePtBr}, sem grau interno definido`
-        : 'constelação IAU indisponível junto ao limite catalogado, sem grau interno definido';
+        ? `constelação IAU ${position.astronomicalReal.constellation.namePtBr}`
+        : 'constelação IAU indisponível';
     lines.push(
       `  • ${PLANET_LABEL_BY_ID[position.bodyId]}: ${formatDegreeDmsTruncated(position.tropical.degreeWithinSignDeg)} de ${position.tropical.signNamePtBr}; ${astronomicalReal} — ${house}`,
     );
   }
   lines.push('', '*Aspectos entre trânsitos e mapa natal:*');
-  if (data.aspects.length === 0) lines.push('  • Nenhum aspecto persistido dentro do orbe de 2°.');
+  if (data.aspects.length === 0) lines.push('  • Nenhum aspecto foi encontrado nesta leitura.');
   for (const aspect of data.aspects) {
     lines.push(
       `  • ${transitNames.get(aspect.transitPoint.bodyId) ?? 'Planeta'} em trânsito e ${natalNames.get(aspect.natalPoint.pointId) ?? 'ponto'} natal — ${aspect.displayNamePtBr}; orbe ${decimalFormatter.format(aspect.orbDeg)}°; fase ${transitPhasePtBr(aspect.phase).toLocaleLowerCase('pt-BR')}; ${exactitudePtBr(aspect.exactitude)}`,
@@ -79,7 +83,7 @@ export const renderTransitRunText = (result: TransitRunV1ParseResult): string =>
 export const renderTransitRunHtml = (result: TransitRunV1ParseResult, boxShadow: string): string => {
   if (result.status === 'legacy') return '';
   if (result.status === 'invalid') {
-    return `<section style="margin-top:28px;padding:24px;border:1px solid #fdba74;border-radius:18px;background:#fff7ed;${boxShadow}"><h2 style="color:#9a3412;margin:0 0 8px;">Céu atual indisponível</h2><p style="color:#7c2d12;margin:0;">O artefato não passou pela validação defensiva; nenhum valor foi recalculado pelo Admin.</p></section>`;
+    return `<section style="margin-top:28px;padding:24px;border:1px solid #fdba74;border-radius:18px;background:#fff7ed;${boxShadow}"><h2 style="color:#9a3412;margin:0 0 8px;">Céu atual indisponível</h2><p style="color:#7c2d12;margin:0;">Não foi possível apresentar esta seção no relatório.</p></section>`;
   }
   const data = result.data;
   const transitNames = new Map(
@@ -94,8 +98,8 @@ export const renderTransitRunHtml = (result: TransitRunV1ParseResult, boxShadow:
           : 'Casa natal indisponível';
       const astronomicalReal =
         position.astronomicalReal.status === 'available'
-          ? `Constelação IAU: ${position.astronomicalReal.constellation.namePtBr} — grau interno não definido`
-          : 'Constelação IAU indisponível junto ao limite catalogado — grau interno não definido';
+          ? `Constelação IAU: ${position.astronomicalReal.constellation.namePtBr}`
+          : 'Constelação IAU indisponível';
       return `<li style="padding:10px;border:1px solid #bae6fd;border-radius:12px;list-style:none;background:#f8fafc;"><strong>${escapeHtml(position.symbol)} ${escapeHtml(PLANET_LABEL_BY_ID[position.bodyId])}</strong><br><span style="font-size:13px;color:#475569;">${escapeHtml(formatDegreeDmsTruncated(position.tropical.degreeWithinSignDeg))} de ${escapeHtml(position.tropical.signNamePtBr)} · ${escapeHtml(house)}</span><br><span style="font-size:12px;color:#64748b;">${escapeHtml(astronomicalReal)}</span></li>`;
     })
     .join('');
@@ -106,12 +110,11 @@ export const renderTransitRunHtml = (result: TransitRunV1ParseResult, boxShadow:
             `<tr><th scope="row" style="padding:9px;text-align:left;border-bottom:1px solid #e2e8f0;">${escapeHtml(transitNames.get(aspect.transitPoint.bodyId) ?? 'Planeta')} em trânsito e ${escapeHtml(natalNames.get(aspect.natalPoint.pointId) ?? 'ponto')} natal</th><td style="padding:9px;border-bottom:1px solid #e2e8f0;">${escapeHtml(aspect.displayNamePtBr)}</td><td style="padding:9px;border-bottom:1px solid #e2e8f0;">${escapeHtml(decimalFormatter.format(aspect.orbDeg))}°</td><td style="padding:9px;border-bottom:1px solid #e2e8f0;">${escapeHtml(transitPhasePtBr(aspect.phase))}</td><td style="padding:9px;border-bottom:1px solid #e2e8f0;">${escapeHtml(exactitudePtBr(aspect.exactitude))}</td></tr>`,
         )
         .join('')
-    : '<tr><td colspan="5" style="padding:10px;">Nenhum aspecto persistido dentro do orbe de 2°.</td></tr>';
+    : '<tr><td colspan="5" style="padding:10px;">Nenhum aspecto foi encontrado nesta leitura.</td></tr>';
   return `<section style="margin-top:28px;padding:28px;border:1px solid #bae6fd;border-radius:22px;background:#f0f9ff;${boxShadow}">
     <h2 style="font-size:23px;color:#075985;margin:0 0 8px;">🌌 Céu atual e trânsitos</h2>
     <p style="font-size:13px;color:#475569;margin:0 0 4px;"><strong>Referência:</strong> ${escapeHtml(formatInstantInBrasilia(data.request.referenceInstantUtc))} — ${escapeHtml(data.presentationPolicy.timeZoneLabel)}</p>
     <p style="font-size:12px;color:#64748b;margin:0 0 6px;">Horizonte até ${escapeHtml(formatInstantInBrasilia(data.request.horizonEndInstantUtc))}. Leitura simbólica; não é uma previsão inevitável.</p>
-    <p style="font-size:12px;color:#64748b;margin:0 0 16px;">Constelações IAU são regiões bidimensionais; grau interno não é definido.</p>
     <h3 style="color:#0369a1;">Posições no instante de referência</h3><ul style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;padding:0;">${positions}</ul>
     <h3 style="color:#6d28d9;margin-top:22px;">Aspectos entre trânsitos e mapa natal</h3><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#e0f2fe;"><th style="padding:9px;text-align:left;">Relação</th><th style="padding:9px;text-align:left;">Aspecto</th><th style="padding:9px;text-align:left;">Orbe</th><th style="padding:9px;text-align:left;">Fase</th><th style="padding:9px;text-align:left;">Exatidão</th></tr></thead><tbody>${aspects}</tbody></table></div>
   </section>`;
@@ -125,7 +128,7 @@ const overlayText = (body: string, source: string, target: string, house?: numbe
 export const renderSynastryRunText = (result: SynastryRunV1ParseResult, subjects: SynastrySubjectNames): string => {
   if (result.status === 'legacy') return '';
   if (result.status === 'invalid') {
-    return '*⚠️ SINASTRIA INDISPONÍVEL*\n\nO artefato não passou pela validação defensiva; nenhuma relação foi reconstruída pelo Admin.\n';
+    return '*⚠️ SINASTRIA INDISPONÍVEL*\n\nNão foi possível apresentar esta seção no relatório.\n';
   }
   const data = result.data;
   const lines = [
@@ -136,7 +139,7 @@ export const renderSynastryRunText = (result: SynastryRunV1ParseResult, subjects
     '',
     '*Aspectos intermapa:*',
   ];
-  if (data.aspects.length === 0) lines.push('  • Nenhum aspecto persistido dentro dos orbes declarados.');
+  if (data.aspects.length === 0) lines.push('  • Nenhum aspecto foi encontrado para esta comparação.');
   for (const aspect of data.aspects) {
     lines.push(
       `  • ${synastryPlanetNamePtBr(aspect.pointA.bodyId)} de ${subjects.A} e ${synastryPlanetNamePtBr(aspect.pointB.bodyId)} de ${subjects.B} — ${aspect.displayNamePtBr}; separação ${decimalFormatter.format(aspect.separationDeg)}°; orbe ${decimalFormatter.format(aspect.orbDeg)}°`,
@@ -164,7 +167,7 @@ export const renderSynastryRunHtml = (
 ): string => {
   if (result.status === 'legacy') return '';
   if (result.status === 'invalid') {
-    return `<section style="margin-top:28px;padding:24px;border:1px solid #f9a8d4;border-radius:18px;background:#fdf2f8;${boxShadow}"><h2 style="color:#9d174d;margin:0 0 8px;">Sinastria indisponível</h2><p style="color:#831843;margin:0;">O artefato não passou pela validação defensiva; nenhuma relação foi reconstruída pelo Admin.</p></section>`;
+    return `<section style="margin-top:28px;padding:24px;border:1px solid #f9a8d4;border-radius:18px;background:#fdf2f8;${boxShadow}"><h2 style="color:#9d174d;margin:0 0 8px;">Sinastria indisponível</h2><p style="color:#831843;margin:0;">Não foi possível apresentar esta seção no relatório.</p></section>`;
   }
   const data = result.data;
   const aspects = data.aspects.length
@@ -174,7 +177,7 @@ export const renderSynastryRunHtml = (
             `<li style="margin:0 0 8px;"><strong>${escapeHtml(aspect.displayNamePtBr)}</strong> — ${escapeHtml(synastryPlanetNamePtBr(aspect.pointA.bodyId))} de ${escapeHtml(subjects.A)} e ${escapeHtml(synastryPlanetNamePtBr(aspect.pointB.bodyId))} de ${escapeHtml(subjects.B)} · separação ${escapeHtml(decimalFormatter.format(aspect.separationDeg))}° · orbe ${escapeHtml(decimalFormatter.format(aspect.orbDeg))}°</li>`,
         )
         .join('')
-    : '<li>Nenhum aspecto persistido dentro dos orbes declarados.</li>';
+    : '<li>Nenhum aspecto foi encontrado para esta comparação.</li>';
   const aToB = data.houseOverlays.aToB
     .map((overlay) => {
       const text = overlayText(
@@ -212,24 +215,20 @@ export const renderSynastryRunHtml = (
 export const renderLocalityMapText = (result: LocalityMapV1ParseResult): string => {
   if (result.status === 'legacy') return '';
   if (result.status === 'invalid') {
-    return '*⚠️ MAPA DE LOCALIDADE INDISPONÍVEL*\n\nO artefato não passou pela validação defensiva; nenhuma linha foi reconstruída pelo Admin.\n';
+    return '*⚠️ MAPA DE LOCALIDADE INDISPONÍVEL*\n\nNão foi possível apresentar esta seção no relatório.\n';
   }
   const data = result.data;
   const lines = [
     '*🗺️ MAPA PLANETÁRIO DE LOCALIDADE*',
     '',
     `*Instante natal:* ${formatInstantInBrasilia(data.source.birthInstantUtc)} — ${data.presentationPolicy.timeZoneLabel}`,
-    `*Resolução latitudinal:* ${decimalFormatter.format(data.models.sampling.latitudeResolutionDeg)}°`,
-    '*Referência equatorial:* EQJ/J2000 → EQD verdadeiro da data, com precessão e nutação explícitas.',
-    '*Base cartográfica:* Natural Earth 1:110m, carregada localmente e sem tiles externos.',
-    '*Horizonte geométrico:* altitude 0°, sem refração e sem elevação do observador.',
     '_Referência simbólica e exploratória: não recomenda mudança, viagem, investimento ou moradia._',
     '',
     '*Linhas planetárias:*',
   ];
   for (const line of data.lines) {
     lines.push(
-      `  • ${line.bodySymbol} ${line.bodyDisplayNamePtBr} — ${line.angleDisplayNamePtBr}: ${localityAvailabilityPtBr(line)}`,
+      `  • ${line.bodySymbol} ${line.bodyDisplayNamePtBr} — ${line.angleDisplayNamePtBr}: ${localityAvailabilityForConsultantPtBr(line)}`,
     );
   }
   return `${lines.join('\n')}\n`;
@@ -238,20 +237,18 @@ export const renderLocalityMapText = (result: LocalityMapV1ParseResult): string 
 export const renderLocalityMapHtml = (result: LocalityMapV1ParseResult, boxShadow: string): string => {
   if (result.status === 'legacy') return '';
   if (result.status === 'invalid') {
-    return `<section style="margin-top:28px;padding:24px;border:1px solid #fcd34d;border-radius:18px;background:#fffbeb;${boxShadow}"><h2 style="color:#92400e;margin:0 0 8px;">Mapa de localidade indisponível</h2><p style="color:#78350f;margin:0;">O artefato não passou pela validação defensiva; nenhuma linha foi reconstruída pelo Admin.</p></section>`;
+    return `<section style="margin-top:28px;padding:24px;border:1px solid #fcd34d;border-radius:18px;background:#fffbeb;${boxShadow}"><h2 style="color:#92400e;margin:0 0 8px;">Mapa de localidade indisponível</h2><p style="color:#78350f;margin:0;">Não foi possível apresentar esta seção no relatório.</p></section>`;
   }
   const data = result.data;
   const lines = data.lines
     .map(
       (line) =>
-        `<li style="margin:0 0 7px;"><strong>${escapeHtml(line.bodySymbol)} ${escapeHtml(line.bodyDisplayNamePtBr)} — ${escapeHtml(line.angleDisplayNamePtBr)}:</strong> ${escapeHtml(localityAvailabilityPtBr(line))}</li>`,
+        `<li style="margin:0 0 7px;"><strong>${escapeHtml(line.bodySymbol)} ${escapeHtml(line.bodyDisplayNamePtBr)} — ${escapeHtml(line.angleDisplayNamePtBr)}:</strong> ${escapeHtml(localityAvailabilityForConsultantPtBr(line))}</li>`,
     )
     .join('');
   return `<section style="margin-top:28px;padding:28px;border:1px solid #fde68a;border-radius:22px;background:#fffbeb;${boxShadow}">
     <h2 style="font-size:23px;color:#92400e;margin:0 0 8px;">🗺️ Mapa planetário de localidade</h2>
     <p style="font-size:13px;color:#475569;margin:0 0 5px;"><strong>Instante natal:</strong> ${escapeHtml(formatInstantInBrasilia(data.source.birthInstantUtc))} — ${escapeHtml(data.presentationPolicy.timeZoneLabel)}</p>
-    <p style="font-size:12px;line-height:1.6;color:#64748b;margin:0 0 5px;">EQJ/J2000 transformado para EQD verdadeiro da data, com precessão e nutação. Horizonte geométrico em 0°, sem refração.</p>
-    <p style="font-size:12px;line-height:1.6;color:#64748b;margin:0 0 16px;">Base cartográfica Natural Earth 1:110m, carregada localmente e sem tiles externos.</p>
     <h3 style="color:#b45309;">Linhas planetárias</h3><ul style="padding-left:20px;">${lines}</ul>
     <p style="font-size:12px;line-height:1.6;color:#881337;margin:18px 0 0;">Referência simbólica e exploratória: não recomenda mudança, viagem, investimento, moradia ou decisão de alto impacto.</p>
   </section>`;

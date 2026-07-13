@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [v02.14.03] - 2026-07-12
+
+### Corrigido
+
+- **Relatórios destinados ao consulente** — HTML, texto e e-mail deixam de exibir versões de contrato, schemas, hashes, perfis, motores, referenciais astronômicos, proveniência, nomes de infraestrutura e mensagens de compatibilidade histórica.
+- **Defesa para análises históricas** — a fronteira de apresentação remove parágrafos estritamente técnicos já armazenados, preservando integralmente os trechos interpretativos e todos os resultados úteis do mapa.
+- **Linguagem humana** — estados antigos ou incompletos são comunicados sem termos como “mapa legado”, “dados posicionais v2”, “artefato inválido” ou referência ao recálculo administrativo.
+- **Cobertura de dependências** — o Dependabot passa a atualizar também as revisões de hooks declaradas em `.pre-commit-config.yaml` e o ambiente Python de `socketsecurity-requirements.txt`, além dos dois projetos npm e das GitHub Actions já cobertas; todas as agendas diárias foram normalizadas conforme a especificação do GitHub.
+
+### Preservado
+
+- Dados armazenados, parsers, cálculos, Arquivo Akáshico e telas operacionais do administrador permanecem inalterados; a correção se limita ao conteúdo que pode ser visualizado, exportado ou enviado ao consulente.
+
 ## [v02.14.02] - 2026-07-12
 
 ### Corrigido

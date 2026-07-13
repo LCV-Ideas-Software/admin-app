@@ -19,12 +19,12 @@ const legacyMapa = {
   dados_astronomica: null,
   dados_tropical: null,
   dados_globais: null,
-  analise_ia: '<p>Conteúdo legado preservado.</p>',
+  analise_ia: '<p>Conteúdo histórico preservado.</p>',
   created_at: '2026-07-11T15:30:45Z',
 };
 
 describe('astrological-report v2', () => {
-  it('identifica no texto e no HTML um Tatwa produzido pelo método atual', () => {
+  it('apresenta os Tatwas sem expor método ou proveniência internos', () => {
     const report = generateAstrologicalReport({
       ...legacyMapa,
       dados_globais: JSON.stringify({
@@ -46,17 +46,13 @@ describe('astrological-report v2', () => {
 
     expect(report.text).toContain('Principal: *Akasha (Éter)*');
     expect(report.text).toContain('Subtatwa: *Vayu (Ar)*');
-    expect(report.text).toContain('Método: *Ordem fixa — Akasha primeiro*');
     expect(report.html).toContain('Akasha (Éter)');
     expect(report.html).toContain('Vayu (Ar)');
-    expect(report.html).toContain('Ordem fixa — Akasha primeiro');
-    expect(report.text).toContain('Proveniência: âncora astronômica registrada');
-    expect(report.html).toContain('Proveniência: âncora astronômica registrada');
-    expect(report.text).not.toContain('fixed');
-    expect(report.html).not.toContain('fixed');
+    expect(report.text).not.toMatch(/método|proveniência|fixed|âncora astronômica/iu);
+    expect(report.html).not.toMatch(/método|proveniência|fixed|âncora astronômica/iu);
   });
 
-  it('identifica um Tatwa legado explicitamente marcado', () => {
+  it('apresenta um Tatwa anterior sem revelar a classificação interna', () => {
     const report = generateAstrologicalReport({
       ...legacyMapa,
       dados_globais: JSON.stringify({
@@ -68,13 +64,13 @@ describe('astrological-report v2', () => {
       }),
     });
 
-    expect(report.text).toContain('Método: *Ordem pelo principal — Tatwa principal primeiro*');
-    expect(report.html).toContain('Ordem pelo principal — Tatwa principal primeiro');
-    expect(report.text).not.toContain('legacy-rulingFirst');
-    expect(report.html).not.toContain('legacy-rulingFirst');
+    expect(report.text).toContain('Principal: *Vayu (Ar)*');
+    expect(report.html).toContain('Vayu (Ar)');
+    expect(report.text).not.toMatch(/método|mapa legado|legacy-rulingFirst/iu);
+    expect(report.html).not.toMatch(/método|mapa legado|legacy-rulingFirst/iu);
   });
 
-  it('identifica como legado inferido um Tatwa anterior ao marcador', () => {
+  it('apresenta um Tatwa sem marcador sem expor a inferência interna', () => {
     const report = generateAstrologicalReport({
       ...legacyMapa,
       dados_globais: JSON.stringify({
@@ -85,13 +81,15 @@ describe('astrological-report v2', () => {
       }),
     });
 
-    expect(report.text).toContain('Método: *Registro legado — ordem pelo principal*');
-    expect(report.html).toContain('Registro legado — ordem pelo principal');
+    expect(report.text).toContain('Principal: *Tejas (Fogo)*');
+    expect(report.html).toContain('Tejas (Fogo)');
+    expect(report.text).not.toMatch(/método|registro legado/iu);
+    expect(report.html).not.toMatch(/método|registro legado/iu);
     expect(report.text).toContain('O subtatwa é indicativo');
     expect(report.html).toContain('O subtatwa é indicativo');
   });
 
-  it('não converte um modo explícito desconhecido em legado', () => {
+  it('omite do relatório um modo de cálculo desconhecido', () => {
     const report = generateAstrologicalReport({
       ...legacyMapa,
       dados_globais: JSON.stringify({
@@ -103,10 +101,10 @@ describe('astrological-report v2', () => {
       }),
     });
 
-    expect(report.text).toContain('Método: *Método de cálculo não identificado*');
-    expect(report.html).toContain('Método de cálculo não identificado');
-    expect(report.text).not.toContain('future-mode');
-    expect(report.html).not.toContain('future-mode');
+    expect(report.text).toContain('Principal: *Apas (Água)*');
+    expect(report.html).toContain('Apas (Água)');
+    expect(report.text).not.toMatch(/método|future-mode/iu);
+    expect(report.html).not.toMatch(/método|future-mode/iu);
   });
 
   it('ignora um Tatwa malformado sem impedir a geração do relatório', () => {
@@ -117,8 +115,8 @@ describe('astrological-report v2', () => {
 
     expect(report.text).not.toContain('*Tatwas:*');
     expect(report.html).not.toContain('Forças Globais: Tatwas');
-    expect(report.text).toContain('Conteúdo legado preservado.');
-    expect(report.html).toContain('Conteúdo legado preservado.');
+    expect(report.text).toContain('Conteúdo histórico preservado.');
+    expect(report.html).toContain('Conteúdo histórico preservado.');
   });
 
   it('não propaga sentinelas internas de análises legadas para HTML, texto ou resumo', () => {
@@ -136,6 +134,24 @@ describe('astrological-report v2', () => {
     expect(report.summary).not.toContain('ASTROLOGO_PAYLOAD');
   });
 
+  it('preserva a interpretação histórica, mas remove parágrafos técnicos da análise exibida e enviada', () => {
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      analise_ia: [
+        '<p>Sol e Lua reforçam uma expressão afetiva direta.</p>',
+        '<p>Versão do contrato posicional: 2.0.0; schemaId urn:astrologo:dados-posicionais.</p>',
+        '<p>Perfil metodológico astrologo-natal-major-v1; referencial EQJ/J2000 para EQD.</p>',
+      ].join(''),
+    });
+
+    expect(report.html).toContain('Sol e Lua reforçam uma expressão afetiva direta.');
+    expect(report.text).toContain('Sol e Lua reforçam uma expressão afetiva direta.');
+    expect(report.summary).toContain('Sol e Lua reforçam uma expressão afetiva direta.');
+    expect(report.html).not.toMatch(/contrato posicional|schemaId|perfil metodológico|EQJ|J2000|EQD/iu);
+    expect(report.text).not.toMatch(/contrato posicional|schemaId|perfil metodológico|EQJ|J2000|EQD/iu);
+    expect(report.summary).not.toMatch(/contrato posicional|schemaId|perfil metodológico|EQJ|J2000|EQD/iu);
+  });
+
   it('acrescenta os dez planetas e a falange após o conteúdo legado, sem grau IAU interno', () => {
     const dadosPosicionaisV2 = createDadosPosicionaisV2Fixture();
     const report = generateAstrologicalReport({
@@ -144,29 +160,28 @@ describe('astrological-report v2', () => {
       dados_posicionais_v2: JSON.stringify(dadosPosicionaisV2),
     });
 
-    expect(report.text.indexOf('Conteúdo legado preservado.')).toBeLessThan(
+    expect(report.text.indexOf('Conteúdo histórico preservado.')).toBeLessThan(
       report.text.indexOf('POSIÇÕES PLANETÁRIAS E CORRESPONDÊNCIAS ANGÉLICAS'),
     );
     expect(report.text).toContain('Sol: 12°20\'44" de Áries | Constelação IAU: Áries (Ari) | Casa Placidus 1');
     expect(report.text).toContain('Anjo #3: Sitael');
     expect(report.text).toContain('ANJO REGENTE DO CONSULENTE');
     expect(report.text).toContain('Anjo #3: Sitael');
-    expect(report.text).toContain('Critério: quinário tropical da posição do Sol');
     expect(report.text).toContain('Falange angélica');
     expect(report.text).toContain('CÚSPIDES DAS 12 CASAS PLACIDUS');
     expect(report.text).toContain('Casa 12: 0°00\'00" de Peixes');
     expect(report.text).toContain('ÂNGULOS DO MAPA');
     expect(report.text).toContain('Ascendente: 15°30\'00" de Áries');
     expect(report.text).toContain('Meio do Céu: 15°15\'00" de Câncer');
-    expect(report.text).toContain('Calculado em 11/07/2026 às 12:30:45 — Hora oficial de Brasília');
+    expect(report.text).toContain('Nascimento — Hora oficial de Brasília:* 20/05/1993 às 21:12:00');
     expect(report.text).not.toMatch(/grau(?:s)? (?:na|dentro da) constelação/i);
 
-    expect(report.html.indexOf('Conteúdo legado preservado.')).toBeLessThan(
+    expect(report.html.indexOf('Conteúdo histórico preservado.')).toBeLessThan(
       report.html.indexOf('Posições planetárias e correspondências angélicas'),
     );
     expect(report.html).toContain('<bdi lang="he" dir="rtl">והו</bdi>');
     expect(report.html).toContain('Anjo regente do consulente');
-    expect(report.html).toContain('Quinário tropical da posição do Sol');
+    expect(report.html).toContain('Anjo correspondente');
     expect(report.html).toContain('Cúspides das 12 Casas Placidus');
     expect(report.html).toContain('Ângulos do mapa');
     expect(report.html).toContain('#db2777');
@@ -174,6 +189,8 @@ describe('astrological-report v2', () => {
     expect(report.html).not.toMatch(/\b(?:sun|moon|mercury|venus|mars|jupiter|saturn|uranus|neptune|pluto)\b/);
     expect(report.text).not.toMatch(/urn:astrologo|iau-roman|mayhem-shem|America\/Sao_Paulo/);
     expect(report.html).not.toMatch(/urn:astrologo|iau-roman|mayhem-shem|America\/Sao_Paulo/);
+    expect(report.text).not.toMatch(/contrato posicional|sha-256|astronomy engine|swiss ephemeris|wasm/iu);
+    expect(report.html).not.toMatch(/contrato posicional|sha-256|astronomy engine|swiss ephemeris|wasm/iu);
     expect(report.html).not.toContain('5fc61d188c19097709c4674f756da5b2.jpg');
   });
 
@@ -190,7 +207,7 @@ describe('astrological-report v2', () => {
     expect(report.text).toContain('Exato');
     expect(report.text).toContain('ANÁLISE DAS CASAS');
     expect(report.text).toContain('Sol: 12°00\'00" dentro da Casa 1');
-    expect(report.text).toContain('não foi estimado pelas cúspides');
+    expect(report.text).toContain('grau na casa indisponível');
     expect(report.html).toContain('Aspectos natais');
     expect(report.html).toContain('Análise das casas');
     expect(report.html).not.toMatch(/fixed-by-aspect|planet:sun|POSITION_V2_0/);
@@ -210,7 +227,7 @@ describe('astrological-report v2', () => {
     expect(report.text).toContain('CÉU ATUAL E TRÂNSITOS');
     expect(report.text).toContain('12/07/2026 às 12:00:00');
     expect(report.text).toContain('Sol em trânsito e Lua natal');
-    expect(report.text).toContain('constelação IAU Áries, sem grau interno definido');
+    expect(report.text).toContain('constelação IAU Áries');
     expect(report.text).toContain('Exatidão comprovada');
     expect(report.text).toContain('SINASTRIA');
     expect(report.text).toContain('João Antônio nas casas de Leonardo Cardozo');
@@ -218,11 +235,11 @@ describe('astrological-report v2', () => {
     expect(report.text).toContain('não determina o destino da relação');
     expect(report.html).toContain('Céu atual e trânsitos');
     expect(report.html).toContain('Sinastria');
-    expect(report.html).toContain('Constelação IAU: Áries — grau interno não definido');
+    expect(report.html).toContain('Constelação IAU: Áries');
     expect(report.html).not.toMatch(/astrologo-transit-major-v1|A:sun|recipient-placidus|compatibilidade/i);
   });
 
-  it('propaga a localidade com EQJ para EQD, Natural Earth, Brasília e cautela de não relocação', () => {
+  it('propaga a localidade em Brasília e a cautela, sem referenciais ou implementação internos', () => {
     const locality = createLocalityMapV1Fixture();
     const report = generateAstrologicalReport({
       ...legacyMapa,
@@ -232,11 +249,11 @@ describe('astrological-report v2', () => {
 
     expect(report.text).toContain('MAPA PLANETÁRIO DE LOCALIDADE');
     expect(report.text).toContain('20/05/1993 às 21:12:00');
-    expect(report.text).toContain('EQJ/J2000 → EQD verdadeiro da data');
-    expect(report.text).toContain('Natural Earth 1:110m');
     expect(report.text).toContain('não recomenda mudança');
     expect(report.html).toContain('Mapa planetário de localidade');
     expect(report.html).toContain('Hora oficial de Brasília');
+    expect(report.text).not.toMatch(/EQJ|EQD|J2000|Natural Earth|grade amostrada|resolução latitudinal/iu);
+    expect(report.html).not.toMatch(/EQJ|EQD|J2000|Natural Earth|tiles externos|grade amostrada/iu);
     expect(report.html).not.toMatch(/raio de influência|recomenda-se mudar/i);
   });
 
@@ -259,14 +276,35 @@ describe('astrological-report v2', () => {
     expect(report.html).not.toMatch(/16\/07\/2000 às 01:30|America\/Sao_Paulo/);
   });
 
-  it('avisa em mapas legados que o horário não tem fuso verificável e não fabrica conversão', () => {
+  it('avisa que o horário não tem fuso verificável sem classificar o mapa internamente', () => {
     const report = generateAstrologicalReport(legacyMapa);
 
-    expect(report.text).toContain('Mapa legado: horário de nascimento sem fuso verificável');
-    expect(report.html).toContain('Mapa legado: horário de nascimento sem fuso verificável');
+    expect(report.text).toContain('Horário de nascimento sem fuso verificável');
+    expect(report.html).toContain('Horário de nascimento sem fuso verificável');
+    expect(report.text).not.toMatch(/mapa legado|dados posicionais v2/iu);
+    expect(report.html).not.toMatch(/mapa legado|dados posicionais v2/iu);
     expect(report.text).not.toContain('Horário de nascimento em Brasília');
     expect(report.text).not.toContain('10:00');
     expect(report.html).not.toContain('10:00');
+  });
+
+  it('não inclui metadados técnicos do cálculo em nenhuma saída destinada ao consulente', () => {
+    const dadosPosicionaisV2 = createDadosPosicionaisV2Fixture();
+    const natal = createNatalChartAnalysisV1Fixture(dadosPosicionaisV2.calculationId);
+    const locality = createLocalityMapV1Fixture(dadosPosicionaisV2.calculationId);
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      id: dadosPosicionaisV2.calculationId,
+      dados_posicionais_v2: JSON.stringify(dadosPosicionaisV2),
+      natal_chart_analysis_v1: JSON.stringify(natal),
+      locality_map_v1: JSON.stringify(locality),
+    });
+    const internalTerms =
+      /schema|contrato posicional|perfil maior versionado|artefato|validação defensiva|recalculado pelo Admin|SHA-256|WASM|Astronomy Engine|Swiss Ephemeris|EQJ|EQD|J2000|Natural Earth|mapa legado|dados posicionais v2/iu;
+
+    expect(report.text).not.toMatch(internalTerms);
+    expect(report.html).not.toMatch(internalTerms);
+    expect(report.summary).not.toMatch(internalTerms);
   });
 
   it('escapa no HTML todos os campos persistidos usados no cabeçalho do e-mail', () => {

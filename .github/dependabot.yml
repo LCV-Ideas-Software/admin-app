@@ -15,7 +15,6 @@ updates:
     directory: '/'
     schedule:
       interval: 'daily'
-      day: 'thursday'
       time: '01:00'
       timezone: 'America/Los_Angeles'
     labels:
@@ -36,7 +35,6 @@ updates:
       - stepsecurity-javascript
     schedule:
       interval: 'daily'
-      day: 'thursday'
       time: '01:00'
       timezone: 'America/Los_Angeles'
     labels:
@@ -106,7 +104,6 @@ updates:
       - stepsecurity-javascript
     schedule:
       interval: 'daily'
-      day: 'thursday'
       time: '01:00'
       timezone: 'America/Los_Angeles'
     labels:
@@ -141,4 +138,30 @@ updates:
           - 'major'
           - 'minor'
           - 'patch'
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: 'pre-commit'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+      time: '01:00'
+      timezone: 'America/Los_Angeles'
+    labels:
+      - 'dependencies'
+    commit-message:
+      prefix: 'deps'
+      include: 'scope'
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: 'pip'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+      time: '01:00'
+      timezone: 'America/Los_Angeles'
+    labels:
+      - 'dependencies'
+    commit-message:
+      prefix: 'deps'
+      include: 'scope'
     open-pull-requests-limit: 10
