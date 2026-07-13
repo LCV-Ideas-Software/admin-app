@@ -190,9 +190,9 @@ socketdev==3.1.0 \
     --hash=sha256:a9534189d50c9f6c39e802280cc2317f830dd0c9970677e8cde843a69daa84ed \
     --hash=sha256:e9245916d423952aba4f0018bea2bca28740530ec30308089c48dddb2133e38a
     # via socketsecurity
-socketsecurity==2.2.90 \
-    --hash=sha256:a06798d2d8c24465fd75b53105cb6ad1022d37c2c4771a85a0fb2466bce3d11d \
-    --hash=sha256:a535eaabfd0bc0c78d1dcdeb84859e0bd811fbd9f2f8aa96d1169d586f07e991
+socketsecurity==2.4.20 \
+    --hash=sha256:005665d5227b67e5c95c033e8dc4c8ca7d8db1d2c9b6725dbf73c5b74b81cdc0 \
+    --hash=sha256:b55a7ce6017261b16dcf75c350f5f76fe7f61b8a6939b7179c06345f9838517d
     # via -r C:/Users/leona/AppData/Local/Temp/socketsecurity-req.in
 soupsieve==2.8.4 \
     --hash=sha256:e121fd02e975c695e4e9e8774a5ee35d74714b59307868dcc5319ad2d9e3328e \
