@@ -544,10 +544,6 @@ function gerarTextoRelatorio(
     t += advancedText;
   }
 
-  t += divider;
-  t += `*✨ DUAS PERSPECTIVAS, UM MESMO NASCIMENTO ✨*\n\n`;
-  t += `_O módulo tropical organiza o zodíaco pelo ciclo sazonal; o resumo constelacional usa 13 faixas de referência aproximadas ao longo da eclíptica. Quando disponíveis, os dados posicionais detalhados fazem a classificação pelas regiões oficiais da IAU._\n`;
-
   if (astronomica) {
     t += divider;
     t += `*⭐ MÓDULO II: ASTRONÔMICO CONSTELACIONAL*\n`;
@@ -565,11 +561,11 @@ function gerarTextoRelatorio(
   if (positional.status === 'available') {
     t += renderPositionalText(positional.data);
   } else {
-    t += `*⚠️ DADOS POSICIONAIS V2 INDISPONÍVEIS*\n\n${positionalWarning(positional)}\n`;
+    t += `*⚠️ DETALHAMENTO PLANETÁRIO INDISPONÍVEL*\n\n${positionalWarning(positional)}\n`;
   }
 
   t += divider;
-  t += `✨ _Gerado via Oráculo Celestial — Admin LCV_ ✨`;
+  t += `✨ _Gerado via Oráculo Celestial_ ✨`;
   return t;
 }
 
@@ -740,15 +736,6 @@ function gerarHtmlRelatorio(
 
       ${tropical?.astrologia && tropical?.umbanda ? renderBlocoAstrologicoEmail('Módulo I: Astrológico Tropical', tropical.astrologia, tropical.umbanda, true) : ''}
 
-      <div style="margin: 60px 0; text-align: center; position: relative;">
-        <div style="position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(251, 146, 60, 0.2), rgba(99, 102, 241, 0.2), rgba(52, 211, 153, 0.2)); border-radius: 24px; filter: blur(20px);"></div>
-        <div style="position: relative; background-color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); padding: 40px; border-radius: 24px; ${boxShadow}">
-          <p style="font-size: 32px; margin: 0 0 12px 0;">✨</p>
-          <h3 style="font-size: 24px; font-weight: 900; color: #1a73e8; margin: 0 0 8px 0;">Duas perspectivas, um mesmo nascimento</h3>
-          <p style="font-size: 16px; color: #475569; margin: 0; max-width: 500px; margin-left: auto; margin-right: auto;">O módulo tropical organiza o zodíaco pelo ciclo sazonal. O resumo constelacional usa 13 faixas de referência aproximadas ao longo da eclíptica; quando disponíveis, os dados posicionais detalhados classificam pelas regiões oficiais da IAU.</p>
-        </div>
-      </div>
-
       ${astronomica?.astrologia && astronomica?.umbanda ? renderBlocoAstrologicoEmail('Módulo II: Astronômico Constelacional', astronomica.astrologia, astronomica.umbanda, false) : ''}
 
       ${
@@ -777,7 +764,7 @@ function gerarHtmlRelatorio(
       ${advancedHtml}
 
       <footer style="text-align: center; margin-top: 60px; padding-top: 20px; border-top: 1px solid #dde4ee;">
-        <p style="font-size: 12px; color: #64748b; margin: 0;">Gerado via Oráculo Celestial — Admin LCV</p>
+        <p style="font-size: 12px; color: #64748b; margin: 0;">Gerado via Oráculo Celestial</p>
       </footer>
 
     </div>
@@ -843,7 +830,8 @@ export function generateAstrologicalReport(mapa: MapaDetalhado): GeneratedReport
   // Summary from AI or fallback
   let summary: string;
   if (mapa.analise_ia) {
-    summary = (htmlToPlainText(mapa.analise_ia).split('.')[0] ?? '').trim();
+    const analysisText = htmlToPlainText(mapa.analise_ia).trim();
+    summary = (analysisText.match(/^[\s\S]*?[.!?](?:\s|$)/u)?.[0] ?? analysisText).trim();
   } else {
     summary = `Mapa astrológico de ${mapa.nome}`;
   }

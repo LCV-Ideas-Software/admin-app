@@ -173,7 +173,7 @@ describe('astrological-report v2', () => {
     expect(report.text).toContain('ÂNGULOS DO MAPA');
     expect(report.text).toContain('Ascendente: 15°30\'00" de Áries');
     expect(report.text).toContain('Meio do Céu: 15°15\'00" de Câncer');
-    expect(report.text).toContain('Nascimento — Hora oficial de Brasília:* 20/05/1993 às 21:12:00');
+    expect(report.text).toContain('Nascimento — Hora oficial de Brasília:* 15/07/2000 às 10:00:00');
     expect(report.text).not.toMatch(/grau(?:s)? (?:na|dentro da) constelação/i);
 
     expect(report.html.indexOf('Conteúdo histórico preservado.')).toBeLessThan(
@@ -283,6 +283,8 @@ describe('astrological-report v2', () => {
     expect(report.html).toContain('Horário de nascimento sem fuso verificável');
     expect(report.text).not.toMatch(/mapa legado|dados posicionais v2/iu);
     expect(report.html).not.toMatch(/mapa legado|dados posicionais v2/iu);
+    expect(report.text).not.toMatch(/duas perspectivas|Admin LCV/iu);
+    expect(report.html).not.toMatch(/duas perspectivas|Admin LCV/iu);
     expect(report.text).not.toContain('Horário de nascimento em Brasília');
     expect(report.text).not.toContain('10:00');
     expect(report.html).not.toContain('10:00');

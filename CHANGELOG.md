@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v02.14.05] - 2026-07-12
+
+### Corrigido
+
+- **Relatório estritamente interpretativo** — o e-mail e o texto deixam de repetir explicações sobre os sistemas astrológicos, de citar a interface administrativa e de expor o título técnico de indisponibilidade posicional.
+- **Resumo e testes de contrato** — a primeira frase preserva sua pontuação, e a expectativa do instante de Brasília passa a usar o valor da própria fixture posicional.
+
 ## [v02.14.04] - 2026-07-12
 
 ### Corrigido
