@@ -9,6 +9,7 @@
  * faithfully reproducing the original Oráculo Celestial layout.
  */
 
+import { stripInternalAnalysisMarkers } from './analysis-output';
 import {
   renderLocalityMapHtml,
   renderLocalityMapText,
@@ -128,8 +129,9 @@ const formatPosicaoLabel = (pos: string): string => {
 
 /** Sanitiza HTML para uso em e-mail (tags seguras apenas) */
 const htmlToPlainText = (html: string): string => {
+  const safeHtml = stripInternalAnalysisMarkers(html);
   if (typeof DOMParser === 'undefined') {
-    return html
+    return safeHtml
       .split('&nbsp;')
       .join(' ')
       .split('&amp;')
@@ -141,17 +143,18 @@ const htmlToPlainText = (html: string): string => {
       .trim();
   }
 
-  const parsed = new DOMParser().parseFromString(html, 'text/html');
-  return (parsed.body.textContent || '').trim();
+  const parsed = new DOMParser().parseFromString(safeHtml, 'text/html');
+  return stripInternalAnalysisMarkers(parsed.body.textContent || '').trim();
 };
 
 const sanitizeForEmail = (html: string): string => {
+  const safeHtml = stripInternalAnalysisMarkers(html);
   if (typeof DOMParser === 'undefined') {
-    return htmlToPlainText(html);
+    return htmlToPlainText(safeHtml);
   }
 
   const blockedTags = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'meta', 'link', 'base']);
-  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const parsed = new DOMParser().parseFromString(safeHtml, 'text/html');
 
   const nodes = Array.from(parsed.body.querySelectorAll('*'));
   nodes.forEach((node) => {
@@ -191,7 +194,7 @@ const sanitizeForEmail = (html: string): string => {
     });
   });
 
-  return parsed.body.innerHTML;
+  return stripInternalAnalysisMarkers(parsed.body.innerHTML);
 };
 
 const escapeHtml = (value: string | number): string =>

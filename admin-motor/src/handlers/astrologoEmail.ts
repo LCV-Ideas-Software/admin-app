@@ -2,6 +2,7 @@ import { resolveAdminActorFromRequest } from '../../../functions/api/_lib/admin-
 import { toHeaders } from '../../../functions/api/_lib/astrologo-admin';
 import { type D1Database, logModuleOperationalEvent } from '../../../functions/api/_lib/operational';
 import { createResponseTrace } from '../../../functions/api/_lib/request-trace';
+import { stripInternalAnalysisMarkers } from '../../../src/lib/analysis-output';
 import { maskEmail } from './routes/_lib/log-safety';
 
 type Env = {
@@ -30,8 +31,8 @@ export const handleAstrologoEnviarEmailPost = async (context: Context) => {
     const body = (await request.json()) as Record<string, unknown>;
     const adminActor = resolveAdminActorFromRequest(request, body);
     const emailDestino = String(body.emailDestino ?? '').trim();
-    const relatorioHtml = String(body.relatorioHtml ?? '');
-    const relatorioTexto = String(body.relatorioTexto ?? '');
+    const relatorioHtml = stripInternalAnalysisMarkers(String(body.relatorioHtml ?? ''));
+    const relatorioTexto = stripInternalAnalysisMarkers(String(body.relatorioTexto ?? ''));
     const nomeConsulente = String(body.nomeConsulente ?? '').trim();
 
     if (!isValidEmail(emailDestino)) {

@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [v02.14.02] - 2026-07-12
+
+### Corrigido
+
+- **Arquivo Akáshico e relatórios** — sentinelas internas `ASTROLOGO_PAYLOAD` presentes em análises históricas deixam de aparecer no detalhe administrativo, no resumo e nos relatórios HTML/texto.
+- **Última fronteira do e-mail** — o Admin remove as sentinelas novamente imediatamente antes de chamar o Resend, protegendo envios mesmo quando recebe conteúdo antigo ainda contaminado no D1.
+
+### Preservado
+
+- A análise original permanece armazenada sem migração destrutiva; somente o marcador técnico completo é ocultado. Cálculos, contratos canônicos, hora oficial de Brasília e demais módulos do Admin não são alterados.
+
 ## [v02.14.01] - 2026-07-12
 
 ### Adicionado

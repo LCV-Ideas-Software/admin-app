@@ -121,6 +121,21 @@ describe('astrological-report v2', () => {
     expect(report.html).toContain('Conteúdo legado preservado.');
   });
 
+  it('não propaga sentinelas internas de análises legadas para HTML, texto ou resumo', () => {
+    const marker = `⟦ASTROLOGO_PAYLOAD:advanced.synastry:${'e'.repeat(64)}⟧`;
+    const report = generateAstrologicalReport({
+      ...legacyMapa,
+      analise_ia: `<p>Antes ${marker} depois.</p>`,
+    });
+
+    expect(report.html).toContain('Antes');
+    expect(report.text).toContain('depois.');
+    expect(report.summary).toContain('Antes');
+    expect(report.html).not.toContain('ASTROLOGO_PAYLOAD');
+    expect(report.text).not.toContain('ASTROLOGO_PAYLOAD');
+    expect(report.summary).not.toContain('ASTROLOGO_PAYLOAD');
+  });
+
   it('acrescenta os dez planetas e a falange após o conteúdo legado, sem grau IAU interno', () => {
     const dadosPosicionaisV2 = createDadosPosicionaisV2Fixture();
     const report = generateAstrologicalReport({

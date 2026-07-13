@@ -143,4 +143,34 @@ describe('handleAstrologoEnviarEmailPost', () => {
     expect(requestBody.html).toContain('Natural Earth 1:110m');
     expect(requestBody.text).toContain('MAPA PLANETÁRIO DE LOCALIDADE');
   });
+
+  it('removes internal analysis sentinels at the final Resend boundary', async () => {
+    const marker = `⟦ASTROLOGO_PAYLOAD:canonical.v2:${'1'.repeat(64)}⟧`;
+    const request = new Request('https://admin.lcv.app.br/api/astrologo/enviar-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': 'admin@lcv.app.br' },
+      body: JSON.stringify({
+        emailDestino: 'consulente@example.com',
+        relatorioHtml: `<p>Antes ${marker} depois.</p>`,
+        relatorioTexto: `Antes ${marker} depois.`,
+        nomeConsulente: 'Teste',
+      }),
+    });
+
+    const response = await handleAstrologoEnviarEmailPost({
+      request,
+      env: { RESEND_API_KEY: 'resend-key' },
+    });
+
+    expect(response.status).toBe(200);
+    const fetchMock = vi.mocked(fetch);
+    const requestBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)) as {
+      html: string;
+      text: string;
+    };
+    expect(requestBody.html).toContain('Antes');
+    expect(requestBody.text).toContain('depois.');
+    expect(requestBody.html).not.toContain('ASTROLOGO_PAYLOAD');
+    expect(requestBody.text).not.toContain('ASTROLOGO_PAYLOAD');
+  });
 });

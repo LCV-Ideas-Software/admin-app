@@ -9,6 +9,7 @@ import type { FormEvent } from 'react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
+import { stripInternalAnalysisMarkers } from '../../lib/analysis-output';
 import { parseLocalityMapV1 } from '../../lib/astrological-locality-map-v1';
 import { parseNatalChartAnalysisV1 } from '../../lib/astrological-natal-analysis-v1';
 import {
@@ -111,10 +112,12 @@ type RelatorioDoMapa = {
 // Allowlist restrita: só tags estruturais/semânticas. Sem `style` — evita exfiltração via
 // background-image: url(...) caso a síntese do Gemini seja influenciada por prompt-injection.
 const sanitizeRichHtml = (html: string): string =>
-  DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'strong', 'ul', 'li', 'em', 'b', 'i', 'h1', 'h2', 'h3', 'br'],
-    ALLOWED_ATTR: [],
-  });
+  stripInternalAnalysisMarkers(
+    DOMPurify.sanitize(stripInternalAnalysisMarkers(html), {
+      ALLOWED_TAGS: ['p', 'strong', 'ul', 'li', 'em', 'b', 'i', 'h1', 'h2', 'h3', 'br'],
+      ALLOWED_ATTR: [],
+    }),
+  );
 
 const formatarData = (dataStr: string): string => {
   if (!dataStr) return '';

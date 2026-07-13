@@ -30,7 +30,7 @@ const mapaA = {
   dados_astronomica: null,
   dados_tropical: null,
   dados_globais: null,
-  analise_ia: null,
+  analise_ia: `<p>Antes ⟦ASTROLOGO_PAYLOAD:legacy.query:${'f'.repeat(64)}⟧ depois.</p>`,
   created_at: '2026-07-11T12:00:00Z',
 };
 
@@ -168,5 +168,22 @@ describe('AstrologoModule email report ownership', () => {
         relatorioTexto: `Relatório de ${mapaB.nome}`,
       });
     });
+  });
+
+  it('não exibe sentinelas internas presentes em uma análise histórica', async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationProvider>
+        <AstrologoModule />
+      </NotificationProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Atualizar arquivo' }));
+    const rowA = (await screen.findByText(mapaA.nome)).closest('li');
+    expect(rowA).not.toBeNull();
+    await user.click(within(rowA as HTMLElement).getByRole('button', { name: 'Ler detalhes' }));
+
+    expect(await screen.findByText(/Antes\s+depois\./)).toBeInTheDocument();
+    expect(screen.queryByText(/ASTROLOGO_PAYLOAD/)).not.toBeInTheDocument();
   });
 });
