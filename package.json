@@ -72,7 +72,7 @@
     "prosemirror-view": "^1.42.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "sanitize-html": "^2.17.5",
+    "sanitize-html": "^2.17.6",
     "tiptap-markdown": "^0.9.0",
     "topojson-client": "3.1.0",
     "world-atlas": "2.0.2",
