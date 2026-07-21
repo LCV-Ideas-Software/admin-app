@@ -1,4 +1,6 @@
+import { cfApiRequest } from '../_lib/cf-api-core';
 import {
+  type CfpwPageDeployment,
   getCloudflarePagesProject,
   listCloudflarePagesDeployments,
   resolveCloudflarePwAccount,
@@ -45,6 +47,72 @@ const toError = (message: string, trace: { request_id: string; timestamp: string
 
 const toProjectName = (raw: string | null) => String(raw ?? '').trim();
 
+// PW-3: paginação/filtro opcionais da lista de deployments. Sem os params o
+// comportamento legado (lista padrão da CF) permanece intacto.
+type DeploymentsPaging = {
+  page: number;
+  perPage: number;
+  env: 'production' | 'preview' | null;
+};
+
+const DEPLOYMENTS_PER_PAGE_DEFAULT = 25;
+const DEPLOYMENTS_PER_PAGE_MAX = 25;
+
+/** Lê page/perPage/env da URL; null quando nenhum foi enviado; string = erro pt-BR. */
+const parseDeploymentsPaging = (url: URL): DeploymentsPaging | null | string => {
+  const rawPage = url.searchParams.get('page');
+  const rawPerPage = url.searchParams.get('perPage');
+  const rawEnv = url.searchParams.get('env');
+
+  if (rawPage === null && rawPerPage === null && rawEnv === null) {
+    return null;
+  }
+
+  const page = rawPage === null ? 1 : Number(rawPage);
+  if (!Number.isInteger(page) || page < 1) {
+    return 'Parâmetro page inválido: use um inteiro maior ou igual a 1.';
+  }
+
+  const perPage = rawPerPage === null ? DEPLOYMENTS_PER_PAGE_DEFAULT : Number(rawPerPage);
+  if (!Number.isInteger(perPage) || perPage < 1 || perPage > DEPLOYMENTS_PER_PAGE_MAX) {
+    return `Parâmetro perPage inválido: use um inteiro entre 1 e ${DEPLOYMENTS_PER_PAGE_MAX}.`;
+  }
+
+  let env: DeploymentsPaging['env'] = null;
+  if (rawEnv !== null) {
+    const normalized = rawEnv.trim();
+    if (normalized !== 'production' && normalized !== 'preview') {
+      return "Parâmetro env inválido: use 'production' ou 'preview'.";
+    }
+    env = normalized;
+  }
+
+  return { page, perPage, env };
+};
+
+const listDeploymentsPaged = async (env: Env, accountId: string, projectName: string, paging: DeploymentsPaging) => {
+  const query = new URLSearchParams({ page: String(paging.page), per_page: String(paging.perPage) });
+  if (paging.env) {
+    query.set('env', paging.env);
+  }
+
+  const payload = await cfApiRequest<CfpwPageDeployment[]>(
+    env,
+    'pw',
+    `/accounts/${encodeURIComponent(accountId)}/pages/projects/${encodeURIComponent(projectName)}/deployments?${query.toString()}`,
+    `Falha ao listar deployments de Pages ${projectName}`,
+  );
+
+  const deployments = Array.isArray(payload.result) ? payload.result : [];
+  const resultInfo = payload.resultInfo as { page?: number; total_pages?: number } | undefined;
+  const hasMore =
+    typeof resultInfo?.total_pages === 'number' && Number.isFinite(resultInfo.total_pages)
+      ? paging.page < resultInfo.total_pages
+      : deployments.length === paging.perPage;
+
+  return { deployments, hasMore };
+};
+
 export async function onRequestGet(context: Context) {
   const trace = createResponseTrace(context.request);
   const url = new URL(context.request.url);
@@ -54,12 +122,25 @@ export async function onRequestGet(context: Context) {
     return toError('Parâmetro projectName é obrigatório.', trace, 400);
   }
 
+  const paging = parseDeploymentsPaging(url);
+  if (typeof paging === 'string') {
+    return toError(paging, trace, 400);
+  }
+
   try {
     const accountInfo = await resolveCloudflarePwAccount(context.data?.env ?? context.env);
 
+    let deploymentsHasMore = false;
     const [projectResult, deploymentsResult] = await Promise.allSettled([
       getCloudflarePagesProject(context.data?.env ?? context.env, accountInfo.accountId, projectName),
-      listCloudflarePagesDeployments(context.data?.env ?? context.env, accountInfo.accountId, projectName),
+      paging
+        ? listDeploymentsPaged(context.data?.env ?? context.env, accountInfo.accountId, projectName, paging).then(
+            (paged) => {
+              deploymentsHasMore = paged.hasMore;
+              return paged.deployments;
+            },
+          )
+        : listCloudflarePagesDeployments(context.data?.env ?? context.env, accountInfo.accountId, projectName),
     ]);
 
     const warnings: PartialWarning[] = [];
@@ -117,6 +198,9 @@ export async function onRequestGet(context: Context) {
         projectName,
         project,
         deployments,
+        ...(paging
+          ? { deploymentsPagination: { page: paging.page, perPage: paging.perPage, hasMore: deploymentsHasMore } }
+          : {}),
         warnings,
       }),
       {

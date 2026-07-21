@@ -31,7 +31,24 @@ import {
   onRequestPost as handleCalculadoraParametrosPost,
 } from './handlers/routes/calculadora/parametros';
 import { onRequestPost as handleCalculadoraSyncPost } from './handlers/routes/calculadora/sync';
+import {
+  onRequestGetBytime as handleCfdnsAnalyticsBytimeGet,
+  onRequestGetTop as handleCfdnsAnalyticsTopGet,
+} from './handlers/routes/cfdns/analytics';
+import { onRequestPost as handleCfdnsBatchPost } from './handlers/routes/cfdns/batch';
 import { onRequestDelete as handleCfdnsDeleteDelete } from './handlers/routes/cfdns/delete';
+import {
+  onRequestGet as handleCfdnsDnsSettingsGet,
+  onRequestPatch as handleCfdnsDnsSettingsPatch,
+} from './handlers/routes/cfdns/dns-settings';
+import {
+  onRequestGet as handleCfdnsDnssecGet,
+  onRequestPatch as handleCfdnsDnssecPatch,
+} from './handlers/routes/cfdns/dnssec';
+import {
+  onRequestGetExport as handleCfdnsExportGet,
+  onRequestPostImport as handleCfdnsImportPost,
+} from './handlers/routes/cfdns/import-export';
 import { onRequestGet as handleCfdnsRecordsGet } from './handlers/routes/cfdns/records';
 import {
   onRequestPostCheck as handleCfdnsRegistrarCheckPost,
@@ -45,17 +62,110 @@ import {
   onRequestGetUpdateStatus as handleCfdnsRegistrarUpdateStatusGet,
 } from './handlers/routes/cfdns/registrar';
 import { onRequestPost as handleCfdnsUpsertPost } from './handlers/routes/cfdns/upsert';
+import { onRequestGet as handleCfdnsZoneCapabilitiesGet } from './handlers/routes/cfdns/zone-capabilities';
+import {
+  onRequestPostActivationCheck as handleCfdnsZonesAdminActivationCheckPost,
+  onRequestDelete as handleCfdnsZonesAdminDelete,
+  onRequestGet as handleCfdnsZonesAdminGet,
+  onRequestPatch as handleCfdnsZonesAdminPatch,
+  onRequestPost as handleCfdnsZonesAdminPost,
+} from './handlers/routes/cfdns/zones-admin';
+import {
+  onRequestPostBuildCancel as handleCfpwBuildCancelPost,
+  onRequestGetBuildConfig as handleCfpwBuildConfigGet,
+  onRequestGetBuild as handleCfpwBuildGet,
+  onRequestGetBuildLogs as handleCfpwBuildLogsGet,
+  onRequestPostBuildRetry as handleCfpwBuildRetryPost,
+  onRequestGetBuilds as handleCfpwBuildsGet,
+} from './handlers/routes/cfpw/builds';
+import { onRequestGet as handleCfpwCapabilitiesGet } from './handlers/routes/cfpw/capabilities';
 import { onRequestPost as handleCfpwCleanupCacheProjectPost } from './handlers/routes/cfpw/cleanup-cache-project';
 import { onRequestPost as handleCfpwDeletePagePost } from './handlers/routes/cfpw/delete-page';
 import { onRequestPost as handleCfpwDeleteWorkerPost } from './handlers/routes/cfpw/delete-worker';
+import {
+  onRequestGetAccountMetrics as handleCfpwAccountMetricsGet,
+  onRequestGetWorkerMetrics as handleCfpwWorkerMetricsGet,
+} from './handlers/routes/cfpw/metrics';
 import {
   onRequestGet as handleCfpwObservabilityGet,
   onRequestPost as handleCfpwObservabilityPost,
 } from './handlers/routes/cfpw/observability';
 import { onRequestPost as handleCfpwOpsPost } from './handlers/routes/cfpw/ops';
 import { onRequestGet as handleCfpwOverviewGet } from './handlers/routes/cfpw/overview';
+import { onRequestPost as handleCfpwPageDeployPost } from './handlers/routes/cfpw/page-deploy';
+import {
+  onRequestDelete as handleCfpwPageDeploymentDelete,
+  onRequestGet as handleCfpwPageDeploymentGet,
+} from './handlers/routes/cfpw/page-deployment';
 import { onRequestGet as handleCfpwPageDetailsGet } from './handlers/routes/cfpw/page-details';
+import {
+  onRequestGet as handleCfpwPageDomainGet,
+  onRequestPostRecheck as handleCfpwPageDomainRecheckPost,
+} from './handlers/routes/cfpw/page-domain';
+import {
+  onRequestGet as handleCfpwPageEnvGet,
+  onRequestPatch as handleCfpwPageEnvPatch,
+} from './handlers/routes/cfpw/page-env';
+import {
+  onRequestPatchBuildConfig as handleCfpwPageBuildConfigPatch,
+  onRequestPost as handleCfpwPageProjectPost,
+  onRequestPostPurgeBuildCache as handleCfpwPagePurgeBuildCachePost,
+} from './handlers/routes/cfpw/page-project';
+import { onRequestGetRawAllowlist as handleCfpwRawAllowlistGet } from './handlers/routes/cfpw/raw-console';
+import { onRequestPost as handleCfpwPageWebAnalyticsPost } from './handlers/routes/cfpw/rum';
+import {
+  onRequestDeleteDatabases as handleCfpwD1DatabasesDelete,
+  onRequestGetDatabases as handleCfpwD1DatabasesGet,
+  onRequestPostDatabases as handleCfpwD1DatabasesPost,
+  onRequestPostExport as handleCfpwD1ExportPost,
+  onRequestPostImport as handleCfpwD1ImportPost,
+  onRequestPostQuery as handleCfpwD1QueryPost,
+  onRequestGetSchema as handleCfpwD1SchemaGet,
+  onRequestGetTable as handleCfpwD1TableGet,
+} from './handlers/routes/cfpw/storage/d1';
+import {
+  onRequestPostBulkDelete as handleCfpwKvBulkDeletePost,
+  onRequestPutBulk as handleCfpwKvBulkPut,
+  onRequestGetKeys as handleCfpwKvKeysGet,
+  onRequestPutNamespaceRename as handleCfpwKvNamespaceRenamePut,
+  onRequestDeleteNamespaces as handleCfpwKvNamespacesDelete,
+  onRequestGetNamespaces as handleCfpwKvNamespacesGet,
+  onRequestPostNamespaces as handleCfpwKvNamespacesPost,
+  onRequestDeleteValue as handleCfpwKvValueDelete,
+  onRequestGetValue as handleCfpwKvValueGet,
+  onRequestPutValue as handleCfpwKvValuePut,
+} from './handlers/routes/cfpw/storage/kv';
+import {
+  onRequestGetBucketSettings as handleCfpwR2BucketSettingsGet,
+  onRequestDeleteBuckets as handleCfpwR2BucketsDelete,
+  onRequestGetBuckets as handleCfpwR2BucketsGet,
+  onRequestPostBuckets as handleCfpwR2BucketsPost,
+  onRequestGetObject as handleCfpwR2ObjectGet,
+  onRequestPutObject as handleCfpwR2ObjectPut,
+  onRequestDeleteObjects as handleCfpwR2ObjectsDelete,
+  onRequestGetObjects as handleCfpwR2ObjectsGet,
+} from './handlers/routes/cfpw/storage/r2';
+import {
+  onRequestGet as handleCfpwWorkerCodeGet,
+  onRequestPut as handleCfpwWorkerCodePut,
+} from './handlers/routes/cfpw/worker-code';
+import { onRequestPost as handleCfpwWorkerCreatePost } from './handlers/routes/cfpw/worker-create';
+import { onRequestPost as handleCfpwWorkerDeploymentsPost } from './handlers/routes/cfpw/worker-deployments';
 import { onRequestGet as handleCfpwWorkerDetailsGet } from './handlers/routes/cfpw/worker-details';
+import {
+  onRequestDelete as handleCfpwWorkerDomainsDelete,
+  onRequestGet as handleCfpwWorkerDomainsGet,
+  onRequestPost as handleCfpwWorkerDomainsPost,
+  onRequestPostSubdomain as handleCfpwWorkerSubdomainPost,
+} from './handlers/routes/cfpw/worker-domains';
+import {
+  onRequestGet as handleCfpwWorkerSettingsGet,
+  onRequestPatch as handleCfpwWorkerSettingsPatch,
+} from './handlers/routes/cfpw/worker-settings';
+import {
+  onRequestGetDetail as handleCfpwWorkerVersionGet,
+  onRequestGetList as handleCfpwWorkerVersionsGet,
+} from './handlers/routes/cfpw/worker-versions';
 import {
   onRequestGet as handleConfigStoreGet,
   onRequestPost as handleConfigStorePost,
@@ -154,6 +264,7 @@ type AdminMotorEnv = {
   RESEND_API_KEY?: unknown;
   CLOUDFLARE_DNS?: unknown;
   CLOUDFLARE_CACHE?: unknown;
+  CLOUDFLARE_STORAGE?: unknown;
   GCP_SA_KEY?: unknown;
   GCP_PROJECT_ID?: unknown;
   JINA_API_KEY?: unknown;
@@ -180,6 +291,7 @@ type ResolvedAdminMotorEnv = {
   RESEND_API_KEY?: string;
   CLOUDFLARE_DNS?: string;
   CLOUDFLARE_CACHE?: string;
+  CLOUDFLARE_STORAGE?: string;
   GCP_SA_KEY?: string;
   GCP_PROJECT_ID?: string;
   JINA_API_KEY?: string;
@@ -274,6 +386,7 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   RESEND_API_KEY: await readSecretString(env.RESEND_API_KEY),
   CLOUDFLARE_DNS: await readSecretString(env.CLOUDFLARE_DNS),
   CLOUDFLARE_CACHE: await readSecretString(env.CLOUDFLARE_CACHE),
+  CLOUDFLARE_STORAGE: await readSecretString(env.CLOUDFLARE_STORAGE),
   GCP_SA_KEY: await readSecretString(env.GCP_SA_KEY),
   GCP_PROJECT_ID: await readSecretString(env.GCP_PROJECT_ID),
   JINA_API_KEY: await readSecretString(env.JINA_API_KEY),
@@ -457,6 +570,9 @@ app.delete('/api/astrologo/userdata', (c) => handleAstrologoUserdataDelete(rc(c)
 // ── cfdns ──
 app.get('/api/cfdns/zones', (c) => handleCfdnsZonesGet(re(c)));
 app.get('/api/cfdns/records', (c) => handleCfdnsRecordsGet(rc(c)));
+app.get('/api/cfdns/zone-capabilities', (c) => handleCfdnsZoneCapabilitiesGet(rc(c)));
+app.get('/api/cfdns/analytics/bytime', (c) => handleCfdnsAnalyticsBytimeGet(rc(c)));
+app.get('/api/cfdns/analytics/top', (c) => handleCfdnsAnalyticsTopGet(rc(c)));
 app.get('/api/cfdns/registrar/search', (c) => handleCfdnsRegistrarSearchGet(rc(c)));
 app.post('/api/cfdns/registrar/check', (c) => handleCfdnsRegistrarCheckPost(rc(c)));
 app.get('/api/cfdns/registrar/registrations', (c) => handleCfdnsRegistrarRegistrationsGet(rc(c)));
@@ -466,10 +582,23 @@ app.patch('/api/cfdns/registrar/registration', (c) => handleCfdnsRegistrarRegist
 app.put('/api/cfdns/registrar/domain', (c) => handleCfdnsRegistrarDomainPut(rc(c)));
 app.get('/api/cfdns/registrar/registration-status', (c) => handleCfdnsRegistrarRegistrationStatusGet(rc(c)));
 app.get('/api/cfdns/registrar/update-status', (c) => handleCfdnsRegistrarUpdateStatusGet(rc(c)));
+app.get('/api/cfdns/zones-admin', (c) => handleCfdnsZonesAdminGet(rc(c)));
+app.post('/api/cfdns/zones-admin', (c) => handleCfdnsZonesAdminPost(rc(c)));
+app.delete('/api/cfdns/zones-admin', (c) => handleCfdnsZonesAdminDelete(rc(c)));
+app.patch('/api/cfdns/zones-admin', (c) => handleCfdnsZonesAdminPatch(rc(c)));
+app.post('/api/cfdns/zones-admin/activation-check', (c) => handleCfdnsZonesAdminActivationCheckPost(rc(c)));
+app.get('/api/cfdns/dnssec', (c) => handleCfdnsDnssecGet(rc(c)));
+app.patch('/api/cfdns/dnssec', (c) => handleCfdnsDnssecPatch(rc(c)));
+app.get('/api/cfdns/dns-settings', (c) => handleCfdnsDnsSettingsGet(rc(c)));
+app.patch('/api/cfdns/dns-settings', (c) => handleCfdnsDnsSettingsPatch(rc(c)));
 app.delete('/api/cfdns/delete', (c) => handleCfdnsDeleteDelete(rc(c)));
 app.post('/api/cfdns/upsert', (c) => handleCfdnsUpsertPost(rc(c)));
+app.post('/api/cfdns/batch', (c) => handleCfdnsBatchPost(rc(c)));
+app.get('/api/cfdns/export', (c) => handleCfdnsExportGet(rc(c)));
+app.post('/api/cfdns/import', (c) => handleCfdnsImportPost(rc(c)));
 
 // ── cfpw ──
+app.get('/api/cfpw/capabilities', (c) => handleCfpwCapabilitiesGet(rc(c)));
 app.get('/api/cfpw/overview', (c) => handleCfpwOverviewGet(rc(c)));
 app.post('/api/cfpw/ops', (c) => handleCfpwOpsPost(rc(c)));
 app.get('/api/cfpw/page-details', (c) => handleCfpwPageDetailsGet(rc(c)));
@@ -481,6 +610,66 @@ app.get('/api/cfpw/observability', (c) => handleCfpwObservabilityGet(rc(c)));
 app.post('/api/cfpw/observability', (c) => handleCfpwObservabilityPost(rc(c)));
 app.get('/api/cfpw/cleanup-deployments', (c) => handleCleanupDeploymentsGet(re(c)));
 app.post('/api/cfpw/cleanup-deployments', (c) => handleCleanupDeploymentsPost(re(c)));
+app.post('/api/cfpw/worker', (c) => handleCfpwWorkerCreatePost(rc(c)));
+app.get('/api/cfpw/worker-code', (c) => handleCfpwWorkerCodeGet(rc(c)));
+app.put('/api/cfpw/worker-code', (c) => handleCfpwWorkerCodePut(rc(c)));
+app.get('/api/cfpw/worker-versions', (c) => handleCfpwWorkerVersionsGet(rc(c)));
+app.get('/api/cfpw/worker-version', (c) => handleCfpwWorkerVersionGet(rc(c)));
+app.post('/api/cfpw/worker-deployments', (c) => handleCfpwWorkerDeploymentsPost(rc(c)));
+app.get('/api/cfpw/worker-settings', (c) => handleCfpwWorkerSettingsGet(rc(c)));
+app.patch('/api/cfpw/worker-settings', (c) => handleCfpwWorkerSettingsPatch(rc(c)));
+app.get('/api/cfpw/worker-domains', (c) => handleCfpwWorkerDomainsGet(rc(c)));
+app.post('/api/cfpw/worker-domains', (c) => handleCfpwWorkerDomainsPost(rc(c)));
+app.delete('/api/cfpw/worker-domains', (c) => handleCfpwWorkerDomainsDelete(rc(c)));
+app.post('/api/cfpw/worker-subdomain', (c) => handleCfpwWorkerSubdomainPost(rc(c)));
+app.get('/api/cfpw/builds', (c) => handleCfpwBuildsGet(rc(c)));
+app.get('/api/cfpw/build', (c) => handleCfpwBuildGet(rc(c)));
+app.get('/api/cfpw/build-logs', (c) => handleCfpwBuildLogsGet(rc(c)));
+app.post('/api/cfpw/build-retry', (c) => handleCfpwBuildRetryPost(rc(c)));
+app.post('/api/cfpw/build-cancel', (c) => handleCfpwBuildCancelPost(rc(c)));
+app.get('/api/cfpw/build-config', (c) => handleCfpwBuildConfigGet(rc(c)));
+app.get('/api/cfpw/worker-metrics', (c) => handleCfpwWorkerMetricsGet(rc(c)));
+app.get('/api/cfpw/account-metrics', (c) => handleCfpwAccountMetricsGet(rc(c)));
+app.get('/api/cfpw/raw-allowlist', (c) => handleCfpwRawAllowlistGet(rc(c)));
+app.post('/api/cfpw/page-project', (c) => handleCfpwPageProjectPost(rc(c)));
+app.patch('/api/cfpw/page-build-config', (c) => handleCfpwPageBuildConfigPatch(rc(c)));
+app.post('/api/cfpw/page-purge-build-cache', (c) => handleCfpwPagePurgeBuildCachePost(rc(c)));
+app.get('/api/cfpw/page-env', (c) => handleCfpwPageEnvGet(rc(c)));
+app.patch('/api/cfpw/page-env', (c) => handleCfpwPageEnvPatch(rc(c)));
+app.post('/api/cfpw/page-deploy', (c) => handleCfpwPageDeployPost(rc(c)));
+app.get('/api/cfpw/page-domain', (c) => handleCfpwPageDomainGet(rc(c)));
+app.post('/api/cfpw/page-domain-recheck', (c) => handleCfpwPageDomainRecheckPost(rc(c)));
+app.get('/api/cfpw/page-deployment', (c) => handleCfpwPageDeploymentGet(rc(c)));
+app.delete('/api/cfpw/page-deployment', (c) => handleCfpwPageDeploymentDelete(rc(c)));
+app.post('/api/cfpw/page-web-analytics', (c) => handleCfpwPageWebAnalyticsPost(rc(c)));
+
+// ── cfpw/storage ──
+app.get('/api/cfpw/storage/kv/namespaces', (c) => handleCfpwKvNamespacesGet(rc(c)));
+app.post('/api/cfpw/storage/kv/namespaces', (c) => handleCfpwKvNamespacesPost(rc(c)));
+app.put('/api/cfpw/storage/kv/namespaces/rename', (c) => handleCfpwKvNamespaceRenamePut(rc(c)));
+app.delete('/api/cfpw/storage/kv/namespaces', (c) => handleCfpwKvNamespacesDelete(rc(c)));
+app.get('/api/cfpw/storage/kv/keys', (c) => handleCfpwKvKeysGet(rc(c)));
+app.get('/api/cfpw/storage/kv/value', (c) => handleCfpwKvValueGet(rc(c)));
+app.put('/api/cfpw/storage/kv/value', (c) => handleCfpwKvValuePut(rc(c)));
+app.delete('/api/cfpw/storage/kv/value', (c) => handleCfpwKvValueDelete(rc(c)));
+app.put('/api/cfpw/storage/kv/bulk', (c) => handleCfpwKvBulkPut(rc(c)));
+app.post('/api/cfpw/storage/kv/bulk-delete', (c) => handleCfpwKvBulkDeletePost(rc(c)));
+app.get('/api/cfpw/storage/d1/databases', (c) => handleCfpwD1DatabasesGet(rc(c)));
+app.post('/api/cfpw/storage/d1/databases', (c) => handleCfpwD1DatabasesPost(rc(c)));
+app.delete('/api/cfpw/storage/d1/databases', (c) => handleCfpwD1DatabasesDelete(rc(c)));
+app.post('/api/cfpw/storage/d1/query', (c) => handleCfpwD1QueryPost(rc(c)));
+app.get('/api/cfpw/storage/d1/schema', (c) => handleCfpwD1SchemaGet(rc(c)));
+app.get('/api/cfpw/storage/d1/table', (c) => handleCfpwD1TableGet(rc(c)));
+app.post('/api/cfpw/storage/d1/export', (c) => handleCfpwD1ExportPost(rc(c)));
+app.post('/api/cfpw/storage/d1/import', (c) => handleCfpwD1ImportPost(rc(c)));
+app.get('/api/cfpw/storage/r2/buckets', (c) => handleCfpwR2BucketsGet(rc(c)));
+app.post('/api/cfpw/storage/r2/buckets', (c) => handleCfpwR2BucketsPost(rc(c)));
+app.delete('/api/cfpw/storage/r2/buckets', (c) => handleCfpwR2BucketsDelete(rc(c)));
+app.get('/api/cfpw/storage/r2/objects', (c) => handleCfpwR2ObjectsGet(rc(c)));
+app.get('/api/cfpw/storage/r2/object', (c) => handleCfpwR2ObjectGet(rc(c)));
+app.put('/api/cfpw/storage/r2/object', (c) => handleCfpwR2ObjectPut(rc(c)));
+app.delete('/api/cfpw/storage/r2/object', (c) => handleCfpwR2ObjectsDelete(rc(c)));
+app.get('/api/cfpw/storage/r2/bucket-settings', (c) => handleCfpwR2BucketSettingsGet(rc(c)));
 
 // ── config ──
 app.get('/api/config-store', (c) => handleConfigStoreGet(rc(c)));

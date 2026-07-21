@@ -1,14 +1,6 @@
-type CloudflareApiError = {
-  message?: string;
-};
+import { CfApiError, cfApiRequest } from './cf-api-core';
 
-type CloudflareApiResponse<T> = {
-  success?: boolean;
-  errors?: CloudflareApiError[];
-  result?: T;
-};
-
-export type CfpwAccount = {
+type CfpwAccount = {
   id: string;
   name: string;
 };
@@ -98,36 +90,28 @@ type EnvWithCloudflarePwToken = {
   CLOUDFLARE_CACHE?: string;
 };
 
-const resolveToken = (env: EnvWithCloudflarePwToken) => {
-  const byPwToken = env.CLOUDFLARE_PW?.trim();
-  if (byPwToken) {
-    return byPwToken;
+const LEGACY_MISSING_TOKEN_MESSAGE =
+  'Token Cloudflare ausente no runtime (configure CLOUDFLARE_PW ou use token override).';
+
+// Converte o erro do núcleo compartilhado (cf-api-core) para o contrato de
+// erro legado deste módulo: sempre Error simples, com as mesmas mensagens.
+const toLegacyCfpwError = (error: unknown, fallback: string): Error => {
+  if (!(error instanceof CfApiError)) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 
-  return '';
-};
-
-const parseJsonOrThrow = <T>(rawText: string, fallback: string, response: Response): T => {
-  const trimmed = rawText.trim();
-  if (!trimmed) {
-    throw new Error(`${fallback}: corpo vazio inesperado (HTTP ${response.status}).`);
+  switch (error.kind) {
+    case 'missing-token':
+      return new Error(LEGACY_MISSING_TOKEN_MESSAGE);
+    case 'empty-body':
+      return new Error(`${fallback}: corpo vazio inesperado (HTTP ${error.status}).`);
+    case 'html-body':
+      return new Error(`${fallback}: resposta HTML inesperada da API Cloudflare (HTTP ${error.status}).`);
+    case 'non-json':
+      return new Error(`${fallback}: resposta não-JSON da API Cloudflare (HTTP ${error.status}).`);
+    default:
+      return new Error(error.apiMessage ? `${fallback}: ${error.apiMessage}` : `${fallback}: HTTP ${error.status}`);
   }
-
-  const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html');
-  if (looksLikeHtml) {
-    throw new Error(`${fallback}: resposta HTML inesperada da API Cloudflare (HTTP ${response.status}).`);
-  }
-
-  try {
-    return JSON.parse(trimmed) as T;
-  } catch {
-    throw new Error(`${fallback}: resposta não-JSON da API Cloudflare (HTTP ${response.status}).`);
-  }
-};
-
-const toFirstError = (payload: CloudflareApiResponse<unknown>) => {
-  const firstError = Array.isArray(payload.errors) && payload.errors.length > 0 ? payload.errors[0] : null;
-  return firstError?.message?.trim() || null;
 };
 
 const cloudflareRequest = async <T>(
@@ -137,48 +121,44 @@ const cloudflareRequest = async <T>(
   init?: RequestInit,
   overrideToken?: string,
 ) => {
-  const token = overrideToken || resolveToken(env);
-  if (!token) {
-    throw new Error('Token Cloudflare ausente no runtime (configure CLOUDFLARE_PW ou use token override).');
+  // O overrideToken é usado pelos fluxos de zona/purge com o CLOUDFLARE_CACHE
+  // já validado no call site; o env sintético entrega esse token ao core sem
+  // criar fallback novo para o produto 'pw'.
+  const requestEnv = overrideToken ? { CLOUDFLARE_PW: overrideToken } : env;
+
+  try {
+    const payload = await cfApiRequest<T>(requestEnv, 'pw', path, fallback, init);
+    return payload.result;
+  } catch (error) {
+    throw toLegacyCfpwError(error, fallback);
   }
-
-  const hasContentTypeHeader = Boolean(init?.headers && new Headers(init.headers).has('Content-Type'));
-  const isFormDataBody = typeof FormData !== 'undefined' && init?.body instanceof FormData;
-
-  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
-    method: init?.method ?? 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(hasContentTypeHeader || isFormDataBody ? {} : { 'Content-Type': 'application/json' }),
-      ...(init?.headers ?? {}),
-    },
-    ...(init?.body !== undefined ? { body: init.body } : {}),
-  });
-
-  const rawText = await response.text();
-  const payload = parseJsonOrThrow<CloudflareApiResponse<T>>(rawText, fallback, response);
-
-  if (!response.ok || payload.success !== true) {
-    const message = toFirstError(payload);
-    throw new Error(message ? `${fallback}: ${message}` : `${fallback}: HTTP ${response.status}`);
-  }
-
-  return payload.result as T;
 };
 
 /**
- * Paths permitidos para o raw request de CF API.
+ * Paths permitidos para o raw request de CF API (fonte única: também alimenta
+ * GET /api/cfpw/raw-allowlist com pattern + descrição humana).
  * Restringe ao subconjunto de endpoints legitimamente necessários para operações de Workers e Pages.
+ * @public
  */
-const ALLOWED_CF_PATH_PATTERNS: RegExp[] = [
-  /^\/accounts(\?|$)/, // listar contas
-  /^\/accounts\/[^/]+\/workers\//, // Workers scripts, settings, deployments, schedules, secrets
-  /^\/accounts\/[^/]+\/pages\//, // Pages projects, deployments, domains
-  /^\/zones(\?|$)/, // listar zones
-  /^\/zones\/[^/]+\/workers\/routes(\/|$|\?)/, // rotas de Workers
-  /^\/zones\/[^/]+\/purge_cache(\/|$|\?)/, // purge de cache
+export const CF_RAW_PATH_ALLOWLIST: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /^\/accounts(\?|$)/, label: '/accounts — listar contas' },
+  {
+    pattern: /^\/accounts\/[^/]+\/workers\//,
+    label: '/accounts/{accountId}/workers/… — scripts, settings, deployments, schedules, secrets',
+  },
+  {
+    pattern: /^\/accounts\/[^/]+\/pages\//,
+    label: '/accounts/{accountId}/pages/… — projetos, deployments, domínios',
+  },
+  { pattern: /^\/zones(\?|$)/, label: '/zones — listar zonas' },
+  { pattern: /^\/zones\/[^/]+\/workers\/routes(\/|$|\?)/, label: '/zones/{zoneId}/workers/routes — rotas de Workers' },
+  { pattern: /^\/zones\/[^/]+\/purge_cache(\/|$|\?)/, label: '/zones/{zoneId}/purge_cache — purge de cache' },
 ];
+
+const ALLOWED_CF_PATH_PATTERNS: RegExp[] = CF_RAW_PATH_ALLOWLIST.map((entry) => entry.pattern);
+
+/** Métodos HTTP aceitos pelo raw request (mesma fonte do runCloudflareRawRequest). @public */
+export const CF_RAW_ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
 const validateCloudflareApiPath = (path: string) => {
   const normalized = path.trim();
@@ -216,7 +196,7 @@ const normalizeAccount = (account: { id?: string; name?: string }) => ({
   name: String(account.name ?? '').trim(),
 });
 
-export const listCloudflareAccounts = async (env: EnvWithCloudflarePwToken) => {
+const listCloudflareAccounts = async (env: EnvWithCloudflarePwToken) => {
   const accounts = await cloudflareRequest<Array<{ id?: string; name?: string }>>(
     env,
     '/accounts?page=1&per_page=50',
@@ -432,13 +412,18 @@ export const getCloudflareWorkerSchedules = async (
     throw new Error('Account ID e scriptName são obrigatórios para ler cron triggers do Worker.');
   }
 
-  const schedules = await cloudflareRequest<CfpwWorkerSchedule[]>(
+  // A API da CF devolve result como { schedules: [...] } neste endpoint; formas em array
+  // são aceitas defensivamente para compatibilidade.
+  const result = await cloudflareRequest<{ schedules?: CfpwWorkerSchedule[] } | CfpwWorkerSchedule[]>(
     env,
     `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/schedules`,
     `Falha ao ler cron triggers do Worker ${normalizedScript}`,
   );
 
-  return Array.isArray(schedules) ? schedules : [];
+  if (Array.isArray(result)) {
+    return result;
+  }
+  return Array.isArray(result?.schedules) ? result.schedules : [];
 };
 
 export const updateCloudflareWorkerSchedules = async (
@@ -747,6 +732,8 @@ export const getCloudflarePagesDeploymentLogs = async (
   );
 };
 
+// Lança CfApiError (não o Error legado): o handler worker-create precisa do
+// status/código CF para mapear conflito de nome (10021/409) em 409 pt-BR.
 export const createCloudflareWorkerFromTemplate = async (
   env: EnvWithCloudflarePwToken,
   accountId: string,
@@ -765,6 +752,7 @@ export const createCloudflareWorkerFromTemplate = async (
     main_module: 'index.js',
     compatibility_date: compatibilityDate,
     usage_model: usageModel?.trim() || 'standard',
+    observability: { enabled: true },
   };
 
   const content =
@@ -773,20 +761,23 @@ export const createCloudflareWorkerFromTemplate = async (
 
   const form = new FormData();
   form.append('metadata', JSON.stringify(metadata));
-  form.append('index.js', new Blob([content], { type: 'application/javascript' }), 'index.js');
+  // O template é um ES module (export default): a parte precisa do content
+  // type application/javascript+module para a Cloudflare tratá-la como ESM.
+  form.append('index.js', new Blob([content], { type: 'application/javascript+module' }), 'index.js');
 
-  return cloudflareRequest<Record<string, unknown>>(
+  const payload = await cfApiRequest<Record<string, unknown>>(
     env,
+    'pw',
     `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}`,
     `Falha ao criar Worker ${normalizedScript}`,
     {
       method: 'PUT',
-      headers: {
-        // fetch define boundary automaticamente para multipart/form-data
-      },
+      // fetch define boundary automaticamente para multipart/form-data
       body: form,
     },
   );
+
+  return payload.result;
 };
 
 export const createCloudflarePagesProject = async (
@@ -860,35 +851,44 @@ export const listCloudflareWorkerVersions = async (
   return Array.isArray(versions) ? versions : [];
 };
 
+// Lança CfApiError (não o Error legado): o handler worker-deployments precisa
+// do status CF para o mapeamento 4xx-passthrough.
 export const deployCloudflareWorkerVersion = async (
   env: EnvWithCloudflarePwToken,
   accountId: string,
   scriptName: string,
-  versionId: string,
+  versions: Array<{ versionId: string; percentage: number }>,
+  options?: { message?: string; force?: boolean },
 ) => {
   const normalizedAccountId = accountId.trim();
   const normalizedScript = scriptName.trim();
-  const normalizedVersion = versionId.trim();
-  if (!normalizedAccountId || !normalizedScript || !normalizedVersion) {
-    throw new Error('Account ID, scriptName e versionId são obrigatórios para promover versão do Worker.');
+  if (!normalizedAccountId || !normalizedScript || versions.length === 0) {
+    throw new Error('Account ID, scriptName e versions são obrigatórios para promover versão do Worker.');
   }
 
-  return cloudflareRequest<Record<string, unknown>>(
+  const queryString = options?.force ? '?force=true' : '';
+
+  const payload = await cfApiRequest<Record<string, unknown>>(
     env,
-    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/deployments`,
-    `Falha ao promover versão ${normalizedVersion} do Worker ${normalizedScript}`,
+    'pw',
+    `/accounts/${encodeURIComponent(normalizedAccountId)}/workers/scripts/${encodeURIComponent(normalizedScript)}/deployments${queryString}`,
+    `Falha ao promover versão do Worker ${normalizedScript}`,
     {
       method: 'POST',
       body: JSON.stringify({
-        versions: [
-          {
-            version_id: normalizedVersion,
-            percentage: 100,
-          },
-        ],
+        strategy: 'percentage',
+        versions: versions.map((version) => ({
+          version_id: version.versionId,
+          percentage: version.percentage,
+        })),
+        annotations: {
+          'workers/message': options?.message?.trim() || 'Deploy via admin-app',
+        },
       }),
     },
   );
+
+  return payload.result;
 };
 
 export const listCloudflareWorkerRoutes = async (env: EnvWithCloudflarePwToken, zoneId: string) => {
@@ -959,7 +959,7 @@ export const runCloudflareRawRequest = async (
   const normalizedPath = validateCloudflareApiPath(path);
   const normalizedMethod = method.trim().toUpperCase();
 
-  if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod)) {
+  if (!(CF_RAW_ALLOWED_METHODS as readonly string[]).includes(normalizedMethod)) {
     throw new Error(`Método não suportado para operação raw: ${normalizedMethod}`);
   }
 

@@ -7,6 +7,7 @@ const SECRET_ALIASES = {
   JINA_API_KEY: ['jina-api-key'],
   CLOUDFLARE_DNS: ['cloudflare-dns'],
   CLOUDFLARE_CACHE: ['cloudflare-cache', 'cloudflare-cache-token'],
+  CLOUDFLARE_STORAGE: ['cloudflare-storage'],
   CF_ACCOUNT_ID: ['cf-account-id'],
   MAINSITE_WORKER_API_SECRET: ['mainsite-worker-api-secret'],
   MAINSITE_WORKER_API_BASE_URL: ['mainsite-worker-api-base-url'],

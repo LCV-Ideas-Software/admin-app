@@ -4,7 +4,7 @@ import {
   listCloudflarePagesDeployments,
   listCloudflarePagesProjects,
   resolveCloudflarePwAccount,
-} from '../../../functions/api/_lib/cfpw-api';
+} from './routes/_lib/cfpw-api';
 
 type CleanupEnv = {
   CLOUDFLARE_PW?: string;

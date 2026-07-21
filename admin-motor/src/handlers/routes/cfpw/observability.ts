@@ -11,10 +11,12 @@ import { resolveCloudflarePwAccount } from '../_lib/cfpw-api';
 import {
   createObservabilityDestination,
   deleteObservabilityDestination,
+  heartbeatObservabilityLiveTail,
   listObservabilityDestinations,
   listObservabilityKeys,
   listObservabilityValues,
   queryObservabilityTelemetry,
+  startObservabilityLiveTail,
 } from '../_lib/observability-api';
 import { createResponseTrace } from '../_lib/request-trace';
 
@@ -115,6 +117,16 @@ export async function onRequestPost(context: Context) {
         const slug = String(payload.slug ?? '').trim();
         if (!slug) return toError('Campo "slug" é obrigatório para action "delete-destination".', trace, 400);
         result = await deleteObservabilityDestination(env, accountId, slug);
+        break;
+      }
+
+      case 'live-tail-start': {
+        result = await startObservabilityLiveTail(env, accountId, payload.body ?? {});
+        break;
+      }
+
+      case 'live-tail-heartbeat': {
+        result = await heartbeatObservabilityLiveTail(env, accountId, payload.body ?? {});
         break;
       }
 

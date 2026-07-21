@@ -38,3 +38,34 @@ for (const { id, heading } of modules) {
     await expect(page.locator('.module-error-panel')).not.toBeVisible();
   });
 }
+
+test('module /cfdns renders the 4 tabs and switching does not crash', async ({ page }) => {
+  await page.goto('/cfdns');
+  await expect(page.locator('.topbar h2')).toContainText('CF DNS', { timeout: 10_000 });
+
+  const tabNav = page.locator('.page-tab-nav');
+  const tabNames = ['Registros', 'Análises', 'Zona & DNSSEC', 'Registrar'];
+  for (const name of tabNames) {
+    await expect(tabNav.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  for (const name of tabNames) {
+    await tabNav.getByRole('button', { name, exact: true }).click();
+    await expect(page.locator('.module-error-panel')).not.toBeVisible();
+  }
+});
+
+test('module /cfpw renders top tabs and storage sub-tabs without crashing', async ({ page }) => {
+  await page.goto('/cfpw');
+  await expect(page.locator('.topbar h2')).toContainText('CF P&W', { timeout: 10_000 });
+
+  const topNav = page.locator('.cfpw-top-tab-nav');
+  await expect(topNav.getByRole('button', { name: 'Recursos', exact: true })).toBeVisible();
+  await expect(topNav.getByRole('button', { name: 'Armazenamento', exact: true })).toBeVisible();
+
+  await topNav.getByRole('button', { name: 'Armazenamento', exact: true }).click();
+  const subNav = page.locator('.storage-subtab-nav').first();
+  for (const name of ['KV', 'D1', 'R2']) {
+    await expect(subNav.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  await expect(page.locator('.module-error-panel')).not.toBeVisible();
+});
