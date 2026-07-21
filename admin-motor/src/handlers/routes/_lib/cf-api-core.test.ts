@@ -294,15 +294,36 @@ describe('cf-api-core', () => {
       expect(translateCloudflareError(403, [], 'Falha')).toContain('verifique as permissões do token');
     });
 
-    it('maps CF 1034 (plan window limit) as a plan limit, not a permission error, even at 403', () => {
+    it('maps CF 1034 (plan limit) as a plan limit, not a permission error, even at 403 — window case', () => {
       const message = translateCloudflareError(
         403,
         [{ code: 1034, message: 'Maximum queryable time period for the free plan is 6h0m0s.' }],
         'Falha',
       );
-      expect(message).toContain('excede o máximo permitido no plano');
+      expect(message).toContain('indisponível no plano da zona');
       expect(message).toContain('não é problema de token nem de permissão');
+      // Repassa o texto próprio da CF, que explica o motivo exato.
+      expect(message).toContain('Maximum queryable time period for the free plan is 6h0m0s.');
       expect(message).toContain('código CF 1034');
+      expect(message).not.toContain('permissões do token');
+    });
+
+    it('maps CF 1034 for a plan-gated dimension (queryType) with the CF reason, not a window hint', () => {
+      const message = translateCloudflareError(
+        403,
+        [
+          {
+            code: 1034,
+            message:
+              'Query Type is not available for your plan. Upgrade to the business plan to see DNS analytics by queryType.',
+          },
+        ],
+        'Falha',
+      );
+      expect(message).toContain('indisponível no plano da zona');
+      expect(message).toContain('Upgrade to the business plan');
+      // Não deve sugerir "período menor": aqui a causa é a dimensão, não a janela.
+      expect(message).not.toContain('período menor');
       expect(message).not.toContain('permissões do token');
     });
 

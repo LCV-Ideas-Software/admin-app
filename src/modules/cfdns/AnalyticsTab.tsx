@@ -19,12 +19,12 @@ import { useNotification } from '../../components/Notification';
 import type { ApiResult } from '../../lib/apiClient';
 import { cfApiErrorMessage } from '../shared/cfApi';
 import {
+  type Breakdown,
   type BytimeTransform,
   isPeriodAllowed,
-  type TopItem,
+  resolveBreakdown,
   toPercentLabel,
   transformBytimeReport,
-  transformTopReport,
 } from './analyticsHelpers';
 import * as api from './api';
 import type { DnsAnalyticsPayload, DnsAnalyticsReport } from './types';
@@ -56,6 +56,30 @@ const unwrapAnalytics = (result: ApiResult<DnsAnalyticsPayload>, contexto: strin
   return result.data.report;
 };
 
+// Card de um breakdown (top nomes/tipos/códigos): renderiza o gráfico quando há
+// itens ou uma nota curta quando a dimensão está indisponível no plano da zona
+// — cada card degrada sozinho, sem derrubar a aba.
+function BreakdownCard({
+  title,
+  breakdown,
+  ariaLabel,
+}: {
+  title: string;
+  breakdown: Breakdown | null;
+  ariaLabel?: string;
+}) {
+  return (
+    <div className="cfdns-analytics-card">
+      <h5>{title}</h5>
+      {breakdown && 'unavailable' in breakdown ? (
+        <p className="result-empty">{breakdown.unavailable}</p>
+      ) : (
+        <SvgBarChart items={breakdown?.items ?? []} ariaLabel={ariaLabel ?? title} />
+      )}
+    </div>
+  );
+}
+
 type AnalyticsTabProps = {
   selectedZoneId: string;
 };
@@ -71,9 +95,9 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [bytime, setBytime] = useState<BytimeTransform | null>(null);
-  const [topNames, setTopNames] = useState<TopItem[]>([]);
-  const [topTypes, setTopTypes] = useState<TopItem[]>([]);
-  const [topCodes, setTopCodes] = useState<TopItem[]>([]);
+  const [topNames, setTopNames] = useState<Breakdown | null>(null);
+  const [topTypes, setTopTypes] = useState<Breakdown | null>(null);
+  const [topCodes, setTopCodes] = useState<Breakdown | null>(null);
 
   // Sequência de requisição: troca rápida de zona/período não pode deixar uma
   // resposta antiga sobrescrever a mais recente.
@@ -158,20 +182,17 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
           return;
         }
 
+        // Núcleo: a série temporal. Se falhar, é erro no nível da aba (catch).
         setBytime(
           transformBytimeReport(
             unwrapAnalytics(bytimeResult, 'Não foi possível carregar a série temporal de consultas DNS'),
           ),
         );
-        setTopNames(
-          transformTopReport(unwrapAnalytics(namesResult, 'Não foi possível carregar o top de nomes consultados')),
-        );
-        setTopTypes(
-          transformTopReport(unwrapAnalytics(typesResult, 'Não foi possível carregar o top de tipos de consulta')),
-        );
-        setTopCodes(
-          transformTopReport(unwrapAnalytics(codesResult, 'Não foi possível carregar o top de códigos de resposta')),
-        );
+        // Cada breakdown degrada por conta própria — uma dimensão gated no plano
+        // (ex.: queryType exige Business) não derruba o resto da aba.
+        setTopNames(resolveBreakdown(namesResult, 'Não foi possível carregar o top de nomes consultados'));
+        setTopTypes(resolveBreakdown(typesResult, 'Não foi possível carregar o top de tipos de consulta'));
+        setTopCodes(resolveBreakdown(codesResult, 'Não foi possível carregar o top de códigos de resposta'));
       } catch (loadError) {
         if (requestSeqRef.current !== seq) {
           return;
@@ -179,9 +200,9 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
         const message =
           loadError instanceof Error ? loadError.message : 'Não foi possível carregar as análises DNS da zona.';
         setBytime(null);
-        setTopNames([]);
-        setTopTypes([]);
-        setTopCodes([]);
+        setTopNames(null);
+        setTopTypes(null);
+        setTopCodes(null);
         setError(message);
         showNotification(message, 'error');
       } finally {
@@ -196,9 +217,9 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
   useEffect(() => {
     if (!selectedZoneId) {
       setBytime(null);
-      setTopNames([]);
-      setTopTypes([]);
-      setTopCodes([]);
+      setTopNames(null);
+      setTopTypes(null);
+      setTopCodes(null);
       setError('');
       return;
     }
@@ -311,18 +332,9 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
           </div>
 
           <div className="cfdns-analytics-grid">
-            <div className="cfdns-analytics-card">
-              <h5>Top nomes consultados</h5>
-              <SvgBarChart items={topNames} ariaLabel="Top nomes consultados" />
-            </div>
-            <div className="cfdns-analytics-card">
-              <h5>Top tipos</h5>
-              <SvgBarChart items={topTypes} ariaLabel="Top tipos de consulta" />
-            </div>
-            <div className="cfdns-analytics-card">
-              <h5>Top códigos de resposta</h5>
-              <SvgBarChart items={topCodes} ariaLabel="Top códigos de resposta" />
-            </div>
+            <BreakdownCard title="Top nomes consultados" breakdown={topNames} />
+            <BreakdownCard title="Top tipos" breakdown={topTypes} ariaLabel="Top tipos de consulta" />
+            <BreakdownCard title="Top códigos de resposta" breakdown={topCodes} />
           </div>
         </>
       )}

@@ -9,7 +9,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isPeriodAllowed, toPercentLabel, transformBytimeReport, transformTopReport } from './analyticsHelpers';
+import {
+  isPeriodAllowed,
+  resolveBreakdown,
+  toPercentLabel,
+  transformBytimeReport,
+  transformTopReport,
+} from './analyticsHelpers';
 import type { DnsAnalyticsReport } from './types';
 
 const T0 = Date.parse('2026-07-19T12:00:00Z');
@@ -172,5 +178,43 @@ describe('isPeriodAllowed', () => {
 
   it('allows everything when both limits are unknown', () => {
     expect(isPeriodAllowed(720, null, null)).toBe(true);
+  });
+});
+
+describe('resolveBreakdown', () => {
+  const okPayload = (report: DnsAnalyticsReport) => ({
+    ok: true as const,
+    data: { ok: true as const, report },
+  });
+
+  it('returns items on success', () => {
+    const result = resolveBreakdown(
+      okPayload({ data: [{ dimensions: ['A'], metrics: [10] }], query: { metrics: ['queryCount'] } }),
+      'ctx',
+    );
+    expect('items' in result && result.items).toEqual([{ label: 'A', value: 10 }]);
+  });
+
+  it('returns { unavailable } with the backend error when the plan gates the dimension', () => {
+    const result = resolveBreakdown(
+      {
+        ok: true,
+        data: {
+          ok: false,
+          error: 'Recurso de análises indisponível no plano da zona (código CF 1034: Upgrade to the business plan)',
+        },
+      },
+      'Não foi possível carregar o top de tipos de consulta',
+    );
+    expect('unavailable' in result && result.unavailable).toContain('indisponível no plano');
+    expect('unavailable' in result && result.unavailable).toContain('business plan');
+  });
+
+  it('returns { unavailable } on a transport failure (never throws)', () => {
+    const result = resolveBreakdown(
+      { ok: false, status: 500, statusText: 'x', contentType: null, error: 'falha', bodyPreview: '' },
+      'Contexto do card',
+    );
+    expect('unavailable' in result).toBe(true);
   });
 });

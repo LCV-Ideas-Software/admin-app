@@ -10,7 +10,9 @@
  * vive aqui, isolada e testável, e não no componente.
  */
 
-import type { DnsAnalyticsReport } from './types';
+import type { ApiResult } from '../../lib/apiClient';
+import { cfApiErrorMessage } from '../shared/cfApi';
+import type { DnsAnalyticsPayload, DnsAnalyticsReport } from './types';
 
 /**
  * Um período de análises é permitido quando a janela (em horas) não excede nem a
@@ -155,6 +157,24 @@ export const transformTopReport = (report?: DnsAnalyticsReport | null): TopItem[
       };
     })
     .sort((a, b) => b.value - a.value);
+};
+
+/**
+ * Resultado de um breakdown (top nomes/tipos/códigos): itens quando disponível
+ * ou uma mensagem de indisponibilidade. Cada card degrada por conta própria —
+ * uma dimensão gated no plano (ex.: `queryType` exige Business) não derruba a
+ * aba inteira. `cfApiFetch` nunca rejeita, então a falha vem encodada no ApiResult.
+ */
+export type Breakdown = { items: TopItem[] } | { unavailable: string };
+
+export const resolveBreakdown = (result: ApiResult<DnsAnalyticsPayload>, contexto: string): Breakdown => {
+  if (!result.ok) {
+    return { unavailable: cfApiErrorMessage(result, contexto) };
+  }
+  if (!result.data.ok) {
+    return { unavailable: result.data.error ?? `${contexto}.` };
+  }
+  return { items: transformTopReport(result.data.report) };
 };
 
 /** Percentual 0–100 formatado pt-BR (1 casa); '—' quando não há denominador. */

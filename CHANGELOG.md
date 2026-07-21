@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.09] - 2026-07-21
+
+### Corrigido
+
+- **Análises DNS: CF 1034 é limite de plano genérico, não permissão nem só janela** — o código CF 1034 é guarda-chuva de "recurso indisponível no plano": vale para a janela de tempo (Free = 6h) e para dimensões (`queryType` exige plano Business). A mensagem deixou de fixar "escolha um período menor" e passa a repassar o texto próprio da Cloudflare, que explica o motivo exato (6h ou upgrade). Além disso, a aba passou a **degradar por breakdown**: uma dimensão indisponível no plano (ex.: nomes/tipos) marca só aquele card como "indisponível no plano" em vez de derrubar a aba inteira — a série temporal e o top de códigos de resposta continuam aparecendo no plano Free.
+
 ## [v02.15.08] - 2026-07-21
 
 ### Corrigido
