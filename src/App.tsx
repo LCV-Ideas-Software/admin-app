@@ -32,7 +32,7 @@ import { useNavigate, useParams } from './router-context';
 
 export type { ModuleId };
 
-const APP_VERSION = 'APP v02.15.02';
+const APP_VERSION = 'APP v02.15.03';
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   astrologo: 'Astrólogo',
@@ -140,6 +140,11 @@ function App() {
   };
 
   const [sidebarPinned, setSidebarPinned] = useState(true);
+  // 'hovered' precisa ser estado React: a className do <aside> é controlada e
+  // qualquer re-render (ex.: alternar o pin) apagaria uma classe adicionada via
+  // classList. Rastreamos o ponteiro sempre; o CSS só reage em .collapsed.hovered.
+  // Assim, despinar com o cursor dentro mantém o menu (e este botão) visível.
+  const [sidebarHovered, setSidebarHovered] = useState(false);
 
   return (
     <div className={`app-shell${sidebarPinned ? '' : ' sidebar-collapsed'}`}>
@@ -147,13 +152,9 @@ function App() {
         Ir para conteúdo principal
       </a>
       <aside
-        className={`sidebar${sidebarPinned ? '' : ' collapsed'}`}
-        onMouseEnter={() => {
-          if (!sidebarPinned) document.querySelector('.sidebar')?.classList.add('hovered');
-        }}
-        onMouseLeave={() => {
-          if (!sidebarPinned) document.querySelector('.sidebar')?.classList.remove('hovered');
-        }}
+        className={`sidebar${sidebarPinned ? '' : ' collapsed'}${sidebarHovered ? ' hovered' : ''}`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
       >
         <div className="brand-card">
           <div className="brand-icon">
@@ -167,7 +168,6 @@ function App() {
             title={sidebarPinned ? 'Recolher menu' : 'Fixar menu'}
             onClick={() => {
               setSidebarPinned(!sidebarPinned);
-              document.querySelector('.sidebar')?.classList.remove('hovered');
             }}
           >
             {sidebarPinned ? <PinOff size={14} /> : <Pin size={14} />}

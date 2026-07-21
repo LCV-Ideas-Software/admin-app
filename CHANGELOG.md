@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.03] - 2026-07-21
+
+### Corrigido
+
+- **Menu lateral sumia sob o cursor ao despinar** — a classe de hover era manipulada imperativamente num elemento cuja `className` é controlada pelo React, e qualquer re-render (como alternar o pin) a apagava; com o cursor ainda dentro da sidebar, o menu recolhia e o próprio botão de fixar ficava invisível (também detectado pelo teste e2e do pin, que travava por 30s). O hover agora é estado React, o menu permanece visível até o ponteiro sair e a suíte e2e voltou a 26/26.
+
 ## [v02.15.02] - 2026-07-21
 
 ### Corrigido
