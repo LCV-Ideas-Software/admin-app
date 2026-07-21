@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { toPercentLabel, transformBytimeReport, transformTopReport } from './analyticsHelpers';
+import { isPeriodAllowed, toPercentLabel, transformBytimeReport, transformTopReport } from './analyticsHelpers';
 import type { DnsAnalyticsReport } from './types';
 
 const T0 = Date.parse('2026-07-19T12:00:00Z');
@@ -153,5 +153,24 @@ describe('toPercentLabel', () => {
   it('formats pt-BR percentages and degrades to "—" without a denominator', () => {
     expect(toPercentLabel(39, 392)).toBe('9,9%');
     expect(toPercentLabel(1, 0)).toBe('—');
+  });
+});
+
+describe('isPeriodAllowed', () => {
+  it('blocks windows above the Free plan max window (6h) — 24h is not allowed', () => {
+    // Free: retenção 8 dias, mas janela máxima por consulta = 6h.
+    expect(isPeriodAllowed(6, 8, 6)).toBe(true);
+    expect(isPeriodAllowed(24, 8, 6)).toBe(false);
+    expect(isPeriodAllowed(720, 8, 6)).toBe(false);
+  });
+
+  it('blocks windows above retention (days) when there is no per-window cap', () => {
+    // Pro: 31 dias de retenção, sem teto de janela por consulta.
+    expect(isPeriodAllowed(720, 31, null)).toBe(true);
+    expect(isPeriodAllowed(24 * 40, 31, null)).toBe(false);
+  });
+
+  it('allows everything when both limits are unknown', () => {
+    expect(isPeriodAllowed(720, null, null)).toBe(true);
   });
 });

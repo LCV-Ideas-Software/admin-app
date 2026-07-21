@@ -13,6 +13,7 @@ type CapabilitiesBody = {
   commentMaxLength?: number;
   batchOpsLimit?: number;
   analyticsRetentionDays?: number;
+  analyticsMaxWindowHours?: number | null;
   planLabel?: string | null;
   status?: string | null;
   paused?: boolean;
@@ -62,6 +63,7 @@ describe('cfdns zone-capabilities handler', () => {
       commentMaxLength: 100,
       batchOpsLimit: 200,
       analyticsRetentionDays: 8,
+      analyticsMaxWindowHours: 6,
       planLabel: 'Free Website',
       status: 'active',
       paused: false,
@@ -88,6 +90,7 @@ describe('cfdns zone-capabilities handler', () => {
       commentMaxLength: 500,
       batchOpsLimit: 3500,
       analyticsRetentionDays: 62,
+      analyticsMaxWindowHours: null,
       planLabel: 'Enterprise Website',
       originalNameServers: null,
     });

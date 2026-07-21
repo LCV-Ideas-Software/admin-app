@@ -294,6 +294,18 @@ describe('cf-api-core', () => {
       expect(translateCloudflareError(403, [], 'Falha')).toContain('verifique as permissões do token');
     });
 
+    it('maps CF 1034 (plan window limit) as a plan limit, not a permission error, even at 403', () => {
+      const message = translateCloudflareError(
+        403,
+        [{ code: 1034, message: 'Maximum queryable time period for the free plan is 6h0m0s.' }],
+        'Falha',
+      );
+      expect(message).toContain('excede o máximo permitido no plano');
+      expect(message).toContain('não é problema de token nem de permissão');
+      expect(message).toContain('código CF 1034');
+      expect(message).not.toContain('permissões do token');
+    });
+
     it('keeps the fallback with raw CF detail for unmapped failures', () => {
       expect(translateCloudflareError(418, [{ code: 1234, message: 'teapot' }], 'Falha na operação')).toBe(
         'Falha na operação (código CF 1234: teapot)',

@@ -16,12 +16,13 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release: **v02.15.07**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+**Status.** Stable. Current release: **v02.15.08**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 The version history at a glance:
 
 | Release         | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`v02.15.08`** | **Análises DNS com diagnóstico correto no plano Free.** O código CF 1034 (janela de 6h no Free) deixa de ser rotulado como "token sem permissão"; a aba oferece o período de 6h e desabilita janelas acima do limite do plano. Inclui override de segurança `linkify-it` 5.0.2. |
 | **`v02.15.07`** | **Telemetria de SQL sem texto da consulta.** O metadata do D1 passa a registrar só contagens (statements/leituras/escritas); truncar um prefixo não redigia valores literais no início do SQL. |
 | **`v02.15.06`** | **Guard do console avançado à prova de encoding.** Decodifica o percent-encoding do path (a Cloudflare o decodifica) antes de checar os recursos protegidos, fechando o bypass via `%2F`/`%2D`. |
 | **`v02.15.05`** | **Gate do biome restaurado.** Normaliza finais de linha CRLF de um arquivo de teste que quebravam a formatação e o passo de gates do deploy; sem mudança de comportamento. |

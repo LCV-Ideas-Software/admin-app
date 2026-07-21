@@ -20,6 +20,7 @@ import type { ApiResult } from '../../lib/apiClient';
 import { cfApiErrorMessage } from '../shared/cfApi';
 import {
   type BytimeTransform,
+  isPeriodAllowed,
   type TopItem,
   toPercentLabel,
   transformBytimeReport,
@@ -29,6 +30,7 @@ import * as api from './api';
 import type { DnsAnalyticsPayload, DnsAnalyticsReport } from './types';
 
 const PERIODS = [
+  { key: '6h', label: '6h', hours: 6 },
   { key: '24h', label: '24h', hours: 24 },
   { key: '72h', label: '72h', hours: 72 },
   { key: '7d', label: '7 dias', hours: 168 },
@@ -63,7 +65,8 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
 
   const [period, setPeriod] = useState<PeriodKey>('24h');
   const [retentionDays, setRetentionDays] = useState<number | null>(null);
-  const retentionCacheRef = useRef(new Map<string, number>());
+  const [maxWindowHours, setMaxWindowHours] = useState<number | null>(null);
+  const retentionCacheRef = useRef(new Map<string, { retentionDays: number; maxWindowHours: number | null }>());
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -81,28 +84,34 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
   useEffect(() => {
     if (!selectedZoneId) {
       setRetentionDays(null);
+      setMaxWindowHours(null);
       return;
     }
 
     const cached = retentionCacheRef.current.get(selectedZoneId);
     if (cached != null) {
-      setRetentionDays(cached);
+      setRetentionDays(cached.retentionDays);
+      setMaxWindowHours(cached.maxWindowHours);
       return;
     }
 
     let cancelled = false;
     setRetentionDays(null);
+    setMaxWindowHours(null);
 
     void (async () => {
       const result = await api.fetchZoneCapabilities(selectedZoneId);
       if (cancelled || !result.ok || !result.data.ok) {
-        // Retenção desconhecida não bloqueia a aba: só deixa de desabilitar períodos.
+        // Limites desconhecidos não bloqueiam a aba: só deixa de desabilitar períodos.
         return;
       }
       const days = result.data.analyticsRetentionDays;
+      const windowHours =
+        typeof result.data.analyticsMaxWindowHours === 'number' ? result.data.analyticsMaxWindowHours : null;
       if (typeof days === 'number' && days > 0) {
-        retentionCacheRef.current.set(selectedZoneId, days);
+        retentionCacheRef.current.set(selectedZoneId, { retentionDays: days, maxWindowHours: windowHours });
         setRetentionDays(days);
+        setMaxWindowHours(windowHours);
       }
     })();
 
@@ -111,13 +120,20 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
     };
   }, [selectedZoneId]);
 
-  // Se a retenção carregada invalida o período atual (ex.: 30 dias num plano
-  // Free), volta para 24h em vez de consultar uma janela que a CF rejeitaria.
+  // Se os limites carregados invalidam o período atual (ex.: janela de 6h num
+  // plano Free), cai para o maior período permitido em vez de consultar uma
+  // janela que a CF rejeitaria com o código 1034.
   useEffect(() => {
-    if (retentionDays != null && periodHours(period) / 24 > retentionDays) {
-      setPeriod('24h');
+    if (isPeriodAllowed(periodHours(period), retentionDays, maxWindowHours)) {
+      return;
     }
-  }, [retentionDays, period]);
+    const largestAllowed = [...PERIODS]
+      .reverse()
+      .find((option) => isPeriodAllowed(option.hours, retentionDays, maxWindowHours));
+    if (largestAllowed && largestAllowed.key !== period) {
+      setPeriod(largestAllowed.key);
+    }
+  }, [retentionDays, maxWindowHours, period]);
 
   const loadAnalytics = useCallback(
     async (zoneId: string, periodKey: PeriodKey) => {
@@ -202,15 +218,19 @@ export function AnalyticsTab({ selectedZoneId }: AnalyticsTabProps) {
         <div className="inline-actions">
           <div className="cfdns-analytics-periods">
             {PERIODS.map((option) => {
-              const beyondRetention = retentionDays != null && option.hours / 24 > retentionDays;
+              const allowed = isPeriodAllowed(option.hours, retentionDays, maxWindowHours);
+              const beyondWindow = maxWindowHours != null && option.hours > maxWindowHours;
+              const blockedTitle = beyondWindow
+                ? `Além da janela do seu plano (máx. ${maxWindowHours}h por consulta)`
+                : `Além da retenção do seu plano (${retentionDays} dias)`;
               return (
                 <button
                   key={option.key}
                   type="button"
                   className={period === option.key ? 'primary-button' : 'ghost-button'}
                   onClick={() => setPeriod(option.key)}
-                  disabled={loading || beyondRetention}
-                  title={beyondRetention ? `Além da retenção do seu plano (${retentionDays} dias)` : undefined}
+                  disabled={loading || !allowed}
+                  title={allowed ? undefined : blockedTitle}
                 >
                   {option.label}
                 </button>

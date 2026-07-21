@@ -12,6 +12,25 @@
 
 import type { DnsAnalyticsReport } from './types';
 
+/**
+ * Um período de análises é permitido quando a janela (em horas) não excede nem a
+ * retenção do plano (em dias) nem a janela máxima por consulta (em horas — ex.:
+ * 6h no plano Free). Acima disso a Cloudflare rejeita a chamada (código 1034).
+ */
+export const isPeriodAllowed = (
+  hours: number,
+  retentionDays: number | null,
+  maxWindowHours: number | null,
+): boolean => {
+  if (retentionDays != null && hours / 24 > retentionDays) {
+    return false;
+  }
+  if (maxWindowHours != null && hours > maxWindowHours) {
+    return false;
+  }
+  return true;
+};
+
 type AnalyticsPoint = {
   t: number;
   v: number;

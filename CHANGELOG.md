@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v02.15.08] - 2026-07-21
+
+### Corrigido
+
+- **Análises DNS diagnostica a causa certa (limite do plano, não permissão)** — no plano Free a janela consultável de análises DNS é de 6 horas; a Cloudflare rejeitava a consulta de 24h com o código 1034 em HTTP 403, e a tradução de erro rotulava isso como "token sem permissão". Agora o código CF 1034 é reconhecido como limite de janela do plano (mensagem própria, antes da regra de permissão), e a aba passa a oferecer o período de 6h e desabilita os períodos acima da janela máxima do plano — então a consulta padrão funciona no Free em vez de falhar.
+
+### Segurança
+
+- **Aviso de auditoria `linkify-it` (GHSA-v245-v573-v5vm) resolvido** — override para `5.0.2` (patch semver-compatível, via `markdown-it`), zerando o `npm audit` e mantendo o passo de auditoria do deploy verde.
+
 ## [v02.15.07] - 2026-07-21
 
 ### Segurança

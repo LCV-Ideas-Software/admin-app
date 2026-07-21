@@ -130,9 +130,20 @@ type CfTranslationRule = {
   translate: (status: number, errors: CfErrorDetail[], fallbackPtBr: string) => string;
 };
 
+// Código CF 1034: a janela de tempo pedida excede o máximo consultável do
+// plano da zona (ex.: análises DNS no plano Free são limitadas às últimas 6h).
+// A CF devolve isso como 403, então precede a regra de auth para não ser
+// diagnosticado como falta de permissão.
+const PLAN_WINDOW_LIMIT_CODES = [1034];
+
 // Tabela extensível de tradução: a primeira regra que casar vence; novos
 // mapeamentos entram como novos itens do array.
 const CF_ERROR_TRANSLATIONS: CfTranslationRule[] = [
+  {
+    matches: (_status, errors) => Boolean(findByCode(errors, PLAN_WINDOW_LIMIT_CODES)),
+    translate: (status, errors) =>
+      `A janela de tempo pedida excede o máximo permitido no plano da zona (não é problema de token nem de permissão) — escolha um período menor ${formatCfCode(status, findByCode(errors, PLAN_WINDOW_LIMIT_CODES))}`,
+  },
   {
     matches: (status, errors) => status === 401 || status === 403 || Boolean(findByCode(errors, AUTH_ERROR_CODES)),
     translate: (status, errors) =>

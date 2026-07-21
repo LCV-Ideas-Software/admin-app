@@ -1,7 +1,7 @@
 {
   "name": "admin-app",
   "private": true,
-  "version": "2.15.7",
+  "version": "2.15.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -135,6 +135,7 @@
     "ws": "8.21.0",
     "esbuild": "0.28.1",
     "protobufjs": "7.6.5",
-    "@babel/core": "7.29.6"
+    "@babel/core": "7.29.6",
+    "linkify-it": "5.0.2"
   }
 }

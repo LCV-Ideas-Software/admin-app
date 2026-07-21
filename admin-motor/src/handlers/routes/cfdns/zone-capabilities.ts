@@ -54,6 +54,11 @@ const resolveAnalyticsRetentionDays = (legacyId: string) => {
   return 31;
 };
 
+// Janela máxima consultável de análises DNS por requisição: o plano Free limita
+// a consulta às últimas 6 horas (a CF rejeita janelas maiores com o código
+// 1034). Planos pagos não têm esse teto por janela; null = sem limite de janela.
+const resolveAnalyticsMaxWindowHours = (legacyId: string) => (legacyId === 'free' ? 6 : null);
+
 // Zona inexistente (ou invisível ao token) responde 404 ou código CF 7003;
 // o admin deve ver 404 com a mensagem diagnóstica, não um 500 genérico de upstream.
 const isZoneNotFound = (error: unknown) =>
@@ -103,6 +108,7 @@ export async function onRequestGet(context: Context) {
       commentMaxLength: isFreePlan ? 100 : 500,
       batchOpsLimit: isFreePlan ? 200 : 3500,
       analyticsRetentionDays: resolveAnalyticsRetentionDays(legacyId),
+      analyticsMaxWindowHours: resolveAnalyticsMaxWindowHours(legacyId),
       planLabel: result?.plan?.name ?? null,
       status: result?.status ?? null,
       paused: Boolean(result?.paused),

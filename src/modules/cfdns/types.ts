@@ -369,6 +369,7 @@ export type ZoneCapabilitiesPayload = {
   commentMaxLength?: number;
   batchOpsLimit?: number;
   analyticsRetentionDays?: number;
+  analyticsMaxWindowHours?: number | null;
   planLabel?: string | null;
   status?: string | null;
   paused?: boolean;
