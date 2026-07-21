@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.10] - 2026-07-21
+
+### Segurança
+
+- **Alerta OpenSSF Scorecard #51 (Vulnerabilities) zerado** — dois advisories recém-publicados que o `npm audit` da raiz não flagava mas o OSV do Scorecard sim: `sharp` <0.35.0 (GHSA-f88m-g3jw-g9cj, CVEs libvips; transitiva de `wrangler`→`miniflare`, dev-only) resolvida via override `0.35.3`; `gitpython` ≤3.1.51 (GHSA-rwj8-pgh3-r573; transitiva do Socket Security) elevada a 3.1.53 no lock Python hashado (piso `gitpython>=3.1.52` no `.in`, recompilado com `uv`).
+
 ## [v02.15.09] - 2026-07-21
 
 ### Corrigido

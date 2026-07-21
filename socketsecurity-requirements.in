@@ -1,3 +1,6 @@
 # Direct dependency for the Socket Security workflow.
 # Regenerate socketsecurity-requirements.txt with hashes after every update.
 socketsecurity==2.5.0
+# Piso de segurança da transitiva gitpython (GHSA-rwj8-pgh3-r573, patched 3.1.52).
+# Remover quando socketsecurity passar a exigir gitpython>=3.1.52 sozinho.
+gitpython>=3.1.52
