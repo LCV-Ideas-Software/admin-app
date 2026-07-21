@@ -79,11 +79,6 @@
       "secret_name": "cloudflare-cache"
     },
     {
-      "binding": "CLOUDFLARE_STORAGE",
-      "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "cloudflare-storage"
-    },
-    {
       "binding": "RESEND_API_KEY",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "resend-api-key"

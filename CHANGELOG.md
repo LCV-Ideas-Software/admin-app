@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.01] - 2026-07-21
+
+### Corrigido
+
+- **Deploy do admin-motor destravado** — o binding de Secrets Store `CLOUDFLARE_STORAGE` referenciava o secret `cloudflare-storage`, que ainda não existe no store, e a Cloudflare valida bindings desse tipo em tempo de deploy (erro 10182), derrubando o wrangler. O binding foi removido do `wrangler.json` até o operador criar o secret; em runtime nada muda — o núcleo de API já usa o fallback `CLOUDFLARE_PW` com aviso, e os painéis de Armazenamento seguem funcionais ou degradam com instrução exata. Quando o secret for criado, basta recolocar o bloco do binding.
+
 ## [v02.15.00] - 2026-07-21
 
 ### Adicionado
