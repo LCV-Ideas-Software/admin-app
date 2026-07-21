@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.05] - 2026-07-21
+
+### Corrigido
+
+- **Gate do biome restaurado** — um arquivo de teste da versão anterior foi gravado com finais de linha CRLF e quebrava a checagem de formatação (e, com ela, o passo de gates do deploy). Normalizado para LF; nenhuma mudança de comportamento.
+
 ## [v02.15.04] - 2026-07-21
 
 ### Segurança
