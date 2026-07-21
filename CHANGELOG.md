@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.11] - 2026-07-21
+
+### Segurança
+
+- **Override de `sharp` estendido ao `tlsrpt-motor`** — o v02.15.10 cobriu só o lockfile da raiz; o `sharp` <0.35.0 (GHSA-f88m-g3jw-g9cj) também vivia em `tlsrpt-motor/package-lock.json` (mesma transitiva dev de `wrangler`→`miniflare`) e mantinha o alerta Scorecard #51 aberto. Override `0.35.3` no `tlsrpt-motor` também; testes 5/5, audit 0, wrangler carrega.
+
 ## [v02.15.10] - 2026-07-21
 
 ### Segurança

@@ -1,32 +1,33 @@
 {
-	"name": "tlsrpt-motor",
-	"version": "3.1.0",
-	"private": true,
-	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"format": "biome format --write .",
-		"lint": "biome check .",
-		"biome": "biome check .",
-		"biome:write": "biome check --write .",
-		"start": "wrangler dev",
-		"test": "vitest"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^2.5.5",
-		"@cloudflare/vitest-pool-workers": "^0.18.6",
-		"vitest": "^4.1.10",
-		"wrangler": "^4.85.0"
-	},
-	"dependencies": {
-		"postal-mime": "^2.7.5"
-	},
-	"overrides": {
-		"picomatch": "4.0.4",
-		"postcss": "8.5.10",
-		"undici": "6.27.0",
-		"vite": "8.0.16",
-		"ws": "8.21.0",
-		"esbuild": "0.28.1"
-	}
+  "name": "tlsrpt-motor",
+  "version": "3.1.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "biome": "biome check .",
+    "biome:write": "biome check --write .",
+    "start": "wrangler dev",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
+    "@cloudflare/vitest-pool-workers": "^0.18.6",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.85.0"
+  },
+  "dependencies": {
+    "postal-mime": "^2.7.5"
+  },
+  "overrides": {
+    "picomatch": "4.0.4",
+    "postcss": "8.5.10",
+    "undici": "6.27.0",
+    "vite": "8.0.16",
+    "ws": "8.21.0",
+    "esbuild": "0.28.1",
+    "sharp": "0.35.3"
+  }
 }

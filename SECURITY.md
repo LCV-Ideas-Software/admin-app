@@ -2,7 +2,7 @@
 
 ## Supported status
 
-Latest supported release: v02.15.10. The current main branch is also supported for security fixes until the next release is published.
+Latest supported release: v02.15.11. The current main branch is also supported for security fixes until the next release is published.
 
 ## Reporting a vulnerability
 
