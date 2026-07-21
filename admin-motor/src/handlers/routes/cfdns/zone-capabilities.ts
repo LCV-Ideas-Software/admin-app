@@ -55,7 +55,7 @@ const resolveAnalyticsRetentionDays = (legacyId: string) => {
 };
 
 // Zona inexistente (ou invisível ao token) responde 404 ou código CF 7003;
-// o admin deve ver 404 com a mensagem diagnóstica, não um 502 de gateway.
+// o admin deve ver 404 com a mensagem diagnóstica, não um 500 genérico de upstream.
 const isZoneNotFound = (error: unknown) =>
   error instanceof CfApiError &&
   (error.status === 404 || error.code === 7003 || error.errors.some((detail) => detail.code === 7003));
@@ -67,7 +67,9 @@ const resolveErrorStatus = (error: unknown) => {
   if (error instanceof CfApiError && error.kind === 'missing-token') {
     return 500;
   }
-  return 502;
+  // Falha de upstream vira 500 — nunca 502: o edge da Cloudflare intercepta
+  // 502 da origem e troca o body JSON de diagnóstico pela página HTML dele.
+  return 500;
 };
 
 export async function onRequestGet(context: Context) {

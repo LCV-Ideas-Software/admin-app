@@ -29,3 +29,20 @@ export function assertWorkerMutationAllowed(scriptName: string, confirmPhrase?: 
     `'${scriptName}' é um worker de PRODUÇÃO do próprio admin-app. Um deploy/alteração defeituoso pode derrubar esta interface (a recuperação exigirá dashboard/wrangler). Para prosseguir, envie confirmPhrase: '${PROTECTED_CONFIRM_PHRASE}'.`,
   );
 }
+
+// Projeto Pages que serve o frontend de produção da própria admin-app.
+const PROTECTED_PAGES_PROJECTS = ['admin-app'];
+
+export function assertPagesProjectMutationAllowed(projectName: string, confirmPhrase?: string): void {
+  if (!PROTECTED_PAGES_PROJECTS.includes(projectName)) {
+    return;
+  }
+
+  if (confirmPhrase === PROTECTED_CONFIRM_PHRASE) {
+    return;
+  }
+
+  throw new ProtectedWorkerError(
+    `'${projectName}' é o projeto Pages de PRODUÇÃO que serve o frontend da própria admin-app. Excluí-lo derruba esta interface (a recuperação exigirá dashboard/wrangler). Para prosseguir, envie confirmPhrase: '${PROTECTED_CONFIRM_PHRASE}'.`,
+  );
+}

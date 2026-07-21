@@ -10,7 +10,9 @@
 //
 // A API GraphQL devolve HTTP 200 com array `errors` em falha: erro com cara de
 // autenticação vira 403 pt-BR (sugere Account Analytics Read no token
-// CLOUDFLARE_PW); o restante vira 502 com a primeira mensagem CF.
+// CLOUDFLARE_PW); o restante vira 500 com a primeira mensagem CF — nunca 502,
+// porque o edge da Cloudflare intercepta respostas 502 da origem e troca o
+// body JSON de diagnóstico pela página HTML de erro dele.
 
 import { resolveCfToken } from '../_lib/cf-api-core';
 import { resolveCloudflarePwAccount } from '../_lib/cfpw-api';
@@ -176,7 +178,7 @@ const runMetricsQuery = async (
   if (!response.ok) {
     throw new MetricsError(
       `Falha temporária na API GraphQL Analytics da Cloudflare (HTTP ${response.status}) — tente novamente em instantes`,
-      502,
+      500,
     );
   }
 
@@ -184,7 +186,7 @@ const runMetricsQuery = async (
   try {
     payload = (await response.json()) as GraphqlEnvelope;
   } catch {
-    throw new MetricsError('Resposta não-JSON da API GraphQL Analytics da Cloudflare (HTTP 200)', 502);
+    throw new MetricsError('Resposta não-JSON da API GraphQL Analytics da Cloudflare (HTTP 200)', 500);
   }
 
   const errors = Array.isArray(payload.errors) ? payload.errors : [];
@@ -193,7 +195,7 @@ const runMetricsQuery = async (
     if (errors.some((item) => GRAPHQL_AUTH_PATTERN.test(String(item?.message ?? '')))) {
       throw new MetricsError(`${ANALYTICS_PERMISSION_HINT} (erro CF GraphQL: ${firstMessage})`, 403);
     }
-    throw new MetricsError(`Falha na consulta GraphQL Analytics da Cloudflare: ${firstMessage}`, 502);
+    throw new MetricsError(`Falha na consulta GraphQL Analytics da Cloudflare: ${firstMessage}`, 500);
   }
 
   const rawSeries = payload.data?.viewer?.accounts?.[0]?.series;

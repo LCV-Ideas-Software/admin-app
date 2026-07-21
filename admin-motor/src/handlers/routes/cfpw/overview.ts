@@ -259,7 +259,9 @@ export async function onRequestGet(context: Context) {
     }
 
     // CF 4xx (ex.: parâmetro de busca rejeitado) passa adiante com a mensagem
-    // traduzida; token ausente vira 500; demais falhas de upstream, 502.
+    // traduzida; token ausente vira 500; demais falhas de upstream também 500
+    // — nunca 502: o edge da Cloudflare intercepta 502 da origem e troca o
+    // body JSON de diagnóstico pela página HTML de erro dele.
     return toError(message, trace, resolveCfpwErrorStatus(error));
   }
 }

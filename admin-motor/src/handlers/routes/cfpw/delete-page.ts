@@ -2,6 +2,7 @@ import { deleteCloudflarePagesProject, resolveCloudflarePwAccount } from '../_li
 import type { D1Database } from '../_lib/operational';
 import { logModuleOperationalEvent } from '../_lib/operational';
 import { createResponseTrace } from '../_lib/request-trace';
+import { assertPagesProjectMutationAllowed, ProtectedWorkerError } from './_protected';
 
 type Env = {
   BIGDATA_DB?: D1Database;
@@ -20,6 +21,7 @@ type Context = {
 type DeletePagePayload = {
   projectName?: unknown;
   confirmation?: unknown;
+  confirmPhrase?: unknown;
 };
 
 const toHeaders = () => ({
@@ -60,6 +62,17 @@ export async function onRequestPost(context: Context) {
 
   if (confirmation !== projectName) {
     return toError(`Confirmação inválida. Digite exatamente o nome do projeto (${projectName}).`, trace, 400);
+  }
+
+  // Guard anti-decapitação: projeto Pages protegido exige a frase de
+  // confirmação explícita ANTES de qualquer chamada à API Cloudflare.
+  try {
+    assertPagesProjectMutationAllowed(projectName, toText(payload.confirmPhrase) || undefined);
+  } catch (error) {
+    if (error instanceof ProtectedWorkerError) {
+      return toError(error.message, trace, error.status);
+    }
+    throw error;
   }
 
   try {
@@ -119,6 +132,8 @@ export async function onRequestPost(context: Context) {
       }
     }
 
-    return toError(message, trace, 502);
+    // Falha de upstream vira 500 — nunca 502: o edge da Cloudflare intercepta
+    // 502 da origem e troca o body JSON de diagnóstico pela página HTML dele.
+    return toError(message, trace, 500);
   }
 }

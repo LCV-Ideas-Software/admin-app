@@ -106,13 +106,14 @@ const resolveErrorStatus = (error: unknown) => {
     if (error.kind === 'missing-token') {
       return 500;
     }
-    // Rejeições 4xx da CF voltam com o próprio status e a mensagem traduzida
-    // (o edge da Cloudflare substitui corpos 5xx por página HTML de erro).
+    // Rejeições 4xx da CF voltam com o próprio status e a mensagem traduzida.
     if (error.kind === 'api' && error.status >= 400 && error.status < 500) {
       return error.status;
     }
   }
-  return 502;
+  // Falha de upstream vira 500 — nunca 502: o edge da Cloudflare intercepta
+  // 502 da origem e troca o body JSON de diagnóstico pela página HTML dele.
+  return 500;
 };
 
 const logZonesAdminEvent = async (

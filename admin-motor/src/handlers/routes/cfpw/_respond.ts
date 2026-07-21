@@ -46,9 +46,10 @@ export const toErrorResponse = (message: string, trace: ResponseTrace, status = 
 
 // Mapeamento de status: 400 é validação local (decidida no call site); guard de
 // worker protegido devolve 403; token ausente é erro de configuração (500);
-// 4xx da API Cloudflare passa adiante com a mensagem traduzida (o edge da
-// Cloudflare troca o corpo de respostas 5xx por página HTML); o restante das
-// falhas de upstream vira 502 (bad gateway).
+// 4xx da API Cloudflare passa adiante com a mensagem traduzida; o restante das
+// falhas de upstream vira 500 — nunca 502, porque o edge da Cloudflare
+// intercepta respostas 502 da origem e troca o body JSON de diagnóstico pela
+// página HTML de erro dele (500 passa intacto ao browser).
 export const resolveCfpwErrorStatus = (error: unknown): number => {
   if (error instanceof ProtectedWorkerError) {
     return error.status;
@@ -61,7 +62,7 @@ export const resolveCfpwErrorStatus = (error: unknown): number => {
     if (error.status >= 400 && error.status <= 499) {
       return error.status;
     }
-    return 502;
+    return 500;
   }
 
   // Helpers legados (cfpw-api) convertem missing-token em Error simples.
@@ -69,7 +70,7 @@ export const resolveCfpwErrorStatus = (error: unknown): number => {
     return 500;
   }
 
-  return 502;
+  return 500;
 };
 
 /** Telemetria best-effort: nunca bloqueia nem derruba a resposta. */

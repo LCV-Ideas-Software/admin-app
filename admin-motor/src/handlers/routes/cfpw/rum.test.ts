@@ -100,7 +100,7 @@ describe('cfpw rum (page-web-analytics) handler', () => {
     expect(body.error).toContain('Account Rum');
   });
 
-  it('returns 502 with a clear message when the RUM result lacks site_tag/site_token', async () => {
+  it('returns 500 with a clear message when the RUM result lacks site_tag/site_token', async () => {
     const { calls } = stubCloudflareFetch([
       { method: 'GET', url: PROJECT_URL, reply: { json: projectFixture() } },
       { method: 'POST', url: SITE_INFO_URL, reply: { json: cfEnvelope({ site_tag: 'tag-123' }) } },
@@ -109,7 +109,7 @@ describe('cfpw rum (page-web-analytics) handler', () => {
     const response = await onRequestPost(postContext({ projectName: 'meu-projeto' }));
     const body = await readBody(response);
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
     expect(body.error).toContain('site_tag/site_token');
     // Sem tag/token o build_config do projeto não é tocado.
     expect(calls.filter((call) => call.init?.method === 'PATCH')).toHaveLength(0);

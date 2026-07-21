@@ -86,14 +86,15 @@ export async function onRequestPost(context: CfpwRouteContext) {
 
     // Formato defensivo: a API RUM devolve site_tag/site_token (e opcionalmente
     // snippet/auto_install/rules) — sem esses campos não há como ligar o
-    // projeto ao site, então 502 diagnóstico.
+    // projeto ao site, então 500 diagnóstico (nunca 502: o edge da Cloudflare
+    // intercepta 502 e troca o body JSON pela página HTML de erro dele).
     const siteTag = String(siteInfo.site_tag ?? '').trim();
     const siteToken = String(siteInfo.site_token ?? '').trim();
     if (!siteTag || !siteToken) {
       const received = Object.keys(siteInfo).join(', ') || 'nenhum campo';
       const message = `A API RUM da Cloudflare não devolveu site_tag/site_token para ${host} — resposta inesperada (campos recebidos: ${received}). O site pode ter sido criado; verifique em Web Analytics no dashboard.`;
       await logCfpwEvent(env, 'page-web-analytics', false, { projectName, host }, message);
-      return toErrorResponse(message, trace, 502);
+      return toErrorResponse(message, trace, 500);
     }
 
     // (c) Read-modify-write do build_config com a tag/token do Web Analytics.

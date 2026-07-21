@@ -104,6 +104,8 @@ export async function onRequestDelete(context: Context) {
       }
     }
 
-    return toError(message, trace, 502);
+    // Falha de upstream vira 500 — nunca 502: o edge da Cloudflare intercepta
+    // 502 da origem e troca o body JSON de diagnóstico pela página HTML dele.
+    return toError(message, trace, 500);
   }
 }

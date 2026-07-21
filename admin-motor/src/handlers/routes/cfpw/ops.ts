@@ -110,7 +110,9 @@ const resolveOpsErrorStatus = (message: string) => {
     return 409;
   }
 
-  return 502;
+  // Falha de upstream vira 500 — nunca 502: o edge da Cloudflare intercepta
+  // 502 da origem e troca o body JSON de diagnóstico pela página HTML dele.
+  return 500;
 };
 
 export async function onRequestPost(context: Context) {

@@ -92,7 +92,9 @@ const resolveErrorStatus = (error: unknown) => {
   if (error instanceof CfApiError && error.status === 400) {
     return 400;
   }
-  return 502;
+  // Falha de upstream vira 500 — nunca 502: o edge da Cloudflare intercepta
+  // 502 da origem e troca o body JSON de diagnóstico pela página HTML dele.
+  return 500;
 };
 
 // CF responde 400 quando a janela pedida ultrapassa a retenção de análises do

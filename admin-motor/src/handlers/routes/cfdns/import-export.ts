@@ -47,7 +47,9 @@ const resolveErrorStatus = (error: unknown) => {
       return error.status;
     }
   }
-  return 502;
+  // Falha de upstream vira 500 — nunca 502: o edge da Cloudflare intercepta
+  // 502 da origem e troca o body JSON de diagnóstico pela página HTML dele.
+  return 500;
 };
 
 // Nome de arquivo seguro para o header Content-Disposition: só

@@ -298,9 +298,12 @@ export const fetchPageDetails = async (adminActor: string, projectName: string, 
   return { response, payload };
 };
 
-export const deleteResource = async (adminActor: string, type: DetailType, id: string) => {
+export const deleteResource = async (adminActor: string, type: DetailType, id: string, confirmPhrase?: string) => {
   const endpoint = type === 'worker' ? '/api/cfpw/delete-worker' : '/api/cfpw/delete-page';
-  const body = type === 'worker' ? { scriptName: id, confirmation: id } : { projectName: id, confirmation: id };
+  // confirmPhrase: exigida pelo motor para alvos protegidos (recursos que
+  // servem a própria admin-app); omitida para os demais.
+  const base = type === 'worker' ? { scriptName: id, confirmation: id } : { projectName: id, confirmation: id };
+  const body = confirmPhrase !== undefined ? { ...base, confirmPhrase } : base;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Admin-Actor': adminActor },

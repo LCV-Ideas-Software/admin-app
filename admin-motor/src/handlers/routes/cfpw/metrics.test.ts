@@ -178,7 +178,7 @@ describe('cfpw metrics handler', () => {
     expect(body.error).toContain('CLOUDFLARE_PW');
   });
 
-  it('maps other GraphQL errors to 502 with the first CF message', async () => {
+  it('maps other GraphQL errors to 500 with the first CF message (502 would be swallowed by the CF edge)', async () => {
     stubCloudflareFetch([
       {
         method: 'POST',
@@ -190,7 +190,7 @@ describe('cfpw metrics handler', () => {
     const response = await onRequestGetWorkerMetrics(workerContext('?scriptName=meu-worker'));
     const body = await readBody(response);
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
     expect(body.error).toContain('unknown field durationP42');
   });
 

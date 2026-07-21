@@ -22,6 +22,7 @@ import { PageDetail } from './pages/PageDetail';
 import { AdvancedConsole } from './shared/AdvancedConsole';
 import { DeleteConfirmModal } from './shared/DeleteConfirmModal';
 import { OpsModal } from './shared/OpsModal';
+import { isProtectedTarget } from './shared/protectedTargets';
 import { StorageTab } from './tabs/storage/StorageTab';
 import { parseStorageHash, type StorageDeepLink } from './tabs/storage/storageDeepLink';
 import type {
@@ -94,6 +95,7 @@ export function CfPwModule() {
 
   const [deleteTarget, setDeleteTarget] = useState<{ type: DetailType; id: string } | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletePhrase, setDeletePhrase] = useState('');
   const [deleting, setDeleting] = useState(false);
 
   const [selectedOp, setSelectedOp] = useState<OpsActionDefinition | null>(null);
@@ -238,6 +240,7 @@ export function CfPwModule() {
     if (!details) return;
     setDeleteTarget({ type: details.type, id: details.id });
     setDeleteConfirmation('');
+    setDeletePhrase('');
   };
 
   const runDelete = useCallback(async () => {
@@ -249,12 +252,20 @@ export function CfPwModule() {
     }
     setDeleting(true);
     try {
-      const { response, payload } = await api.deleteResource(adminActor, deleteTarget.type, expected);
+      // Alvo protegido (serve a própria admin-app): repassa a frase de risco
+      // exigida pelo motor; nos demais o campo nem é enviado.
+      const { response, payload } = await api.deleteResource(
+        adminActor,
+        deleteTarget.type,
+        expected,
+        isProtectedTarget(deleteTarget.type, expected) ? deletePhrase : undefined,
+      );
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Falha exclusão.');
 
       showNotification(api.withReq(payload.message ?? 'Excluído.', payload), 'success');
       setDeleteTarget(null);
       setDeleteConfirmation('');
+      setDeletePhrase('');
       if (details?.id === expected && details.type === deleteTarget.type) setDetails(null);
       await loadOverview();
     } catch (error) {
@@ -262,7 +273,7 @@ export function CfPwModule() {
     } finally {
       setDeleting(false);
     }
-  }, [adminActor, deleteConfirmation, deleteTarget, details, loadOverview, showNotification]);
+  }, [adminActor, deleteConfirmation, deletePhrase, deleteTarget, details, loadOverview, showNotification]);
 
   const executeAdvancedOp = useCallback(
     async (actionDef: OpsActionDefinition) => {
@@ -623,8 +634,10 @@ export function CfPwModule() {
       <DeleteConfirmModal
         deleteTarget={deleteTarget}
         deleteConfirmation={deleteConfirmation}
+        deletePhrase={deletePhrase}
         deleting={deleting}
         onConfirmationChange={setDeleteConfirmation}
+        onPhraseChange={setDeletePhrase}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void runDelete()}
       />

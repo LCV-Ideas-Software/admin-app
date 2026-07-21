@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v02.15.02] - 2026-07-21
+
+### Corrigido
+
+- **Erros diagnósticos deixavam de chegar à interface (HTML 502 do edge)** — o edge da Cloudflare intercepta respostas 502 da origem e substitui o corpo JSON pela página HTML de erro, escondendo a causa real (visto ao vivo na aba Análises do CF DNS). Toda a superfície cfdns/cfpw passou a responder 500 em falhas de upstream, preservando a mensagem diagnóstica (mesma regra que a Observability já aplicava); comportamentos de 4xx e de token ausente permanecem inalterados.
+
+### Segurança
+
+- **Guards de exclusão para recursos de produção do próprio admin** — excluir os workers `admin-motor`/`tlsrpt-motor` ou o projeto Pages `admin-app` agora exige, além da confirmação por nome, a frase "EU ENTENDO O RISCO"; o bloqueio ocorre no servidor antes de qualquer chamada à Cloudflare, com aviso na interface.
+
 ## [v02.15.01] - 2026-07-21
 
 ### Corrigido

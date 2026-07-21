@@ -300,7 +300,7 @@ describe('cfdns registrar routes', () => {
     });
   });
 
-  it('keeps unexpected Registrar workflow failures as gateway errors', async () => {
+  it('maps unexpected Registrar workflow failures to 500 (502 would be swallowed by the CF edge)', async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(
@@ -327,7 +327,7 @@ describe('cfdns registrar routes', () => {
       },
     });
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
     await expect(response.json()).resolves.toMatchObject({
       ok: false,
       error: expect.stringContaining('Unexpected Cloudflare Registrar workflow failure'),
@@ -390,7 +390,7 @@ describe('cfdns registrar routes', () => {
     expect(response.status).toBe(400);
   });
 
-  it('surfaces Cloudflare rate-limiting (HTTP 429) instead of flattening to 502', async () => {
+  it('surfaces Cloudflare rate-limiting (HTTP 429) instead of flattening to 500', async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(JSON.stringify({ success: false, errors: [{ code: 971, message: 'rate limited' }] }), {
@@ -417,7 +417,7 @@ describe('cfdns registrar routes', () => {
     expect(response.status).toBe(500);
   });
 
-  it('surfaces a Cloudflare domain-check rejection (HTTP 400) as 400, not a 502 gateway error', async () => {
+  it('surfaces a Cloudflare domain-check rejection (HTTP 400) as 400, not a 500 upstream error', async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(
