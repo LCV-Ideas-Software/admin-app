@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v02.15.04] - 2026-07-21
+
+### Segurança
+
+- **Criar worker não pode mais sobrescrever um worker existente** — o endpoint de upload da Cloudflare tem semântica de upsert, então "criar" um nome já usado substituiria silenciosamente o código do worker (inclusive os de produção do próprio admin). A criação agora verifica a existência antes e responde 409 sem tocar na Cloudflare quando o nome já existe. Achado do retro cross-review (peer codex).
+- **Console avançado sem bypass dos guards** — métodos mutantes (POST/PUT/PATCH/DELETE) do `raw-cloudflare-request` são bloqueados (403) quando o path atinge os workers de produção do admin ou o projeto Pages `admin-app`; diagnósticos GET continuam permitidos, e as mutações legítimas seguem pelas rotas dedicadas, que exigem as confirmações de segurança.
+
 ## [v02.15.03] - 2026-07-21
 
 ### Corrigido

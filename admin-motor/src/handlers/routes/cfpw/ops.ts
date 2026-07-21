@@ -24,6 +24,7 @@ import {
 import type { D1Database } from '../_lib/operational';
 import { logModuleOperationalEvent } from '../_lib/operational';
 import { createResponseTrace } from '../_lib/request-trace';
+import { assertRawApiRequestAllowed, ProtectedWorkerError } from './_protected';
 
 type Env = {
   BIGDATA_DB?: D1Database;
@@ -390,6 +391,17 @@ export async function onRequestPost(context: Context) {
       case 'raw-cloudflare-request': {
         if (!rawMethod || !rawPath) {
           return toError('rawMethod e rawPath são obrigatórios para raw-cloudflare-request.', trace, 400);
+        }
+        // Anti-bypass: o console avançado não pode mutar os recursos de
+        // produção do próprio admin (guards com frase só existem nas rotas
+        // dedicadas).
+        try {
+          assertRawApiRequestAllowed(rawMethod, rawPath);
+        } catch (error) {
+          if (error instanceof ProtectedWorkerError) {
+            return toError(error.message, trace, error.status);
+          }
+          throw error;
         }
         result = await runCloudflareRawRequest(context.data?.env ?? context.env, rawMethod, rawPath, rawBodyJson);
         break;

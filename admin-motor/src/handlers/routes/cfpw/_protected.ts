@@ -2,7 +2,7 @@
 // produção que servem a própria interface com um deploy/alteração defeituoso
 // sem confirmação explícita do operador.
 
-const PROTECTED_WORKERS = ['admin-motor', 'tlsrpt-motor'];
+export const PROTECTED_WORKERS = ['admin-motor', 'tlsrpt-motor'];
 
 export const PROTECTED_CONFIRM_PHRASE = 'EU ENTENDO O RISCO';
 
@@ -31,7 +31,7 @@ export function assertWorkerMutationAllowed(scriptName: string, confirmPhrase?: 
 }
 
 // Projeto Pages que serve o frontend de produção da própria admin-app.
-const PROTECTED_PAGES_PROJECTS = ['admin-app'];
+export const PROTECTED_PAGES_PROJECTS = ['admin-app'];
 
 export function assertPagesProjectMutationAllowed(projectName: string, confirmPhrase?: string): void {
   if (!PROTECTED_PAGES_PROJECTS.includes(projectName)) {
@@ -44,5 +44,25 @@ export function assertPagesProjectMutationAllowed(projectName: string, confirmPh
 
   throw new ProtectedWorkerError(
     `'${projectName}' é o projeto Pages de PRODUÇÃO que serve o frontend da própria admin-app. Excluí-lo derruba esta interface (a recuperação exigirá dashboard/wrangler). Para prosseguir, envie confirmPhrase: '${PROTECTED_CONFIRM_PHRASE}'.`,
+  );
+}
+
+// Console avançado (raw-cloudflare-request): métodos mutantes sobre os
+// recursos de produção do próprio admin são bloqueados SEMPRE — as mutações
+// legítimas passam pelas rotas dedicadas, que aplicam os guards com frase.
+const PROTECTED_RAW_PATH = new RegExp(
+  `/(workers/scripts/(${PROTECTED_WORKERS.join('|')})|pages/projects/(${PROTECTED_PAGES_PROJECTS.join('|')}))(/|$|\\?)`,
+);
+
+export function assertRawApiRequestAllowed(method: string, path: string): void {
+  const normalizedMethod = method.trim().toUpperCase();
+  if (normalizedMethod === 'GET') {
+    return;
+  }
+  if (!PROTECTED_RAW_PATH.test(path)) {
+    return;
+  }
+  throw new ProtectedWorkerError(
+    `Operação ${normalizedMethod} bloqueada no console avançado: o path atinge um recurso de PRODUÇÃO do próprio admin-app (${path}). Use as rotas dedicadas do módulo, que exigem as confirmações de segurança.`,
   );
 }

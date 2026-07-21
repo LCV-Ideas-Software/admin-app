@@ -5,8 +5,16 @@ import { onRequestPost } from './worker-create';
 
 const BASE = 'https://api.cloudflare.com/client/v4/accounts/acct-1';
 const SCRIPT_PUT_URL = `${BASE}/workers/scripts/meu-worker`;
+const SCRIPT_SETTINGS_URL = `${BASE}/workers/scripts/meu-worker/settings`;
 const SCRIPT_SUBDOMAIN_URL = `${BASE}/workers/scripts/meu-worker/subdomain`;
 const ACCOUNT_SUBDOMAIN_URL = `${BASE}/workers/subdomain`;
+
+// Checagem de existência (PUT da CF é upsert): 404/10007 = nome livre.
+const settingsNotFoundRoute = {
+  method: 'GET',
+  url: SCRIPT_SETTINGS_URL,
+  reply: cfErrorEnvelope(10007, 'workers.api.error.script_not_found', 404),
+};
 
 type CreateBody = {
   ok: boolean;
@@ -46,6 +54,7 @@ describe('cfpw worker-create handler', () => {
 
   it('creates the worker from template with observability enabled and enables the script subdomain', async () => {
     const { calls } = stubCloudflareFetch([
+      settingsNotFoundRoute,
       { method: 'PUT', url: SCRIPT_PUT_URL, reply: { json: cfEnvelope({ id: 'meu-worker' }) } },
       {
         method: 'POST',
@@ -105,6 +114,7 @@ describe('cfpw worker-create handler', () => {
 
   it('maps a CF 10021 conflict to 409 with a pt-BR message', async () => {
     stubCloudflareFetch([
+      settingsNotFoundRoute,
       {
         method: 'PUT',
         url: SCRIPT_PUT_URL,
@@ -122,6 +132,7 @@ describe('cfpw worker-create handler', () => {
 
   it('flags subdomainPending when the account has no workers.dev subdomain', async () => {
     stubCloudflareFetch([
+      settingsNotFoundRoute,
       { method: 'PUT', url: SCRIPT_PUT_URL, reply: { json: cfEnvelope({ id: 'meu-worker' }) } },
       {
         method: 'POST',
@@ -142,6 +153,7 @@ describe('cfpw worker-create handler', () => {
 
   it('skips the script subdomain call when enableSubdomain is false', async () => {
     const { calls } = stubCloudflareFetch([
+      settingsNotFoundRoute,
       { method: 'PUT', url: SCRIPT_PUT_URL, reply: { json: cfEnvelope({ id: 'meu-worker' }) } },
       { url: ACCOUNT_SUBDOMAIN_URL, reply: { json: cfEnvelope({ subdomain: 'lcv' }) } },
     ]);
@@ -151,6 +163,36 @@ describe('cfpw worker-create handler', () => {
 
     expect(response.status).toBe(200);
     expect(body.scriptSubdomain).toBeNull();
-    expect(calls.map((call) => call.url)).toEqual([SCRIPT_PUT_URL, ACCOUNT_SUBDOMAIN_URL]);
+    expect(calls.map((call) => call.url)).toEqual([SCRIPT_SETTINGS_URL, SCRIPT_PUT_URL, ACCOUNT_SUBDOMAIN_URL]);
+  });
+
+  it('returns 409 without any PUT when the worker name already exists (CF PUT is upsert)', async () => {
+    const { calls } = stubCloudflareFetch([
+      { method: 'GET', url: SCRIPT_SETTINGS_URL, reply: { json: cfEnvelope({ compatibility_date: '2026-01-01' }) } },
+    ]);
+
+    const response = await onRequestPost(postContext({ scriptName: 'meu-worker' }));
+    const body = await readBody(response);
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain('Já existe um worker com esse nome');
+    expect(calls.some((call) => String(call.init?.method).toUpperCase() === 'PUT')).toBe(false);
+  });
+
+  it('never overwrites a protected production worker via create (409, no PUT)', async () => {
+    const { calls } = stubCloudflareFetch([
+      {
+        method: 'GET',
+        url: `${BASE}/workers/scripts/admin-motor/settings`,
+        reply: { json: cfEnvelope({ compatibility_date: '2026-01-01' }) },
+      },
+    ]);
+
+    const response = await onRequestPost(postContext({ scriptName: 'admin-motor' }));
+    const body = await readBody(response);
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain('Já existe um worker com esse nome');
+    expect(calls.some((call) => String(call.init?.method).toUpperCase() === 'PUT')).toBe(false);
   });
 });

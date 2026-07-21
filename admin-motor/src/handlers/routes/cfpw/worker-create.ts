@@ -17,6 +17,30 @@ import {
 
 const SCRIPT_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
+// GET settings: 200 = script existe; 404/10007 = não existe. Necessário porque
+// o PUT /workers/scripts da CF é upsert — sem checagem prévia, "criar" um nome
+// existente SOBRESCREVERIA o worker (inclusive os de produção do admin).
+const workerScriptExists = async (
+  env: Parameters<typeof cfApiRequest>[0],
+  accountId: string,
+  scriptName: string,
+): Promise<boolean> => {
+  try {
+    await cfApiRequest(
+      env,
+      'pw',
+      `/accounts/${encodeURIComponent(accountId)}/workers/scripts/${encodeURIComponent(scriptName)}/settings`,
+      `Falha ao verificar se o Worker ${scriptName} já existe`,
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof CfApiError && (error.status === 404 || error.code === 10007)) {
+      return false;
+    }
+    throw error;
+  }
+};
+
 type CreateWorkerPayload = {
   scriptName?: unknown;
   enableSubdomain?: unknown;
@@ -54,6 +78,14 @@ export async function onRequestPost(context: CfpwRouteContext) {
     const accountInfo = await resolveCloudflarePwAccount(env);
     const encodedAccountId = encodeURIComponent(accountInfo.accountId);
     const encodedScript = encodeURIComponent(scriptName);
+
+    if (await workerScriptExists(env, accountInfo.accountId, scriptName)) {
+      return toErrorResponse(
+        `Já existe um worker com esse nome ('${scriptName}') na conta Cloudflare — escolha outro nome ou remova o worker existente.`,
+        trace,
+        409,
+      );
+    }
 
     const worker = await createCloudflareWorkerFromTemplate(env, accountInfo.accountId, scriptName, '');
 

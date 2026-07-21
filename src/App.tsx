@@ -32,7 +32,7 @@ import { useNavigate, useParams } from './router-context';
 
 export type { ModuleId };
 
-const APP_VERSION = 'APP v02.15.03';
+const APP_VERSION = 'APP v02.15.04';
 
 const MODULE_LABELS: Record<Exclude<ModuleId, 'overview'>, string> = {
   astrologo: 'Astrólogo',
