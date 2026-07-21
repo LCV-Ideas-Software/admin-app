@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.06] - 2026-07-21
+
+### Segurança
+
+- **Guard do console avançado à prova de percent-encoding** — a Cloudflare decodifica o percent-encoding do path, então um caminho como `workers%2Fscripts%2Fadmin%2Dmotor` escaparia da checagem que comparava o path cru. O guard agora decodifica o path (em laço, cobrindo duplo-encoding) antes de testar contra os recursos protegidos. Achado do retro cross-review (peer codex).
+
 ## [v02.15.05] - 2026-07-21
 
 ### Corrigido

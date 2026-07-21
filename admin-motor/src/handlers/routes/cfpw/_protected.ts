@@ -54,12 +54,32 @@ const PROTECTED_RAW_PATH = new RegExp(
   `/(workers/scripts/(${PROTECTED_WORKERS.join('|')})|pages/projects/(${PROTECTED_PAGES_PROJECTS.join('|')}))(/|$|\\?)`,
 );
 
+// A CF decodifica percent-encoding no path; comparar o path CRU permitiria
+// bypass via encoding (ex.: admin%2Dmotor). Decodifica em loop (cap 3, cobre
+// duplo-encoding) antes de testar; falha de decode mantém o valor da iteração.
+const decodeRawPathForGuard = (path: string): string => {
+  let current = path;
+  for (let i = 0; i < 3; i += 1) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(current);
+    } catch {
+      break;
+    }
+    if (decoded === current) {
+      break;
+    }
+    current = decoded;
+  }
+  return current;
+};
+
 export function assertRawApiRequestAllowed(method: string, path: string): void {
   const normalizedMethod = method.trim().toUpperCase();
   if (normalizedMethod === 'GET') {
     return;
   }
-  if (!PROTECTED_RAW_PATH.test(path)) {
+  if (!PROTECTED_RAW_PATH.test(decodeRawPathForGuard(path))) {
     return;
   }
   throw new ProtectedWorkerError(

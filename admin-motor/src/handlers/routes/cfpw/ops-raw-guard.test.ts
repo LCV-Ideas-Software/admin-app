@@ -88,6 +88,24 @@ describe('cfpw ops raw-cloudflare-request (guard anti-bypass de recursos protegi
     expect((await readBody(response)).ok).toBe(true);
   });
 
+  it('blocks a percent-encoded protected path (no bypass via encoding)', async () => {
+    const { calls } = stubCloudflareFetch([]);
+
+    // 'admin-motor' com o hífen percent-encoded (%2D) e o path com %2F.
+    const response = await onRequestPost(
+      postContext({
+        action: 'raw-cloudflare-request',
+        rawMethod: 'DELETE',
+        rawPath: '/accounts/acct-1/workers%2Fscripts%2Fadmin%2Dmotor',
+      }),
+    );
+    const body = await readBody(response);
+
+    expect(response.status).toBe(403);
+    expect(body.error).toContain('recurso de PRODUÇÃO');
+    expect(calls).toHaveLength(0);
+  });
+
   it('still allows mutating methods on non-protected worker paths', async () => {
     stubCloudflareFetch([
       {
