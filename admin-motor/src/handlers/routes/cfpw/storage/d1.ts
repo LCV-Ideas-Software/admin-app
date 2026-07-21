@@ -32,7 +32,6 @@ import { classifyD1Statements } from './_d1-sql-guard';
 
 const DATABASE_NAME_PATTERN = /^[a-z0-9][a-z0-9-_]{0,62}$/i;
 const SQL_MAX_CHARS = 100_000;
-const SQL_PREVIEW_MAX_CHARS = 200;
 const LIST_MAX_PAGES = 10;
 const TABLE_PER_PAGE_MIN = 10;
 const TABLE_PER_PAGE_MAX = 200;
@@ -70,9 +69,6 @@ const resolveD1DatabaseName = async (env: D1RouteEnv, accountId: string, databas
 
 const resolveD1ErrorStatus = (error: unknown): number =>
   error instanceof ProtectedD1Error ? error.status : resolveCfpwErrorStatus(error);
-
-const toSqlPreview = (sql: string): string =>
-  sql.length > SQL_PREVIEW_MAX_CHARS ? `${sql.slice(0, SQL_PREVIEW_MAX_CHARS)}…` : sql;
 
 const clampInt = (raw: string | null, fallback: number, min: number, max: number): number => {
   const parsed = Number.parseInt(String(raw ?? ''), 10);
@@ -240,7 +236,9 @@ export async function onRequestPostQuery(context: CfpwRouteContext) {
     return toErrorResponse('Nenhum statement SQL encontrado — o corpo contém apenas ";" ou espaços.', trace, 400);
   }
   const writes = statements.filter((statement) => statement.kind === 'write').length;
-  const sqlPreview = toSqlPreview(payload.sql);
+  const reads = statements.length - writes;
+  // Telemetria NUNCA registra o texto do SQL (nem um prefixo): valores literais
+  // — segredos, PII — poderiam aparecer nas primeiras posições. Só contagens.
 
   try {
     const accountInfo = await resolveCloudflarePwAccount(env);
@@ -266,13 +264,13 @@ export async function onRequestPostQuery(context: CfpwRouteContext) {
       accountId: accountInfo.accountId,
       databaseId,
       statements: statements.length,
+      reads,
       writes,
-      sqlPreview,
     });
     return toJsonResponse({ ok: true, ...trace, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao executar SQL no banco D1.';
-    await logCfpwEvent(env, 'd1-query', false, { databaseId, statements: statements.length, sqlPreview }, message);
+    await logCfpwEvent(env, 'd1-query', false, { databaseId, statements: statements.length, reads, writes }, message);
     return toErrorResponse(message, trace, resolveD1ErrorStatus(error));
   }
 }

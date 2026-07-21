@@ -650,23 +650,30 @@ describe('cfpw storage/d1 handlers', () => {
 
   // ── Telemetria ──
 
-  it('never logs the full SQL: telemetry metadata keeps a preview truncated at 200 chars', async () => {
+  it('never logs any SQL text in telemetry: only statement/read/write counts', async () => {
     stubCloudflareFetch([
+      { method: 'GET', url: `${D1_BASE}/u1`, reply: { json: cfEnvelope({ uuid: 'u1', name: 'app_db' }) } },
       { method: 'POST', url: `${D1_BASE}/u1/query`, reply: { json: cfEnvelope([{ results: [], success: true }]) } },
     ]);
     const { db, inserts } = makeOperationalDbStub();
-    const sql = `SELECT '${'a'.repeat(990)}' AS blob`;
+    // Um segredo literal LOGO no início do SQL — dentro dos antigos 200 chars.
+    const secret = 'sk-super-secreto-1234567890';
+    const sql = `INSERT INTO tokens (v) VALUES ('${secret}')`;
 
     const response = await onRequestPostQuery(
-      bodyContext('POST', { databaseId: 'u1', sql }, { ...baseEnv(), BIGDATA_DB: db }),
+      bodyContext('POST', { databaseId: 'u1', sql, confirmDangerous: true }, { ...baseEnv(), BIGDATA_DB: db }),
     );
 
     expect(response.status).toBe(200);
     expect(inserts).toHaveLength(1);
     const metadataJson = String(inserts[0]?.[6] ?? '');
-    const metadata = JSON.parse(metadataJson) as { sqlPreview?: string };
-    expect(metadata.sqlPreview?.length).toBeLessThanOrEqual(220);
-    expect(metadata.sqlPreview?.length).toBe(201);
-    expect(metadataJson).not.toContain('a'.repeat(300));
+    // Nenhum vestígio do SQL nem do segredo, nem em prefixo.
+    expect(metadataJson).not.toContain(secret);
+    expect(metadataJson).not.toContain('INSERT INTO tokens');
+    const metadata = JSON.parse(metadataJson) as Record<string, unknown>;
+    expect(metadata.sqlPreview).toBeUndefined();
+    expect(metadata.statements).toBe(1);
+    expect(metadata.writes).toBe(1);
+    expect(metadata.reads).toBe(0);
   });
 });

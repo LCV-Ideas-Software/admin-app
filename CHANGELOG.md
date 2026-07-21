@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v02.15.07] - 2026-07-21
+
+### Segurança
+
+- **Telemetria de SQL do D1 não registra mais o texto da consulta** — antes o metadata guardava um prefixo de 200 caracteres do SQL; truncar não é redigir, e um valor literal (segredo, PII) nas primeiras posições poderia ser gravado. Agora a telemetria registra apenas contagens (statements, leituras, escritas) — nenhum trecho do SQL. Achado do retro cross-review (peer codex).
+
 ## [v02.15.06] - 2026-07-21
 
 ### Segurança
