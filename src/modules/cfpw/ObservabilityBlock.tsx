@@ -25,7 +25,7 @@ import {
   Wifi,
   XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNotification } from '../../components/Notification';
 
 // ── Types ──
@@ -154,6 +154,8 @@ export function ObservabilityBlock() {
   // Live state
   const [liveEvents, setLiveEvents] = useState<EventRow[]>([]);
   const [liveLoading, setLiveLoading] = useState(false);
+  const [liveTailEnhanced, setLiveTailEnhanced] = useState(false);
+  const liveTailSessionRef = useRef<Record<string, unknown> | null>(null);
 
   // Errors state
   const [errors, setErrors] = useState<EventRow[]>([]);
@@ -502,6 +504,52 @@ export function ObservabilityBlock() {
     const interval = setInterval(() => void loadLiveEvents(), 3_000);
     return () => clearInterval(interval);
   }, [liveActive, loadLiveEvents]);
+
+  // ── Live tail REST (PW-2, aditivo) ──
+  // Verificado: o motor expõe as actions live-tail-start/live-tail-heartbeat
+  // (passthrough para POST .../workers/observability/telemetry/live-tail e
+  // /heartbeat; um 404 da CF vira erro pt-BR "indisponível — usando modo
+  // polling"). NÃO verificado: o contrato de resposta/stream de eventos do
+  // live-tail da CF (não documentado publicamente). Por isso o polling da
+  // janela de 90s acima permanece como fonte PRIMÁRIA dos eventos; o start
+  // bem-sucedido apenas liga o badge "modo aprimorado" e um heartbeat de 30s
+  // (com o result do start como body) mantém a sessão viva. Falha em start ou
+  // heartbeat é silenciosa e volta ao comportamento anterior.
+  useEffect(() => {
+    if (!liveActive) {
+      setLiveTailEnhanced(false);
+      liveTailSessionRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await obsPost('live-tail-start', {});
+        if (cancelled) return;
+        if (res.ok) {
+          liveTailSessionRef.current = (res.result ?? {}) as Record<string, unknown>;
+          setLiveTailEnhanced(true);
+        }
+      } catch {
+        // Live tail indisponível/sem permissão — segue apenas com polling.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [liveActive]);
+
+  useEffect(() => {
+    if (!liveActive || !liveTailEnhanced) return;
+    const interval = setInterval(() => {
+      obsPost('live-tail-heartbeat', liveTailSessionRef.current ?? {})
+        .then((res) => {
+          if (!res.ok) setLiveTailEnhanced(false);
+        })
+        .catch(() => setLiveTailEnhanced(false));
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [liveActive, liveTailEnhanced]);
 
   // Auto-refresh every 60s for non-live tabs
   useEffect(() => {
@@ -1096,6 +1144,14 @@ export function ObservabilityBlock() {
         <div className="cfpw-obs-live-indicator">
           <span className={`cfpw-obs-live-dot ${liveActive ? 'pulsing' : ''}`} />
           <span>{liveActive ? 'Transmitindo ao vivo' : 'Pausado'}</span>
+          {liveTailEnhanced && (
+            <span
+              className="cfpw-obs-beta-badge"
+              title="Sessão live-tail REST ativa na Cloudflare — os eventos continuam vindo do polling"
+            >
+              modo aprimorado
+            </span>
+          )}
         </div>
         <div className="cfpw-obs-live-stats">
           <span>{liveEvents.length} eventos capturados</span>

@@ -1,9 +1,9 @@
 import { resolveAdminActorFromRequest } from '../../../../../functions/api/_lib/admin-actor';
-import type { CloudflareDnsRecordInput } from '../../../../../functions/api/_lib/cloudflare-api';
-import { createCloudflareDnsRecord, updateCloudflareDnsRecord } from '../../../../../functions/api/_lib/cloudflare-api';
 import type { D1Database } from '../../../../../functions/api/_lib/operational';
 import { logModuleOperationalEvent } from '../../../../../functions/api/_lib/operational';
 import { createResponseTrace } from '../../../../../functions/api/_lib/request-trace';
+import type { CloudflareDnsRecordInput } from '../_lib/cloudflare-api';
+import { createCloudflareDnsRecord, DnsRecordValidationError, updateCloudflareDnsRecord } from '../_lib/cloudflare-api';
 
 type Env = {
   BIGDATA_DB?: D1Database;
@@ -146,6 +146,8 @@ export async function onRequestPost(context: Context) {
       }
     }
 
-    return toError(message, trace, 502);
+    // Entrada inválida do admin (campo/faixa fora do schema) é 400; falha de
+    // upstream/gateway permanece 502.
+    return toError(message, trace, error instanceof DnsRecordValidationError ? 400 : 502);
   }
 }

@@ -24,6 +24,7 @@
     "format:public:check": "prettier --check \"**/index.html\""
   },
   "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.5",
     "@google/genai": "^2.12.0",
     "@radix-ui/react-dialog": "^1.1.20",
     "@tanstack/react-query": "^5.101.3",
@@ -60,6 +61,9 @@
     "@tiptap/starter-kit": "^3.28.0",
     "@tiptap/suggestion": "^3.28.0",
     "@tiptap/y-tiptap": "^3.0.7",
+    "codemirror": "^6.0.2",
+    "croner": "^10.0.1",
+    "cronstrue": "^3.24.0",
     "d3-geo": "3.1.1",
     "dompurify": "^3.4.12",
     "hono": "^4.12.31",
@@ -73,6 +77,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "sanitize-html": "^2.17.6",
+    "spark-md5": "^3.0.2",
     "tiptap-markdown": "^0.9.0",
     "topojson-client": "3.1.0",
     "world-atlas": "2.0.2",
@@ -94,6 +99,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/sanitize-html": "^2.16.1",
+    "@types/spark-md5": "^3.0.5",
     "@types/topojson-client": "3.1.5",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.10",
@@ -128,7 +134,7 @@
     "@xmldom/xmldom": "^0.9.10",
     "ws": "8.21.0",
     "esbuild": "0.28.1",
-    "protobufjs": "7.6.3",
+    "protobufjs": "7.6.5",
     "@babel/core": "7.29.6"
   }
 }

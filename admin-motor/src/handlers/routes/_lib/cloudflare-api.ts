@@ -1,20 +1,12 @@
-type CloudflareApiError = {
-  code?: number | string;
-  message?: string;
-};
+import { CfApiError, cfApiRequest } from './cf-api-core';
 
-type CloudflareApiResponse<T> = {
-  success?: boolean;
-  errors?: CloudflareApiError[];
-  result?: T;
-  result_info?: {
-    cursor?: string;
-    page?: number;
-    per_page?: number;
-    total_pages?: number;
-    count?: number;
-    total_count?: number;
-  };
+type CloudflareResultInfo = {
+  cursor?: string;
+  page?: number;
+  per_page?: number;
+  total_pages?: number;
+  count?: number;
+  total_count?: number;
 };
 
 export type CloudflareZone = {
@@ -150,57 +142,6 @@ export type CloudflareRegistrarDomainPatch = {
   privacy?: boolean;
 };
 
-const resolveToken = (env: EnvWithCloudflareToken) => {
-  const byDnsToken = env.CLOUDFLARE_DNS?.trim();
-  if (byDnsToken) {
-    console.debug('[cloudflare-api] token:using-CLOUDFLARE_DNS', {
-      tokenLength: byDnsToken.length,
-    });
-    return byDnsToken;
-  }
-
-  const byPwToken = env.CLOUDFLARE_PW?.trim();
-  if (byPwToken) {
-    console.warn('[cloudflare-api] token:fallback-CLOUDFLARE_PW', {
-      tokenLength: byPwToken.length,
-    });
-    return byPwToken;
-  }
-
-  const byCacheToken = env.CLOUDFLARE_CACHE?.trim();
-  if (byCacheToken) {
-    console.warn('[cloudflare-api] token:fallback-CLOUDFLARE_CACHE', {
-      tokenLength: byCacheToken.length,
-    });
-    return byCacheToken;
-  }
-
-  console.error('[cloudflare-api] token:missing', {
-    hasDnsToken: Boolean(env.CLOUDFLARE_DNS?.trim()),
-    hasPwToken: Boolean(env.CLOUDFLARE_PW?.trim()),
-    hasCacheToken: Boolean(env.CLOUDFLARE_CACHE?.trim()),
-  });
-  return '';
-};
-
-const parseJsonOrThrow = <T>(rawText: string, fallback: string, response: Response): T => {
-  const trimmed = rawText.trim();
-  if (!trimmed) {
-    throw new Error(`${fallback}: corpo vazio inesperado (HTTP ${response.status}).`);
-  }
-
-  const looksLikeHtml = trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html');
-  if (looksLikeHtml) {
-    throw new Error(`${fallback}: resposta HTML inesperada da API Cloudflare (HTTP ${response.status}).`);
-  }
-
-  try {
-    return JSON.parse(trimmed) as T;
-  } catch {
-    throw new Error(`${fallback}: resposta não-JSON da API Cloudflare (HTTP ${response.status}).`);
-  }
-};
-
 export class CloudflareRequestError extends Error {
   readonly status: number;
   readonly code: number | string | null;
@@ -215,12 +156,33 @@ export class CloudflareRequestError extends Error {
   }
 }
 
-const toFirstErrorDetails = (payload: CloudflareApiResponse<unknown>) => {
-  const firstError = Array.isArray(payload.errors) && payload.errors.length > 0 ? payload.errors[0] : null;
-  return {
-    code: firstError?.code ?? null,
-    message: firstError?.message?.trim() || null,
-  };
+const LEGACY_MISSING_TOKEN_MESSAGE =
+  'Token Cloudflare ausente no runtime (configure CLOUDFLARE_DNS, CLOUDFLARE_PW ou CLOUDFLARE_CACHE).';
+
+// Converte o erro do núcleo compartilhado (cf-api-core) para o contrato de
+// erro legado deste módulo: mesmas mensagens e mesma classe
+// (CloudflareRequestError) esperadas pelos consumidores — ex.:
+// resolveUpstreamStatus e isNoRegistrarWorkflowFound em routes/cfdns.
+const toLegacyCloudflareError = (error: unknown, fallback: string): Error => {
+  if (!(error instanceof CfApiError)) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  switch (error.kind) {
+    case 'missing-token':
+      return new Error(LEGACY_MISSING_TOKEN_MESSAGE);
+    case 'empty-body':
+      return new Error(`${fallback}: corpo vazio inesperado (HTTP ${error.status}).`);
+    case 'html-body':
+      return new Error(`${fallback}: resposta HTML inesperada da API Cloudflare (HTTP ${error.status}).`);
+    case 'non-json':
+      return new Error(`${fallback}: resposta não-JSON da API Cloudflare (HTTP ${error.status}).`);
+    default:
+      return new CloudflareRequestError(
+        error.apiMessage ? `${fallback}: ${error.apiMessage}` : `${fallback}: HTTP ${error.status}`,
+        { status: error.status, code: error.code, apiMessage: error.apiMessage },
+      );
+  }
 };
 
 // O endpoint de status responde HTTP 404 + código `10000` quando não há
@@ -247,57 +209,15 @@ const cloudflareRequestPayload = async <T>(
   fallback: string,
   init?: RequestInit,
 ) => {
-  const token = resolveToken(env);
-  if (!token) {
-    throw new Error(
-      'Token Cloudflare ausente no runtime (configure CLOUDFLARE_DNS, CLOUDFLARE_PW ou CLOUDFLARE_CACHE).',
-    );
+  try {
+    const payload = await cfApiRequest<T>(env, 'dns', path, fallback, init);
+    return {
+      result: payload.result,
+      result_info: payload.resultInfo as CloudflareResultInfo | undefined,
+    };
+  } catch (error) {
+    throw toLegacyCloudflareError(error, fallback);
   }
-
-  console.debug('[cloudflare-api] request:start', {
-    method: init?.method ?? 'GET',
-    path,
-    fallback,
-  });
-
-  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
-    method: init?.method ?? 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-    ...(init?.body !== undefined ? { body: init.body } : {}),
-  });
-
-  const rawText = await response.text();
-  const payload = parseJsonOrThrow<CloudflareApiResponse<T>>(rawText, fallback, response);
-
-  if (!response.ok || payload.success !== true) {
-    const { code, message } = toFirstErrorDetails(payload);
-    console.error('[cloudflare-api] request:error', {
-      method: init?.method ?? 'GET',
-      path,
-      status: response.status,
-      code: code ?? null,
-      message: message ?? null,
-      fallback,
-    });
-    throw new CloudflareRequestError(message ? `${fallback}: ${message}` : `${fallback}: HTTP ${response.status}`, {
-      status: response.status,
-      code,
-      apiMessage: message,
-    });
-  }
-
-  console.info('[cloudflare-api] request:ok', {
-    method: init?.method ?? 'GET',
-    path,
-    status: response.status,
-  });
-
-  return payload;
 };
 
 const normalizeCloudflareAccount = (account: { id?: string; name?: string }): CloudflareAccount => ({
@@ -712,15 +632,27 @@ export const updateCloudflareRegistrarDomain = async (
 export const getCloudflareRegistrarRegistration = async (env: EnvWithCloudflareToken, domainName: string) => {
   const account = await resolveCloudflareAccount(env);
   const normalizedDomain = normalizeDomainName(domainName);
-  const registration = await cloudflareRequest<CloudflareRegistrarRegistration>(
+  const registration = await cloudflareRequest<
+    CloudflareRegistrarRegistration & { name_servers?: unknown; contacts?: unknown }
+  >(
     env,
     `/accounts/${encodeURIComponent(account.accountId)}/registrar/registrations/${encodeURIComponent(normalizedDomain)}`,
     `Falha ao consultar registro Registrar ${normalizedDomain}`,
   );
 
+  // DNS-4: o detalhe por domínio preserva name_servers/contacts quando a CF os
+  // devolve (o drawer "Detalhes" do admin os exibe); a lista continua enxuta.
   return {
     account,
-    registration: normalizeRegistrarRegistration(registration ?? {}),
+    registration: {
+      ...normalizeRegistrarRegistration(registration ?? {}),
+      ...(Array.isArray(registration?.name_servers)
+        ? { name_servers: registration.name_servers.map((server) => String(server)) }
+        : {}),
+      ...(registration?.contacts && typeof registration.contacts === 'object'
+        ? { contacts: registration.contacts as Record<string, unknown> }
+        : {}),
+    },
   };
 };
 
@@ -853,6 +785,190 @@ const normalizeRecordName = (recordName: string) => {
   return normalized;
 };
 
+// Erro de validação de entrada de registro DNS: o handler converte em HTTP 400
+// (entrada inválida do admin), distinto de falha de gateway/upstream (502).
+export class DnsRecordValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DnsRecordValidationError';
+  }
+}
+
+type DnsDataFieldRule =
+  | { field: string; kind: 'int' | 'number'; min: number; max: number }
+  | { field: string; kind: 'string' | 'hex' | 'text' }
+  | { field: string; kind: 'enum'; values: readonly string[] };
+
+// Tipos estruturados (payload em `data`) e os limites de cada campo, conforme
+// os schemas da API Cloudflare (POST/PUT /zones/{zone}/dns_records).
+const DNS_STRUCTURED_DATA_RULES: Record<string, DnsDataFieldRule[]> = {
+  DS: [
+    { field: 'key_tag', kind: 'int', min: 0, max: 65535 },
+    { field: 'algorithm', kind: 'int', min: 0, max: 255 },
+    { field: 'digest_type', kind: 'int', min: 0, max: 255 },
+    { field: 'digest', kind: 'hex' },
+  ],
+  DNSKEY: [
+    { field: 'flags', kind: 'int', min: 0, max: 65535 },
+    { field: 'protocol', kind: 'int', min: 0, max: 255 },
+    { field: 'algorithm', kind: 'int', min: 0, max: 255 },
+    { field: 'public_key', kind: 'string' },
+  ],
+  SSHFP: [
+    { field: 'algorithm', kind: 'int', min: 0, max: 255 },
+    { field: 'type', kind: 'int', min: 0, max: 255 },
+    { field: 'fingerprint', kind: 'hex' },
+  ],
+  SMIMEA: [
+    { field: 'usage', kind: 'int', min: 0, max: 255 },
+    { field: 'selector', kind: 'int', min: 0, max: 255 },
+    { field: 'matching_type', kind: 'int', min: 0, max: 255 },
+    { field: 'certificate', kind: 'string' },
+  ],
+  TLSA: [
+    { field: 'usage', kind: 'int', min: 0, max: 255 },
+    { field: 'selector', kind: 'int', min: 0, max: 255 },
+    { field: 'matching_type', kind: 'int', min: 0, max: 255 },
+    { field: 'certificate', kind: 'string' },
+  ],
+  CERT: [
+    { field: 'type', kind: 'int', min: 0, max: 65535 },
+    { field: 'key_tag', kind: 'int', min: 0, max: 65535 },
+    { field: 'algorithm', kind: 'int', min: 0, max: 255 },
+    { field: 'certificate', kind: 'string' },
+  ],
+  LOC: [
+    { field: 'lat_degrees', kind: 'int', min: 0, max: 90 },
+    { field: 'lat_minutes', kind: 'int', min: 0, max: 59 },
+    { field: 'lat_seconds', kind: 'number', min: 0, max: 59.999 },
+    { field: 'lat_direction', kind: 'enum', values: ['N', 'S'] },
+    { field: 'long_degrees', kind: 'int', min: 0, max: 180 },
+    { field: 'long_minutes', kind: 'int', min: 0, max: 59 },
+    { field: 'long_seconds', kind: 'number', min: 0, max: 59.999 },
+    { field: 'long_direction', kind: 'enum', values: ['E', 'W'] },
+    { field: 'altitude', kind: 'number', min: -100000, max: 42849672.95 },
+    { field: 'size', kind: 'number', min: 0, max: 90000000 },
+    { field: 'precision_horz', kind: 'number', min: 0, max: 90000000 },
+    { field: 'precision_vert', kind: 'number', min: 0, max: 90000000 },
+  ],
+  NAPTR: [
+    { field: 'order', kind: 'int', min: 0, max: 65535 },
+    { field: 'preference', kind: 'int', min: 0, max: 65535 },
+    { field: 'flags', kind: 'text' },
+    { field: 'service', kind: 'text' },
+    { field: 'regex', kind: 'text' },
+    { field: 'replacement', kind: 'text' },
+  ],
+};
+
+const DNS_HEX_PATTERN = /^[0-9A-Fa-f]+$/;
+
+const validateStructuredDataField = (type: string, data: Record<string, unknown>, rule: DnsDataFieldRule) => {
+  const value = data[rule.field];
+  const label = `data.${rule.field} do registro ${type}`;
+
+  switch (rule.kind) {
+    case 'int':
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < rule.min || value > rule.max) {
+        throw new DnsRecordValidationError(
+          `Campo ${label} inválido: informe um inteiro entre ${rule.min} e ${rule.max}.`,
+        );
+      }
+      return;
+    case 'number':
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < rule.min || value > rule.max) {
+        throw new DnsRecordValidationError(
+          `Campo ${label} inválido: informe um número entre ${rule.min} e ${rule.max}.`,
+        );
+      }
+      return;
+    case 'string':
+      if (typeof value !== 'string' || !value.trim()) {
+        throw new DnsRecordValidationError(`Campo ${label} é obrigatório: informe um texto não vazio.`);
+      }
+      return;
+    case 'hex':
+      if (typeof value !== 'string' || !value.trim() || !DNS_HEX_PATTERN.test(value.trim())) {
+        throw new DnsRecordValidationError(`Campo ${label} inválido: informe um valor hexadecimal não vazio.`);
+      }
+      return;
+    case 'text':
+      if (typeof value !== 'string') {
+        throw new DnsRecordValidationError(`Campo ${label} é obrigatório: informe uma string (pode ser vazia).`);
+      }
+      return;
+    case 'enum':
+      if (typeof value !== 'string' || !rule.values.includes(value)) {
+        throw new DnsRecordValidationError(`Campo ${label} inválido: valores aceitos: ${rule.values.join(', ')}.`);
+      }
+      return;
+  }
+};
+
+// Mesmo estilo do validador de domínio Registrar (normalizeDomainName), mas
+// com mensagens próprias: PTR/NS carregam um hostname em `content`.
+const HOSTNAME_CONTENT_PATTERN = /^[A-Za-z0-9.-]+$/;
+
+const assertHostnameContent = (type: string, content: string) => {
+  if (!content) {
+    throw new DnsRecordValidationError(`Registro ${type} exige content com um hostname (ex.: host.exemplo.com).`);
+  }
+  if (!HOSTNAME_CONTENT_PATTERN.test(content) || content.includes('..') || content.startsWith('.')) {
+    throw new DnsRecordValidationError(
+      `Content inválido para registro ${type}: "${content}" não é um hostname válido (use letras, números, hífens e pontos).`,
+    );
+  }
+};
+
+// Limites de tag da API Cloudflare: nome com 1-32 caracteres [A-Za-z0-9_.-],
+// valor opcional (`nome:valor`) com até 100 caracteres, máximo de 20 tags.
+const DNS_TAG_PATTERN = /^[A-Za-z0-9_.-]{1,32}(:.{0,100})?$/;
+const DNS_MAX_TAGS = 20;
+
+const validateDnsRecordTags = (tags: string[]) => {
+  if (tags.length > DNS_MAX_TAGS) {
+    throw new DnsRecordValidationError(
+      `Máximo de ${DNS_MAX_TAGS} tags por registro DNS; foram recebidas ${tags.length}. Remova as excedentes.`,
+    );
+  }
+  for (const tag of tags) {
+    if (!DNS_TAG_PATTERN.test(tag)) {
+      throw new DnsRecordValidationError(
+        `Tag inválida: "${tag}". Use o formato nome:valor (nome com 1-32 caracteres [A-Za-z0-9_.-], valor com até 100 caracteres).`,
+      );
+    }
+  }
+};
+
+const validateDnsRecordInput = (normalized: {
+  type: string;
+  content: string;
+  tags: string[];
+  data: Record<string, unknown> | null;
+}) => {
+  const rules = DNS_STRUCTURED_DATA_RULES[normalized.type];
+  if (rules) {
+    if (!normalized.data) {
+      throw new DnsRecordValidationError(
+        `Registro ${normalized.type} exige o objeto data com os campos ${rules.map((rule) => rule.field).join(', ')} (content não é aceito para esse tipo).`,
+      );
+    }
+    for (const rule of rules) {
+      validateStructuredDataField(normalized.type, normalized.data, rule);
+    }
+  }
+
+  if (normalized.type === 'OPENPGPKEY' && !normalized.content) {
+    throw new DnsRecordValidationError('Registro OPENPGPKEY exige content (chave pública OpenPGP em texto).');
+  }
+
+  if (normalized.type === 'PTR' || normalized.type === 'NS') {
+    assertHostnameContent(normalized.type, normalized.content);
+  }
+
+  validateDnsRecordTags(normalized.tags);
+};
+
 const normalizeRecordInput = (input: CloudflareDnsRecordInput) => {
   const type = normalizeRecordType(input.type);
   const name = normalizeRecordName(input.name);
@@ -864,16 +980,20 @@ const normalizeRecordInput = (input: CloudflareDnsRecordInput) => {
   const tags = Array.isArray(input.tags) ? input.tags.map((tag) => String(tag).trim()).filter(Boolean) : [];
   const data = input.data && typeof input.data === 'object' ? input.data : null;
 
+  // Validação por tipo antes dos checks genéricos, para que a mensagem nomeie
+  // o campo/faixa violados (ex.: DS sem data, NAPTR sem order).
+  validateDnsRecordInput({ type, content, tags, data });
+
   if (!content && !data) {
-    throw new Error('Informe content ou data para o registro DNS.');
+    throw new DnsRecordValidationError('Informe content ou data para o registro DNS.');
   }
 
   if (!Number.isFinite(ttl) || (ttl !== 1 && (ttl < 60 || ttl > 86400))) {
-    throw new Error('TTL inválido. Use 1 (auto) ou um valor entre 60 e 86400 segundos.');
+    throw new DnsRecordValidationError('TTL inválido. Use 1 (auto) ou um valor entre 60 e 86400 segundos.');
   }
 
   if (priority != null && (!Number.isInteger(priority) || priority < 0 || priority > 65535)) {
-    throw new Error('Priority inválido. Use um inteiro entre 0 e 65535.');
+    throw new DnsRecordValidationError('Priority inválido. Use um inteiro entre 0 e 65535.');
   }
 
   return {
@@ -915,6 +1035,89 @@ const buildDnsRecordPayload = (input: CloudflareDnsRecordInput) => {
   }
   if (normalized.data) {
     payload.data = normalized.data;
+  }
+
+  return payload;
+};
+
+// ── DNS-2: payloads do endpoint de lote (POST /zones/{zone}/dns_records/batch) ──
+
+/**
+ * Valida e monta o payload COMPLETO de um registro para posts/puts do batch,
+ * usando o mesmo caminho de validação do upsert (normalizeRecordInput +
+ * regras estruturadas por tipo).
+ * @public
+ */
+export const buildDnsRecordFullPayload = (input: CloudflareDnsRecordInput): Record<string, unknown> =>
+  buildDnsRecordPayload(input);
+
+/**
+ * Valida e monta um payload PARCIAL para patches do batch: apenas os campos
+ * presentes no input são validados/incluídos (mesmas regras de faixa do
+ * upsert). `comment: ''` limpa o comentário e `tags: []` limpa as tags.
+ * @public
+ */
+export const buildDnsRecordPatchPayload = (input: Partial<CloudflareDnsRecordInput>): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+
+  if (input.type != null) {
+    payload.type = normalizeRecordType(String(input.type));
+  }
+
+  if (input.name != null) {
+    payload.name = normalizeRecordName(String(input.name));
+  }
+
+  if (input.content != null) {
+    const content = String(input.content).trim();
+    if (!content) {
+      throw new DnsRecordValidationError('content não pode ser vazio em um patch; omita o campo para mantê-lo.');
+    }
+    payload.content = content;
+  }
+
+  if (input.ttl != null) {
+    const ttl = Number(input.ttl);
+    if (!Number.isFinite(ttl) || (ttl !== 1 && (ttl < 60 || ttl > 86400))) {
+      throw new DnsRecordValidationError('TTL inválido. Use 1 (auto) ou um valor entre 60 e 86400 segundos.');
+    }
+    payload.ttl = ttl;
+  }
+
+  if (input.proxied != null) {
+    payload.proxied = Boolean(input.proxied);
+  }
+
+  if (input.priority != null) {
+    const priority = Number(input.priority);
+    if (!Number.isInteger(priority) || priority < 0 || priority > 65535) {
+      throw new DnsRecordValidationError('Priority inválido. Use um inteiro entre 0 e 65535.');
+    }
+    payload.priority = priority;
+  }
+
+  if (input.comment != null) {
+    payload.comment = String(input.comment).trim();
+  }
+
+  if (input.tags != null) {
+    const tags = Array.isArray(input.tags) ? input.tags.map((tag) => String(tag).trim()).filter(Boolean) : [];
+    validateDnsRecordTags(tags);
+    payload.tags = tags;
+  }
+
+  if (input.data != null && typeof input.data === 'object') {
+    // O objeto data substitui o payload estruturado inteiro no PATCH; quando o
+    // tipo acompanha o patch e tem regras, validamos com as mesmas regras do
+    // upsert. Sem o tipo no patch, a validação fica a cargo da Cloudflare.
+    const type = typeof payload.type === 'string' ? payload.type : '';
+    const rules = type ? DNS_STRUCTURED_DATA_RULES[type] : undefined;
+    if (rules) {
+      for (const rule of rules) {
+        validateStructuredDataField(type, input.data, rule);
+      }
+    }
+    payload.data = input.data;
   }
 
   return payload;
@@ -1040,6 +1243,16 @@ export const listCloudflareDnsRecords = async (
     perPage?: number;
     type?: string;
     search?: string;
+    order?: string;
+    direction?: string;
+    nameContains?: string;
+    contentContains?: string;
+    commentContains?: string;
+    commentPresent?: boolean;
+    tagExact?: string;
+    tagPresent?: string;
+    proxied?: boolean;
+    match?: string;
   },
 ): Promise<CloudflareDnsRecordListResult> => {
   const normalizedZoneId = normalizeZoneId(zoneId);
@@ -1055,20 +1268,67 @@ export const listCloudflareDnsRecords = async (
   const search = String(options?.search ?? '')
     .trim()
     .toLowerCase();
+  const order = String(options?.order ?? '')
+    .trim()
+    .toLowerCase();
+  const direction = String(options?.direction ?? '')
+    .trim()
+    .toLowerCase();
 
   const query = new URLSearchParams({
     page: String(page),
     per_page: String(perPage),
-    order: 'type',
-    direction: 'asc',
+    order: order || 'type',
+    direction: direction || 'asc',
   });
 
   if (type) {
     query.set('type', type);
   }
 
+  // `search` é a busca humana multi-propriedade da API Cloudflare. O parâmetro
+  // `name` (usado antes) é alias de match EXATO e quebrava busca parcial.
   if (search) {
-    query.set('name', search);
+    query.set('search', search);
+  }
+
+  const nameContains = String(options?.nameContains ?? '').trim();
+  if (nameContains) {
+    query.set('name.contains', nameContains);
+  }
+  const contentContains = String(options?.contentContains ?? '').trim();
+  if (contentContains) {
+    query.set('content.contains', contentContains);
+  }
+  const commentContains = String(options?.commentContains ?? '').trim();
+  if (commentContains) {
+    query.set('comment.contains', commentContains);
+  }
+  // A API define `comment.present` e `comment.absent` como filtros por
+  // PRESENÇA do parâmetro (o valor enviado é ignorado) — não como um boolean
+  // único; por isso `commentPresent=false` vira `comment.absent`.
+  if (options?.commentPresent === true) {
+    query.set('comment.present', 'true');
+  }
+  if (options?.commentPresent === false) {
+    query.set('comment.absent', 'true');
+  }
+  const tagExact = String(options?.tagExact ?? '').trim();
+  if (tagExact) {
+    query.set('tag.exact', tagExact);
+  }
+  const tagPresent = String(options?.tagPresent ?? '').trim();
+  if (tagPresent) {
+    query.set('tag.present', tagPresent);
+  }
+  if (typeof options?.proxied === 'boolean') {
+    query.set('proxied', String(options.proxied));
+  }
+  const match = String(options?.match ?? '')
+    .trim()
+    .toLowerCase();
+  if (match) {
+    query.set('match', match);
   }
 
   const payload = await cloudflareRequestPayload<CloudflareDnsRecord[]>(

@@ -1,6 +1,6 @@
-import { getCloudflareDnsSnapshot, listCloudflareZones } from '../../../../../functions/api/_lib/cloudflare-api';
 import type { D1Database } from '../../../../../functions/api/_lib/operational';
 import { finishSyncRun, logModuleOperationalEvent, startSyncRun } from '../../../../../functions/api/_lib/operational';
+import { getCloudflareDnsSnapshot, listCloudflareZones } from '../_lib/cloudflare-api';
 
 type Env = {
   BIGDATA_DB?: D1Database;

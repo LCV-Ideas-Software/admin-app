@@ -41,6 +41,28 @@ const toPositiveInt = (value: string | null, fallback: number) => {
   return Math.trunc(parsed);
 };
 
+const ORDER_FIELDS = ['type', 'name', 'content', 'ttl', 'proxied'];
+const DIRECTION_VALUES = ['asc', 'desc'];
+const MATCH_VALUES = ['all', 'any'];
+
+// Parâmetro booleano opcional: ausente → null; 'true'/'false' → boolean;
+// qualquer outro valor → 'invalid' (o handler responde 400 nomeando o parâmetro).
+const parseOptionalBooleanParam = (raw: string | null): boolean | null | 'invalid' => {
+  const normalized = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+  return 'invalid';
+};
+
 export async function onRequestGet(context: Context) {
   const trace = createResponseTrace(context.request);
   const url = new URL(context.request.url);
@@ -53,9 +75,47 @@ export async function onRequestGet(context: Context) {
   const search = String(url.searchParams.get('search') ?? '')
     .trim()
     .toLowerCase();
+  const order = String(url.searchParams.get('order') ?? '')
+    .trim()
+    .toLowerCase();
+  const direction = String(url.searchParams.get('direction') ?? '')
+    .trim()
+    .toLowerCase();
+  const match = String(url.searchParams.get('match') ?? '')
+    .trim()
+    .toLowerCase();
+  const nameContains = String(url.searchParams.get('nameContains') ?? '').trim();
+  const contentContains = String(url.searchParams.get('contentContains') ?? '').trim();
+  const commentContains = String(url.searchParams.get('commentContains') ?? '').trim();
+  const tagExact = String(url.searchParams.get('tagExact') ?? '').trim();
+  const tagPresent = String(url.searchParams.get('tagPresent') ?? '').trim();
+  const commentPresent = parseOptionalBooleanParam(url.searchParams.get('commentPresent'));
+  const proxied = parseOptionalBooleanParam(url.searchParams.get('proxied'));
 
   if (!zoneId) {
     return toError('Parâmetro zoneId é obrigatório.', trace, 400);
+  }
+  if (order && !ORDER_FIELDS.includes(order)) {
+    return toError(`Parâmetro order inválido: "${order}". Valores aceitos: ${ORDER_FIELDS.join(', ')}.`, trace, 400);
+  }
+  if (direction && !DIRECTION_VALUES.includes(direction)) {
+    return toError(
+      `Parâmetro direction inválido: "${direction}". Valores aceitos: ${DIRECTION_VALUES.join(', ')}.`,
+      trace,
+      400,
+    );
+  }
+  if (match && !MATCH_VALUES.includes(match)) {
+    return toError(`Parâmetro match inválido: "${match}". Valores aceitos: ${MATCH_VALUES.join(', ')}.`, trace, 400);
+  }
+  if (commentPresent === 'invalid') {
+    return toError('Parâmetro commentPresent inválido: use true ou false.', trace, 400);
+  }
+  if (proxied === 'invalid') {
+    return toError('Parâmetro proxied inválido: use true ou false.', trace, 400);
+  }
+  if (tagExact && !tagExact.includes(':')) {
+    return toError('Parâmetro tagExact inválido: use o formato nome:valor.', trace, 400);
   }
 
   const env = context.data?.env ?? context.env;
@@ -66,6 +126,16 @@ export async function onRequestGet(context: Context) {
       perPage,
       type,
       search,
+      order,
+      direction,
+      match,
+      nameContains,
+      contentContains,
+      commentContains,
+      tagExact,
+      tagPresent,
+      ...(commentPresent === null ? {} : { commentPresent }),
+      ...(proxied === null ? {} : { proxied }),
     });
 
     if (env.BIGDATA_DB) {

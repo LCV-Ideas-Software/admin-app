@@ -192,3 +192,86 @@ export const deleteObservabilityDestination = async (
     { method: 'DELETE' },
   );
 };
+
+/** Mensagem pt-BR quando a conta não expõe o live-tail (HTTP 404 na CF). @public */
+export const LIVE_TAIL_UNAVAILABLE_MESSAGE = 'Live tail da Observability indisponível na conta — usando modo polling';
+
+// Variante status-aware do request helper, exclusiva do live-tail: um 404 da
+// CF significa "recurso não disponível na conta" e precisa virar a mensagem
+// pt-BR de fallback (o helper genérico não expõe o status na mensagem).
+const cloudflareLiveTailRequest = async (
+  env: EnvWithCloudflarePwToken,
+  path: string,
+  body: Record<string, unknown>,
+  fallback: string,
+): Promise<Record<string, unknown>> => {
+  const token = resolveToken(env);
+  if (!token) {
+    throw new Error('Token Cloudflare ausente (CLOUDFLARE_PW) para Observability.');
+  }
+
+  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status === 404) {
+    throw new Error(LIVE_TAIL_UNAVAILABLE_MESSAGE);
+  }
+
+  const rawText = await response.text();
+  const payload = parseJsonOrThrow<CloudflareApiResponse<Record<string, unknown>>>(rawText, fallback, response);
+
+  if (!response.ok || payload.success !== true) {
+    const allErrors = Array.isArray(payload.errors) ? payload.errors : [];
+    const firstError = allErrors.length > 0 ? allErrors[0]?.message?.trim() : null;
+    console.error(`[observability-api] ${fallback}`, {
+      status: response.status,
+      path,
+      errors: allErrors,
+      rawResponse: rawText.substring(0, 500),
+    });
+    throw new Error(firstError ? `${fallback}: ${firstError}` : `${fallback}: HTTP ${response.status}`);
+  }
+
+  return (payload.result ?? {}) as Record<string, unknown>;
+};
+
+/**
+ * POST /accounts/{id}/workers/observability/telemetry/live-tail
+ * Inicia uma sessão de live tail (passthrough do body do cliente).
+ */
+export const startObservabilityLiveTail = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> => {
+  return cloudflareLiveTailRequest(
+    env,
+    `/accounts/${encodeURIComponent(accountId)}/workers/observability/telemetry/live-tail`,
+    body,
+    'Falha ao iniciar live tail de observability',
+  );
+};
+
+/**
+ * POST /accounts/{id}/workers/observability/telemetry/live-tail/heartbeat
+ * Mantém a sessão de live tail viva (passthrough do body do cliente).
+ */
+export const heartbeatObservabilityLiveTail = async (
+  env: EnvWithCloudflarePwToken,
+  accountId: string,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> => {
+  return cloudflareLiveTailRequest(
+    env,
+    `/accounts/${encodeURIComponent(accountId)}/workers/observability/telemetry/live-tail/heartbeat`,
+    body,
+    'Falha no heartbeat do live tail de observability',
+  );
+};

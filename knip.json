@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["admin-motor/src/index.ts", "functions/**/*.ts"],
+  "entry": ["admin-motor/src/index.ts", "functions/_middleware.ts", "functions/api/*.ts", "functions/api/tlsrpt/*.ts"],
   "project": ["src/**/*.{ts,tsx}", "admin-motor/src/**/*.ts", "functions/**/*.{ts,tsx}"],
-  "ignore": ["src/test-setup.ts", "**/*.test.{ts,tsx}"],
+  "ignore": ["src/test-setup.ts", "**/*.test.{ts,tsx}", "admin-motor/src/test-utils/**"],
   "ignoreDependencies": ["@cloudflare/workers-types"]
 }

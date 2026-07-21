@@ -1,4 +1,4 @@
-import { listCloudflareZones } from '../../../functions/api/_lib/cloudflare-api';
+import { listCloudflareZones } from './routes/_lib/cloudflare-api';
 
 type Env = {
   CLOUDFLARE_DNS?: string;

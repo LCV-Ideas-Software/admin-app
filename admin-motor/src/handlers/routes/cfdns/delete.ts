@@ -1,8 +1,8 @@
 import { resolveAdminActorFromRequest } from '../../../../../functions/api/_lib/admin-actor';
-import { deleteCloudflareDnsRecord } from '../../../../../functions/api/_lib/cloudflare-api';
 import type { D1Database } from '../../../../../functions/api/_lib/operational';
 import { logModuleOperationalEvent } from '../../../../../functions/api/_lib/operational';
 import { createResponseTrace } from '../../../../../functions/api/_lib/request-trace';
+import { deleteCloudflareDnsRecord } from '../_lib/cloudflare-api';
 
 type Env = {
   BIGDATA_DB?: D1Database;

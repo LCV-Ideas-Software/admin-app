@@ -1,0 +1,1259 @@
+/* Estilos do módulo CF DNS — regras .cfdns-* movidas de src/App.css sem
+   alteração, mais a barra de abas (mesmo padrão/classes de CfPwModule.css). */
+
+.page-tab-nav {
+  display: flex;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+}
+
+.page-tab-item {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  font-weight: 600;
+  color: #5f6368;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+}
+
+.page-tab-item:hover {
+  color: #202124;
+}
+
+.page-tab-item.active {
+  color: #1a73e8;
+  border-bottom-color: #1a73e8;
+}
+
+.cfdns-table-wrap {
+  width: 100%;
+}
+
+.cfdns-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+/* DNS-2: a 1ª coluna passou a ser a de seleção em lote (checkbox); as demais
+   larguras foram deslocadas em +1 e o conteúdo cedeu 4% para a nova coluna. */
+.cfdns-table th:nth-child(1),
+.cfdns-table td:nth-child(1) {
+  width: 4%;
+  text-align: center;
+}
+
+.cfdns-table th:nth-child(2),
+.cfdns-table td:nth-child(2) {
+  width: 8%;
+}
+
+.cfdns-table th:nth-child(3),
+.cfdns-table td:nth-child(3) {
+  width: 18%;
+}
+
+.cfdns-table th:nth-child(4),
+.cfdns-table td:nth-child(4) {
+  width: 28%;
+}
+
+.cfdns-table th:nth-child(5),
+.cfdns-table td:nth-child(5) {
+  width: 6%;
+}
+
+.cfdns-table th:nth-child(6),
+.cfdns-table td:nth-child(6) {
+  width: 10%;
+}
+
+.cfdns-table th:nth-child(7),
+.cfdns-table td:nth-child(7) {
+  width: 12%;
+}
+
+.cfdns-table th:nth-child(8),
+.cfdns-table td:nth-child(8) {
+  width: 14%;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.cfdns-table thead th {
+  text-align: left;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #80868b;
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.cfdns-table tbody td {
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  color: #202124;
+  vertical-align: middle;
+  font-size: 0.79rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cfdns-table tbody tr:hover {
+  background: rgba(26, 115, 232, 0.06);
+}
+
+.cfdns-row-selected {
+  background: rgba(26, 115, 232, 0.09);
+}
+
+.cfdns-cell-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cfdns-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.cfdns-inline-editor-row td {
+  padding: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  /* O editor ocupa a linha inteira (colSpan): não herda o centering da 1ª coluna. */
+  text-align: left;
+}
+
+.cfdns-inline-editor {
+  margin: 0;
+  padding: 12px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.14);
+  background: rgba(251, 146, 60, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cfdns-inline-editor__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+}
+
+.cfdns-inline-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cfdns-inline-editor .field-group label {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+}
+
+.cfdns-inline-editor .field-group input,
+.cfdns-inline-editor .field-group select,
+.cfdns-inline-editor .field-group textarea {
+  min-height: 32px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+}
+
+.cfdns-pagination {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cfdns-pagination span {
+  color: #5f6368;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .cfdns-inline-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .cfdns-row-actions {
+    flex-wrap: wrap;
+  }
+
+  .cfdns-inline-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── CF DNS — Proxy badges ───────────────────────────────────────── */
+.cfdns-proxy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.cfdns-proxy-badge--proxied {
+  background: rgba(26, 115, 232, 0.14);
+  color: #1a73e8;
+  border: 1px solid rgba(26, 115, 232, 0.3);
+}
+
+.cfdns-proxy-badge--proxied svg {
+  color: #e37400;
+}
+
+.cfdns-proxy-badge--dns {
+  background: rgba(154, 160, 166, 0.14);
+  color: #80868b;
+  border: 1px solid rgba(154, 160, 166, 0.3);
+}
+
+.cfdns-ttl-auto {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #80868b;
+  letter-spacing: 0.03em;
+}
+
+.cfdns-registrar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cfdns-registrar-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1.2fr) 90px minmax(130px, 1fr) minmax(130px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid rgba(26, 115, 232, 0.14);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.74);
+}
+
+.cfdns-registrar-query {
+  min-width: 0;
+}
+
+.cfdns-registrar-actions,
+.cfdns-registrar-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.cfdns-registrar-actions {
+  justify-content: flex-end;
+}
+
+.cfdns-registrar-table-wrap {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+}
+
+.cfdns-registrar-table {
+  min-width: 780px;
+}
+
+.cfdns-registrar-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.cfdns-registrar-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cfdns-registrar-item:last-child {
+  border-right: none;
+}
+
+.cfdns-registrar-item span {
+  color: #80868b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cfdns-registrar-item strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #202124;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.cfdns-registrar-item small {
+  color: #5f6368;
+  font-size: 0.76rem;
+}
+
+.cfdns-registrar-workflows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cfdns-registrar-workflow-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(26, 115, 232, 0.14);
+  background: rgba(239, 246, 255, 0.42);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cfdns-registrar-workflow-item span {
+  color: #5f6368;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cfdns-registrar-workflow-item strong {
+  color: #202124;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.cfdns-registrar-workflow-item small {
+  color: #5f6368;
+  font-size: 0.75rem;
+}
+
+.cfdns-registrar-workflow-item--succeeded {
+  border-color: rgba(30, 142, 62, 0.32);
+  background: rgba(232, 245, 233, 0.5);
+}
+
+.cfdns-registrar-workflow-item--action_required,
+.cfdns-registrar-workflow-item--failed {
+  border-color: rgba(217, 48, 37, 0.34);
+  background: rgba(252, 232, 230, 0.55);
+}
+
+.cfdns-registrar-workflow-item--blocked {
+  border-color: rgba(249, 171, 0, 0.4);
+  background: rgba(254, 247, 224, 0.6);
+}
+
+.cfdns-registrar-workflow-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #5f6368;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.cfdns-registrar-workflow-note--alert {
+  color: #c5221f;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .cfdns-registrar-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cfdns-registrar-actions {
+    justify-content: flex-start;
+  }
+
+  .cfdns-registrar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cfdns-registrar-item {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .cfdns-registrar-workflows {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .cfdns-registrar-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── CF DNS — Ordenação por coluna (DNS-1) ───────────────────────── */
+.cfdns-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.cfdns-sort-button:hover:not(:disabled) {
+  color: #1a73e8;
+}
+
+.cfdns-sort-button:disabled {
+  cursor: default;
+}
+
+/* ── CF DNS — Filtros avançados (DNS-1) ──────────────────────────── */
+.cfdns-advanced-toggle {
+  margin-top: 10px;
+}
+
+.cfdns-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cfdns-advanced-panel {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px dashed rgba(26, 115, 232, 0.28);
+  border-radius: 10px;
+  background: rgba(239, 246, 255, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── CF DNS — Tags em chips (DNS-1) ──────────────────────────────── */
+.cfdns-tags-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.cfdns-tags-input input {
+  flex: 1 1 160px;
+  min-width: 120px;
+  border: none;
+  outline: none;
+  background: transparent;
+  min-height: 26px;
+}
+
+.cfdns-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 14px;
+  background: rgba(26, 115, 232, 0.12);
+  color: #1a73e8;
+  border: 1px solid rgba(26, 115, 232, 0.3);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.cfdns-tag-chip button {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.cfdns-tag-chip button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* ── CF DNS — Paginação estendida (DNS-1) ────────────────────────── */
+.cfdns-pagination {
+  flex-wrap: wrap;
+}
+
+.cfdns-pagination__nav,
+.cfdns-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cfdns-pagination__controls label {
+  color: #5f6368;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.cfdns-pagination__controls select,
+.cfdns-pagination__controls input {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.cfdns-page-jump-input {
+  width: 84px;
+}
+
+/* ── DNS-2: seleção em lote, BatchBar e modais de lote ─────────────────────── */
+
+.cfdns-select-col input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.cfdns-batchbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(26, 115, 232, 0.35);
+  border-radius: 10px;
+  background: rgba(26, 115, 232, 0.07);
+}
+
+.cfdns-batchbar strong {
+  font-size: 0.82rem;
+  color: #1a73e8;
+}
+
+.cfdns-batch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.cfdns-batch-modal {
+  /* Com Radix Dialog, Overlay e Content são siblings no Portal: o modal
+     precisa se centralizar sozinho no viewport. */
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100000;
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  border-radius: 16px;
+  padding: 1.4rem 1.6rem 1.2rem;
+  width: min(460px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+}
+
+.cfdns-batch-modal--edit {
+  width: min(560px, 94vw);
+}
+
+.cfdns-batch-modal__icon {
+  display: flex;
+  justify-content: center;
+  color: #d93025;
+  margin-bottom: 6px;
+}
+
+.cfdns-batch-modal__title {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.cfdns-batch-modal__text {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: #5f6368;
+  text-align: center;
+}
+
+.cfdns-batch-modal__list {
+  margin: 0 0 6px;
+  padding: 8px 12px 8px 28px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
+.cfdns-batch-modal__more {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: #5f6368;
+}
+
+.cfdns-batch-modal__preview {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(26, 115, 232, 0.07);
+  font-size: 0.8rem;
+}
+
+.cfdns-batch-modal__ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+  font-size: 0.78rem;
+  color: #3c4043;
+  cursor: pointer;
+}
+
+.cfdns-batch-modal__ack input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.cfdns-batch-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ── DNS-2: painel Importar / Exportar zona (BIND) ─────────────────────────── */
+
+.cfdns-importexport__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #202124;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cfdns-importexport__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.cfdns-importexport__section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+}
+
+.cfdns-importexport__section h5 {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5f6368;
+}
+
+.cfdns-importexport__proxy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #3c4043;
+  cursor: pointer;
+}
+
+/* ── CF DNS — DNS-3: aba "Zona & DNSSEC" ─────────────────────────── */
+.cfdns-zone-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.cfdns-zone-badge--ok {
+  background: rgba(30, 142, 62, 0.14);
+  color: #1e8e3e;
+  border: 1px solid rgba(30, 142, 62, 0.32);
+}
+
+.cfdns-zone-badge--warn {
+  background: rgba(249, 171, 0, 0.16);
+  color: #b06000;
+  border: 1px solid rgba(249, 171, 0, 0.4);
+}
+
+.cfdns-zone-badge--danger {
+  background: rgba(217, 48, 37, 0.12);
+  color: #c5221f;
+  border: 1px solid rgba(217, 48, 37, 0.34);
+}
+
+.cfdns-zone-badge--muted {
+  background: rgba(154, 160, 166, 0.14);
+  color: #80868b;
+  border: 1px solid rgba(154, 160, 166, 0.3);
+}
+
+.cfdns-zone-badge--critical {
+  background: rgba(217, 48, 37, 0.12);
+  color: #c5221f;
+  border: 1px solid rgba(217, 48, 37, 0.34);
+  cursor: help;
+}
+
+.cfdns-zone-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cfdns-zone-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cfdns-zonesadmin-card,
+.cfdns-dnssec-card,
+.cfdns-dns-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cfdns-danger-action {
+  color: #c5221f;
+}
+
+.cfdns-zone-ns-row td {
+  background: rgba(248, 250, 252, 0.74);
+}
+
+.cfdns-ns-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 8px 4px;
+}
+
+.cfdns-ns-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.cfdns-ns-block pre,
+.cfdns-zone-dialog__ns {
+  margin: 0;
+  padding: 8px 10px;
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.cfdns-ds-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cfdns-ds-panel textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.cfdns-ds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.cfdns-ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cfdns-ds-field > span {
+  color: #80868b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cfdns-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cfdns-copy-row code {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: rgba(248, 250, 252, 0.74);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.cfdns-advanced-accordion {
+  border: 1px solid rgba(26, 115, 232, 0.14);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.cfdns-advanced-accordion summary {
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #202124;
+}
+
+.cfdns-dnssec-toggles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cfdns-settings-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.cfdns-settings-switch input {
+  margin-top: 3px;
+}
+
+.cfdns-settings-switch span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #202124;
+}
+
+.cfdns-settings-switch small {
+  color: #5f6368;
+  font-size: 0.74rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.cfdns-dns-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cfdns-radio-label {
+  color: #80868b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cfdns-radio-group {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+}
+
+.cfdns-radio-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  color: #3c4043;
+  cursor: pointer;
+}
+
+.cfdns-soa-fieldset {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.cfdns-soa-fieldset legend {
+  padding: 0 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #5f6368;
+  text-transform: uppercase;
+}
+
+/* Radix: Overlay/Content são irmãos — o Content centraliza a si mesmo. */
+.cfdns-zone-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 33, 36, 0.5);
+  z-index: 60;
+}
+
+.cfdns-zone-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 61;
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(85vh, 640px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(32, 33, 36, 0.28);
+}
+
+.cfdns-zone-dialog__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+  color: #202124;
+}
+
+.cfdns-zone-dialog__description {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #3c4043;
+}
+
+.cfdns-zone-dialog__ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(217, 48, 37, 0.34);
+  border-radius: 10px;
+  background: rgba(252, 232, 230, 0.55);
+  font-size: 0.8rem;
+  color: #c5221f;
+  cursor: pointer;
+}
+
+.cfdns-zone-dialog__ack input {
+  margin-top: 2px;
+}
+
+.cfdns-zone-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cfdns-zone-dialog__danger {
+  background: #c5221f;
+  border-color: #c5221f;
+}
+
+/* ── CF DNS — DNS-4: aba "Análises" ──────────────────────────────── */
+.cfdns-analytics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cfdns-analytics-periods {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cfdns-analytics-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cfdns-analytics-kpi {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(26, 115, 232, 0.14);
+  border-radius: 10px;
+  background: rgba(239, 246, 255, 0.42);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cfdns-analytics-kpi span {
+  color: #80868b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cfdns-analytics-kpi strong {
+  color: #202124;
+  font-size: 1.05rem;
+}
+
+.cfdns-analytics-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+}
+
+.cfdns-analytics-card h5 {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5f6368;
+}
+
+.cfdns-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.cfdns-analytics-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cfdns-analytics-skeleton {
+  height: 160px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.05));
+  background-size: 200% 100%;
+  animation: cfdns-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.cfdns-analytics-skeleton--kpis {
+  height: 64px;
+}
+
+@keyframes cfdns-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.chart-empty {
+  color: #5f6368;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 760px) {
+  .cfdns-analytics-kpis {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── CF DNS — DNS-4: residuais do Registrar (drawer, contatos, transfer) ── */
+.cfdns-registrar-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 33, 36, 0.5);
+  z-index: 60;
+}
+
+.cfdns-registrar-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+  width: min(440px, 94vw);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: -16px 0 40px rgba(32, 33, 36, 0.28);
+}
+
+.cfdns-registrar-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cfdns-registrar-drawer__header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+  color: #202124;
+}
+
+.cfdns-registrar-drawer__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cfdns-registrar-drawer__field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cfdns-registrar-drawer__field span {
+  color: #80868b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cfdns-registrar-drawer__field strong {
+  color: #202124;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.cfdns-registrar-drawer pre {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.74);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.cfdns-registrar-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cfdns-transfer-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed rgba(26, 115, 232, 0.28);
+  border-radius: 10px;
+  background: rgba(239, 246, 255, 0.35);
+}
+
+.cfdns-transfer-card h5 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.84rem;
+  color: #202124;
+}
