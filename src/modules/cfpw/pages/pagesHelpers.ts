@@ -9,7 +9,7 @@
  * e extração de branches únicas dos deployments carregados.
  */
 
-export const PAGES_PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,57}$/;
+const PAGES_PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,57}$/;
 
 export const PAGES_PROJECT_NAME_HINT =
   'Use apenas letras minúsculas, dígitos e hífens, iniciando com letra ou dígito, com no máximo 58 caracteres.';

@@ -514,7 +514,7 @@ export type DnsAnalyticsPayload = {
 export type DnsAnalyticsTopDimension = 'queryName' | 'queryType' | 'responseCode';
 
 /** Detalhe de uma registration (GET por domínio): campos extras quando a CF os devolve. */
-export type RegistrarRegistrationDetail = RegistrarRegistration & {
+type RegistrarRegistrationDetail = RegistrarRegistration & {
   name_servers?: string[];
   contacts?: Record<string, unknown>;
 };

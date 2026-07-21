@@ -13,7 +13,7 @@
 /** 90 MiB — espelho do limite de upload validado no motor (413 acima). */
 export const R2_MAX_UPLOAD_BYTES = 94_371_840;
 /** Máximo de chaves por chamada de DELETE do motor; o painel encadeia lotes. */
-export const R2_DELETE_CHUNK_SIZE = 40;
+const R2_DELETE_CHUNK_SIZE = 40;
 /** Acima deste número de objetos, o bulk-delete exige digitar o total exato. */
 export const R2_BULK_DELETE_TYPE_THRESHOLD = 25;
 

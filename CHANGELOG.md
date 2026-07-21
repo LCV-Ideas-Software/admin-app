@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+## [v02.15.00] - 2026-07-21
+
+### Adicionado
+
+- **CF DNS — paridade de registros**: os 21 tipos de registro aceitos pela Cloudflare (novos: DS, DNSKEY, SSHFP, SMIMEA, CERT, LOC, OPENPGPKEY; editores estruturados também para TLSA e NAPTR), edição de tags e comentários com limites por plano, ordenação por coluna, seletor de tamanho de página com salto direto e filtros avançados (nome/conteúdo/comentário/tag/proxy com combinação todos/qualquer).
+- **CF DNS — operações em lote**: seleção múltipla de registros com exclusão e edição em massa (TTL, proxy, tags, comentário) via endpoint de batch da Cloudflare (tudo-ou-nada), com confirmação listando os registros afetados.
+- **CF DNS — import/export BIND**: exportação da zona em formato BIND e importação de arquivo de zona (até 2 MB) com pré-visualização, opção de proxy e resultado com contadores.
+- **CF DNS — zona e DNSSEC**: gestão do ciclo de vida de zonas (listagem com status, criação, exclusão com confirmação por nome, pausa/despausa, verificação de ativação e nameservers para zonas pendentes), painel DNSSEC completo (5 estados, registro DS com cópia, multi-signer/presigned/NSEC3) e configurações DNS da zona (CNAME flattening, multi-provider, NS TTL, SOA completo, modo da zona, nameservers customizados).
+- **CF DNS — análises**: consultas DNS por período com série temporal e rankings (nomes, tipos, códigos de resposta), com retenção ajustada ao plano da zona e gráficos SVG próprios sem dependências.
+- **CF DNS — Registrar**: gaveta de detalhes por domínio, contato de registrante opcional e anos no registro, contagem regressiva de expiração com alerta e atalhos para renovação/transferência no dashboard (operações sem API pública documentadas como tal).
+- **CF P&W — Workers**: criação de worker pela interface, editor de código com deploy (multi-módulo, detecção de conflito por etag), versões com promoção, rollback e rollout gradual por porcentagem, edição completa de settings (data/flags de compatibilidade, placement, logpush, tail consumers, observabilidade com amostragem, limites de CPU) e editor de bindings de todos os tipos com preservação garantida de secrets, domínios customizados e workers.dev (conta e por script), cron triggers com validação, descrição humanizada e próximas execuções, busca e paginação na listagem.
+- **CF P&W — Builds e métricas**: histórico de builds do Workers CI com logs, reexecução e cancelamento; métricas GraphQL por worker e da conta (requests, erros, subrequests, CPU e duração p50/p99) com gráficos e KPIs; aba Live da observabilidade com modo aprimorado via live-tail; console avançado para chamadas diretas à API Cloudflare dentro da allowlist.
+- **CF P&W — Pages**: criação completa de projeto (wizard com build config e conexão de repositório já autorizado), edição de build config com purge de cache de build, variáveis e bindings por ambiente (produção/preview) com editor estruturado, disparo de novo deployment por branch, detalhe de deployment com timeline de estágios e logs ao vivo, domínios com status de verificação/SSL e reverificação, ativação de Web Analytics.
+- **CF P&W — Armazenamento**: gestão completa de KV (namespaces, navegador de chaves com cursor, editor de valores com TTL/metadata, operações em massa), D1 (bancos, console SQL com classificação de comandos perigosos, navegador de tabelas, export com URL assinada e import direto ao R2 pré-assinado) e R2 (buckets, navegador de objetos com pastas e multi-seleção, upload até 90 MB, download em stream, configurações do bucket), com navegação cruzada a partir dos bindings e seletores de KV/D1/R2 nos editores de binding.
+- **Fundação técnica**: núcleo único de chamadas à API Cloudflare com tradução diagnóstica de erros (causa real + ação sugerida + código CF), sondagem de capacidades por conta/zona com degradação graciosa por permissão/plano, harness de testes compartilhado para handlers e binding de secret dedicado para storage.
+
+### Segurança
+
+- **Guardas de autoproteção**: deploy/alterações nos workers de produção do próprio admin (admin-motor, tlsrpt-motor) exigem frase de confirmação explícita; zona crítica que hospeda o admin exige confirmação reforçada para pausa/exclusão/desativação de DNSSEC; banco D1 operacional `bigdata_db` tem exclusão e import bloqueados no servidor sem exceção e escrita SQL somente com frase de confirmação; bucket de mídia de produção protegido contra exclusão.
+- **Correção dos avisos de auditoria**: `brace-expansion` e `protobufjs` atualizados para as versões corrigidas (GHSA-3jxr-9vmj-r5cp e GHSA-j3f2-48v5-ccww), zerando o npm audit e destravando o passo de auditoria do deploy.
+
+### Corrigido
+
+- **Busca de registros DNS**: o campo de busca fazia correspondência exata de nome; agora usa a busca parcial multi-propriedade da Cloudflare.
+- **Cron triggers vazios**: a leitura de agendamentos interpretava o envelope da Cloudflare incorretamente e sempre retornava lista vazia.
+- **Modais herdados sem estilo**: os diálogos de confirmação antigos do CF DNS referenciavam classes CSS inexistentes e foram convertidos ao padrão Radix centralizado do aplicativo.
+
+### Alterado
+
+- **Módulos reestruturados**: CF DNS e CF P&W foram divididos em abas e componentes dedicados (monólitos de 3.679 e 1.331 linhas decompostos), bibliotecas Cloudflare duplicadas foram consolidadas em fonte única e arquivos órfãos removidos.
+
 ## [v02.14.06] - 2026-07-12
 
 ### Corrigido

@@ -2,7 +2,7 @@
 // produção que servem a própria interface com um deploy/alteração defeituoso
 // sem confirmação explícita do operador.
 
-export const PROTECTED_WORKERS = ['admin-motor', 'tlsrpt-motor'];
+const PROTECTED_WORKERS = ['admin-motor', 'tlsrpt-motor'];
 
 export const PROTECTED_CONFIRM_PHRASE = 'EU ENTENDO O RISCO';
 

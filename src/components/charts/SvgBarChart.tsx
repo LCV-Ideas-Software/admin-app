@@ -10,7 +10,7 @@
  * proporcional ao maior valor e valor formatado à direita.
  */
 
-export type SvgBarChartItem = {
+type SvgBarChartItem = {
   label: string;
   value: number;
 };

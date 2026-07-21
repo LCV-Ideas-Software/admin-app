@@ -13,8 +13,8 @@
 import type { KvValueType } from '../../../types';
 
 export const KV_KEY_MAX_BYTES = 512;
-export const KV_METADATA_MAX_BYTES = 1024;
-export const KV_TTL_MIN_SECONDS = 60;
+const KV_METADATA_MAX_BYTES = 1024;
+const KV_TTL_MIN_SECONDS = 60;
 /** Acima deste número de chaves, o bulk-delete exige digitar o total exato. */
 export const KV_BULK_DELETE_TYPE_THRESHOLD = 25;
 

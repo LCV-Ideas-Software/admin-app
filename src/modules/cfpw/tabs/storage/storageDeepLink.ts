@@ -11,7 +11,7 @@
  * interna atualiza o hash com history.replaceState.
  */
 
-export type StorageDeepLinkKind = 'kv' | 'd1' | 'r2';
+type StorageDeepLinkKind = 'kv' | 'd1' | 'r2';
 
 export type StorageDeepLink = {
   kind: StorageDeepLinkKind;

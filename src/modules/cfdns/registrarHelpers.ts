@@ -86,7 +86,7 @@ export const buildRegistrantContacts = (draft: RegistrantContactDraft): Record<s
   return { registrant };
 };
 
-export const EXPIRY_WARNING_DAYS = 30;
+const EXPIRY_WARNING_DAYS = 30;
 
 export type ExpiryBadge = {
   label: string;

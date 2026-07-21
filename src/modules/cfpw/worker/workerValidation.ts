@@ -10,7 +10,7 @@
  * verdade no backend; aqui apenas orientamos a UI).
  */
 
-export const WORKER_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const WORKER_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
 export const WORKER_NAME_HINT =
   'Use apenas letras minúsculas, dígitos e hífens (sem hífen no início/fim), com no máximo 63 caracteres.';
@@ -31,7 +31,7 @@ export const validateWorkerName = (name: string): string | null => {
 };
 
 /** Workers de produção do próprio admin-app (mutações exigem frase de confirmação). */
-export const PROTECTED_WORKERS = ['admin-motor', 'tlsrpt-motor'];
+const PROTECTED_WORKERS = ['admin-motor', 'tlsrpt-motor'];
 
 export const PROTECTED_CONFIRM_PHRASE = 'EU ENTENDO O RISCO';
 

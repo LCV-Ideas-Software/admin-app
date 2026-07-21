@@ -5,7 +5,7 @@
 
 import { PROTECTED_CONFIRM_PHRASE } from '../_protected';
 
-export const PROTECTED_D1_NAMES = ['bigdata_db'];
+const PROTECTED_D1_NAMES = ['bigdata_db'];
 
 /** Erro tratado (HTTP 403) de operação bloqueada em banco D1 protegido. */
 export class ProtectedD1Error extends Error {

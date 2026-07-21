@@ -54,7 +54,7 @@ import type {
   WorkerVersionsPayload,
 } from './types';
 
-export const parseApiPayload = async <T>(response: Response, fallback: string): Promise<T> => {
+const parseApiPayload = async <T>(response: Response, fallback: string): Promise<T> => {
   const rawText = await response.text();
   const trimmed = rawText.trim();
   const cfRay = response.headers.get('cf-ray');

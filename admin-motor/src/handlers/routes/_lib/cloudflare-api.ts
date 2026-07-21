@@ -14,7 +14,7 @@ export type CloudflareZone = {
   name?: string;
 };
 
-export type CloudflareAccount = {
+type CloudflareAccount = {
   id: string;
   name: string;
 };
@@ -81,7 +81,7 @@ export type CloudflareRegistrarRegistration = {
   locked: boolean | null;
 };
 
-export type CloudflareRegistrarPricing = {
+type CloudflareRegistrarPricing = {
   currency: string;
   registration_cost: string;
   renewal_cost: string;
@@ -225,7 +225,7 @@ const normalizeCloudflareAccount = (account: { id?: string; name?: string }): Cl
   name: String(account.name ?? '').trim(),
 });
 
-export const listCloudflareAccounts = async (env: EnvWithCloudflareToken) => {
+const listCloudflareAccounts = async (env: EnvWithCloudflareToken) => {
   const accounts = await cloudflareRequest<Array<{ id?: string; name?: string }>>(
     env,
     '/accounts?page=1&per_page=50',

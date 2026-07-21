@@ -15,10 +15,10 @@ import type { D1ExportResult, D1StatementClassification } from '../../../types';
 
 export const D1_SQL_HISTORY_MAX = 50;
 export const D1_GRID_MAX_ROWS = 200;
-export const D1_GRID_MAX_COLUMNS = 200;
+const D1_GRID_MAX_COLUMNS = 200;
 /** Acima disso o aviso de truncamento destaca o volume total do resultado. */
-export const D1_GRID_LARGE_RESULT_ROWS = 5000;
-export const D1_IMPORT_CHUNK_BYTES = 2 * 1024 * 1024;
+const D1_GRID_LARGE_RESULT_ROWS = 5000;
+const D1_IMPORT_CHUNK_BYTES = 2 * 1024 * 1024;
 export const D1_DATABASE_NAME_PATTERN = /^[a-z0-9][a-z0-9-_]{0,62}$/i;
 
 // ── Histórico de SQL ──
@@ -36,7 +36,7 @@ export function pushSqlHistory(history: string[], sql: string): string[] {
 // ── Espelho client-side do classificador (autoridade = motor) ──
 
 /** Divide o SQL por ';' fora de aspas simples/duplas (espelho do motor). */
-export function splitSqlStatementsClient(sql: string): string[] {
+function splitSqlStatementsClient(sql: string): string[] {
   const statements: string[] = [];
   let current = '';
   let inSingleQuote = false;

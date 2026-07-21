@@ -167,7 +167,7 @@ export const toIntOrFallback = (raw: string, fallback: number) => {
   return Math.trunc(parsed);
 };
 
-export const toNumberOrFallback = (raw: string, fallback: number) => {
+const toNumberOrFallback = (raw: string, fallback: number) => {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) {
     return fallback;
@@ -603,7 +603,7 @@ export const parseStructuredDraft = (draft: EditorDraft): StructuredDataValidati
 
 // ── DNS-1: tags (mesmos limites do motor: máx. 20, nome 1-32 [A-Za-z0-9_.-], valor até 100) ──
 
-export const DNS_TAG_REGEX = /^[A-Za-z0-9_.-]{1,32}(:.{0,100})?$/;
+const DNS_TAG_REGEX = /^[A-Za-z0-9_.-]{1,32}(:.{0,100})?$/;
 export const MAX_DNS_TAGS = 20;
 
 /** Retorna a mensagem de erro (pt-BR) ou null quando a tag é válida. */

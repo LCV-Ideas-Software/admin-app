@@ -30,6 +30,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/Dialog';
 import * as api from './api';
 import {
   buildRegistrantContacts,
@@ -590,7 +591,7 @@ export function useRegistrarController({ adminActor, zones, selectedZoneName }: 
   };
 }
 
-export type RegistrarController = ReturnType<typeof useRegistrarController>;
+type RegistrarController = ReturnType<typeof useRegistrarController>;
 
 type RegistrarTabProps = {
   controller: RegistrarController;
@@ -1081,137 +1082,103 @@ export function RegistrarTab({ controller, zones, selectedZoneName, onZoneChange
         </div>
       </article>
 
-      {pendingRegistrarCreate &&
-        createPortal(
-          // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop — click dismisses; keyboard dismissal handled by Escape
-          <div
-            className="cleanup-confirm-overlay"
-            onClick={() => setPendingRegistrarCreate(null)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setPendingRegistrarCreate(null);
-            }}
-          >
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: event guard — isolates modal body from backdrop dismiss */}
-            <div
-              className="cleanup-confirm-modal"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <AlertTriangle size={32} className="cleanup-confirm-icon" />
-              <h3>Registrar domínio</h3>
-              <p>
-                Confirma o registro billable de <strong>{pendingRegistrarCreate.name}</strong> por {registrarYears}{' '}
-                ano(s), {formatRegistrarPrice(pendingRegistrarCreate.pricing)}?
-                <br />
-                Registros concluídos não são reembolsáveis.
-              </p>
-              <div className="field-group">
-                <label htmlFor="cfdns-registrar-modal-years">Anos</label>
-                <select
-                  id="cfdns-registrar-modal-years"
-                  name="cfDnsRegistrarModalYears"
-                  value={registrarYears}
-                  onChange={(event) => setRegistrarYears(event.target.value)}
-                >
-                  {Array.from({ length: 10 }, (_, index) => String(index + 1)).map((years) => (
-                    <option key={years} value={years}>
-                      {years}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <details className="cfdns-advanced-accordion">
-                <summary>Contato do registrante (opcional)</summary>
-                <p className="field-hint">Sem contato informado, a Cloudflare usa o cadastro padrão da conta.</p>
-                <div className="cfdns-registrar-contact-grid">
-                  {(
-                    [
-                      ['first_name', 'Nome'],
-                      ['last_name', 'Sobrenome'],
-                      ['organization', 'Organização'],
-                      ['address', 'Endereço'],
-                      ['address2', 'Complemento'],
-                      ['city', 'Cidade'],
-                      ['state', 'Estado (UF)'],
-                      ['zip', 'CEP'],
-                      ['country', 'País (código, ex.: BR)'],
-                      ['email', 'E-mail'],
-                      ['phone', 'Telefone (+55.51...)'],
-                    ] as const
-                  ).map(([field, label]) => (
-                    <div key={field} className="field-group">
-                      <label htmlFor={`cfdns-registrar-contact-${field}`}>{label}</label>
-                      <input
-                        id={`cfdns-registrar-contact-${field}`}
-                        name={`cfDnsRegistrarContact_${field}`}
-                        type="text"
-                        autoComplete="off"
-                        value={registrarContactDraft[field]}
-                        onChange={(event) => updateRegistrarContactField(field, event.target.value)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </details>
-              <div className="cleanup-confirm-actions">
-                <button
-                  type="button"
-                  className="cleanup-confirm-cancel"
-                  onClick={() => setPendingRegistrarCreate(null)}
-                >
-                  Cancelar
-                </button>
-                <button type="button" className="cleanup-confirm-proceed" onClick={() => void executeRegistrarCreate()}>
-                  Confirmar registro
-                </button>
-              </div>
+      {pendingRegistrarCreate && (
+        <Dialog open onOpenChange={(nextOpen) => (!nextOpen ? setPendingRegistrarCreate(null) : undefined)}>
+          <DialogContent overlayClassName="cfdns-zone-dialog-overlay" className="cfdns-zone-dialog">
+            <DialogTitle className="cfdns-zone-dialog__title">
+              <AlertTriangle size={18} /> Registrar domínio
+            </DialogTitle>
+            <DialogDescription className="cfdns-zone-dialog__description">
+              Confirma o registro billable de <strong>{pendingRegistrarCreate.name}</strong> por {registrarYears}{' '}
+              ano(s), {formatRegistrarPrice(pendingRegistrarCreate.pricing)}?
+              <br />
+              Registros concluídos não são reembolsáveis.
+            </DialogDescription>
+            <div className="field-group">
+              <label htmlFor="cfdns-registrar-modal-years">Anos</label>
+              <select
+                id="cfdns-registrar-modal-years"
+                name="cfDnsRegistrarModalYears"
+                value={registrarYears}
+                onChange={(event) => setRegistrarYears(event.target.value)}
+              >
+                {Array.from({ length: 10 }, (_, index) => String(index + 1)).map((years) => (
+                  <option key={years} value={years}>
+                    {years}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>,
-          document.body,
-        )}
+            <details className="cfdns-advanced-accordion">
+              <summary>Contato do registrante (opcional)</summary>
+              <p className="field-hint">Sem contato informado, a Cloudflare usa o cadastro padrão da conta.</p>
+              <div className="cfdns-registrar-contact-grid">
+                {(
+                  [
+                    ['first_name', 'Nome'],
+                    ['last_name', 'Sobrenome'],
+                    ['organization', 'Organização'],
+                    ['address', 'Endereço'],
+                    ['address2', 'Complemento'],
+                    ['city', 'Cidade'],
+                    ['state', 'Estado (UF)'],
+                    ['zip', 'CEP'],
+                    ['country', 'País (código, ex.: BR)'],
+                    ['email', 'E-mail'],
+                    ['phone', 'Telefone (+55.51...)'],
+                  ] as const
+                ).map(([field, label]) => (
+                  <div key={field} className="field-group">
+                    <label htmlFor={`cfdns-registrar-contact-${field}`}>{label}</label>
+                    <input
+                      id={`cfdns-registrar-contact-${field}`}
+                      name={`cfDnsRegistrarContact_${field}`}
+                      type="text"
+                      autoComplete="off"
+                      value={registrarContactDraft[field]}
+                      onChange={(event) => updateRegistrarContactField(field, event.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
+            <div className="cfdns-zone-dialog__actions">
+              <button type="button" className="ghost-button" onClick={() => setPendingRegistrarCreate(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="primary-button cfdns-zone-dialog__danger"
+                onClick={() => void executeRegistrarCreate()}
+              >
+                Confirmar registro
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {pendingRegistrarSettings &&
-        createPortal(
-          // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop — click dismisses; keyboard dismissal handled by Escape
-          <div
-            className="cleanup-confirm-overlay"
-            onClick={() => setPendingRegistrarSettings(null)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setPendingRegistrarSettings(null);
-            }}
-          >
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: event guard — isolates modal body from backdrop dismiss */}
-            <div
-              className="cleanup-confirm-modal"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <AlertTriangle size={32} className="cleanup-confirm-icon" />
-              <h3>Atualizar Registrar</h3>
-              <p>
-                Confirma <strong>{pendingRegistrarSettings.label}</strong> em{' '}
-                <strong>{pendingRegistrarSettings.domain}</strong>?
-              </p>
-              <div className="cleanup-confirm-actions">
-                <button
-                  type="button"
-                  className="cleanup-confirm-cancel"
-                  onClick={() => setPendingRegistrarSettings(null)}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="cleanup-confirm-proceed"
-                  onClick={() => void executeRegistrarSettingsPatch()}
-                >
-                  Confirmar
-                </button>
-              </div>
+      {pendingRegistrarSettings && (
+        <Dialog open onOpenChange={(nextOpen) => (!nextOpen ? setPendingRegistrarSettings(null) : undefined)}>
+          <DialogContent overlayClassName="cfdns-zone-dialog-overlay" className="cfdns-zone-dialog">
+            <DialogTitle className="cfdns-zone-dialog__title">
+              <AlertTriangle size={18} /> Atualizar Registrar
+            </DialogTitle>
+            <DialogDescription className="cfdns-zone-dialog__description">
+              Confirma <strong>{pendingRegistrarSettings.label}</strong> em{' '}
+              <strong>{pendingRegistrarSettings.domain}</strong>?
+            </DialogDescription>
+            <div className="cfdns-zone-dialog__actions">
+              <button type="button" className="ghost-button" onClick={() => setPendingRegistrarSettings(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="primary-button" onClick={() => void executeRegistrarSettingsPatch()}>
+                Confirmar
+              </button>
             </div>
-          </div>,
-          document.body,
-        )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {registrarDetail &&
         createPortal(

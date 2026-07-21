@@ -1,6 +1,6 @@
 import { CfApiError, cfApiRequest } from './cf-api-core';
 
-export type CfpwAccount = {
+type CfpwAccount = {
   id: string;
   name: string;
 };
@@ -196,7 +196,7 @@ const normalizeAccount = (account: { id?: string; name?: string }) => ({
   name: String(account.name ?? '').trim(),
 });
 
-export const listCloudflareAccounts = async (env: EnvWithCloudflarePwToken) => {
+const listCloudflareAccounts = async (env: EnvWithCloudflarePwToken) => {
   const accounts = await cloudflareRequest<Array<{ id?: string; name?: string }>>(
     env,
     '/accounts?page=1&per_page=50',

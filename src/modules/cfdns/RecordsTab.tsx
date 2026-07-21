@@ -26,8 +26,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNotification } from '../../components/Notification';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/Dialog';
 import { cfApiErrorMessage } from '../shared/cfApi';
 import * as api from './api';
 import { BatchBar } from './BatchBar';
@@ -992,7 +992,7 @@ export function useRecordsController({ adminActor, selectedZoneId, zoneContextLa
   };
 }
 
-export type RecordsController = ReturnType<typeof useRecordsController>;
+type RecordsController = ReturnType<typeof useRecordsController>;
 
 type RecordsTabProps = {
   controller: RecordsController;
@@ -1899,83 +1899,63 @@ export function RecordsTab({ controller, selectedZoneId, selectedZoneName }: Rec
       )}
 
       {/* ── Confirm Modal DNS Save (substitui window.confirm) ── */}
-      {pendingSaveConfirm &&
-        createPortal(
-          // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop — click dismisses; keyboard dismissal handled elsewhere
-          <div
-            className="cleanup-confirm-overlay"
-            onClick={() => setPendingSaveConfirm(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setPendingSaveConfirm(false);
-            }}
-          >
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: event guard — isolates modal body from backdrop dismiss */}
-            <div
-              className="cleanup-confirm-modal"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <AlertTriangle size={32} className="cleanup-confirm-icon" />
-              <h3>{isEditing ? 'Atualizar registro DNS' : 'Criar registro DNS'}</h3>
-              <p>
-                Confirma a {isEditing ? 'atualização' : 'criação'} do registro{' '}
-                <strong>
-                  {draft.type} {draft.name}
-                </strong>
-                ?
-              </p>
-              <div className="cleanup-confirm-actions">
-                <button type="button" className="cleanup-confirm-cancel" onClick={() => setPendingSaveConfirm(false)}>
-                  Cancelar
-                </button>
-                <button type="button" className="cleanup-confirm-proceed" onClick={() => void executeSaveRecord()}>
-                  Confirmar
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      <Dialog
+        open={pendingSaveConfirm}
+        onOpenChange={(nextOpen) => (!nextOpen ? setPendingSaveConfirm(false) : undefined)}
+      >
+        <DialogContent overlayClassName="cfdns-zone-dialog-overlay" className="cfdns-zone-dialog">
+          <DialogTitle className="cfdns-zone-dialog__title">
+            <AlertTriangle size={18} /> {isEditing ? 'Atualizar registro DNS' : 'Criar registro DNS'}
+          </DialogTitle>
+          <DialogDescription className="cfdns-zone-dialog__description">
+            Confirma a {isEditing ? 'atualização' : 'criação'} do registro{' '}
+            <strong>
+              {draft.type} {draft.name}
+            </strong>
+            ?
+          </DialogDescription>
+          <div className="cfdns-zone-dialog__actions">
+            <button type="button" className="ghost-button" onClick={() => setPendingSaveConfirm(false)}>
+              Cancelar
+            </button>
+            <button type="button" className="primary-button" onClick={() => void executeSaveRecord()}>
+              Confirmar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Confirm Modal DNS Delete (substitui window.confirm) ── */}
-      {pendingDeleteRecord &&
-        createPortal(
-          // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop — click dismisses; keyboard dismissal handled elsewhere
-          <div
-            className="cleanup-confirm-overlay"
-            onClick={() => setPendingDeleteRecord(null)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setPendingDeleteRecord(null);
-            }}
-          >
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: event guard — isolates modal body from backdrop dismiss */}
-            <div
-              className="cleanup-confirm-modal"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
+      <Dialog
+        open={pendingDeleteRecord !== null}
+        onOpenChange={(nextOpen) => (!nextOpen ? setPendingDeleteRecord(null) : undefined)}
+      >
+        <DialogContent overlayClassName="cfdns-zone-dialog-overlay" className="cfdns-zone-dialog">
+          <DialogTitle className="cfdns-zone-dialog__title">
+            <AlertTriangle size={18} /> Excluir registro DNS
+          </DialogTitle>
+          <DialogDescription className="cfdns-zone-dialog__description">
+            Confirma a exclusão do registro{' '}
+            <strong>
+              {String(pendingDeleteRecord?.type ?? '')} {String(pendingDeleteRecord?.name ?? '')}
+            </strong>
+            ?<br />
+            Esta ação é irreversível.
+          </DialogDescription>
+          <div className="cfdns-zone-dialog__actions">
+            <button type="button" className="ghost-button" onClick={() => setPendingDeleteRecord(null)}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="primary-button cfdns-zone-dialog__danger"
+              onClick={() => void executeDeleteRecord()}
             >
-              <AlertTriangle size={32} className="cleanup-confirm-icon" />
-              <h3>Excluir registro DNS</h3>
-              <p>
-                Confirma a exclusão do registro{' '}
-                <strong>
-                  {String(pendingDeleteRecord?.type ?? '')} {String(pendingDeleteRecord?.name ?? '')}
-                </strong>
-                ?<br />
-                Esta ação é irreversível.
-              </p>
-              <div className="cleanup-confirm-actions">
-                <button type="button" className="cleanup-confirm-cancel" onClick={() => setPendingDeleteRecord(null)}>
-                  Cancelar
-                </button>
-                <button type="button" className="cleanup-confirm-proceed" onClick={() => void executeDeleteRecord()}>
-                  Confirmar exclusão
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+              Confirmar exclusão
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

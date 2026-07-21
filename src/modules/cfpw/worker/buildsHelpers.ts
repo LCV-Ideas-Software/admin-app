@@ -10,7 +10,7 @@
  * de log ([timestamp, texto] ou string).
  */
 
-export type BuildPillTone = 'queued' | 'running' | 'success' | 'failed' | 'cancelled' | 'unknown';
+type BuildPillTone = 'queued' | 'running' | 'success' | 'failed' | 'cancelled' | 'unknown';
 
 export type BuildPill = {
   label: string;

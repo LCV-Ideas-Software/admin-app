@@ -12,12 +12,12 @@
 
 import type { DnsAnalyticsReport } from './types';
 
-export type AnalyticsPoint = {
+type AnalyticsPoint = {
   t: number;
   v: number;
 };
 
-export type AnalyticsSeries = {
+type AnalyticsSeries = {
   label: string;
   points: AnalyticsPoint[];
 };

@@ -11,7 +11,7 @@
  * qualquer edição de secret com valor conta como substituição.
  */
 
-export type PageEnvVarDraft = {
+type PageEnvVarDraft = {
   type: 'plain_text' | 'secret_text';
   value?: string;
 };

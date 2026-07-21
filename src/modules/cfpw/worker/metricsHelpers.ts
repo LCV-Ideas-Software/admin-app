@@ -18,7 +18,7 @@
 
 import type { WorkerMetricsPoint } from '../types';
 
-export type ChartPoint = {
+type ChartPoint = {
   t: number;
   v: number;
 };
