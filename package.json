@@ -86,7 +86,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
-    "@cloudflare/workers-types": "^5.20260721.1",
+    "@cloudflare/workers-types": "^5.20260722.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@tanstack/react-query-devtools": "^5.101.3",
@@ -119,7 +119,7 @@
     "typescript-eslint": "^8.65.0",
     "vite": "^8.1.5",
     "vitest": "^4.1.10",
-    "wrangler": "^4.112.0"
+    "wrangler": "^4.113.0"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
