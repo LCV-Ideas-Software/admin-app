@@ -1,0 +1,15 @@
+# Organization policy requires explicit `permissions: write-all` at workflow
+# and job scope. That deliberate policy leaves no useful signal for this audit;
+# every other zizmor audit remains enabled.
+rules:
+  dependabot-cooldown:
+    # GitHub applies a three-day default to version updates while security
+    # updates bypass cooldown. Preserve that upstream security/freshness balance.
+    config:
+      days: 3
+  excessive-permissions:
+    disable: true
+  dangerous-triggers:
+    ignore:
+      # API-only controller: no checkout, cache, artifact, or PR code execution.
+      - dependabot-automerge.yml

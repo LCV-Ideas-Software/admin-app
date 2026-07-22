@@ -6,10 +6,8 @@ name: Auto-release on version bump
 #
 # Idempotent on transition: checks BOTH the new universal format
 # (vXX.YY.ZZ) AND the legacy unpadded format (vX.Y.Z) for the current
-# version. If either exists on origin, the workflow exits without
-# creating anything. This prevents a duplicate release when the repo's
-# history has tags from before the universal convention was adopted
-# (e.g. `v2.0.10` legacy vs `v02.00.10` universal).
+# version. An existing identity must resolve to the exact workflow SHA;
+# missing or draft releases are reconciled without creating a second tag.
 #
 # Inspired by maestro-app's release.yml (Codex 2026-04-26) and
 # cross-review-mcp's auto-tag.yml. Adapted for the 8 LCV-Ideas-Software
@@ -18,8 +16,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-permissions:
-  contents: read
+permissions: write-all
 concurrency:
   group: auto-release-${{ github.ref }}
   cancel-in-progress: false
@@ -29,9 +26,9 @@ env:
 jobs:
   auto-release:
     name: Create universal-format tag + GitHub Release if APP_VERSION was bumped
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    permissions: write-all
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -41,6 +38,7 @@ jobs:
       - name: Checkout main with full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Extract APP_VERSION + compute tags
         id: version
@@ -66,28 +64,325 @@ jobs:
           echo "tag=$PAD" >> "$GITHUB_OUTPUT"
           echo "legacy_tag=$LEGACY" >> "$GITHUB_OUTPUT"
           echo "APP_VERSION='APP v${DIGITS}' → universal: $PAD, legacy: $LEGACY"
-      - name: Check if either tag already exists on origin
+      - name: Audit existing tag and release state
         id: check
         env:
           TAG: ${{ steps.version.outputs.tag }}
           LEGACY_TAG: ${{ steps.version.outputs.legacy_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Tag ${TAG} already exists; skipping."
-          elif [ "$TAG" != "$LEGACY_TAG" ] && git ls-remote --exit-code --tags origin "refs/tags/${LEGACY_TAG}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Legacy tag ${LEGACY_TAG} already exists for this version; skipping (transition guard)."
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "Neither ${TAG} nor ${LEGACY_TAG} exists; will create universal-format tag ${TAG}."
+
+          tag_exists() {
+            local encoded_tag
+            encoded_tag="$(jq -rn --arg value "$1" '$value | @uri')"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/git/ref/tags/${encoded_tag}" \
+              >/dev/null 2>&1
+          }
+
+          resolve_commitish() {
+            local commitish="$1"
+            local encoded_commitish resolved_sha
+            encoded_commitish="$(jq -rn --arg value "$commitish" '$value | @uri')"
+            if ! resolved_sha="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/commits/${encoded_commitish}" \
+                --jq '.sha'
+            )"; then
+              echo "::error::Could not resolve release target_commitish ${commitish}." >&2
+              return 1
+            fi
+            if [[ ! "$resolved_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Resolved release target is not a full commit SHA: ${resolved_sha}." >&2
+              return 1
+            fi
+            printf '%s\n' "$resolved_sha"
+          }
+
+          universal_tag=false
+          legacy_tag=false
+          tag_exists "$TAG" && universal_tag=true
+          if [ "$TAG" != "$LEGACY_TAG" ]; then
+            tag_exists "$LEGACY_TAG" && legacy_tag=true
           fi
+
+          releases="$(
+            gh api --method GET --paginate \
+              "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+              jq -sc 'if length == 0 then [] else add end'
+          )"
+          universal_releases="$(jq -c --arg tag "$TAG" '[.[] | select(.tag_name == $tag)]' <<<"$releases")"
+          legacy_releases='[]'
+          if [ "$TAG" != "$LEGACY_TAG" ]; then
+            legacy_releases="$(jq -c --arg tag "$LEGACY_TAG" '[.[] | select(.tag_name == $tag)]' <<<"$releases")"
+          fi
+          universal_release_count="$(jq 'length' <<<"$universal_releases")"
+          legacy_release_count="$(jq 'length' <<<"$legacy_releases")"
+          if [ "$universal_release_count" -gt 1 ] || [ "$legacy_release_count" -gt 1 ]; then
+            echo "::error::Multiple releases resolve to the same version identity." >&2
+            exit 1
+          fi
+
+          universal_identity=false
+          legacy_identity=false
+          if [ "$universal_tag" = true ] || [ "$universal_release_count" -eq 1 ]; then
+            universal_identity=true
+          fi
+          if [ "$legacy_tag" = true ] || [ "$legacy_release_count" -eq 1 ]; then
+            legacy_identity=true
+          fi
+          if [ "$universal_identity" = true ] && [ "$legacy_identity" = true ]; then
+            echo "::error::Both universal and legacy release identities exist for this version." >&2
+            exit 1
+          fi
+
+          if [ "$legacy_identity" = true ]; then
+            release_tag="$LEGACY_TAG"
+            selected_tag_exists="$legacy_tag"
+            selected_releases="$legacy_releases"
+          else
+            release_tag="$TAG"
+            selected_tag_exists="$universal_tag"
+            selected_releases="$universal_releases"
+          fi
+
+          tag_sha=''
+          if [ "$selected_tag_exists" = true ]; then
+            tag_sha="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/commits/${release_tag}" \
+                --jq '.sha'
+            )"
+          fi
+
+          release_state=missing
+          complete=false
+          if [ "$(jq 'length' <<<"$selected_releases")" -eq 1 ]; then
+            release_state="$(jq -r 'if .[0].draft then "draft" else "published" end' <<<"$selected_releases")"
+            prerelease="$(jq -r '.[0].prerelease' <<<"$selected_releases")"
+            asset_count="$(jq '.[0].assets | length' <<<"$selected_releases")"
+            release_target="$(jq -r '.[0].target_commitish' <<<"$selected_releases")"
+            if [ "$prerelease" != false ]; then
+              echo "::error::Release ${release_tag} is classified as a prerelease; expected a normal release." >&2
+              exit 1
+            fi
+            if [ "$asset_count" -ne 0 ]; then
+              echo "::error::Release ${release_tag} has ${asset_count} unexpected uploaded asset(s)." >&2
+              exit 1
+            fi
+            if [ "$release_state" = published ]; then
+              if [ "$selected_tag_exists" != true ]; then
+                echo "::error::Published release ${release_tag} has no matching remote tag." >&2
+                exit 1
+              fi
+              # For a published release, a symbolic target is historical metadata
+              # that may move. The exact existing tag is authoritative.
+              if [[ "$release_target" =~ ^[0-9a-f]{40}$ ]] && [ "$release_target" != "$tag_sha" ]; then
+                echo "::error::Published release ${release_tag} targets ${release_target}, but its tag resolves to ${tag_sha}." >&2
+                exit 1
+              fi
+              complete=true
+            else
+              release_target_sha="$(resolve_commitish "$release_target")"
+              if [ "$release_target_sha" != "$GITHUB_SHA" ]; then
+                echo "::error::Draft release ${release_tag} target ${release_target} resolves to ${release_target_sha}, not ${GITHUB_SHA}." >&2
+                exit 1
+              fi
+            fi
+          fi
+          if [ "$complete" != true ] && [ "$selected_tag_exists" = true ] && [ "$tag_sha" != "$GITHUB_SHA" ]; then
+            echo "::error::Tag ${release_tag} resolves to ${tag_sha}, not the reconciliation target ${GITHUB_SHA}." >&2
+            exit 1
+          fi
+
+          {
+            echo "release_tag=$release_tag"
+            echo "tag_exists=$selected_tag_exists"
+            echo "release_state=$release_state"
+            echo "complete=$complete"
+          } >> "$GITHUB_OUTPUT"
+          echo "Release state for ${release_tag}: tag_exists=${selected_tag_exists}, state=${release_state}, complete=${complete}."
+      - name: Wait for successful push workflows on this commit
+        if: steps.check.outputs.complete != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUIRED_PUSH_WORKFLOWS: deploy.yml format-public.yml codeql.yml socket.yml zizmor.yml
+        run: |
+          set -euo pipefail
+          readonly poll_seconds=10
+          readonly stable_polls_required=3
+          deadline=$((SECONDS + 2700))
+          read -r -a required_workflows <<<"$REQUIRED_PUSH_WORKFLOWS"
+
+          remote_main_sha() {
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+              --jq '.object.sha'
+          }
+
+          assert_main_is_target() {
+            local phase="$1"
+            local main_sha
+            main_sha="$(remote_main_sha)"
+            if [ "$main_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::Remote main moved during $phase: expected $GITHUB_SHA, found $main_sha." >&2
+              exit 1
+            fi
+            echo "Remote main is still $GITHUB_SHA ($phase)."
+          }
+
+          latest_push_runs() {
+            gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --commit "$GITHUB_SHA" \
+              --event push \
+              --limit 1000 \
+              --json attempt,conclusion,createdAt,databaseId,event,headSha,name,status,workflowDatabaseId,workflowName |
+              jq -c --arg sha "$GITHUB_SHA" --arg current "$GITHUB_RUN_ID" '
+                def workflow_label:
+                  ([.workflowName, .name] | map(select(. != null and . != "")) | first) // "";
+                def workflow_key:
+                  if (.workflowDatabaseId // 0) != 0 then "id:\(.workflowDatabaseId)"
+                  elif (workflow_label | length) > 0 then "name:\(workflow_label)"
+                  else "run:\(.databaseId)"
+                  end;
+                map(select(
+                  .headSha == $sha and
+                  .event == "push" and
+                  ((.databaseId | tostring) != $current)
+                ))
+                | group_by(workflow_key)
+                | map(max_by([.createdAt, .databaseId]))
+                | sort_by(workflow_key)
+              '
+          }
+
+          declare -A required_labels=()
+          required_ids=()
+          for workflow in "${required_workflows[@]}"; do
+            workflow_id="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}" \
+                --jq '.id'
+            )"
+            required_ids+=("$workflow_id")
+            required_labels["$workflow_id"]="$workflow"
+          done
+
+          assert_main_is_target "before the workflow wait"
+
+          while true; do
+            latest_runs="$(latest_push_runs)"
+            all_required_succeeded=true
+
+            for workflow_id in "${required_ids[@]}"; do
+              workflow="${required_labels[$workflow_id]}"
+              run_json="$(
+                jq -c --argjson workflow_id "$workflow_id" \
+                  '.[] | select(.workflowDatabaseId == $workflow_id)' \
+                  <<<"$latest_runs"
+              )"
+              if [ -z "$run_json" ]; then
+                echo "$workflow has not started for $GITHUB_SHA yet."
+                all_required_succeeded=false
+                continue
+              fi
+
+              status="$(jq -r '.status' <<<"$run_json")"
+              conclusion="$(jq -r '.conclusion // ""' <<<"$run_json")"
+              run_id="$(jq -r '.databaseId' <<<"$run_json")"
+              echo "$workflow run $run_id: status=$status conclusion=${conclusion:-pending}"
+
+              if [ "$status" = "completed" ] && [ "$conclusion" != "success" ]; then
+                echo "::error::$workflow run $run_id concluded $conclusion for $GITHUB_SHA." >&2
+                exit 1
+              fi
+              if [ "$status" != "completed" ]; then
+                all_required_succeeded=false
+              fi
+            done
+
+            if [ "$all_required_succeeded" = true ]; then
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for required push workflows on $GITHUB_SHA." >&2
+              exit 1
+            fi
+            sleep "$poll_seconds"
+          done
+
+          stable_signature=""
+          stable_polls=0
+          while true; do
+            latest_runs="$(latest_push_runs)"
+            failed_runs="$(
+              jq -c '[.[] | select(.status == "completed" and (.conclusion // "") != "success")]' \
+                <<<"$latest_runs"
+            )"
+            if [ "$(jq 'length' <<<"$failed_runs")" -gt 0 ]; then
+              jq -r '
+                def label:
+                  ([.workflowName, .name] | map(select(. != null and . != "")) | first) //
+                  ("workflow " + ((.workflowDatabaseId // 0) | tostring));
+                .[] | "::error::\(label) run \(.databaseId) concluded \(.conclusion // "without a conclusion")."
+              ' <<<"$failed_runs" >&2
+              exit 1
+            fi
+
+            pending_runs="$(jq -c '[.[] | select(.status != "completed")]' <<<"$latest_runs")"
+            pending_count="$(jq 'length' <<<"$pending_runs")"
+            if [ "$pending_count" -eq 0 ]; then
+              signature="$(
+                jq -r '
+                  map([
+                    (.workflowDatabaseId | tostring),
+                    (.databaseId | tostring),
+                    (.attempt | tostring),
+                    .status,
+                    (.conclusion // "")
+                  ] | join(":")) | sort | join("|")
+                ' <<<"$latest_runs"
+              )"
+              if [ "$signature" = "$stable_signature" ]; then
+                stable_polls=$((stable_polls + 1))
+              else
+                stable_signature="$signature"
+                stable_polls=1
+              fi
+              echo "All observed push workflows succeeded (stable poll $stable_polls/$stable_polls_required)."
+              if [ "$stable_polls" -ge "$stable_polls_required" ]; then
+                break
+              fi
+            else
+              stable_signature=""
+              stable_polls=0
+              jq -r '
+                def label:
+                  ([.workflowName, .name] | map(select(. != null and . != "")) | first) //
+                  ("workflow " + ((.workflowDatabaseId // 0) | tostring));
+                .[] | "Waiting for \(label) run \(.databaseId): \(.status)"
+              ' <<<"$pending_runs"
+            fi
+
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              if [ "$pending_count" -gt 0 ]; then
+                echo "::error::Timed out with pending push workflows on $GITHUB_SHA." >&2
+                exit 1
+              fi
+              echo "All observed push workflows succeeded at the timeout boundary."
+              break
+            fi
+            sleep "$poll_seconds"
+          done
+
+          assert_main_is_target "after the workflow wait"
       - name: Extract release notes from CHANGELOG.md
         id: notes
-        if: steps.check.outputs.exists == 'false'
+        if: steps.check.outputs.complete != 'true'
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.check.outputs.release_tag }}
           RAW_VERSION: ${{ steps.version.outputs.raw_version }}
         run: |
           set -euo pipefail
@@ -114,19 +409,199 @@ jobs:
             echo "$NOTES"
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
-      - name: Create tag + GitHub Release
-        if: steps.check.outputs.exists == 'false'
+      - name: Reconcile exact tag + GitHub Release
+        if: steps.check.outputs.complete != 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          LEGACY_TAG: ${{ steps.version.outputs.legacy_tag }}
+          RELEASE_TAG: ${{ steps.check.outputs.release_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NOTES: ${{ steps.notes.outputs.notes }}
         run: |
           set -euo pipefail
-          gh release create "${TAG}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "${TAG}" \
-            --notes "$NOTES" \
-            --latest
-          echo "Created release ${TAG} at ${GITHUB_SHA}."
+
+          tag_exists() {
+            local encoded_tag
+            encoded_tag="$(jq -rn --arg value "$1" '$value | @uri')"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/git/ref/tags/${encoded_tag}" \
+              >/dev/null 2>&1
+          }
+
+          assert_main_is_target() {
+            local phase="$1"
+            local main_sha
+            main_sha="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+                --jq '.object.sha'
+            )"
+            if [ "$main_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::Remote main moved during ${phase}: expected $GITHUB_SHA, found $main_sha." >&2
+              exit 1
+            fi
+          }
+
+          assert_tag_is_target() {
+            local candidate="$1"
+            local tag_sha
+            if ! tag_exists "$candidate"; then
+              echo "::error::Required tag ${candidate} does not exist." >&2
+              exit 1
+            fi
+            tag_sha="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/commits/${candidate}" \
+                --jq '.sha'
+            )"
+            if [ "$tag_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag ${candidate} resolves to ${tag_sha}, not ${GITHUB_SHA}." >&2
+              exit 1
+            fi
+          }
+
+          release_snapshot() {
+            gh api --method GET --paginate \
+              "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+              jq -sc 'if length == 0 then [] else add end'
+          }
+
+          resolve_commitish() {
+            local commitish="$1"
+            local encoded_commitish resolved_sha
+            encoded_commitish="$(jq -rn --arg value "$commitish" '$value | @uri')"
+            if ! resolved_sha="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/commits/${encoded_commitish}" \
+                --jq '.sha'
+            )"; then
+              echo "::error::Could not resolve release target_commitish ${commitish}." >&2
+              return 1
+            fi
+            if [[ ! "$resolved_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Resolved release target is not a full commit SHA: ${resolved_sha}." >&2
+              return 1
+            fi
+            printf '%s\n' "$resolved_sha"
+          }
+
+          release_state() {
+            local matches="$1"
+            local count prerelease asset_count target_commitish target_sha state
+            count="$(jq 'length' <<<"$matches")"
+            if [ "$count" -gt 1 ]; then
+              echo "::error::Multiple releases resolve to ${RELEASE_TAG}." >&2
+              return 1
+            fi
+            if [ "$count" -eq 0 ]; then
+              echo missing
+              return
+            fi
+            prerelease="$(jq -r '.[0].prerelease' <<<"$matches")"
+            asset_count="$(jq '.[0].assets | length' <<<"$matches")"
+            target_commitish="$(jq -r '.[0].target_commitish' <<<"$matches")"
+            if [ "$prerelease" != false ]; then
+              echo "::error::Release ${RELEASE_TAG} is classified as a prerelease; expected a normal release." >&2
+              return 1
+            fi
+            if [ "$asset_count" -ne 0 ]; then
+              echo "::error::Release ${RELEASE_TAG} has ${asset_count} unexpected uploaded asset(s)." >&2
+              return 1
+            fi
+            state="$(jq -r 'if .[0].draft then "draft" else "published" end' <<<"$matches")"
+            if [ "$state" = draft ]; then
+              target_sha="$(resolve_commitish "$target_commitish")" || return 1
+              if [ "$target_sha" != "$GITHUB_SHA" ]; then
+                echo "::error::Draft release ${RELEASE_TAG} target ${target_commitish} resolves to ${target_sha}, not ${GITHUB_SHA}." >&2
+                return 1
+              fi
+            elif [[ "$target_commitish" =~ ^[0-9a-f]{40}$ ]] && [ "$target_commitish" != "$GITHUB_SHA" ]; then
+              echo "::error::Published release ${RELEASE_TAG} targets ${target_commitish}, not ${GITHUB_SHA}." >&2
+              return 1
+            fi
+            printf '%s\n' "$state"
+          }
+
+          case "$RELEASE_TAG" in
+            "$TAG") alternate_tag="$LEGACY_TAG" ;;
+            "$LEGACY_TAG") alternate_tag="$TAG" ;;
+            *)
+              echo "::error::Unexpected release identity: ${RELEASE_TAG}." >&2
+              exit 1
+              ;;
+          esac
+
+          assert_main_is_target "pre-release reconciliation"
+          releases="$(release_snapshot)"
+          selected_releases="$(jq -c --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)]' <<<"$releases")"
+          state="$(release_state "$selected_releases")"
+          if [ "$TAG" != "$LEGACY_TAG" ]; then
+            alternate_release_count="$(jq --arg tag "$alternate_tag" '[.[] | select(.tag_name == $tag)] | length' <<<"$releases")"
+            if tag_exists "$alternate_tag" || [ "$alternate_release_count" -ne 0 ]; then
+              echo "::error::Alternate release identity ${alternate_tag} appeared during reconciliation." >&2
+              exit 1
+            fi
+          fi
+
+          if tag_exists "$RELEASE_TAG"; then
+            assert_tag_is_target "$RELEASE_TAG"
+          else
+            if [ "$state" = published ]; then
+              echo "::error::Published release ${RELEASE_TAG} has no matching remote tag." >&2
+              exit 1
+            fi
+            assert_main_is_target "exact tag creation"
+            if ! gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${RELEASE_TAG}" \
+              -f sha="$GITHUB_SHA" >/dev/null; then
+              echo "Tag creation returned an error; checking for a concurrent exact creation."
+            fi
+            assert_tag_is_target "$RELEASE_TAG"
+            echo "Created exact tag ${RELEASE_TAG} at ${GITHUB_SHA}."
+          fi
+
+          releases="$(release_snapshot)"
+          selected_releases="$(jq -c --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)]' <<<"$releases")"
+          state="$(release_state "$selected_releases")"
+          assert_main_is_target "the final release mutation"
+          assert_tag_is_target "$RELEASE_TAG"
+
+          # Deliberately omit --latest: gh documents automatic selection based
+          # on date and version, so a retry of an older release cannot force a
+          # regression of the repository's current Latest release.
+          case "$state" in
+            missing)
+              gh release create "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --verify-tag \
+                --target "$GITHUB_SHA" \
+                --title "$RELEASE_TAG" \
+                --notes "$NOTES"
+              echo "Created release ${RELEASE_TAG} from the verified tag."
+              ;;
+            draft)
+              gh release edit "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --verify-tag \
+                --target "$GITHUB_SHA" \
+                --title "$RELEASE_TAG" \
+                --notes "$NOTES" \
+                --draft=false
+              echo "Published reconciled draft release ${RELEASE_TAG}."
+              ;;
+            published)
+              echo "Release ${RELEASE_TAG} was published concurrently; validating it."
+              ;;
+          esac
+
+          assert_tag_is_target "$RELEASE_TAG"
+          releases="$(release_snapshot)"
+          selected_releases="$(jq -c --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)]' <<<"$releases")"
+          final_state="$(release_state "$selected_releases")"
+          if [ "$final_state" != published ]; then
+            echo "::error::Release ${RELEASE_TAG} did not converge to a published normal release." >&2
+            exit 1
+          fi
+          echo "Verified published release ${RELEASE_TAG} at ${GITHUB_SHA} with no uploaded assets."
     timeout-minutes: 60

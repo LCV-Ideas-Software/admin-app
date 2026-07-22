@@ -33,7 +33,11 @@ export const hasBinaryModules = (modules: WorkerCodeModule[]): boolean => module
 export const buildCodeSaveModules = (
   modules: WorkerCodeModule[],
   drafts: Record<string, string>,
-): Array<{ name: string; content: string }> =>
+): Array<{ name: string; content: string; contentType: string }> =>
   modules
     .filter((module) => !module.binary)
-    .map((module) => ({ name: module.name, content: drafts[module.name] ?? module.content }));
+    .map((module) => ({
+      name: module.name,
+      content: drafts[module.name] ?? module.content,
+      contentType: module.contentType,
+    }));

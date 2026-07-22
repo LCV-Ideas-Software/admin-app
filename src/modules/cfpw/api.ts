@@ -143,7 +143,7 @@ export const putWorkerCode = async (
   adminActor: string,
   body: {
     scriptName: string;
-    modules: Array<{ name: string; content: string }>;
+    modules: Array<{ name: string; content: string; contentType: string }>;
     mainModule: string;
     confirmPhrase?: string;
     expectedEtag?: string;

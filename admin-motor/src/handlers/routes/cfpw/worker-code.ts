@@ -209,9 +209,14 @@ export async function onRequestPut(context: CfpwRouteContext) {
     return toErrorResponse('Campo modules é obrigatório: envie ao menos um módulo {name, content}.', trace, 400);
   }
 
-  const modules: Array<{ name: string; content: string }> = [];
+  const modules: Array<{ name: string; content: string; contentType: string }> = [];
   for (const rawModule of rawModules) {
-    const record = (rawModule ?? {}) as { name?: unknown; content?: unknown; binary?: unknown };
+    const record = (rawModule ?? {}) as {
+      name?: unknown;
+      content?: unknown;
+      contentType?: unknown;
+      binary?: unknown;
+    };
     const name = String(record.name ?? '').trim();
     if (!name || typeof record.content !== 'string') {
       return toErrorResponse('Cada módulo precisa de name (string não vazia) e content (string).', trace, 400);
@@ -223,7 +228,15 @@ export async function onRequestPut(context: CfpwRouteContext) {
         400,
       );
     }
-    modules.push({ name, content: record.content });
+    const contentType = String(record.contentType ?? '').trim() || 'application/javascript+module';
+    if (!isTextLikeContentType(contentType)) {
+      return toErrorResponse(
+        `Módulo ('${name}') possui contentType não textual ('${contentType}') e não é editável pela admin-app.`,
+        trace,
+        400,
+      );
+    }
+    modules.push({ name, content: record.content, contentType });
   }
 
   if (!mainModule || !modules.some((module) => module.name === mainModule)) {
@@ -251,7 +264,7 @@ export async function onRequestPut(context: CfpwRouteContext) {
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify({ main_module: mainModule })], { type: 'application/json' }));
     for (const module of modules) {
-      form.append(module.name, new Blob([module.content], { type: 'application/javascript+module' }), module.name);
+      form.append(module.name, new Blob([module.content], { type: module.contentType }), module.name);
     }
 
     const putPayload = await cfApiRequest<Record<string, unknown>>(

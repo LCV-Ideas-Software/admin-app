@@ -45,7 +45,8 @@ type D1ExportImportProps = {
 export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
   const [dumpMode, setDumpMode] = useState<DumpMode>('full');
   const [exportState, dispatchExport] = useReducer(exportPollReducer, INITIAL_EXPORT_POLL);
-  const pollAbortRef = useRef(false);
+  const exportPollAbortRef = useRef(false);
+  const importPollAbortRef = useRef(false);
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPhase, setImportPhase] = useState<ImportPhase>('idle');
@@ -57,7 +58,8 @@ export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
   useEffect(
     () => () => {
       // Unmount: interrompe loops de polling em andamento.
-      pollAbortRef.current = true;
+      exportPollAbortRef.current = true;
+      importPollAbortRef.current = true;
     },
     [],
   );
@@ -65,11 +67,11 @@ export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
   // ── Export ──
 
   const runExportLoop = async (startBookmark: string | null) => {
-    pollAbortRef.current = false;
+    exportPollAbortRef.current = false;
     dispatchExport({ type: 'start' });
     let bookmark = startBookmark;
 
-    while (!pollAbortRef.current) {
+    while (!exportPollAbortRef.current) {
       try {
         const dumpOptions =
           dumpMode === 'schema' ? { noData: true } : dumpMode === 'data' ? { noSchema: true } : undefined;
@@ -81,7 +83,7 @@ export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
         if (!response.ok || !payload.ok) {
           throw new Error(payload.error ?? `Falha no export (HTTP ${response.status}).`);
         }
-        if (pollAbortRef.current) {
+        if (exportPollAbortRef.current) {
           return;
         }
         const result = payload.result ?? null;
@@ -97,7 +99,7 @@ export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
         }
         await sleep(POLL_INTERVAL_MS);
       } catch (error) {
-        if (!pollAbortRef.current) {
+        if (!exportPollAbortRef.current) {
           dispatchExport({
             type: 'fail',
             error: error instanceof Error ? error.message : 'Falha ao exportar o banco D1.',
@@ -109,7 +111,7 @@ export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
   };
 
   const pauseExport = () => {
-    pollAbortRef.current = true;
+    exportPollAbortRef.current = true;
     dispatchExport({ type: 'pause' });
   };
 
@@ -122,6 +124,7 @@ export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
     if (!file) {
       return;
     }
+    importPollAbortRef.current = false;
     setImportError('');
     setImportDetail('');
     try {
@@ -161,7 +164,7 @@ export function D1ExportImport({ adminActor, database }: D1ExportImportProps) {
       let result: D1ImportResult | null = ingest.payload.result ?? null;
       let bookmark = typeof result?.at_bookmark === 'string' && result.at_bookmark ? result.at_bookmark : '';
       for (;;) {
-        if (pollAbortRef.current) {
+        if (importPollAbortRef.current) {
           return;
         }
         if (typeof result?.error === 'string' && result.error) {

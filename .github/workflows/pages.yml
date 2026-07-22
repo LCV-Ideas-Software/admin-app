@@ -6,15 +6,13 @@ on:
       - '.github/workflows/pages.yml'
       - 'site/**'
   workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: write-all
 concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
   deploy:
+    permissions: write-all
     name: Deploy GitHub Pages
     runs-on: ubuntu-latest
     environment:
@@ -28,6 +26,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         with:

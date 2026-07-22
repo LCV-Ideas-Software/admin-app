@@ -166,4 +166,5 @@ updates:
       include: 'scope'
     allow:
       - dependency-name: 'socketsecurity'
+      - dependency-name: 'gitpython'
     open-pull-requests-limit: 10
