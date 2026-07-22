@@ -74,7 +74,30 @@ jobs:
           set -euo pipefail
 
           tag_exists() {
-            git ls-remote --exit-code --tags origin "refs/tags/${1}" >/dev/null 2>&1
+            local encoded_tag
+            encoded_tag="$(jq -rn --arg value "$1" '$value | @uri')"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/git/ref/tags/${encoded_tag}" \
+              >/dev/null 2>&1
+          }
+
+          resolve_commitish() {
+            local commitish="$1"
+            local encoded_commitish resolved_sha
+            encoded_commitish="$(jq -rn --arg value "$commitish" '$value | @uri')"
+            if ! resolved_sha="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/commits/${encoded_commitish}" \
+                --jq '.sha'
+            )"; then
+              echo "::error::Could not resolve release target_commitish ${commitish}." >&2
+              return 1
+            fi
+            if [[ ! "$resolved_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Resolved release target is not a full commit SHA: ${resolved_sha}." >&2
+              return 1
+            fi
+            printf '%s\n' "$resolved_sha"
           }
 
           universal_tag=false
@@ -153,14 +176,19 @@ jobs:
                 echo "::error::Published release ${release_tag} has no matching remote tag." >&2
                 exit 1
               fi
-              if [ "$release_target" != "$tag_sha" ]; then
+              # For a published release, a symbolic target is historical metadata
+              # that may move. The exact existing tag is authoritative.
+              if [[ "$release_target" =~ ^[0-9a-f]{40}$ ]] && [ "$release_target" != "$tag_sha" ]; then
                 echo "::error::Published release ${release_tag} targets ${release_target}, but its tag resolves to ${tag_sha}." >&2
                 exit 1
               fi
               complete=true
-            elif [ "$release_target" != "$GITHUB_SHA" ]; then
-              echo "::error::Draft release ${release_tag} targets ${release_target}, not ${GITHUB_SHA}." >&2
-              exit 1
+            else
+              release_target_sha="$(resolve_commitish "$release_target")"
+              if [ "$release_target_sha" != "$GITHUB_SHA" ]; then
+                echo "::error::Draft release ${release_tag} target ${release_target} resolves to ${release_target_sha}, not ${GITHUB_SHA}." >&2
+                exit 1
+              fi
             fi
           fi
           if [ "$complete" != true ] && [ "$selected_tag_exists" = true ] && [ "$tag_sha" != "$GITHUB_SHA" ]; then
@@ -393,7 +421,11 @@ jobs:
           set -euo pipefail
 
           tag_exists() {
-            git ls-remote --exit-code --tags origin "refs/tags/${1}" >/dev/null 2>&1
+            local encoded_tag
+            encoded_tag="$(jq -rn --arg value "$1" '$value | @uri')"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/git/ref/tags/${encoded_tag}" \
+              >/dev/null 2>&1
           }
 
           assert_main_is_target() {
@@ -434,9 +466,28 @@ jobs:
               jq -sc 'if length == 0 then [] else add end'
           }
 
+          resolve_commitish() {
+            local commitish="$1"
+            local encoded_commitish resolved_sha
+            encoded_commitish="$(jq -rn --arg value "$commitish" '$value | @uri')"
+            if ! resolved_sha="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/commits/${encoded_commitish}" \
+                --jq '.sha'
+            )"; then
+              echo "::error::Could not resolve release target_commitish ${commitish}." >&2
+              return 1
+            fi
+            if [[ ! "$resolved_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Resolved release target is not a full commit SHA: ${resolved_sha}." >&2
+              return 1
+            fi
+            printf '%s\n' "$resolved_sha"
+          }
+
           release_state() {
             local matches="$1"
-            local count prerelease asset_count target_commitish
+            local count prerelease asset_count target_commitish target_sha state
             count="$(jq 'length' <<<"$matches")"
             if [ "$count" -gt 1 ]; then
               echo "::error::Multiple releases resolve to ${RELEASE_TAG}." >&2
@@ -457,11 +508,18 @@ jobs:
               echo "::error::Release ${RELEASE_TAG} has ${asset_count} unexpected uploaded asset(s)." >&2
               return 1
             fi
-            if [ "$target_commitish" != "$GITHUB_SHA" ]; then
-              echo "::error::Release ${RELEASE_TAG} targets ${target_commitish}, not ${GITHUB_SHA}." >&2
+            state="$(jq -r 'if .[0].draft then "draft" else "published" end' <<<"$matches")"
+            if [ "$state" = draft ]; then
+              target_sha="$(resolve_commitish "$target_commitish")" || return 1
+              if [ "$target_sha" != "$GITHUB_SHA" ]; then
+                echo "::error::Draft release ${RELEASE_TAG} target ${target_commitish} resolves to ${target_sha}, not ${GITHUB_SHA}." >&2
+                return 1
+              fi
+            elif [[ "$target_commitish" =~ ^[0-9a-f]{40}$ ]] && [ "$target_commitish" != "$GITHUB_SHA" ]; then
+              echo "::error::Published release ${RELEASE_TAG} targets ${target_commitish}, not ${GITHUB_SHA}." >&2
               return 1
             fi
-            jq -r 'if .[0].draft then "draft" else "published" end' <<<"$matches"
+            printf '%s\n' "$state"
           }
 
           case "$RELEASE_TAG" in
