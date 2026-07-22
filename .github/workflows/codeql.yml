@@ -7,18 +7,13 @@ on:
     branches: ['main']
   schedule:
     - cron: '11 6 * * 2'
-permissions:
-  contents: read
-  actions: read
+permissions: write-all
 concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   analyze:
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
+    permissions: write-all
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -167,6 +167,34 @@ describe('cfpw worker-code handler', () => {
     expect(await modulePart.text()).toBe('export default {}');
   });
 
+  it('preserves each text module content type when rebuilding the multipart payload', async () => {
+    const { calls } = stubCloudflareFetch([
+      { method: 'PUT', url: CONTENT_PUT_URL, reply: { json: cfEnvelope({ id: 'meu-worker' }) } },
+    ]);
+
+    const response = await onRequestPut(
+      putContext({
+        scriptName: 'meu-worker',
+        modules: [
+          {
+            name: 'index.js',
+            content: 'import config from "./config.json"; export default config;',
+            contentType: 'application/javascript+module',
+          },
+          { name: 'config.json', content: '{"enabled":true}', contentType: 'application/json' },
+          { name: 'message.txt', content: 'olá', contentType: 'text/plain' },
+        ],
+        mainModule: 'index.js',
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const form = calls[0]?.init?.body as FormData;
+    expect((form.get('index.js') as File).type).toBe('application/javascript+module');
+    expect((form.get('config.json') as File).type).toBe('application/json');
+    expect((form.get('message.txt') as File).type).toBe('text/plain');
+  });
+
   it('rejects binary modules on PUT with 400', async () => {
     const { calls } = stubCloudflareFetch([]);
 

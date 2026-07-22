@@ -34,8 +34,12 @@ describe('dirtyModuleNames', () => {
 describe('buildCodeSaveModules', () => {
   it('applies drafts over originals and keeps untouched modules as-is', () => {
     expect(buildCodeSaveModules(MODULES, { 'worker.js': 'export default { fetch() {} };' })).toEqual([
-      { name: 'worker.js', content: 'export default { fetch() {} };' },
-      { name: 'util.js', content: 'export const x = 1;' },
+      {
+        name: 'worker.js',
+        content: 'export default { fetch() {} };',
+        contentType: 'application/javascript+module',
+      },
+      { name: 'util.js', content: 'export const x = 1;', contentType: 'application/javascript+module' },
     ]);
   });
 

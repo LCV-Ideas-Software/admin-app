@@ -9,6 +9,7 @@ import {
   planAstrologoSchemaReconciliation,
   reconcileAstrologoSchema,
 } from './lib/astrologo-schema-reconciler.mjs';
+import { resolveWranglerInvocation } from './lib/wrangler-command.mjs';
 
 const args = new Set(process.argv.slice(2));
 const remote = args.has('--remote');
@@ -28,12 +29,12 @@ const target = optionValue('--database', process.env.D1_DATABASE_ID || 'bigdata_
 const config = optionValue('--config', 'wrangler.json');
 const mode = remote ? '--remote' : '--local';
 const require = createRequire(import.meta.url);
-const wranglerCli = require.resolve('wrangler');
+const wranglerInvocation = resolveWranglerInvocation({ fallbackCli: require.resolve('wrangler') });
 
 const runD1 = (sql) => {
   const result = spawnSync(
-    process.execPath,
-    [wranglerCli, 'd1', 'execute', target, mode, '--config', config, '--command', sql, '--json'],
+    wranglerInvocation.command,
+    [...wranglerInvocation.argsPrefix, 'd1', 'execute', target, mode, '--config', config, '--command', sql, '--json'],
     {
       cwd: process.cwd(),
       encoding: 'utf8',
