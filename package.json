@@ -111,7 +111,7 @@
     "globals": "^17.7.0",
     "happy-dom": "^20.11.0",
     "husky": "^9.0.0",
-    "knip": "^6.27.0",
+    "knip": "^6.29.0",
     "lint-staged": "^17.1.1",
     "prettier": "^3.9.6",
     "rollup-plugin-visualizer": "^7.0.1",
