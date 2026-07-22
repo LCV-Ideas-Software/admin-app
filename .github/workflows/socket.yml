@@ -10,7 +10,8 @@ permissions: write-all
 
 concurrency:
   group: socket-scan-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  queue: max
+  cancel-in-progress: false
 
 jobs:
   socket-security:

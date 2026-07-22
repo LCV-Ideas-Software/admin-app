@@ -108,8 +108,14 @@ jobs:
           assert_target_version() {
             local target_sha="$1"
             local source raw target_version
-            if ! source="$(git show "${target_sha}:${VERSION_FILE}" 2>/dev/null)"; then
-              echo "::error::${VERSION_FILE} is missing at reconciliation target ${target_sha}." >&2
+            if ! source="$(
+              gh api --method GET \
+                -H "Accept: application/vnd.github.raw+json" \
+                -H "X-GitHub-Api-Version: 2026-03-10" \
+                "repos/${GITHUB_REPOSITORY}/contents/${VERSION_FILE}" \
+                -f ref="$target_sha"
+            )"; then
+              echo "::error::Could not fetch ${VERSION_FILE} from remote reconciliation target ${target_sha}." >&2
               return 1
             fi
             raw="$(grep -E "APP_VERSION[[:space:]]*=[[:space:]]*['\"]APP v[0-9]+\.[0-9]+\.[0-9]+['\"]" <<<"$source" | head -1 || true)"
@@ -447,6 +453,7 @@ jobs:
         run: |
           set -euo pipefail
           readonly poll_seconds=10
+          readonly expected_categories='["/language:actions","/language:javascript-typescript"]'
           deadline=$((SECONDS + 300))
 
           while true; do
@@ -481,6 +488,22 @@ jobs:
               continue
             fi
 
+            missing_categories="$(
+              jq -cn \
+                --argjson expected "$expected_categories" \
+                --argjson analyses "$analyses" \
+                '$expected - [$analyses[].category]'
+            )"
+            if [ "$(jq 'length' <<<"$missing_categories")" -ne 0 ]; then
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::Missing required CodeQL categories for exact release target ${TARGET_SHA}: $(jq -r 'join(", ")' <<<"$missing_categories")." >&2
+                exit 1
+              fi
+              echo "Waiting for required CodeQL categories on exact target ${TARGET_SHA}: $(jq -r 'join(", ")' <<<"$missing_categories")."
+              sleep "$poll_seconds"
+              continue
+            fi
+
             jq -r '
               .[] |
               "CodeQL analysis \(.id): key=\(.analysis_key // "") category=\(.category // "") error=\(.error // "") warning=\(.warning // "") rules=\(.rules_count // "missing") results=\(.results_count // "missing")"
@@ -504,7 +527,7 @@ jobs:
               exit 1
             fi
 
-            echo "Verified zero-result CodeQL analyses for exact release target ${TARGET_SHA}."
+            echo "Verified all required zero-result CodeQL categories for exact release target ${TARGET_SHA}."
             break
           done
       - name: Extract release notes from CHANGELOG.md
