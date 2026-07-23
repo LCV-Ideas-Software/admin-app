@@ -3,7 +3,6 @@ name: Dependabot Automerge
 on:
   workflow_run:
     workflows:
-      - CI
       - CodeQL
       - Dependency Review
       - Public Format
@@ -35,7 +34,7 @@ jobs:
             api.github.com:443
 
       - name: Process one guarded queue mutation
-        uses: LCV-Ideas-Software/.github/dependabot-automerge@c846bc77cbeb38dcf5fb4b8c798dc75227b65f04
+        uses: LCV-Ideas-Software/.github/dependabot-automerge@06078610da5edd1c6d020db205c69d3cd580fcf9
         with:
           github_token: ${{ github.token }}
           automation_token: ${{ secrets.LCV_AUTOMATION_TOKEN }}
