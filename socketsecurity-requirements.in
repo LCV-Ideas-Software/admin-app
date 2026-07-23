@@ -2,4 +2,4 @@
 # Regenerate socketsecurity-requirements.txt with hashes after every update.
 socketsecurity==2.5.0
 # Explicit security floor for GHSA-rwj8-pgh3-r573.
-gitpython>=3.1.54
+gitpython>=3.1.55
