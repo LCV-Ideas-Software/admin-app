@@ -34,7 +34,7 @@ jobs:
             api.github.com:443
 
       - name: Process one guarded queue mutation
-        uses: LCV-Ideas-Software/.github/dependabot-automerge@d8f67ca034edb6173ce9baaff41ccb320ef4bf2d
+        uses: LCV-Ideas-Software/.github/dependabot-automerge@3f62b39a76f767d09a5482b8e380746883be3b94
         with:
           github_token: ${{ github.token }}
           automation_token: ${{ secrets.LCV_AUTOMATION_TOKEN }}
