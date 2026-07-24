@@ -257,9 +257,9 @@ socketdev==3.3.0 \
     --hash=sha256:3d60bd4ac3201e9d581b1fe02bf2e6aef1b90c13ae75d15a8664aa9ef966734e \
     --hash=sha256:513c045ce42bdd6cc2bb66a527f5863e0c399e56dbdcb1832cd5d94a5fb1a5e4
     # via socketsecurity
-socketsecurity==2.5.0 \
-    --hash=sha256:906615866c4ed228a7a38667912802580ac2acf395082263a48e399188a73169 \
-    --hash=sha256:a55237d6a7d4e57cb72cec944b674f97b174c91513f7171856fa5f8bf270a350
+socketsecurity==2.5.1 \
+    --hash=sha256:05ce32491dc0962fd74b2e3989ac27b738fb077dded5c9b08e5f942321bddc0a \
+    --hash=sha256:46987d3e700fd13b13eafe490830faed8df45ef5302317a1212b31bf8a7c1a7d
     # via -r socketsecurity-requirements.in
 soupsieve==2.9.1 \
     --hash=sha256:4f4477399246b7a0c720a88ca2454b11cd6bb9ae4c9d170140786e916776c14c \
