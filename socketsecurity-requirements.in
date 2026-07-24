@@ -1,5 +1,5 @@
 # Direct dependency for the Socket Security workflow.
 # Regenerate socketsecurity-requirements.txt with hashes after every update.
-socketsecurity==2.5.0
+socketsecurity==2.5.1
 # Explicit security floor for GHSA-rwj8-pgh3-r573.
 gitpython>=3.1.55
