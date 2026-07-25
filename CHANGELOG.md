@@ -12,6 +12,10 @@
 - **Port do prompt-cache do desktop**: chamadas OpenAI/Grok (Responses API) agora enviam `prompt_cache_key` determinístico; OpenAI recebe `prompt_cache_retention: "24h"` apenas para as famílias com retenção estendida documentada (a linha gpt-5.6 permanece em retenção default até confirmação em docs oficiais, política herdada do desktop v0.5.19).
 - Nota operacional: `claude-fable-5` exige retenção de dados de 30 dias na Anthropic; organizações ZDR devem fixar `claude-opus-5` nas configurações do Maestro AI.
 
+### Segurança
+
+- **`brace-expansion` ≥5.0.8 no lockfile (GHSA-mh99-v99m-4gvg).** Advisory high (DoS por expansão não limitada) publicado upstream após os gates locais desta release; o `npm audit` do Deploy detectou e bloqueou corretamente. Correção via atualização transitiva no lockfile; `npm audit` zerado.
+
 ### Validação
 
 - Backend: 520 testes (6 novos: migração one-shot, strip puro, resolução Claude 5, chave de cache determinística, gate de retenção, corpos de request); typecheck admin-motor 0/0.
