@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [v02.15.12] - 2026-07-24
+
+### Maestro AI
+
+- **Refresh de gerações de modelos (paridade com o maestro-app desktop).** Candidatos e fallbacks da resolução ao vivo atualizados com o critério "candidato só se listado no `/models` autenticado": OpenAI agora lidera com `gpt-5.6-sol` (família Sol/Terra/Luna, GA 2026-07-09; `gpt-5.3` nu removido — não listado); Anthropic lidera com `claude-fable-5` seguido de `claude-opus-5` (lançado 2026-07-24, US$ 5/25, 1M ctx), `claude-opus-4-8`, `claude-opus-4-7` e `claude-sonnet-5`, mantendo `claude-opus-4-1-20250805` por último até a aposentadoria de 2026-08-05 (remoção agendada); Gemini fica pro-only (`gemini-2.5-flash` e `gemini-1.5-pro` removidos); DeepSeek fica `deepseek-v4-pro`/`deepseek-v4-flash` (aliases `deepseek-reasoner`/`deepseek-chat` deprecados upstream em 2026-07-24 e removidos, fallback movido para `deepseek-v4-pro`); Grok lidera com `grok-4.5` e readota os ids datados `-0309` da geração 4.20 (únicos listados pela xAI). Perplexity permanece `sonar-reasoning-pro`.
+- **Defaults semeados deixam de virar pins fantasmas.** Migração one-shot no D1 (coluna `legacy_defaults_migrated` em `maestro_ai_settings`): valores de modelo/tarifa que foram apenas semeados por releases anteriores (e nunca digitados pelo operador) são normalizados uma única vez; valores digitados a partir desta versão fixam normalmente, inclusive ids que já foram default.
+- **Rate card semeado atualizado para os preços de lista atuais**: Claude Fable 5 US$ 10/50, GPT-5.6 Sol US$ 5/30, Gemini 3.1 Pro Preview US$ 2/12, DeepSeek V4 Pro US$ 0,435/0,87, Grok 4.5 US$ 2/6 (faixa <200K), Perplexity Sonar US$ 2/8 + US$ 14/1k requests. Atenção: com o Claude a 10/50, tetos `max_cost_usd` existentes compram cerca de metade dos turnos Claude anteriores — revise os tetos.
+- **Port do prompt-cache do desktop**: chamadas OpenAI/Grok (Responses API) agora enviam `prompt_cache_key` determinístico; OpenAI recebe `prompt_cache_retention: "24h"` apenas para as famílias com retenção estendida documentada (a linha gpt-5.6 permanece em retenção default até confirmação em docs oficiais, política herdada do desktop v0.5.19).
+- Nota operacional: `claude-fable-5` exige retenção de dados de 30 dias na Anthropic; organizações ZDR devem fixar `claude-opus-5` nas configurações do Maestro AI.
+
+### Validação
+
+- Backend: 520 testes (6 novos: migração one-shot, strip puro, resolução Claude 5, chave de cache determinística, gate de retenção, corpos de request); typecheck admin-motor 0/0.
+
 ## [v02.15.11] - 2026-07-21
 
 ### Segurança

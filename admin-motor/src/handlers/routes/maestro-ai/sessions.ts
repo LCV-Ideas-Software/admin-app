@@ -214,11 +214,11 @@ const AGENT_LABELS: Record<ProviderKey, string> = {
 };
 
 const DEFAULT_MODELS: Record<ProviderKey, string> = {
-  claude: 'claude-opus-4-7',
-  codex: 'gpt-5.5',
+  claude: 'claude-fable-5',
+  codex: 'gpt-5.6-sol',
   gemini: 'gemini-2.5-pro',
   deepseek: 'deepseek-v4-pro',
-  grok: 'grok-4.20-multi-agent',
+  grok: 'grok-4.5',
   perplexity: 'sonar-reasoning-pro',
 };
 
@@ -226,12 +226,30 @@ const DEFAULT_RATES: Record<
   ProviderKey,
   ProviderRates & { input_usd_per_million: number; output_usd_per_million: number }
 > = {
-  claude: { input_usd_per_million: 5, output_usd_per_million: 25 },
+  claude: { input_usd_per_million: 10, output_usd_per_million: 50 },
   codex: { input_usd_per_million: 5, output_usd_per_million: 30 },
-  gemini: { input_usd_per_million: 1.25, output_usd_per_million: 10 },
-  deepseek: { input_usd_per_million: 1.74, output_usd_per_million: 3.48 },
-  grok: { input_usd_per_million: 1.25, output_usd_per_million: 2.5 },
+  gemini: { input_usd_per_million: 2, output_usd_per_million: 12 },
+  deepseek: { input_usd_per_million: 0.435, output_usd_per_million: 0.87 },
+  grok: { input_usd_per_million: 2, output_usd_per_million: 6 },
   perplexity: { input_usd_per_million: 2, output_usd_per_million: 8, request_usd_per_1k: 14 },
+};
+
+// Model ids and rate values seeded as defaults by earlier releases. A seeded
+// value the operator never typed must not survive a default bump as an
+// explicit pin (callProvider treats stored !== current default as a pin).
+// Stripped exactly once by ensureSchema (legacy_defaults_migrated); values
+// typed after that migration pin normally, including former defaults.
+const LEGACY_SEEDED_MODELS: Partial<Record<ProviderKey, string[]>> = {
+  claude: ['claude-opus-4-7'],
+  codex: ['gpt-5.5'],
+  grok: ['grok-4.20-multi-agent', 'grok-4.20-multi-agent-0309'],
+};
+
+const LEGACY_SEEDED_RATES: Partial<Record<ProviderKey, ProviderRates[]>> = {
+  claude: [{ input_usd_per_million: 5, output_usd_per_million: 25 }],
+  gemini: [{ input_usd_per_million: 1.25, output_usd_per_million: 10 }],
+  deepseek: [{ input_usd_per_million: 1.74, output_usd_per_million: 3.48 }],
+  grok: [{ input_usd_per_million: 1.25, output_usd_per_million: 2.5 }],
 };
 
 const PROVIDER_KEYS: ProviderKey[] = ['claude', 'codex', 'gemini', 'deepseek', 'grok', 'perplexity'];
@@ -350,6 +368,35 @@ function sanitizeModels(value: unknown): Record<ProviderKey, string> {
   ) as Record<ProviderKey, string>;
 }
 
+function stripLegacySeededDefaults(
+  modelsJson: string,
+  ratesJson: string,
+): { modelsJson: string; ratesJson: string; changed: boolean } {
+  const models = parseJson<Partial<Record<ProviderKey, string>>>(modelsJson, {});
+  const rates = parseJson<Partial<Record<ProviderKey, ProviderRates>>>(ratesJson, {});
+  let changed = false;
+  for (const agent of PROVIDER_KEYS) {
+    const storedModel = models[agent];
+    if (typeof storedModel === 'string' && (LEGACY_SEEDED_MODELS[agent] ?? []).includes(storedModel)) {
+      delete models[agent];
+      changed = true;
+    }
+    const storedRates = rates[agent];
+    const isLegacyRate = (LEGACY_SEEDED_RATES[agent] ?? []).some(
+      (legacy) =>
+        storedRates &&
+        Number(storedRates.input_usd_per_million) === legacy.input_usd_per_million &&
+        Number(storedRates.output_usd_per_million) === legacy.output_usd_per_million &&
+        (Number(storedRates.request_usd_per_1k) || 0) === (legacy.request_usd_per_1k ?? 0),
+    );
+    if (isLegacyRate) {
+      delete rates[agent];
+      changed = true;
+    }
+  }
+  return { modelsJson: JSON.stringify(models), ratesJson: JSON.stringify(rates), changed };
+}
+
 async function ensureSchema(db: D1Database): Promise<void> {
   await db
     .prepare(
@@ -388,6 +435,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
         configured_secrets_json TEXT NOT NULL DEFAULT '{}',
         rates_json TEXT NOT NULL,
         models_json TEXT NOT NULL,
+        legacy_defaults_migrated INTEGER NOT NULL DEFAULT 0,
         updated_at TEXT NOT NULL
       )`,
     )
@@ -471,6 +519,29 @@ async function ensureSchema(db: D1Database): Promise<void> {
     if (!/duplicate column|already exists/i.test(message)) {
       throw error;
     }
+  }
+  try {
+    await db
+      .prepare('ALTER TABLE maestro_ai_settings ADD COLUMN legacy_defaults_migrated INTEGER NOT NULL DEFAULT 0')
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/duplicate column|already exists/i.test(message)) {
+      throw error;
+    }
+  }
+  const seedRow = await db
+    .prepare(
+      'SELECT models_json, rates_json, legacy_defaults_migrated FROM maestro_ai_settings WHERE id = ? LIMIT 1',
+    )
+    .bind(SETTINGS_ID)
+    .first<{ models_json: string; rates_json: string; legacy_defaults_migrated: number }>();
+  if (seedRow && Number(seedRow.legacy_defaults_migrated) !== 1) {
+    const stripped = stripLegacySeededDefaults(seedRow.models_json, seedRow.rates_json);
+    await db
+      .prepare('UPDATE maestro_ai_settings SET models_json = ?, rates_json = ?, legacy_defaults_migrated = 1 WHERE id = ?')
+      .bind(stripped.modelsJson, stripped.ratesJson, SETTINGS_ID)
+      .run();
   }
 }
 
@@ -2158,52 +2229,42 @@ const MODEL_RESOLUTION: Partial<
   codex: {
     endpoint: 'https://api.openai.com/v1/models',
     auth: 'bearer',
-    candidates: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3', 'gpt-5.2', 'gpt-5', 'gpt-4.1'],
-    fallback: 'gpt-5.4',
+    // Bare gpt-5.6 and bare gpt-5.3 are not live-listed (2026-07-24): excluded.
+    candidates: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.2', 'gpt-5', 'gpt-4.1'],
+    fallback: 'gpt-5.6-sol',
   },
   claude: {
     endpoint: 'https://api.anthropic.com/v1/models',
     auth: 'x-api-key',
     candidates: [
+      'claude-fable-5',
+      'claude-opus-5',
+      'claude-opus-4-8',
       'claude-opus-4-7',
+      'claude-sonnet-5',
+      // Retires 2026-08-05; scheduled for removal with the retirement.
       'claude-opus-4-1-20250805',
-      'claude-opus-4-20250514',
-      'claude-sonnet-4-20250514',
-      'claude-3-7-sonnet-latest',
     ],
-    fallback: 'claude-opus-4-1-20250805',
+    fallback: 'claude-fable-5',
   },
   gemini: {
     endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
     auth: 'query-key',
-    candidates: [
-      'gemini-3.1-pro-preview',
-      'gemini-3-pro-preview',
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-      'gemini-1.5-pro',
-    ],
+    candidates: ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'],
     fallback: 'gemini-2.5-pro',
   },
   deepseek: {
     endpoint: 'https://api.deepseek.com/models',
     auth: 'bearer',
-    candidates: ['deepseek-v4-pro', 'deepseek-reasoner', 'deepseek-chat', 'deepseek-v4-flash'],
-    fallback: 'deepseek-reasoner',
+    candidates: ['deepseek-v4-pro', 'deepseek-v4-flash'],
+    fallback: 'deepseek-v4-pro',
   },
   grok: {
     endpoint: 'https://api.x.ai/v1/models',
     auth: 'bearer',
-    candidates: [
-      'grok-4.20-multi-agent',
-      'grok-4-latest',
-      'grok-4.3',
-      'grok-4.20-reasoning',
-      'grok-4.20',
-      'grok-4-1-fast',
-      'grok-4',
-    ],
-    fallback: 'grok-4.20-multi-agent',
+    // xAI live-lists only dated 4.20 ids; the web re-adopts -0309 (desktop parity).
+    candidates: ['grok-4.5', 'grok-4.20-multi-agent-0309', 'grok-4.20-0309-reasoning', 'grok-4.3'],
+    fallback: 'grok-4.5',
   },
 };
 
@@ -2300,7 +2361,8 @@ async function callProvider(
     };
   }
 
-  const request = buildProviderHttpRequest(agent, apiKey, model, system, prompt, maxOutputTokens);
+  const cacheKey = agent === 'codex' || agent === 'grok' ? await maestroCacheKey(agent, model, system) : undefined;
+  const request = buildProviderHttpRequest(agent, apiKey, model, system, prompt, maxOutputTokens, cacheKey);
   const response = options?.isCancelled
     ? await fetchProviderWithRetry(request.endpoint, request.init, timeoutMs, options.isCancelled)
     : await fetchWithTimeout(request.endpoint, request.init, timeoutMs);
@@ -2345,6 +2407,30 @@ async function callProvider(
   };
 }
 
+// ── Prompt-cache port (desktop parity, session_controls.rs provider_cache_plan):
+// OpenAI/Grok Responses calls send a deterministic prompt_cache_key derived from
+// stable inputs; OpenAI additionally gets prompt_cache_retention "24h" only for
+// the documented extended-retention families. Unknown/unverified families (the
+// gpt-5.6 line included) keep provider default retention.
+function openaiSupportsExtendedPromptCache(model: string): boolean {
+  const lower = model.toLowerCase();
+  return (
+    lower.startsWith('gpt-5.2') ||
+    lower.startsWith('gpt-5.1') ||
+    lower === 'gpt-5' ||
+    lower.startsWith('gpt-5-codex') ||
+    lower.startsWith('gpt-4.1')
+  );
+}
+
+async function maestroCacheKey(agent: ProviderKey, model: string, system: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${model}\n${system}`));
+  const hex = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  return `maestro-web-${agent}-${hex.slice(0, 32)}`;
+}
+
 function buildProviderHttpRequest(
   agent: HttpProviderKey,
   apiKey: string,
@@ -2352,6 +2438,7 @@ function buildProviderHttpRequest(
   system: string,
   prompt: string,
   maxOutputTokens = MAX_OUTPUT_TOKENS,
+  cacheKey?: string,
 ): ProviderHttpRequest {
   if (agent === 'claude') {
     return {
@@ -2389,6 +2476,10 @@ function buildProviderHttpRequest(
           input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }],
           max_output_tokens: maxOutputTokens,
           store: false,
+          ...(cacheKey ? { prompt_cache_key: cacheKey } : {}),
+          ...(cacheKey && agent === 'codex' && openaiSupportsExtendedPromptCache(model)
+            ? { prompt_cache_retention: '24h' }
+            : {}),
         }),
       },
     };
@@ -2491,6 +2582,9 @@ export const maestroAiTestHooks = {
   buildRevisionHistoryBlock,
   choosePreferredModel,
   resolveProviderModel,
+  stripLegacySeededDefaults,
+  openaiSupportsExtendedPromptCache,
+  maestroCacheKey,
   persistSession,
   runSession,
   sweepStaleSessions,

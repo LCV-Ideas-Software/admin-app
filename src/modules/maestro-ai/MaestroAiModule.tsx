@@ -140,11 +140,11 @@ const ARTIFACT_TABS: Array<{ id: ArtifactTab; label: string; Icon: typeof FileTe
 ];
 
 const EMPTY_RATES: Record<AgentKey, AgentRate> = {
-  claude: { input_usd_per_million: 5, output_usd_per_million: 25 },
+  claude: { input_usd_per_million: 10, output_usd_per_million: 50 },
   codex: { input_usd_per_million: 5, output_usd_per_million: 30 },
-  gemini: { input_usd_per_million: 1.25, output_usd_per_million: 10 },
-  deepseek: { input_usd_per_million: 1.74, output_usd_per_million: 3.48 },
-  grok: { input_usd_per_million: 1.25, output_usd_per_million: 2.5 },
+  gemini: { input_usd_per_million: 2, output_usd_per_million: 12 },
+  deepseek: { input_usd_per_million: 0.435, output_usd_per_million: 0.87 },
+  grok: { input_usd_per_million: 2, output_usd_per_million: 6 },
   perplexity: { input_usd_per_million: 2, output_usd_per_million: 8, request_usd_per_1k: 14 },
 };
 

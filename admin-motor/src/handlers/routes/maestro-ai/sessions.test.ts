@@ -45,6 +45,7 @@ function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; a
     configured_secrets_json: '{}',
     rates_json: JSON.stringify(rates),
     models_json: JSON.stringify({}),
+    legacy_defaults_migrated: 1,
     updated_at: '2026-05-14T00:00:00.000Z',
     ...options.settings,
   };
@@ -91,6 +92,13 @@ function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; a
                   rates_json: values[6],
                   models_json: values[7],
                   updated_at: values[8],
+                });
+              }
+              if (/UPDATE maestro_ai_settings SET models_json/i.test(query)) {
+                Object.assign(settings, {
+                  models_json: values[0],
+                  rates_json: values[1],
+                  legacy_defaults_migrated: 1,
                 });
               }
               if (/INSERT INTO maestro_ai_artifacts/i.test(query)) {
@@ -437,14 +445,14 @@ describe('Maestro AI settings', () => {
     expect(payload.settings.agents.find((agent) => agent.key === 'claude')).toMatchObject({
       configured: true,
       runtime_ready: true,
-      model: 'claude-opus-4-7',
+      model: 'claude-fable-5',
     });
     expect(payload.settings.models).toMatchObject({
-      claude: 'claude-opus-4-7',
-      codex: 'gpt-5.5',
+      claude: 'claude-fable-5',
+      codex: 'gpt-5.6-sol',
       gemini: 'gemini-2.5-pro',
       deepseek: 'deepseek-v4-pro',
-      grok: 'grok-4.20-multi-agent',
+      grok: 'grok-4.5',
       perplexity: 'sonar-reasoning-pro',
     });
     expect(JSON.stringify(payload)).not.toContain('secret-claude');
@@ -739,22 +747,131 @@ describe('Maestro AI prior-reports feed, prompt sections and model resolution (P
         const url = new URL(String(input));
         endpoints.push(url.toString());
         if (url.hostname === 'api.openai.com') {
-          return new Response(JSON.stringify({ data: [{ id: 'gpt-5.3' }, { id: 'gpt-4.1' }] }), { status: 200 });
+          return new Response(JSON.stringify({ data: [{ id: 'gpt-4.1' }, { id: 'gpt-5.6-terra' }] }), { status: 200 });
         }
         if (url.hostname === 'api.x.ai') throw new Error('network down');
         return new Response(JSON.stringify({ data: [] }), { status: 200 });
       }),
     );
-    // Candidate match: gpt-5.3 is the first canonical candidate present.
-    expect(await resolveProviderModel('codex', 'key')).toBe('gpt-5.3');
+    // Candidate priority beats live-list order: gpt-5.6-terra outranks gpt-4.1.
+    expect(await resolveProviderModel('codex', 'key')).toBe('gpt-5.6-terra');
     expect(endpoints.some((e) => e.includes('api.openai.com/v1/models'))).toBe(true);
     // Endpoint failure -> canonical hardcoded fallback.
-    expect(await resolveProviderModel('grok', 'key')).toBe('grok-4.20-multi-agent');
+    expect(await resolveProviderModel('grok', 'key')).toBe('grok-4.5');
     // Perplexity has NO live resolution (canonical): no fetch, default returned.
     endpoints.length = 0;
     expect(await resolveProviderModel('perplexity', 'key')).toBe('sonar-reasoning-pro');
     expect(endpoints).toEqual([]);
     vi.unstubAllGlobals();
+  });
+
+  it('resolveProviderModel prefers claude-fable-5 over claude-opus-5 and falls back down the Claude 5 line', async () => {
+    const { resolveProviderModel } = maestroAiTestHooks;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ data: [{ id: 'claude-opus-5' }, { id: 'claude-fable-5' }] }), { status: 200 }),
+      ),
+    );
+    expect(await resolveProviderModel('claude', 'key')).toBe('claude-fable-5');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'claude-opus-5' }] }), { status: 200 })),
+    );
+    expect(await resolveProviderModel('claude', 'key')).toBe('claude-opus-5');
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('Maestro AI legacy seeded-default migration', () => {
+  it('stripLegacySeededDefaults removes seeded models/rates and keeps operator values', () => {
+    const { stripLegacySeededDefaults } = maestroAiTestHooks;
+    const stripped = stripLegacySeededDefaults(
+      JSON.stringify({ claude: 'claude-opus-4-7', codex: 'gpt-5.5', grok: 'grok-4.20-multi-agent-0309' }),
+      JSON.stringify({
+        claude: { input_usd_per_million: 5, output_usd_per_million: 25 },
+        deepseek: { input_usd_per_million: 1.74, output_usd_per_million: 3.48 },
+      }),
+    );
+    expect(stripped.changed).toBe(true);
+    expect(JSON.parse(stripped.modelsJson)).toEqual({});
+    expect(JSON.parse(stripped.ratesJson)).toEqual({});
+
+    const kept = stripLegacySeededDefaults(
+      JSON.stringify({ claude: 'claude-opus-4-20250514' }),
+      JSON.stringify({ claude: { input_usd_per_million: 5.01, output_usd_per_million: 25 } }),
+    );
+    expect(kept.changed).toBe(false);
+    expect(JSON.parse(kept.modelsJson)).toEqual({ claude: 'claude-opus-4-20250514' });
+    expect(JSON.parse(kept.ratesJson)).toEqual({ claude: { input_usd_per_million: 5.01, output_usd_per_million: 25 } });
+
+    const noop = stripLegacySeededDefaults(JSON.stringify({ codex: 'gpt-5.6-sol' }), JSON.stringify({}));
+    expect(noop.changed).toBe(false);
+  });
+
+  it('one-shot migration strips pre-release seeded values and then respects post-release pins', async () => {
+    const seededDb = createMaestroDb({
+      settings: {
+        models_json: JSON.stringify({ claude: 'claude-opus-4-7', codex: 'gpt-5.5' }),
+        rates_json: JSON.stringify({ claude: { input_usd_per_million: 5, output_usd_per_million: 25 } }),
+        legacy_defaults_migrated: 0,
+      },
+    });
+    const migrated = (await (await handleMaestroAiSettingsGet(createContext({}, {}, seededDb))).json()) as {
+      settings: { models: Record<string, string> };
+    };
+    expect(migrated.settings.models.claude).toBe('claude-fable-5');
+    expect(migrated.settings.models.codex).toBe('gpt-5.6-sol');
+
+    const pinnedDb = createMaestroDb({
+      settings: { models_json: JSON.stringify({ codex: 'gpt-5.5' }), legacy_defaults_migrated: 1 },
+    });
+    const pinned = (await (await handleMaestroAiSettingsGet(createContext({}, {}, pinnedDb))).json()) as {
+      settings: { models: Record<string, string> };
+    };
+    expect(pinned.settings.models.codex).toBe('gpt-5.5');
+  });
+});
+
+describe('Maestro AI prompt-cache port (desktop parity)', () => {
+  it('maestroCacheKey is deterministic and scoped by agent/model/system', async () => {
+    const { maestroCacheKey } = maestroAiTestHooks;
+    const a = await maestroCacheKey('codex', 'gpt-5.6-sol', 'system');
+    const b = await maestroCacheKey('codex', 'gpt-5.6-sol', 'system');
+    const c = await maestroCacheKey('codex', 'gpt-5.6-terra', 'system');
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+    expect(a.startsWith('maestro-web-codex-')).toBe(true);
+    expect(a.length).toBe('maestro-web-codex-'.length + 32);
+  });
+
+  it('openai extended retention is gated by documented families only (gpt-5.6 stays default)', () => {
+    const { openaiSupportsExtendedPromptCache } = maestroAiTestHooks;
+    expect(openaiSupportsExtendedPromptCache('gpt-5.2')).toBe(true);
+    expect(openaiSupportsExtendedPromptCache('gpt-4.1')).toBe(true);
+    expect(openaiSupportsExtendedPromptCache('gpt-5.6-sol')).toBe(false);
+    expect(openaiSupportsExtendedPromptCache('gpt-5.5')).toBe(false);
+  });
+
+  it('sends prompt_cache_key on codex/grok bodies, retention only for gated openai families', () => {
+    const { buildProviderHttpRequest } = maestroAiTestHooks;
+    const codexNew = buildProviderHttpRequest('codex', 'k', 'gpt-5.6-sol', 'sys', 'p', 256, 'maestro-web-codex-abc');
+    const codexBody = JSON.parse(String(codexNew.init.body)) as Record<string, unknown>;
+    expect(codexBody.prompt_cache_key).toBe('maestro-web-codex-abc');
+    expect(codexBody.prompt_cache_retention).toBeUndefined();
+
+    const codexGated = buildProviderHttpRequest('codex', 'k', 'gpt-5.2', 'sys', 'p', 256, 'maestro-web-codex-def');
+    const gatedBody = JSON.parse(String(codexGated.init.body)) as Record<string, unknown>;
+    expect(gatedBody.prompt_cache_retention).toBe('24h');
+
+    const grok = buildProviderHttpRequest('grok', 'k', 'grok-4.5', 'sys', 'p', 256, 'maestro-web-grok-ghi');
+    const grokBody = JSON.parse(String(grok.init.body)) as Record<string, unknown>;
+    expect(grokBody.prompt_cache_key).toBe('maestro-web-grok-ghi');
+    expect(grokBody.prompt_cache_retention).toBeUndefined();
+
+    const codexNoKey = buildProviderHttpRequest('codex', 'k', 'gpt-5.6-sol', 'sys', 'p', 256);
+    const noKeyBody = JSON.parse(String(codexNoKey.init.body)) as Record<string, unknown>;
+    expect(noKeyBody.prompt_cache_key).toBeUndefined();
   });
 });
 
