@@ -2415,6 +2415,8 @@ async function callProvider(
 function openaiSupportsExtendedPromptCache(model: string): boolean {
   const lower = model.toLowerCase();
   return (
+    lower.startsWith('gpt-5.5') ||
+    lower.startsWith('gpt-5.4') ||
     lower.startsWith('gpt-5.2') ||
     lower.startsWith('gpt-5.1') ||
     lower === 'gpt-5' ||

@@ -850,8 +850,11 @@ describe('Maestro AI prompt-cache port (desktop parity)', () => {
     const { openaiSupportsExtendedPromptCache } = maestroAiTestHooks;
     expect(openaiSupportsExtendedPromptCache('gpt-5.2')).toBe(true);
     expect(openaiSupportsExtendedPromptCache('gpt-4.1')).toBe(true);
+    expect(openaiSupportsExtendedPromptCache('gpt-5.5')).toBe(true);
+    expect(openaiSupportsExtendedPromptCache('gpt-5.5-pro')).toBe(true);
+    expect(openaiSupportsExtendedPromptCache('gpt-5.4')).toBe(true);
     expect(openaiSupportsExtendedPromptCache('gpt-5.6-sol')).toBe(false);
-    expect(openaiSupportsExtendedPromptCache('gpt-5.5')).toBe(false);
+    expect(openaiSupportsExtendedPromptCache('gpt-5.7')).toBe(false);
   });
 
   it('sends prompt_cache_key on codex/grok bodies, retention only for gated openai families', () => {

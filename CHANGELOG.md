@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v02.15.13] - 2026-07-25
+
+### Maestro AI
+
+- **Gate de retenção estendida OpenAI alinhado à lista oficial.** A documentação oficial de prompt caching lista `gpt-5.5`, `gpt-5.5-pro` e `gpt-5.4` entre os modelos com retenção estendida de 24h (e confirma que para a família GPT-5.6 "the only supported value is `30m`"). `openaiSupportsExtendedPromptCache` agora inclui os prefixos `gpt-5.5`/`gpt-5.4`; a família 5.6 permanece corretamente sem o campo. Efeito prático restrito a seleções de fallback abaixo do tier 5.6. Achado e correção originados do cross-review da release anterior.
+
+### Validação
+
+- Testes do gate atualizados: `gpt-5.5`/`gpt-5.5-pro`/`gpt-5.4` verdadeiros; `gpt-5.6-sol` e `gpt-5.7` falsos.
+
 ## [v02.15.12] - 2026-07-24
 
 ### Maestro AI
