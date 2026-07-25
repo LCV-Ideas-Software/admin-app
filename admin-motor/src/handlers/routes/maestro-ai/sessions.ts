@@ -531,15 +531,15 @@ async function ensureSchema(db: D1Database): Promise<void> {
     }
   }
   const seedRow = await db
-    .prepare(
-      'SELECT models_json, rates_json, legacy_defaults_migrated FROM maestro_ai_settings WHERE id = ? LIMIT 1',
-    )
+    .prepare('SELECT models_json, rates_json, legacy_defaults_migrated FROM maestro_ai_settings WHERE id = ? LIMIT 1')
     .bind(SETTINGS_ID)
     .first<{ models_json: string; rates_json: string; legacy_defaults_migrated: number }>();
   if (seedRow && Number(seedRow.legacy_defaults_migrated) !== 1) {
     const stripped = stripLegacySeededDefaults(seedRow.models_json, seedRow.rates_json);
     await db
-      .prepare('UPDATE maestro_ai_settings SET models_json = ?, rates_json = ?, legacy_defaults_migrated = 1 WHERE id = ?')
+      .prepare(
+        'UPDATE maestro_ai_settings SET models_json = ?, rates_json = ?, legacy_defaults_migrated = 1 WHERE id = ?',
+      )
       .bind(stripped.modelsJson, stripped.ratesJson, SETTINGS_ID)
       .run();
   }

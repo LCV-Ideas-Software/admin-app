@@ -769,8 +769,9 @@ describe('Maestro AI prior-reports feed, prompt sections and model resolution (P
     const { resolveProviderModel } = maestroAiTestHooks;
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ data: [{ id: 'claude-opus-5' }, { id: 'claude-fable-5' }] }), { status: 200 }),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ data: [{ id: 'claude-opus-5' }, { id: 'claude-fable-5' }] }), { status: 200 }),
       ),
     );
     expect(await resolveProviderModel('claude', 'key')).toBe('claude-fable-5');
