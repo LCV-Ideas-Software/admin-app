@@ -627,6 +627,14 @@ jobs:
               jq -sc 'if length == 0 then [] else add end'
           }
 
+          published_release_snapshot() {
+            local encoded_tag
+            encoded_tag="$(jq -rn --arg value "$RELEASE_TAG" '$value | @uri')"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/releases/tags/${encoded_tag}" |
+              jq -c '[.]'
+          }
+
           resolve_commitish() {
             local commitish="$1"
             local encoded_commitish resolved_sha
@@ -758,13 +766,41 @@ jobs:
           esac
 
           assert_tag_is_target "$RELEASE_TAG"
-          releases="$(release_snapshot)"
-          selected_releases="$(jq -c --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)]' <<<"$releases")"
-          final_state="$(release_state "$selected_releases")"
-          if [ "$final_state" != published ]; then
-            echo "::error::Release ${RELEASE_TAG} did not converge to a published normal release." >&2
-            exit 1
-          fi
+          # A successful release mutation can precede visibility through the
+          # read endpoint. Retry only GET visibility; release_state still fails
+          # immediately for an invalid target, prerelease, or uploaded asset.
+          final_state=unavailable
+          lookup_error=
+          for retry_delay in 1 2 4 8 15 0; do
+            if selected_releases="$(published_release_snapshot 2>&1)"; then
+              final_state="$(release_state "$selected_releases")"
+              case "$final_state" in
+                published)
+                  break
+                  ;;
+                missing | draft) ;;
+                *)
+                  echo "::error::Unexpected release convergence state: ${final_state}." >&2
+                  exit 1
+                  ;;
+              esac
+            else
+              lookup_error="$selected_releases"
+              final_state=unavailable
+            fi
+            if [ "$retry_delay" -eq 0 ]; then
+              echo "::error::Release ${RELEASE_TAG} did not converge to a published normal release after bounded retries (last state: ${final_state})." >&2
+              exit 1
+            fi
+            if [ "$final_state" = unavailable ]; then
+              echo "Published release lookup has not succeeded yet: ${lookup_error}" >&2
+            else
+              echo "Release ${RELEASE_TAG} has not converged to published (state=${final_state})."
+            fi
+            echo "Retrying release verification in ${retry_delay}s."
+            sleep "$retry_delay"
+          done
+          assert_tag_is_target "$RELEASE_TAG"
           assert_target_is_on_main "after release publication"
           echo "Verified published release ${RELEASE_TAG} at ${TARGET_SHA} with no uploaded assets."
     timeout-minutes: 60
