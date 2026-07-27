@@ -4,11 +4,6 @@ on:
   workflow_run:
     workflows:
       - CodeQL
-      - Dependency Review
-      - Public Format
-      - Socket Security
-      - OpenSSF Scorecard
-      - Zizmor
     types:
       - completed
   schedule:
@@ -25,20 +20,12 @@ jobs:
     environment: dependabot-automation
     timeout-minutes: 10
     steps:
-      - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
-        with:
-          egress-policy: block
-          disable-telemetry: true
-          allowed-endpoints: |
-            api.github.com:443
-
       - name: Process one guarded queue mutation
-        uses: LCV-Ideas-Software/.github/dependabot-automerge@86383cce42ac86077f87ad80ab48d4308fdd1ab6
+        uses: LCV-Ideas-Software/.github/dependabot-automerge@eabe20b6941cc4094e9ab50edac474b572a972a9
         with:
           github_token: ${{ github.token }}
           automation_token: ${{ secrets.LCV_AUTOMATION_TOKEN }}
-          required_checks_json: '[{"name":"Dependency Review","app_id":15368},{"name":"Check index.html formatting","app_id":15368},{"name":"CodeQL","app_id":57789},{"name":"Socket Security: Project Report","app_id":156372},{"name":"zizmor","app_id":57789}]'
+          required_checks_json: '[{"name":"Dependency Review","app_id":15368},{"name":"Check index.html formatting","app_id":15368},{"name":"CodeQL","app_id":57789},{"name":"zizmor","app_id":57789}]'
 
 concurrency:
   group: dependabot-automerge-${{ github.repository }}
