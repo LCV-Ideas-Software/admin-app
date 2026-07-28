@@ -15,4 +15,4 @@ jobs:
   zizmor:
     name: Run zizmor
     permissions: write-all
-    uses: LCV-Ideas-Software/.github/.github/workflows/zizmor.yml@31c392444a48f03bb88aca3c1cef11fe8f6ff067
+    uses: LCV-Ideas-Software/.github/.github/workflows/zizmor.yml@07aff07fbda8e335dccde0c7173ecc1982c45626
