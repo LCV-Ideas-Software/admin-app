@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [v02.15.14] - 2026-07-29
+
+### Maestro AI
+
+- **Clone comportamental do `maestro-app` v0.5.56.** O motor web agora persiste e restaura integralmente a cadeia circular de custódia: redator inicial histórico separado do líder da retomada, autor corrente excluído da própria revisão, retorno do redator após o circuito independente, aprovações estáveis por versão, limpeza das aprovações após revisão substantiva, repetição corretiva pelo mesmo revisor e convergência somente quando todos os não autores aprovam a versão corrente.
+- **Retomada sem perda de progresso.** Novo estado circular v2 na D1 guarda artefato, autor, SHA-256, rodada, cursor, roster, agentes válidos, aprovações e numeração append-only. Sessões legadas são reconstruídas apenas quando linha e artefatos concordam; divergências, adulteração ou diário inválido pausam antes de qualquer chamada paga.
+- **Contrato serial reforçado.** Quem aponta defeito corrigível deve corrigi-lo e devolver o texto completo; partes não declaradas permanecem protegidas. Tentativas rejeitadas por contrato, content lock, auditoria de liberação ou proteção contra empobrecimento ficam apenas como evidência e não alteram custódia nem aprovações.
+- **Painel configurável na retomada.** A UI envia o líder e os agentes prontos escolhidos pelo operador, preservando o autor inicial como dado histórico e mantendo a numeração de artefatos mesmo após cancelamento.
+- **Limite legado de ciclos retirado da operação.** O campo permanece no schema para compatibilidade, mas não interrompe novas sessões nem aparece nas configurações. Permanecem os tetos financeiro obrigatório, temporal opcional e o limite canônico de segurança do circuito.
+
+### Integridade de dados
+
+- Eventos de sessão passaram a ser anexados atomicamente no D1; o array não é mais substituído. Aceitação, conclusão, erro, cancelamento e retomada gravam evento e transição no mesmo CAS.
+- Artefatos continuam append-only. Se um cancelamento vencer entre inserção e promoção, a custódia anterior permanece íntegra, o artefato órfão fica como evidência e seu turno nunca é reutilizado.
+- Custos conhecidos são monotônicos e persistidos assim que a resposta paga chega, inclusive quando o operador cancela antes da promoção editorial.
+- Cada tentativa corretiva consome individualmente o teto canônico de turnos, como no desktop. Um revisor não pode multiplicar chamadas pagas dentro de um único slot sem avançar o limite global do circuito.
+- O parser de retomada localiza o marcador estrutural após o bloco de link audit e exige igualdade integral do corpo. Um título `## Current Text` escrito dentro do artigo continua válido, mas uma linha D1 truncada que coincida apenas com a subseção final agora falha fechada antes de qualquer chamada paga.
+- Edição externa do texto em sessão retomável é bloqueada para preservar autoria, hash e cadeia de custódia.
+
+### Validação
+
+- Backend: 52 arquivos e 535 testes; orquestrador Maestro AI: 114 testes.
+- Frontend: 54 arquivos e 363 testes.
+- TypeScript, typecheck do admin-motor, ESLint, Biome e `git diff --check`: sem achados.
+- Cross Review v2 `deb6919e-82ac-4a9a-983c-fa19b0b49bd4`: colegiado
+  completo com `outcome=converged` e `outcome_reason=unanimous_ready`.
+- Ultrabrain `maestro-web-v00556-parity-closure-20260729`: validação estrita
+  `valid`, sem vieses ou questões pendentes.
+- Contrato e diferenças de plataforma documentados em `docs/superpowers/plans/2026-07-29-maestro-ai-v00556-behavioral-parity.md`.
+
 ## [v02.15.13] - 2026-07-25
 
 ### Maestro AI

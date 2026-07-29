@@ -100,7 +100,9 @@ type MaestroSessionRow = {
   protocol_text: string;
   status: string;
   initial_agent: string;
+  cycle_lead: string;
   active_agents_json: string;
+  circular_state_json: string;
   current_author: string | null;
   current_text: string;
   final_text: string | null;
@@ -133,6 +135,24 @@ type MaestroArtifactRow = {
   previous_artifact_id: string | null;
   content_bytes: number;
   created_at: string;
+};
+
+const CIRCULAR_REVIEW_STATE_SCHEMA_VERSION = 2;
+
+type CircularReviewState = {
+  schema_version: 2;
+  run_id: string;
+  current_draft_artifact: string;
+  current_draft_author_key: ProviderKey;
+  current_draft_sha256: string;
+  round: number;
+  turn_index: number;
+  round_roster: ProviderKey[];
+  valid_round_agents: ProviderKey[];
+  stable_serial_approval_agents: ProviderKey[];
+  artifact_turn: number;
+  previous_artifact_id: string;
+  updated_at: string;
 };
 
 type ProviderCallResult = {
@@ -406,7 +426,9 @@ async function ensureSchema(db: D1Database): Promise<void> {
         prompt TEXT NOT NULL,
         protocol_text TEXT NOT NULL,
         initial_agent TEXT NOT NULL,
+        cycle_lead TEXT NOT NULL,
         active_agents_json TEXT NOT NULL,
+        circular_state_json TEXT NOT NULL DEFAULT '{}',
         current_author TEXT,
         current_text TEXT NOT NULL DEFAULT '',
         final_text TEXT,
@@ -521,6 +543,22 @@ async function ensureSchema(db: D1Database): Promise<void> {
     }
   }
   try {
+    await db.prepare("ALTER TABLE maestro_ai_sessions ADD COLUMN cycle_lead TEXT NOT NULL DEFAULT ''").run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/duplicate column|already exists/i.test(message)) {
+      throw error;
+    }
+  }
+  try {
+    await db.prepare("ALTER TABLE maestro_ai_sessions ADD COLUMN circular_state_json TEXT NOT NULL DEFAULT '{}'").run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/duplicate column|already exists/i.test(message)) {
+      throw error;
+    }
+  }
+  try {
     await db
       .prepare('ALTER TABLE maestro_ai_settings ADD COLUMN legacy_defaults_migrated INTEGER NOT NULL DEFAULT 0')
       .run();
@@ -557,6 +595,22 @@ function parseJson<T>(value: string | null | undefined, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function parseSessionEventsStrict(value: string): SessionEvent[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(
+      `Session event journal contains invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        cause: error,
+      },
+    );
+  }
+  if (!Array.isArray(parsed)) throw new Error('Session event journal must be a JSON array.');
+  return parsed as SessionEvent[];
 }
 
 async function loadSettings(db: D1Database): Promise<MaestroSettingsRow> {
@@ -637,7 +691,9 @@ function publicSession(row: MaestroSessionRow) {
     title: row.title,
     status: row.status,
     initial_agent: row.initial_agent,
+    cycle_lead: row.cycle_lead || row.initial_agent,
     active_agents: parseJson<ProviderKey[]>(row.active_agents_json, []),
+    circular_state: parseJson<CircularReviewState | null>(row.circular_state_json, null),
     current_author: row.current_author,
     current_text: row.current_text,
     final_text: row.final_text,
@@ -1479,9 +1535,10 @@ function closingTurnHasRequiredPriorReviews(
   order: readonly string[],
   draftLeadKey: string,
   validRoundAgents: ReadonlySet<string>,
+  currentAuthorKey?: string,
 ): boolean {
-  const required = order.filter((agent) => agent !== draftLeadKey);
-  return required.length > 0 && required.every((agent) => validRoundAgents.has(agent));
+  const required = order.filter((agent) => agent !== draftLeadKey && agent !== currentAuthorKey);
+  return order.some((agent) => agent !== draftLeadKey) && required.every((agent) => validRoundAgents.has(agent));
 }
 
 function selectSerialReviewerIndex(
@@ -1496,7 +1553,7 @@ function selectSerialReviewerIndex(
   if (order.length === 0) return null;
   const nominalIndex = nominalTurnIndex % order.length;
   const nominal = order[nominalIndex] as string;
-  const closureReady = closingTurnHasRequiredPriorReviews(order, draftLeadKey, validRoundAgents);
+  const closureReady = closingTurnHasRequiredPriorReviews(order, draftLeadKey, validRoundAgents, currentAuthorKey);
   const nominalIsPending =
     nominal !== currentAuthorKey && !stableApprovals.has(nominal) && (nominal !== draftLeadKey || closureReady);
   if (nominalIsPending) return nominalIndex;
@@ -1509,6 +1566,28 @@ function selectSerialReviewerIndex(
   if (pending.length === 0) return null;
   const offset = selectionSeed % pending.length;
   return pending[offset] ?? null;
+}
+
+function reviewerRedrawReason(
+  order: readonly string[],
+  nominalTurnIndex: number,
+  currentAuthorKey: string,
+  draftLeadKey: string,
+  validRoundAgents: ReadonlySet<string>,
+  stableApprovals: ReadonlySet<string>,
+): string {
+  const nominal = order[nominalTurnIndex % order.length];
+  if (nominal === currentAuthorKey) return 'nominal_reviewer_is_current_author';
+  if (
+    nominal === draftLeadKey &&
+    !closingTurnHasRequiredPriorReviews(order, draftLeadKey, validRoundAgents, currentAuthorKey)
+  ) {
+    return 'original_author_closure_waiting_for_full_peer_circuit';
+  }
+  if (nominal && stableApprovals.has(nominal)) {
+    return 'nominal_reviewer_already_approved_current_version';
+  }
+  return 'nominal_reviewer_ineligible';
 }
 
 // Desktop parity: the exact Mandatory Corrective Retry prompt section injected
@@ -1932,23 +2011,46 @@ type SerialTurnReport = {
   artifact: string;
 };
 
-/** Port of build_revision_history_block (editorial_prompts.rs:327-363): prior
- *  revision REPORTS only (never the final text), each capped at 12,000 Unicode
- *  chars, chronological, no count/total cap; a missing report becomes the
- *  canonical contract-failure placeholder; an extracted-but-empty report skips
- *  the turn. */
+const NON_DELIBERATIVE_REPORT_STATUSES = new Set([
+  'CONTRACT_VIOLATION',
+  'QUALITY_GUARD_REJECTED',
+  'READY_REJECTED',
+  'RUNNING',
+  'AGENT_FAILED_NO_OUTPUT',
+  'AGENT_FAILED_EMPTY',
+  'STOPPED_BY_USER',
+  'COST_LIMIT_REACHED',
+]);
+
+/** Exact web port of the desktop's bounded revision-history feed: choose the
+ * newest useful reports first, cap each report at 8k characters and the whole
+ * block at 48k, then restore chronological display order. Rejected/operational
+ * attempts are evidence artifacts, not deliberative instructions. */
 function buildRevisionHistoryBlock(reports: SerialTurnReport[]): string {
-  let history = '';
-  for (const turn of reports) {
+  const maxHistoryChars = 48_000;
+  const maxReportChars = 8_000;
+  const sections: string[] = [];
+  let usedChars = 0;
+  for (const turn of [...reports].reverse()) {
+    if (NON_DELIBERATIVE_REPORT_STATUSES.has(turn.status)) continue;
     const extracted =
       turn.report === null
         ? `No complete maestro_revision_report block was returned by ${turn.name}. Treat this artifact as a contract failure, not as deliberative substance.`
         : turn.report;
     const report = extracted.trim();
     if (!report) continue;
-    const capped = [...report].slice(0, 12_000).join('');
-    history += `\n### ${turn.name} / ${turn.role} / \`${turn.status}\`\n\nArtifact: \`${turn.artifact}\`\n\n\`\`\`text\n${capped}\n\`\`\`\n`;
+    const header = `\n### ${turn.name} / ${turn.role} / \`${turn.status}\`\n\nArtifact: \`${turn.artifact}\`\n\n\`\`\`text\n`;
+    const footer = '\n```\n';
+    const fixedChars = [...header].length + [...footer].length;
+    if (usedChars + fixedChars >= maxHistoryChars) break;
+    const reportLimit = Math.min(maxReportChars, maxHistoryChars - usedChars - fixedChars);
+    const capped = [...report].slice(0, reportLimit).join('');
+    const section = `${header}${capped}${footer}`;
+    usedChars += [...section].length;
+    sections.push(section);
   }
+  sections.reverse();
+  const history = sections.join('');
   return history.trim() ? history : 'No prior revision reports are recorded for this serial cycle.';
 }
 
@@ -2533,10 +2635,11 @@ function publicApiHealthResult(
   };
 }
 
-// Plan C (canonical resume): only convergence is terminal — everything else can
-// be resumed. The runner re-validates every limit with a fresh per-execution
-// scope (cost baseline, `now` time anchor) and recovers only custody
-// text/author; approvals and round accounting restart empty.
+// Canonical resume: only convergence is terminal. The runner re-validates every
+// limit with a fresh per-execution scope (cost baseline, `now` time anchor) and
+// restores the validated custody hash, artifact chain, round cursor and stable
+// approvals. A changed roster resets only round-local progress and filters
+// approvals that are no longer eligible.
 const RESUMABLE_STATUSES = new Set([
   'paused_cost_limit',
   'paused_time_limit',
@@ -2546,6 +2649,7 @@ const RESUMABLE_STATUSES = new Set([
   'paused_self_review',
   'paused_reviewer_outage',
   'paused_draft_unavailable',
+  'paused_resume_state_invalid',
   'blocked_cancelled',
   'blocked_max_cycles',
   'blocked_link_audit',
@@ -2569,6 +2673,7 @@ export const maestroAiTestHooks = {
   hasAllIndependentApprovals,
   closingTurnHasRequiredPriorReviews,
   selectSerialReviewerIndex,
+  reviewerRedrawReason,
   isBlockedAuditHost,
   extractUrlCandidates,
   countUniqueUrlCandidates,
@@ -2582,6 +2687,7 @@ export const maestroAiTestHooks = {
   sessionTimeExhausted,
   fetchProviderWithRetry,
   buildRevisionHistoryBlock,
+  circularDraftSha256,
   choosePreferredModel,
   resolveProviderModel,
   stripLegacySeededDefaults,
@@ -2615,19 +2721,34 @@ async function loadSession(db: D1Database, id: string): Promise<MaestroSessionRo
 type SessionPatch = Partial<
   Pick<
     MaestroSessionRow,
-    'status' | 'current_author' | 'current_text' | 'final_text' | 'observed_cost_usd' | 'events_json' | 'error'
+    | 'status'
+    | 'cycle_lead'
+    | 'active_agents_json'
+    | 'circular_state_json'
+    | 'current_author'
+    | 'current_text'
+    | 'final_text'
+    | 'observed_cost_usd'
+    | 'error'
   >
 >;
 
 const PERSIST_COLUMNS: ReadonlyArray<keyof SessionPatch> = [
   'status',
+  'cycle_lead',
+  'active_agents_json',
+  'circular_state_json',
   'current_author',
   'current_text',
   'final_text',
   'observed_cost_usd',
-  'events_json',
   'error',
 ];
+
+type PersistSessionOptions = {
+  ifStatusIn?: readonly string[];
+  appendEvent?: SessionEvent;
+};
 
 /**
  * Atomic partial update: writes ONLY the columns present in `patch` in a single
@@ -2645,7 +2766,7 @@ async function persistSession(
   db: D1Database,
   id: string,
   patch: SessionPatch,
-  opts: { ifStatusIn?: readonly string[] } = {},
+  opts: PersistSessionOptions = {},
 ): Promise<boolean> {
   const assignments: string[] = [];
   const values: unknown[] = [];
@@ -2654,6 +2775,10 @@ async function persistSession(
       assignments.push(`${column} = ?`);
       values.push(patch[column]);
     }
+  }
+  if (opts.appendEvent) {
+    assignments.push("events_json = json_insert(events_json, '$[#]', json(?))");
+    values.push(JSON.stringify(opts.appendEvent));
   }
   if (assignments.length === 0) return false;
   assignments.push('updated_at = ?');
@@ -2674,6 +2799,325 @@ async function persistSession(
   // D1 reports modified rows in meta.changes; a store that omits it (older
   // mocks) is treated as applied to preserve unconditional-write semantics.
   return (result?.meta?.changes ?? 1) > 0;
+}
+
+/**
+ * Records already-incurred provider spend without touching session lifecycle or
+ * custody. The SQL comparison is atomic and monotonic, so a late response from
+ * a cancelled runner cannot decrease a newer ledger value or revive the row.
+ */
+async function persistObservedCostFloor(db: D1Database, id: string, observedCost: number): Promise<void> {
+  const floor = Number.isFinite(observedCost) ? Math.max(0, observedCost) : 0;
+  await db
+    .prepare(
+      `UPDATE maestro_ai_sessions
+       SET observed_cost_usd = CASE WHEN observed_cost_usd < ? THEN ? ELSE observed_cost_usd END,
+           updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(floor, floor, nowIso(), id)
+    .run();
+}
+
+type CircularResumeProgress = {
+  round: number;
+  turnIndex: number;
+  validAgents: Set<string>;
+  stableApprovals: Set<string>;
+  currentDraftArtifactId: string;
+  artifactTurn: number;
+  previousArtifactId: string;
+  serialReports: SerialTurnReport[];
+};
+
+function isProviderKey(value: unknown): value is ProviderKey {
+  return typeof value === 'string' && PROVIDER_KEYS.includes(value as ProviderKey);
+}
+
+function sameOrderedRoster(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+async function circularDraftSha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function artifactMatchesCurrentText(artifact: MaestroArtifactRow, expectedText: string): boolean {
+  const expected = expectedText.trim();
+  if (!expected) return false;
+  const markdown = artifact.content_md.replace(/\r\n/g, '\n');
+  const generatedDelimiter = '\n```\n\n## Current Text\n\n';
+  const linkAuditStart = markdown.indexOf('\n## Link Audit\n\n```json\n');
+  const generatedMarker =
+    linkAuditStart >= 0
+      ? markdown.indexOf(generatedDelimiter, linkAuditStart + '\n## Link Audit\n\n```json\n'.length)
+      : -1;
+  const legacyDelimiter = '\n## Current Text\n\n';
+  const marker = generatedMarker >= 0 ? generatedMarker + generatedDelimiter.length : markdown.indexOf(legacyDelimiter);
+  if (marker < 0) return false;
+  const currentText = markdown.slice(generatedMarker >= 0 ? marker : marker + legacyDelimiter.length).trim();
+  return currentText === expected.replace(/\r\n/g, '\n');
+}
+
+function acceptedCustodyArtifact(artifact: MaestroArtifactRow): boolean {
+  return (
+    (artifact.role === 'draft' || artifact.role === 'revision') &&
+    (artifact.status.toLowerCase() === 'ready' || artifact.status.toLowerCase() === 'not_ready')
+  );
+}
+
+function acceptedChainArtifact(artifact: MaestroArtifactRow): boolean {
+  return (
+    (artifact.role === 'draft' || artifact.role === 'revision') &&
+    !['blocked', 'error', 'running'].includes(artifact.status.toLowerCase())
+  );
+}
+
+function deliberativeArtifactReport(artifact: MaestroArtifactRow): SerialTurnReport | null {
+  if (artifact.role !== 'revision' || !acceptedCustodyArtifact(artifact)) return null;
+  const status = artifact.status.toUpperCase();
+  if (NON_DELIBERATIVE_REPORT_STATUSES.has(status)) return null;
+  return {
+    name: AGENT_LABELS[sanitizeAgent(artifact.agent, 'claude')],
+    role: 'review',
+    status,
+    report: artifact.revision_report_json || null,
+    artifact: artifact.id,
+  };
+}
+
+async function loadSessionArtifacts(db: D1Database, sessionId: string): Promise<MaestroArtifactRow[]> {
+  const rows = await db
+    .prepare('SELECT * FROM maestro_ai_artifacts WHERE session_id = ? ORDER BY turn ASC')
+    .bind(sessionId)
+    .all<MaestroArtifactRow>();
+  return rows.results.sort(
+    (left, right) => Number(left.turn) - Number(right.turn) || left.created_at.localeCompare(right.created_at),
+  );
+}
+
+async function loadSessionArtifact(
+  db: D1Database,
+  sessionId: string,
+  artifactId: string,
+): Promise<MaestroArtifactRow | null> {
+  return db
+    .prepare('SELECT * FROM maestro_ai_artifacts WHERE session_id = ? AND id = ? LIMIT 1')
+    .bind(sessionId, artifactId)
+    .first<MaestroArtifactRow>();
+}
+
+function parsePersistedCircularState(raw: string): CircularReviewState | null {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === '{}') return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(
+      `Circular custody state contains invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  if (!value || typeof value !== 'object') {
+    throw new Error('Circular custody state must be an object.');
+  }
+  return value as CircularReviewState;
+}
+
+async function validatePersistedCircularState(
+  db: D1Database,
+  row: MaestroSessionRow,
+  state: CircularReviewState,
+): Promise<void> {
+  if (state.schema_version !== CIRCULAR_REVIEW_STATE_SCHEMA_VERSION) {
+    throw new Error(`Unsupported circular custody schema version: ${String(state.schema_version)}.`);
+  }
+  if (state.run_id !== row.id) throw new Error('Circular custody run_id does not match the session.');
+  if (!isProviderKey(state.current_draft_author_key)) {
+    throw new Error('Circular custody state contains an unknown draft author.');
+  }
+  if (state.current_draft_author_key !== row.current_author) {
+    throw new Error('Circular custody author does not match the session row.');
+  }
+  if (
+    !Array.isArray(state.round_roster) ||
+    !Array.isArray(state.valid_round_agents) ||
+    !Array.isArray(state.stable_serial_approval_agents) ||
+    state.round_roster.some((agent) => !isProviderKey(agent)) ||
+    state.valid_round_agents.some((agent) => !isProviderKey(agent)) ||
+    state.stable_serial_approval_agents.some((agent) => !isProviderKey(agent))
+  ) {
+    throw new Error('Circular custody progress contains an unknown reviewer.');
+  }
+  if (new Set(state.round_roster).size !== state.round_roster.length) {
+    throw new Error('Circular custody state contains duplicate roster members.');
+  }
+  const roster = new Set(state.round_roster);
+  if ([...state.valid_round_agents, ...state.stable_serial_approval_agents].some((agent) => !roster.has(agent))) {
+    throw new Error('Circular custody progress references a reviewer outside its roster.');
+  }
+  if (
+    !Number.isInteger(state.round) ||
+    state.round < 1 ||
+    !Number.isInteger(state.turn_index) ||
+    state.turn_index < 0 ||
+    !Number.isInteger(state.artifact_turn) ||
+    state.artifact_turn < 1 ||
+    !state.current_draft_artifact ||
+    !state.previous_artifact_id
+  ) {
+    throw new Error('Circular custody progress contains invalid counters or artifact references.');
+  }
+  const [custodyArtifact, previousArtifact] = await Promise.all([
+    loadSessionArtifact(db, row.id, state.current_draft_artifact),
+    loadSessionArtifact(db, row.id, state.previous_artifact_id),
+  ]);
+  if (!custodyArtifact || !acceptedCustodyArtifact(custodyArtifact)) {
+    throw new Error('Circular custody references a missing or rejected artifact.');
+  }
+  if (!previousArtifact) throw new Error('Circular custody chain references a missing previous artifact.');
+  if (
+    custodyArtifact.agent !== state.current_draft_author_key ||
+    Number(custodyArtifact.turn) > state.artifact_turn ||
+    Number(previousArtifact.turn) > state.artifact_turn
+  ) {
+    throw new Error('Circular custody artifact author or turn does not match persisted state.');
+  }
+  const rowText = String(row.current_text).trim();
+  if (!artifactMatchesCurrentText(custodyArtifact, rowText)) {
+    throw new Error('Circular custody artifact text does not match the session row.');
+  }
+  const digest = await circularDraftSha256(rowText);
+  if (digest !== state.current_draft_sha256) {
+    throw new Error('Circular custody draft hash does not match the accepted artifact.');
+  }
+}
+
+function restorePersistedCircularProgress(
+  state: CircularReviewState,
+  currentRoster: readonly ProviderKey[],
+  currentAuthor: ProviderKey,
+  serialReports: SerialTurnReport[],
+): CircularResumeProgress {
+  const rosterMatches = sameOrderedRoster(state.round_roster, currentRoster);
+  let round = Math.max(1, state.round);
+  let turnIndex = state.turn_index;
+  let crossedRoundBoundary = false;
+  while (currentRoster.length > 0 && turnIndex >= currentRoster.length) {
+    round += 1;
+    turnIndex -= currentRoster.length;
+    crossedRoundBoundary = true;
+  }
+  if (!rosterMatches) turnIndex = 0;
+  const validAgents =
+    crossedRoundBoundary || !rosterMatches
+      ? new Set<string>()
+      : new Set(state.valid_round_agents.filter((agent) => currentRoster.includes(agent)));
+  const stableApprovals = new Set(
+    state.stable_serial_approval_agents.filter((agent) => currentRoster.includes(agent) && agent !== currentAuthor),
+  );
+  return {
+    round,
+    turnIndex,
+    validAgents,
+    stableApprovals,
+    currentDraftArtifactId: state.current_draft_artifact,
+    artifactTurn: state.artifact_turn,
+    previousArtifactId: state.previous_artifact_id,
+    serialReports,
+  };
+}
+
+async function reconstructLegacyCircularProgress(
+  db: D1Database,
+  row: MaestroSessionRow,
+  input: MaestroResolvedSessionInput,
+  currentAuthor: ProviderKey,
+  currentText: string,
+): Promise<CircularResumeProgress> {
+  const artifacts = await loadSessionArtifacts(db, row.id);
+  let artifactTurn = artifacts.reduce((maximum, artifact) => Math.max(maximum, Number(artifact.turn) || 0), 0);
+  let custodyArtifact = [...artifacts]
+    .reverse()
+    .find(
+      (artifact) =>
+        acceptedCustodyArtifact(artifact) &&
+        artifact.agent === currentAuthor &&
+        artifactMatchesCurrentText(artifact, currentText),
+    );
+  if (!custodyArtifact) {
+    if (artifacts.length > 0) {
+      throw new Error('Legacy circular custody cannot be reconstructed from the existing artifacts.');
+    }
+    artifactTurn += 1;
+    custodyArtifact = await createArtifact(db, {
+      sessionId: row.id,
+      cycle: 0,
+      turn: artifactTurn,
+      agent: currentAuthor,
+      role: 'draft',
+      status: 'ready',
+      title: input.title,
+      contentMd: currentText,
+      revisionReport: JSON.stringify({
+        reviewer: currentAuthor,
+        role: 'legacy_custody_recovery',
+        status: 'ready',
+        custody: 'recovered',
+      }),
+      linkAudit: [],
+      costUsd: 0,
+      previousArtifactId: null,
+    });
+  }
+  const acceptedArtifacts = artifacts.filter(acceptedChainArtifact);
+  const previousArtifact = acceptedArtifacts.at(-1) ?? custodyArtifact;
+  const serialReports = artifacts
+    .map(deliberativeArtifactReport)
+    .filter((report): report is SerialTurnReport => report !== null);
+  return {
+    round: Math.max(1, Number(previousArtifact.cycle) || 1),
+    turnIndex: 0,
+    validAgents: new Set(),
+    stableApprovals: new Set(),
+    currentDraftArtifactId: custodyArtifact.id,
+    artifactTurn: Math.max(artifactTurn, Number(custodyArtifact.turn) || 0),
+    previousArtifactId: previousArtifact.id,
+    serialReports,
+  };
+}
+
+async function serializeCircularReviewState(input: {
+  runId: string;
+  currentDraftArtifactId: string;
+  currentAuthor: ProviderKey;
+  currentText: string;
+  round: number;
+  turnIndex: number;
+  roster: readonly ProviderKey[];
+  validAgents: ReadonlySet<string>;
+  stableApprovals: ReadonlySet<string>;
+  artifactTurn: number;
+  previousArtifactId: string;
+}): Promise<string> {
+  const state: CircularReviewState = {
+    schema_version: CIRCULAR_REVIEW_STATE_SCHEMA_VERSION,
+    run_id: input.runId,
+    current_draft_artifact: input.currentDraftArtifactId,
+    current_draft_author_key: input.currentAuthor,
+    current_draft_sha256: await circularDraftSha256(input.currentText.trim()),
+    round: Math.max(1, input.round),
+    turn_index: Math.max(0, input.turnIndex),
+    round_roster: [...input.roster],
+    valid_round_agents: [...input.validAgents].filter(isProviderKey),
+    stable_serial_approval_agents: [...input.stableApprovals].filter(isProviderKey),
+    artifact_turn: Math.max(1, input.artifactTurn),
+    previous_artifact_id: input.previousArtifactId,
+    updated_at: nowIso(),
+  };
+  return JSON.stringify(state);
 }
 
 /** True when the runner must stop: the row is gone or no longer in a runnable
@@ -2701,10 +3145,26 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     max_cycles: row.max_cycles,
   };
   const activeAgents = input.active_agents?.length ? input.active_agents : PROVIDER_KEYS;
-  const initialAgent = sanitizeAgent(input.initial_agent, activeAgents[0] ?? 'claude');
-  const events = parseJson<SessionEvent[]>(row.events_json, []);
-  const pushEvent = async (event: SessionEvent) => {
-    events.push(event);
+  const originalInitialAgent = sanitizeAgent(input.initial_agent, activeAgents[0] ?? 'claude');
+  const cycleLeadCandidate = sanitizeAgent(row.cycle_lead || row.initial_agent, originalInitialAgent);
+  const cycleLead = activeAgents.includes(cycleLeadCandidate) ? cycleLeadCandidate : originalInitialAgent;
+  const leadIndex = activeAgents.indexOf(cycleLead);
+  const order = [...activeAgents.slice(leadIndex + 1), ...activeAgents.slice(0, leadIndex + 1)] as ProviderKey[];
+  let events: SessionEvent[];
+  try {
+    events = parseSessionEventsStrict(row.events_json);
+  } catch (error) {
+    const message = `Session journal integrity check failed: ${error instanceof Error ? error.message : String(error)}`;
+    logMaestro('error', 'session_journal_integrity_failed', { session_id: id, message });
+    await persistSession(
+      db,
+      id,
+      { status: 'paused_resume_state_invalid', error: message },
+      { ifStatusIn: ['queued', 'running'] },
+    );
+    return;
+  }
+  const logSessionEvent = (event: SessionEvent) => {
     logMaestro(event.status === 'error' ? 'error' : event.status === 'blocked' ? 'warn' : 'info', 'session_event', {
       session_id: id,
       agent: event.agent,
@@ -2715,16 +3175,21 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       model: event.model,
       invalid_links: event.link_audit?.filter((link) => !link.ok).length ?? 0,
     });
-    await persistSession(db, id, { events_json: JSON.stringify(events) });
+  };
+  const pushEvent = async (event: SessionEvent): Promise<boolean> => {
+    const applied = await persistSession(db, id, {}, { ifStatusIn: ['queued', 'running'], appendEvent: event });
+    if (!applied) return false;
+    events.push(event);
+    logSessionEvent(event);
+    return true;
   };
   let observedCost = row.observed_cost_usd || 0;
-  let currentAuthor: ProviderKey = initialAgent;
+  let currentAuthor: ProviderKey = cycleLead;
+  let currentText = '';
   let artifactTurn = 0;
   let previousArtifactId: string | null = null;
+  let currentDraftArtifactId: string | null = null;
   const correctiveRetryCounts = new Map<string, number>();
-  // ── Plan C: resumable lifecycle ──
-  // Resume detection (canonical limited recovery: custody text + author). A
-  // resumed run skips the draft phase and re-enters the review circuit.
   const isResume = Boolean(row.current_text?.trim() && row.current_author);
   // Canonical time anchor: created_at on a fresh run, `now` on resume.
   const createdAtMs = Date.parse(row.created_at);
@@ -2739,10 +3204,69 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     const remaining = remainingSessionMs(timeAnchorMs, input.max_runtime_minutes);
     return remaining === null ? PROVIDER_TIMEOUT_MS : Math.max(1, Math.min(PROVIDER_TIMEOUT_MS, remaining));
   };
-  // Plan F: per-execution live-model cache + the prior-reports feed list (the
-  // web analogue of the desktop's append-only EditorialAgentResult slice).
   const modelCache = new Map<ProviderKey, string>();
   const serialReports: SerialTurnReport[] = [];
+  const roundTurnCount = order.length;
+  const maxSerialTurns = Math.max(roundTurnCount * 4, roundTurnCount);
+  let round = 1;
+  let roundTurnIndex = 0;
+  let serialTurns = 0;
+  const validRoundAgents = new Set<string>();
+  const stableApprovals = new Set<string>();
+  const persistCircularProgress = async (
+    patch: SessionPatch = {},
+    opts: PersistSessionOptions = {},
+  ): Promise<boolean> => {
+    if (!currentDraftArtifactId || !previousArtifactId || !currentText.trim()) {
+      throw new Error('Cannot persist circular progress without accepted draft custody.');
+    }
+    const circularStateJson = await serializeCircularReviewState({
+      runId: id,
+      currentDraftArtifactId,
+      currentAuthor,
+      currentText,
+      round,
+      turnIndex: roundTurnIndex,
+      roster: order,
+      validAgents: validRoundAgents,
+      stableApprovals,
+      artifactTurn,
+      previousArtifactId,
+    });
+    return persistSession(
+      db,
+      id,
+      {
+        current_author: currentAuthor,
+        current_text: currentText,
+        circular_state_json: circularStateJson,
+        ...patch,
+      },
+      opts,
+    );
+  };
+  const consumeSerialTurnBudget = async (): Promise<boolean> => {
+    serialTurns += 1;
+    if (serialTurns <= maxSerialTurns) return true;
+    const event: SessionEvent = {
+      at: nowIso(),
+      status: 'blocked',
+      message: `Serial turn cap reached (${maxSerialTurns}); session stopped without unanimity.`,
+    };
+    const applied = await persistCircularProgress(
+      {
+        status: 'paused_cycle_limit',
+        observed_cost_usd: observedCost,
+        error: `Serial turn cap of ${maxSerialTurns} turns reached without unanimity.`,
+      },
+      { ifStatusIn: ['queued', 'running'], appendEvent: event },
+    );
+    if (applied) {
+      events.push(event);
+      logSessionEvent(event);
+    }
+    return false;
+  };
   const callOptions = (): ProviderCallOptions => ({ timeoutMs: callTimeoutMs(), isCancelled, modelCache });
   // Plan D (documented web deviation): the desktop re-runs the full release
   // audit (incl. HTTP) on every unchanged turn; on Workers that would multiply
@@ -2769,7 +3293,12 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
   };
 
   try {
-    logMaestro('info', 'session_started', { session_id: id, initial_agent: initialAgent, active_agents: activeAgents });
+    logMaestro('info', 'session_started', {
+      session_id: id,
+      original_initial_agent: originalInitialAgent,
+      cycle_lead: cycleLead,
+      active_agents: activeAgents,
+    });
     // Cooperative cancellation (pre-draft): an operator cancel / sweeper can flip
     // the status to terminal while the session is still queued. Detect it BEFORE
     // the cost guard, the paid provider call, and any draft event/artifact.
@@ -2778,28 +3307,76 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       logMaestro('warn', 'session_interrupted', { session_id: id, status: preDraftLive?.status });
       return;
     }
-    let currentText = '';
     if (isResume) {
-      // Canonical resume (limited recovery): custody text/author are restored,
-      // the draft phase is skipped, and the review circuit restarts with empty
-      // approval/round accounting. Link auditing happens only at finalization
-      // attempts (Plan D canonical placement), not here.
       currentText = String(row.current_text);
-      currentAuthor = sanitizeAgent(row.current_author ?? '', initialAgent);
+      currentAuthor = sanitizeAgent(row.current_author ?? '', cycleLead);
+      let progress: CircularResumeProgress;
+      try {
+        const persistedState = parsePersistedCircularState(row.circular_state_json || '{}');
+        if (persistedState) {
+          await validatePersistedCircularState(db, row, persistedState);
+          const artifacts = await loadSessionArtifacts(db, id);
+          progress = restorePersistedCircularProgress(
+            persistedState,
+            order,
+            currentAuthor,
+            artifacts.map(deliberativeArtifactReport).filter((report): report is SerialTurnReport => report !== null),
+          );
+          // A cancelled/lost CAS can leave an append-only evidence artifact
+          // beyond the accepted state's counter. Reserve every observed turn
+          // number without promoting that orphan into the custody chain.
+          progress.artifactTurn = Math.max(
+            progress.artifactTurn,
+            artifacts.reduce((maximum, artifact) => Math.max(maximum, Number(artifact.turn) || 0), 0),
+          );
+        } else {
+          progress = await reconstructLegacyCircularProgress(db, row, input, currentAuthor, currentText);
+        }
+      } catch (error) {
+        const message = `Circular custody integrity check failed: ${error instanceof Error ? error.message : String(error)}`;
+        await pushEvent({
+          at: nowIso(),
+          agent: currentAuthor,
+          role: 'draft',
+          status: 'blocked',
+          message,
+        });
+        await persistSession(
+          db,
+          id,
+          { status: 'paused_resume_state_invalid', error: message },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
+      }
+      round = progress.round;
+      roundTurnIndex = progress.turnIndex;
+      progress.validAgents.forEach((agent) => {
+        validRoundAgents.add(agent);
+      });
+      progress.stableApprovals.forEach((agent) => {
+        stableApprovals.add(agent);
+      });
+      currentDraftArtifactId = progress.currentDraftArtifactId;
+      artifactTurn = progress.artifactTurn;
+      previousArtifactId = progress.previousArtifactId;
+      serialReports.push(...progress.serialReports);
+      if (!(await persistCircularProgress({ status: 'running' }, { ifStatusIn: ['queued', 'running'] }))) {
+        return;
+      }
       await pushEvent({
         at: nowIso(),
         agent: currentAuthor,
         role: 'draft',
         status: 'running',
-        message: 'Session resumed: draft phase skipped, custody text recovered.',
+        message: 'Session resumed: draft phase skipped and circular custody state restored.',
       });
-      await persistSession(db, id, { status: 'running' }, { ifStatusIn: ['queued', 'running'] });
     } else {
       // Canonical draft fallback: the lead drafts first; an operational failure
       // or empty draft falls through to the next active agent; cost/time
       // exhaustion pauses; all agents failing pauses as draft-unavailable.
       const draftPrompt = buildDraftPrompt(input, id);
-      const draftAgents = [initialAgent, ...activeAgents.filter((agent) => agent !== initialAgent)];
+      const draftAgents = [cycleLead, ...activeAgents.filter((agent) => agent !== cycleLead)];
       let draftAuthor: ProviderKey | null = null;
       let draft: ProviderCallResult | null = null;
       let draftCost = 0;
@@ -2847,7 +3424,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           agent: draftAgent,
           role: 'draft',
           status: 'running',
-          message: draftAgent === initialAgent ? 'Draft call started.' : 'Draft fallback call started.',
+          message: draftAgent === cycleLead ? 'Draft call started.' : 'Draft fallback call started.',
         });
         // Re-check immediately before the paid call: a cancel can land during the
         // `await pushEvent` above, and the provider request must not run (cost) for a
@@ -2870,6 +3447,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           );
           draftCost = calculateObservedCost(attempt, draftPrompt, draftRates);
           observedCost += draftCost;
+          await persistObservedCostFloor(db, id, observedCost);
           // M3: an empty provider response (e.g. a thinking-only completion) is a
           // draft failure, not a silent blank custody — fall through to the next agent.
           if (!attempt.text.trim()) {
@@ -2944,7 +3522,8 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         previousArtifactId,
       });
       previousArtifactId = draftArtifact.id;
-      await pushEvent({
+      currentDraftArtifactId = draftArtifact.id;
+      const acceptedDraftEvent: SessionEvent = {
         at: nowIso(),
         agent: draftAuthor,
         role: 'draft',
@@ -2952,44 +3531,27 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         message: 'Initial draft produced.',
         cost_usd: draftCost,
         model: draft.model,
-      });
-      await persistSession(
-        db,
-        id,
-        {
-          status: 'running',
-          current_author: currentAuthor,
-          current_text: currentText,
-          observed_cost_usd: observedCost,
-        },
-        { ifStatusIn: ['queued', 'running'] },
-      );
+      };
+      if (
+        !(await persistCircularProgress(
+          {
+            status: 'running',
+            observed_cost_usd: observedCost,
+          },
+          { ifStatusIn: ['queued', 'running'], appendEvent: acceptedDraftEvent },
+        ))
+      ) {
+        return;
+      }
+      events.push(acceptedDraftEvent);
+      logSessionEvent(acceptedDraftEvent);
     }
 
-    const order = [
-      ...activeAgents.slice(activeAgents.indexOf(initialAgent) + 1),
-      ...activeAgents.slice(0, activeAgents.indexOf(initialAgent)),
-      initialAgent,
-    ];
-    // ── Plan B3: desktop round/turn accounting and cumulative convergence ──
-    // READY-unchanged turns add the reviewer to stableApprovals; substantive
-    // changes, contract/lock violations and quality-guard blocks clear it.
-    // The session finalizes the moment every non-author agent of the rotation
-    // is in the set (mid-round capable), and a global serial-turn cap bounds
-    // deliberation. Since Plan C the paused_* statuses are resumable.
     let converged = false;
-    const maxCycles = Math.max(1, Math.min(5, Number(input.max_cycles || 2)));
-    const roundTurnCount = order.length;
-    const maxSerialTurns = Math.max(roundTurnCount * 4, roundTurnCount);
-    let round = 1;
-    let roundTurnIndex = 0;
-    let serialTurns = 0;
-    const validRoundAgents = new Set<string>();
-    const stableApprovals = new Set<string>();
     // ── Plan C: operational turn failures (canonical 3-strike escalation) ──
     // A provider/network/timeout failure or an exhausted corrective-retry turn
-    // does NOT kill the session: it skips the turn (stableApprovals PRESERVED —
-    // only violations clear it), and three consecutive operational failures
+    // does NOT kill the session: it skips the turn with stable approvals
+    // preserved, and three consecutive operational failures
     // escalate to paused_reviewer_outage. A clean turn resets the counter. A
     // failure on the round's closing turn pauses as paused_round_incomplete.
     const handleOperationalFailure = async (reviewer: ProviderKey, message: string): Promise<'stop' | 'skip'> => {
@@ -3002,13 +3564,9 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         message: `Operational turn failure (${consecutiveOutages}/${REVIEWER_OUTAGE_ESCALATION_THRESHOLD}): ${sanitizeText(message, 300)}`,
       });
       if (consecutiveOutages >= REVIEWER_OUTAGE_ESCALATION_THRESHOLD) {
-        await persistSession(
-          db,
-          id,
+        await persistCircularProgress(
           {
             status: 'paused_reviewer_outage',
-            current_author: currentAuthor,
-            current_text: currentText,
             observed_cost_usd: observedCost,
             error: `${REVIEWER_OUTAGE_ESCALATION_THRESHOLD} consecutive reviewer turns failed operationally; session paused for operator action.`,
           },
@@ -3018,13 +3576,12 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       }
       roundTurnIndex += 1;
       if (roundTurnIndex >= roundTurnCount) {
-        await persistSession(
-          db,
-          id,
+        round += 1;
+        roundTurnIndex = 0;
+        validRoundAgents.clear();
+        await persistCircularProgress(
           {
             status: 'paused_round_incomplete',
-            current_author: currentAuthor,
-            current_text: currentText,
             observed_cost_usd: observedCost,
             error: 'Operational failure at the end of the round; review circuit incomplete.',
           },
@@ -3032,7 +3589,9 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         );
         return 'stop';
       }
-      return 'skip';
+      return (await persistCircularProgress({ observed_cost_usd: observedCost }, { ifStatusIn: ['queued', 'running'] }))
+        ? 'skip'
+        : 'stop';
     };
     for (;;) {
       // Cooperative cancellation: an operator cancel (or sweeper) flips the
@@ -3052,31 +3611,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       // Desktop parity (turn cap): serialTurns counts every iteration —
       // including retries, skips and redraws — and hard-stops runaway
       // deliberation at roundTurnCount * 4.
-      serialTurns += 1;
-      if (serialTurns > maxSerialTurns) {
-        await pushEvent({
-          at: nowIso(),
-          status: 'blocked',
-          message: `Serial turn cap reached (${maxSerialTurns}); session stopped without unanimity.`,
-        });
-        await persistSession(
-          db,
-          id,
-          {
-            status: 'paused_cycle_limit',
-            current_author: currentAuthor,
-            current_text: currentText,
-            observed_cost_usd: observedCost,
-            error: `Serial turn cap of ${maxSerialTurns} turns reached without unanimity.`,
-          },
-          { ifStatusIn: ['queued', 'running'] },
-        );
-        return;
-      }
-      // Interim operator bound (documented deviation until Plan C): the
-      // desktop has no round cap, only the turn cap above; the operator's
-      // max_cycles setting is honored as an outer round bound meanwhile.
-      if (round > maxCycles) break;
+      if (!(await consumeSerialTurnBudget())) return;
       // Scheduling-fairness seed for the redraw, NOT a cryptographic value: the
       // desktop seeds from a wall-clock timestamp (session_orchestration.rs:864,
       // timestamp_nanos % pending). Math.random keeps that non-cryptographic
@@ -3088,25 +3623,38 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         order,
         roundTurnIndex,
         currentAuthor,
-        initialAgent,
+        cycleLead,
         validRoundAgents,
         stableApprovals,
         selectionSeed,
       );
       if (selectedIndex === null) {
-        // Desktop parity: an empty pending set means every schedulable peer
-        // has already approved the current version.
-        converged = true;
-        break;
+        await persistCircularProgress(
+          {
+            status: 'paused_round_incomplete',
+            observed_cost_usd: observedCost,
+            error: 'No eligible reviewer could be scheduled before convergence.',
+          },
+          { ifStatusIn: ['queued', 'running'] },
+        );
+        return;
       }
       const reviewer = order[selectedIndex] as ProviderKey;
       if (selectedIndex !== roundTurnIndex % roundTurnCount) {
+        const redrawReason = reviewerRedrawReason(
+          order,
+          roundTurnIndex,
+          currentAuthor,
+          cycleLead,
+          validRoundAgents,
+          stableApprovals,
+        );
         await pushEvent({
           at: nowIso(),
           agent: reviewer,
           role: 'revision',
           status: 'running',
-          message: 'Reviewer redrawn: nominal slot is the current author or already approved this version.',
+          message: `Reviewer redrawn: ${redrawReason}.`,
         });
       }
       roundTurnIndex = selectedIndex;
@@ -3150,6 +3698,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         // skips the turn, and an exhausted turn at the end of the round pauses
         // the circuit as paused_round_incomplete.
         for (;;) {
+          if (correctiveRetryCount > 0 && !(await consumeSerialTurnBudget())) return;
           await pushEvent({
             at: nowIso(),
             agent: reviewer,
@@ -3171,7 +3720,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               serialReports,
               // Canonical closing-turn flag: the configured lead closing the
               // circuit (the scheduler only makes it eligible via closure gating).
-              closingTurn: reviewer === initialAgent && reviewer !== currentAuthor,
+              closingTurn: reviewer === cycleLead && reviewer !== currentAuthor,
             })) + (correctiveRetryCount > 0 ? correctiveRetrySection(correctiveRetryCount) : '');
           const rates = input.rates?.[reviewer] ?? {};
           const projected = estimateCost(prompt, MAX_OUTPUT_TOKENS, rates);
@@ -3227,6 +3776,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           }
           const cost = calculateObservedCost(result, prompt, rates);
           observedCost += cost;
+          await persistObservedCostFloor(db, id, observedCost);
           // Cooperative cancellation (post-call): if cancelled while the reviewer
           // call was in flight, do not write revision artifacts/events for the
           // now-cancelled session.
@@ -3281,15 +3831,22 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             // CONTRACT_VIOLATION corrective-retry path.
             contractError = validateRevisionContentLock(currentText, revisedText, report ?? '');
           }
+          const changedByReviewer = Boolean(revisedText && isSubstantiveEditorialChange(currentText, revisedText));
+          if (
+            !contractError &&
+            revisedText !== null &&
+            changedByReviewer &&
+            qualityGuardBlocksRevision(currentAuthor, reviewer, currentText, revisedText, true)
+          ) {
+            contractError =
+              'Anti-impoverishment quality ratchet rejected a lower-tier revision that shrank stronger custody text beyond the allowed ratio. Preserve the accepted text and correct only protocol-grounded defects.';
+          }
           if (contractError) {
             const retryKey = `${round}:${roundTurnIndex}:${reviewer}:${currentText}`;
             const retryCount = (correctiveRetryCounts.get(retryKey) ?? 0) + 1;
             correctiveRetryCounts.set(retryKey, retryCount);
-            // Desktop parity: any contract violation clears the cumulative
-            // stable-approval set.
-            stableApprovals.clear();
             artifactTurn += 1;
-            const violationArtifact = await createArtifact(db, {
+            await createArtifact(db, {
               sessionId: id,
               cycle: round,
               turn: artifactTurn,
@@ -3310,15 +3867,6 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               model: result.model,
               previousArtifactId,
             });
-            // Prior-reports feed (canonical): a violating turn enters with its
-            // attempted report (or the contract-failure placeholder when none).
-            serialReports.push({
-              name: AGENT_LABELS[reviewer],
-              role: 'review',
-              status: 'CONTRACT_VIOLATION',
-              report,
-              artifact: violationArtifact.id,
-            });
             await pushEvent({
               at: nowIso(),
               agent: reviewer,
@@ -3336,7 +3884,17 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
                   }
                 : {}),
             });
-            await persistSession(db, id, { observed_cost_usd: observedCost });
+            // RejectedAttempt: preserve every stable approval and keep the
+            // invalid report out of the prompt history. The blocked artifact is
+            // retained solely as append-only evidence.
+            if (
+              !(await persistCircularProgress(
+                { observed_cost_usd: observedCost },
+                { ifStatusIn: ['queued', 'running'] },
+              ))
+            ) {
+              return;
+            }
             if (retryCount <= MAX_CORRECTIVE_CONTRACT_RETRIES_PER_TURN) {
               correctiveRetryCount = retryCount;
               continue;
@@ -3351,68 +3909,6 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             if (action === 'stop') return;
             break;
           }
-          const changedByReviewer = Boolean(revisedText && isSubstantiveEditorialChange(currentText, revisedText));
-          if (
-            revisedText !== null &&
-            changedByReviewer &&
-            qualityGuardBlocksRevision(currentAuthor, reviewer, currentText, revisedText, true)
-          ) {
-            // Desktop parity (anti-impoverishment quality ratchet): the shrunk
-            // revision from a lower-tier reviewer is rejected and discarded; the
-            // custody text and author stay unchanged and the session continues.
-            artifactTurn += 1;
-            const ratchetArtifact = await createArtifact(db, {
-              sessionId: id,
-              cycle: round,
-              turn: artifactTurn,
-              agent: reviewer,
-              role: 'revision',
-              status: 'blocked',
-              title: input.title,
-              contentMd: currentText,
-              revisionReport: JSON.stringify({
-                guard: 'anti_impoverishment_quality_ratchet',
-                reason: 'Lower-tier reviewer shrank stronger custody text beyond the allowed ratio; revision rejected.',
-                attempted_report: (report ?? '').slice(0, 2000),
-              }),
-              linkAudit: [],
-              costUsd: cost,
-              model: result.model,
-              previousArtifactId,
-            });
-            // Prior-reports feed (canonical): the rejected turn's report still
-            // informs later reviewers.
-            serialReports.push({
-              name: AGENT_LABELS[reviewer],
-              role: 'review',
-              status: 'QUALITY_GUARD_REJECTED',
-              report,
-              artifact: ratchetArtifact.id,
-            });
-            await pushEvent({
-              at: nowIso(),
-              agent: reviewer,
-              role: 'revision',
-              status: 'blocked',
-              message: 'Quality guard rejected lower-tier shrink revision; custody unchanged.',
-              cost_usd: cost,
-              model: result.model,
-            });
-            await persistSession(db, id, { observed_cost_usd: observedCost });
-            // Desktop parity: the rejected revision clears the stable set and
-            // the turn does NOT count as a valid round agent. The provider
-            // itself responded, so the operational-outage streak resets.
-            consecutiveOutages = 0;
-            stableApprovals.clear();
-            roundTurnIndex += 1;
-            if (roundTurnIndex >= roundTurnCount) {
-              round += 1;
-              roundTurnIndex = 0;
-              validRoundAgents.clear();
-              stableApprovals.clear();
-            }
-            break;
-          }
           const candidateText = revisedText && changedByReviewer ? revisedText : currentText;
           // Plan D canonical placement: revision turns carry no link audit —
           // links are audited only when a text attempts finalization.
@@ -3423,7 +3919,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             turn: artifactTurn,
             agent: reviewer,
             role: 'revision',
-            status: effectiveStatus.toLowerCase(),
+            status: readyRejectedReason ? 'ready_rejected' : effectiveStatus.toLowerCase(),
             title: input.title,
             contentMd: candidateText,
             revisionReport: report ?? '',
@@ -3433,15 +3929,15 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             previousArtifactId,
           });
           previousArtifactId = artifact.id;
-          // Prior-reports feed (canonical): every accepted turn's report joins
-          // the chronological history fed to later reviewers.
-          serialReports.push({
-            name: AGENT_LABELS[reviewer],
-            role: 'review',
-            status: readyRejectedReason ? 'READY_REJECTED' : effectiveStatus,
-            report,
-            artifact: artifact.id,
-          });
+          if (!readyRejectedReason) {
+            serialReports.push({
+              name: AGENT_LABELS[reviewer],
+              role: 'review',
+              status: effectiveStatus,
+              report,
+              artifact: artifact.id,
+            });
+          }
           // Desktop parity: ReadyRejected turns do not count as valid round
           // agents; every other accepted turn feeds the closure gating. Any
           // accepted turn is a clean provider response: outage streak resets.
@@ -3452,13 +3948,12 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             // earn a fresh full rotation of independent approvals.
             currentText = revisedText;
             currentAuthor = reviewer;
+            currentDraftArtifactId = artifact.id;
             stableApprovals.clear();
           } else if (effectiveStatus === 'READY') {
             stableApprovals.add(reviewer);
-          } else {
-            stableApprovals.clear();
           }
-          await pushEvent({
+          const acceptedReviewEvent: SessionEvent = {
             at: nowIso(),
             agent: reviewer,
             role: 'revision',
@@ -3478,28 +3973,36 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
                     : {}),
                 }
               : {}),
-          });
-          // Do NOT re-assert status:'running' here. The session is already
-          // 'running'; rewriting it would clobber a concurrent operator cancel
-          // (blocked_cancelled) that landed during this turn, defeating the
-          // cooperative-cancel check at the top of the next iteration.
-          await persistSession(db, id, {
-            current_author: currentAuthor,
-            current_text: currentText,
-            observed_cost_usd: observedCost,
-          });
+          };
           roundTurnIndex += 1;
           if (roundTurnIndex >= roundTurnCount) {
             round += 1;
             roundTurnIndex = 0;
             validRoundAgents.clear();
           }
+          // Artifact insertion is append-only. The accepted custody pointer,
+          // hash, approvals, turn cursor and session projection then advance in
+          // one atomic D1 UPDATE; a crash between the two leaves an orphan
+          // artifact, never a half-advanced custody state.
+          if (
+            !(await persistCircularProgress(
+              { observed_cost_usd: observedCost },
+              { ifStatusIn: ['queued', 'running'], appendEvent: acceptedReviewEvent },
+            ))
+          ) {
+            return;
+          }
+          events.push(acceptedReviewEvent);
+          logSessionEvent(acceptedReviewEvent);
           break;
         }
       }
     }
 
-    if (converged) {
+    if (!converged) {
+      throw new Error('Circular scheduler exited without convergence or an explicit pause status.');
+    }
+    {
       // Desktop parity (final release audit, all three canonical stages):
       // bibliographic integrity -> link-audit capacity (> 30 unique URLs) ->
       // HTTP link audit (any error/blocked row). A unanimous version that
@@ -3529,15 +4032,10 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           final_audit: finalAuditEventField(finalGateFailure),
           ...(auditRows ? { link_audit: auditRows } : {}),
         });
-        await persistSession(
-          db,
-          id,
+        await persistCircularProgress(
           {
             status: 'paused_final_audit',
-            current_author: currentAuthor,
-            current_text: currentText,
             observed_cost_usd: observedCost,
-            events_json: JSON.stringify(events),
             error: finalGateFailure.reason,
           },
           { ifStatusIn: ['queued', 'running'] },
@@ -3545,52 +4043,53 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         return;
       }
     }
-    await pushEvent({
+    const finishedEvent: SessionEvent = {
       at: nowIso(),
       status: 'finished',
-      message: converged ? 'All eligible reviewers returned READY.' : 'Maximum cycles reached without unanimity.',
-    });
-    logMaestro(converged ? 'info' : 'warn', 'session_finished', {
+      message: 'All eligible reviewers returned READY.',
+    };
+    const finalized = await persistCircularProgress(
+      {
+        status: 'converged',
+        final_text: currentText,
+        observed_cost_usd: observedCost,
+      },
+      { ifStatusIn: ['queued', 'running'], appendEvent: finishedEvent },
+    );
+    if (!finalized) return;
+    events.push(finishedEvent);
+    logSessionEvent(finishedEvent);
+    logMaestro('info', 'session_finished', {
       session_id: id,
-      status: converged ? 'converged' : 'blocked_max_cycles',
+      status: 'converged',
       observed_cost_usd: observedCost,
       current_author: currentAuthor,
     });
-    await persistSession(
-      db,
-      id,
-      {
-        status: converged ? 'converged' : 'blocked_max_cycles',
-        current_author: currentAuthor,
-        current_text: currentText,
-        final_text: converged ? currentText : null,
-        observed_cost_usd: observedCost,
-        events_json: JSON.stringify(events),
-      },
-      { ifStatusIn: ['queued', 'running'] },
-    );
   } catch (error) {
     logMaestro('error', 'session_failed', {
       session_id: id,
       message: error instanceof Error ? error.message : String(error),
       observed_cost_usd: observedCost,
     });
-    await pushEvent({
+    const errorEvent: SessionEvent = {
       at: nowIso(),
       status: 'error',
       message: error instanceof Error ? error.message : 'Unknown Maestro AI failure.',
-    });
-    await persistSession(
+    };
+    const failed = await persistSession(
       db,
       id,
       {
         status: 'error',
         observed_cost_usd: observedCost,
-        events_json: JSON.stringify(events),
         error: error instanceof Error ? error.message : String(error),
       },
-      { ifStatusIn: ['queued', 'running'] },
+      { ifStatusIn: ['queued', 'running'], appendEvent: errorEvent },
     );
+    if (failed) {
+      events.push(errorEvent);
+      logSessionEvent(errorEvent);
+    }
   }
 }
 
@@ -3666,7 +4165,8 @@ export async function handleMaestroAiSessionsGet(context: RequestContext, sessio
     }
     const rows = await db
       .prepare(
-        `SELECT id, title, status, initial_agent, active_agents_json, current_author, current_text, final_text,
+        `SELECT id, title, status, initial_agent, cycle_lead, active_agents_json, circular_state_json,
+                current_author, current_text, final_text,
                 observed_cost_usd, max_cost_usd, max_runtime_minutes, max_cycles, events_json, created_at, updated_at, error
          FROM maestro_ai_sessions
          ORDER BY updated_at DESC
@@ -3698,10 +4198,10 @@ export async function handleMaestroAiSessionsPost(context: RequestContext): Prom
     await db
       .prepare(
         `INSERT INTO maestro_ai_sessions (
-          id, title, prompt, protocol_text, initial_agent, active_agents_json,
+          id, title, prompt, protocol_text, initial_agent, cycle_lead, active_agents_json, circular_state_json,
           current_author, current_text, final_text, status, observed_cost_usd,
           max_cost_usd, max_runtime_minutes, max_cycles, rates_json, models_json, events_json, created_at, updated_at, error
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -3709,7 +4209,9 @@ export async function handleMaestroAiSessionsPost(context: RequestContext): Prom
         validated.value.prompt,
         validated.value.protocol_text,
         validated.value.initial_agent,
+        validated.value.initial_agent,
         JSON.stringify(validated.value.active_agents),
+        '{}',
         null,
         sanitizeText(validated.value.initial_content, 120_000),
         null,
@@ -3939,6 +4441,16 @@ export async function handleMaestroAiSessionContentPut(context: RequestContext, 
         409,
       );
     }
+    if (RESUMABLE_STATUSES.has(row.status) && row.final_text == null && body.content !== undefined) {
+      return json(
+        {
+          ok: false,
+          error:
+            'Conteudo de uma sessao retomavel nao pode ser substituido fora da cadeia de custodia. Retome a sessao para preservar autoria, hash e historico circular.',
+        },
+        409,
+      );
+    }
     // Fallback simétrico: title e content ausentes preservam o valor atual.
     // Sem isso, `content` omitido apagaria current_text (sanitizeText(undefined) === '').
     await db
@@ -3976,18 +4488,21 @@ export async function handleMaestroAiSessionCancelPost(context: RequestContext, 
     if (!ACTIVE_SESSION_STATUSES.has(row.status)) {
       return json({ ok: false, error: 'Sessao ja finalizada; nada a cancelar.' }, 409);
     }
-    const events = parseJson<SessionEvent[]>(row.events_json, []);
-    events.push({ at: nowIso(), status: 'blocked', message: 'Sessao cancelada pelo operador.' });
-    await persistSession(
+    const cancelEvent: SessionEvent = {
+      at: nowIso(),
+      status: 'blocked',
+      message: 'Sessao cancelada pelo operador.',
+    };
+    const applied = await persistSession(
       db,
       sessionId,
       {
         status: 'blocked_cancelled',
-        events_json: JSON.stringify(events),
         error: 'Sessao cancelada pelo operador.',
       },
-      { ifStatusIn: ['queued', 'running'] },
+      { ifStatusIn: ['queued', 'running'], appendEvent: cancelEvent },
     );
+    if (!applied) return json({ ok: false, error: 'Sessao mudou de estado durante o cancelamento.' }, 409);
     const next = await loadSession(db, sessionId);
     return json({ ok: true, session: next ? publicSession(next) : null });
   } catch (error) {
@@ -4007,13 +4522,60 @@ export async function handleMaestroAiSessionResumePost(context: RequestContext, 
     if (!RESUMABLE_STATUSES.has(row.status) || row.final_text != null) {
       return json({ ok: false, error: 'Sessao concluida; nada a retomar.' }, 409);
     }
-    const events = parseJson<SessionEvent[]>(row.events_json, []);
-    events.push({ at: nowIso(), status: 'running', message: 'Sessao retomada pelo operador.' });
+    let requested: { initial_agent?: unknown; active_agents?: unknown } = {};
+    const rawBody = await context.request.text();
+    if (rawBody.trim()) {
+      try {
+        requested = JSON.parse(rawBody) as { initial_agent?: unknown; active_agents?: unknown };
+      } catch {
+        return json({ ok: false, error: 'Configuracao de retomada invalida.' }, 400);
+      }
+    }
+    const savedAgents = parseJson<ProviderKey[]>(row.active_agents_json, []).filter(isProviderKey);
+    const requestedAgents = requested.active_agents === undefined ? savedAgents : requested.active_agents;
+    if (!Array.isArray(requestedAgents)) {
+      return json({ ok: false, error: 'Selecione ao menos dois agentes validos para retomar.' }, 400);
+    }
+    const activeAgents = requestedAgents.filter(isProviderKey);
+    if (activeAgents.length !== requestedAgents.length || new Set(activeAgents).size !== activeAgents.length) {
+      return json({ ok: false, error: 'O painel de retomada contem agente invalido ou duplicado.' }, 400);
+    }
+    if (activeAgents.length < 2) {
+      return json({ ok: false, error: 'Selecione ao menos dois agentes para retomar a revisao circular.' }, 400);
+    }
+    const requestedLead =
+      requested.initial_agent === undefined ? row.cycle_lead || row.initial_agent : requested.initial_agent;
+    if (!isProviderKey(requestedLead) || !activeAgents.includes(requestedLead)) {
+      return json({ ok: false, error: 'O agente lider da retomada deve pertencer ao painel selecionado.' }, 400);
+    }
+    const rates = parseJson<Partial<Record<ProviderKey, ProviderRates>>>(row.rates_json, {});
+    const unavailable = activeAgents.filter(
+      (agent) => !secretForAgent(context.env, agent) || !hasPositiveRates(rates[agent]),
+    );
+    if (unavailable.length) {
+      return json(
+        {
+          ok: false,
+          error: `Agentes indisponiveis para retomada: ${unavailable.map((agent) => AGENT_LABELS[agent]).join(', ')}.`,
+        },
+        400,
+      );
+    }
+    const resumeEvent: SessionEvent = {
+      at: nowIso(),
+      status: 'running',
+      message: `Sessao retomada pelo operador com ${AGENT_LABELS[requestedLead]} como lider do ciclo.`,
+    };
     const applied = await persistSession(
       db,
       sessionId,
-      { status: 'queued', events_json: JSON.stringify(events), error: null },
-      { ifStatusIn: [row.status] },
+      {
+        status: 'queued',
+        cycle_lead: requestedLead,
+        active_agents_json: JSON.stringify(activeAgents),
+        error: null,
+      },
+      { ifStatusIn: [row.status], appendEvent: resumeEvent },
     );
     if (!applied) {
       // CAS lost: a concurrent resume/cancel changed the row after our read.

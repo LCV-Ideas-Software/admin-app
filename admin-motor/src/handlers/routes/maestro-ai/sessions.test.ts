@@ -64,21 +64,23 @@ function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; a
                   prompt: values[2],
                   protocol_text: values[3],
                   initial_agent: values[4],
-                  active_agents_json: values[5],
-                  current_author: values[6],
-                  current_text: values[7],
-                  final_text: values[8],
-                  status: values[9],
-                  observed_cost_usd: values[10],
-                  max_cost_usd: values[11],
-                  max_runtime_minutes: values[12],
-                  max_cycles: values[13],
-                  rates_json: values[14],
-                  models_json: values[15],
-                  events_json: values[16],
-                  created_at: values[17],
-                  updated_at: values[18],
-                  error: values[19],
+                  cycle_lead: values[5],
+                  active_agents_json: values[6],
+                  circular_state_json: values[7],
+                  current_author: values[8],
+                  current_text: values[9],
+                  final_text: values[10],
+                  status: values[11],
+                  observed_cost_usd: values[12],
+                  max_cost_usd: values[13],
+                  max_runtime_minutes: values[14],
+                  max_cycles: values[15],
+                  rates_json: values[16],
+                  models_json: values[17],
+                  events_json: values[18],
+                  created_at: values[19],
+                  updated_at: values[20],
+                  error: values[21],
                 });
               }
               if (/INSERT INTO maestro_ai_settings/i.test(query) && /ON CONFLICT/i.test(query)) {
@@ -175,7 +177,9 @@ function createInMemoryDb(seed: { settings?: Partial<Row>; sessions?: Row[]; art
     'prompt',
     'protocol_text',
     'initial_agent',
+    'cycle_lead',
     'active_agents_json',
+    'circular_state_json',
     'current_author',
     'current_text',
     'final_text',
@@ -218,6 +222,32 @@ function createInMemoryDb(seed: { settings?: Partial<Row>; sessions?: Row[]; art
     store.set(String(values[0]), row);
   };
 
+  const splitSqlAssignments = (value: string): string[] => {
+    const assignments: string[] = [];
+    let start = 0;
+    let depth = 0;
+    let quote: "'" | '"' | null = null;
+    for (let index = 0; index < value.length; index += 1) {
+      const char = value[index];
+      if (quote) {
+        if (char === quote && value[index - 1] !== '\\') quote = null;
+        continue;
+      }
+      if (char === "'" || char === '"') {
+        quote = char;
+      } else if (char === '(') {
+        depth += 1;
+      } else if (char === ')') {
+        depth = Math.max(0, depth - 1);
+      } else if (char === ',' && depth === 0) {
+        assignments.push(value.slice(start, index).trim());
+        start = index + 1;
+      }
+    }
+    assignments.push(value.slice(start).trim());
+    return assignments.filter(Boolean);
+  };
+
   // Mirrors D1's meta.changes: returns the number of rows the UPDATE modified,
   // so a losing CAS write reports 0 changes like the real database.
   const applyUpdate = (
@@ -225,9 +255,16 @@ function createInMemoryDb(seed: { settings?: Partial<Row>; sessions?: Row[]; art
     query: string,
     values: unknown[],
   ): number => {
+    if (table === 'maestro_ai_sessions' && /observed_cost_usd\s*=\s*CASE/i.test(query)) {
+      const row = sessions.get(String(values[3]));
+      if (!row) return 0;
+      row.observed_cost_usd = Math.max(Number(row.observed_cost_usd) || 0, Number(values[1]) || 0);
+      row.updated_at = values[2];
+      return 1;
+    }
     const setMatch = /SET\s+([\s\S]+?)\s+WHERE/i.exec(query);
     if (!setMatch) return 0;
-    const assignments = (setMatch[1] ?? '').split(',').map((part) => part.trim());
+    const assignments = splitSqlAssignments(setMatch[1] ?? '');
     const setCols = assignments.map((a) => (a.split('=')[0] ?? '').trim());
     if (table === 'maestro_ai_settings') {
       setCols.forEach((col, i) => {
@@ -244,7 +281,13 @@ function createInMemoryDb(seed: { settings?: Partial<Row>; sessions?: Row[]; art
       if (guardStatuses.length && !guardStatuses.includes(String(row.status))) return 0;
     }
     setCols.forEach((col, i) => {
-      row[col] = values[i];
+      if (col === 'events_json' && /json_insert/i.test(assignments[i] ?? '')) {
+        const existing = JSON.parse(String(row.events_json || '[]')) as unknown[];
+        existing.push(JSON.parse(String(values[i])));
+        row.events_json = JSON.stringify(existing);
+      } else {
+        row[col] = values[i];
+      }
     });
     return 1;
   };
@@ -659,9 +702,8 @@ describe('Maestro AI prior-reports feed, prompt sections and model resolution (P
     max_cycles: 2,
   } as Parameters<(typeof maestroAiTestHooks)['buildRevisionPrompt']>[0]['input'];
 
-  it('buildRevisionHistoryBlock formats prior reports canonically (cap, placeholder, skip, order, empty)', () => {
+  it('buildRevisionHistoryBlock keeps only accepted deliberative reports within the canonical caps', () => {
     const { buildRevisionHistoryBlock } = maestroAiTestHooks;
-    // Empty history -> canonical fallback sentence.
     expect(buildRevisionHistoryBlock([])).toBe('No prior revision reports are recorded for this serial cycle.');
     const block = buildRevisionHistoryBlock([
       {
@@ -673,24 +715,49 @@ describe('Maestro AI prior-reports feed, prompt sections and model resolution (P
       },
       { name: 'Claude', role: 'review', status: 'READY', report: null, artifact: 'art-2' },
       { name: 'Gemini', role: 'review', status: 'READY', report: '   ', artifact: 'art-3' },
+      {
+        name: 'DeepSeek',
+        role: 'review',
+        status: 'CONTRACT_VIOLATION',
+        report: 'This rejected attempt must never steer a later reviewer.',
+        artifact: 'art-4',
+      },
+      {
+        name: 'Grok',
+        role: 'review',
+        status: 'QUALITY_GUARD_REJECTED',
+        report: 'This rejected shrink attempt must never enter deliberative history.',
+        artifact: 'art-5',
+      },
     ]);
-    // Chronological order with the canonical header/artifact/fence shape.
     expect(block).toContain('### Codex / review / `NOT_READY`');
     expect(block).toContain('Artifact: `art-1`');
     expect(block).toContain('```text\nreviewer: codex\ncustody: "revised"\n```');
-    // Missing report -> canonical contract-failure placeholder.
     expect(block).toContain(
       'No complete maestro_revision_report block was returned by Claude. Treat this artifact as a contract failure, not as deliberative substance.',
     );
-    // Whitespace-only extracted report -> the turn is skipped entirely.
     expect(block).not.toContain('Gemini');
+    expect(block).not.toContain('DeepSeek');
+    expect(block).not.toContain('Grok');
     expect(block.indexOf('Codex')).toBeLessThan(block.indexOf('Claude'));
-    // Per-report cap: 12,000 Unicode chars.
     const long = buildRevisionHistoryBlock([
       { name: 'Codex', role: 'review', status: 'READY', report: 'x'.repeat(15_000), artifact: 'a' },
     ]);
     const fenced = /```text\n(x+)\n```/.exec(long);
-    expect(fenced?.[1]?.length).toBe(12_000);
+    expect(fenced?.[1]?.length).toBe(8_000);
+
+    const bounded = buildRevisionHistoryBlock(
+      Array.from({ length: 8 }, (_, index) => ({
+        name: `Reviewer-${index + 1}`,
+        role: 'review',
+        status: 'READY',
+        report: `report-${index + 1}:${'x'.repeat(7_980)}`,
+        artifact: `artifact-${index + 1}`,
+      })),
+    );
+    expect(bounded).toContain('Reviewer-8');
+    expect(bounded).not.toContain('Reviewer-1');
+    expect(bounded.length).toBeLessThan(50_000);
   });
 
   it('revision prompt carries the canonical sections: section-ID rule, closing redactor, quality justification, prior reports', async () => {
@@ -1532,7 +1599,9 @@ describe('runSession orchestrator', () => {
     prompt: 'Escreva um artigo.',
     protocol_text: protocolText,
     initial_agent: 'claude',
+    cycle_lead: 'claude',
     active_agents_json: JSON.stringify(['claude', 'codex']),
+    circular_state_json: '{}',
     current_author: null,
     current_text: '',
     final_text: null,
@@ -1660,6 +1729,21 @@ describe('runSession orchestrator', () => {
 
     expect(db.__sessions.get('run-1')?.status).toBe('converged');
     expect(db.__sessions.get('run-1')?.final_text).toBe('Texto de rascunho robusto e completo.');
+    const state = JSON.parse(String(db.__sessions.get('run-1')?.circular_state_json)) as {
+      schema_version?: number;
+      current_draft_artifact?: string;
+      current_draft_author_key?: string;
+      current_draft_sha256?: string;
+      artifact_turn?: number;
+      previous_artifact_id?: string;
+    };
+    expect(state.schema_version).toBe(2);
+    expect(state.current_draft_artifact).toMatch(/^artifact-/);
+    expect(state.current_draft_author_key).toBe('claude');
+    expect(state.current_draft_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(state.artifact_turn).toBe(2);
+    expect(state.previous_artifact_id).toMatch(/^artifact-/);
+    expect(state.previous_artifact_id).not.toBe(state.current_draft_artifact);
   });
 
   it('retries a NOT_READY-unchanged reviewer turn with the corrective section, then converges', async () => {
@@ -1788,6 +1872,63 @@ describe('runSession orchestrator', () => {
     expect(db.__sessions.get('run-1')?.status).toBe('paused_reviewer_outage');
   });
 
+  it('charges every corrective retry against the canonical serial turn cap', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    let anthropicCalls = 0;
+    let reviewCalls = 0;
+    let acceptedText = 'Rascunho valido e completo.';
+    const contractViolation =
+      'MAESTRO_STATUS: NOT_READY\n' +
+      '<maestro_revision_report>custody: "unchanged"\n' +
+      'changes: []\n' +
+      'pass-through objection without correction</maestro_revision_report>';
+    const nextReviewText = () => {
+      reviewCalls += 1;
+      if (reviewCalls % 4 !== 0) return contractViolation;
+      acceptedText += ` Melhoria editorial substantiva ${reviewCalls}.`;
+      return (
+        'MAESTRO_STATUS: READY\n' +
+        '<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "precision rule"}]\n' +
+        'custody: "revised"</maestro_revision_report>\n' +
+        `<maestro_final_text>${acceptedText}</maestro_final_text>`
+      );
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      if (hostOf(url) === 'api.anthropic.com') {
+        anthropicCalls += 1;
+        const text = anthropicCalls === 1 ? acceptedText : nextReviewText();
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text: nextReviewText(),
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    // Two active agents produce a canonical cap of 2 * 4 = 8 review attempts.
+    // The desktop increments that budget for every corrective retry, not only
+    // once per outer reviewer selection.
+    expect(reviewCalls).toBe(8);
+    expect(db.__sessions.get('run-1')?.status).toBe('paused_cycle_limit');
+  });
+
   it('accepts READY with a substantive revision as a normal turn (desktop bans inversion)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
     const revised = 'Texto revisado, mais preciso e completo, sem marcadores pendentes.';
@@ -1815,7 +1956,8 @@ describe('runSession orchestrator', () => {
       sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'deepseek']) })],
     });
     let deepseekCalls = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const deepseekBodies: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (hostOf(url) === 'api.anthropic.com') {
@@ -1829,7 +1971,11 @@ describe('runSession orchestrator', () => {
       }
       if (hostOf(url) === 'api.deepseek.com') {
         deepseekCalls += 1;
-        const text = `MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "concision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${shrunk}</maestro_final_text>`;
+        deepseekBodies.push(String(init?.body ?? ''));
+        const text =
+          deepseekCalls === 1
+            ? `MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "concision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${shrunk}</maestro_final_text>`
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
         return new Response(
           JSON.stringify({
             choices: [{ message: { content: text } }],
@@ -1846,13 +1992,107 @@ describe('runSession orchestrator', () => {
 
     const row = db.__sessions.get('run-1');
     expect(row?.current_text).toBe(original.trim());
-    // The guard keeps rejecting the only pending reviewer until the serial
-    // turn cap fires (desktop PAUSED_EDITORIAL_CYCLE_LIMIT analog). Ratchet
-    // rejections are clean provider responses, so no outage escalation fires.
-    expect(row?.status).toBe('paused_cycle_limit');
-    // Every turn re-selects deepseek (the gated lead is never eligible), and
-    // each rejection consumes one serial turn up to the cap of 8.
-    expect(deepseekCalls).toBe(8);
+    expect(row?.status).toBe('converged');
+    expect(deepseekCalls).toBe(2);
+    expect(deepseekBodies[1]).toContain('Mandatory Corrective Retry');
+  });
+
+  it('preserves earlier stable approvals while the same reviewer corrects a rejected attempt', async () => {
+    const db = createInMemoryDb({
+      sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'codex', 'deepseek']) })],
+    });
+    let codexCalls = 0;
+    let deepseekCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      if (hostOf(url) === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({ content: [{ type: 'text', text: 'Rascunho valido e completo.' }], usage: {} }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        codexCalls += 1;
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: {},
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.deepseek.com') {
+        deepseekCalls += 1;
+        const text =
+          deepseekCalls === 1
+            ? 'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nblocker passed forward without correction</maestro_revision_report>'
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+        return new Response(JSON.stringify({ choices: [{ message: { content: text } }], usage: {} }), {
+          status: 200,
+        });
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, MAESTRO_DEEPSEEK_API_KEY: 'k-ds', BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    expect(db.__sessions.get('run-1')?.status).toBe('converged');
+    expect(codexCalls).toBe(1);
+    expect(deepseekCalls).toBe(2);
+  });
+
+  it('does not let the legacy max_cycles value stop a valid circular review', async () => {
+    const db = createInMemoryDb({
+      sessions: [
+        runnableSession({
+          active_agents_json: JSON.stringify(['claude', 'codex', 'deepseek']),
+          max_cycles: 1,
+        }),
+      ],
+    });
+    let claudeCalls = 0;
+    let codexCalls = 0;
+    const revised = 'Rascunho revisado com mais contexto, precisao e profundidade editorial.';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      if (hostOf(url) === 'api.anthropic.com') {
+        claudeCalls += 1;
+        const text =
+          claudeCalls === 1
+            ? 'Rascunho original valido.'
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+        return new Response(JSON.stringify({ content: [{ type: 'text', text }], usage: {} }), { status: 200 });
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        codexCalls += 1;
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+            usage: {},
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.deepseek.com') {
+        const text = `MAESTRO_STATUS: READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "precision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
+        return new Response(JSON.stringify({ choices: [{ message: { content: text } }], usage: {} }), {
+          status: 200,
+        });
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(db, { ...env, MAESTRO_DEEPSEEK_API_KEY: 'k-ds', BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    expect(db.__sessions.get('run-1')?.status).toBe('converged');
+    expect(db.__sessions.get('run-1')?.final_text).toBe(revised);
+    expect(codexCalls).toBe(2);
   });
 
   it('escalates to paused_reviewer_outage after 3 consecutive empty reviewer turns (operational failures)', async () => {
@@ -2202,6 +2442,22 @@ describe('runSession orchestrator', () => {
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
   });
 
+  it('fails closed before provider work when the persisted event journal is malformed', async () => {
+    const malformedJournal = '{"event":"truncated"';
+    const db = createInMemoryDb({ sessions: [runnableSession({ events_json: malformedJournal })] });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('paused_resume_state_invalid');
+    expect(row?.events_json).toBe(malformedJournal);
+    expect(String(row?.error)).toMatch(/journal|invalid json|integrity/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('does not write a draft artifact when cancelled during the initial draft call', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -2221,6 +2477,7 @@ describe('runSession orchestrator', () => {
 
     // The draft artifact is not written for the cancelled session and no reviewer runs.
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
+    expect(Number(db.__sessions.get('run-1')?.observed_cost_usd)).toBeGreaterThan(0);
     expect(db.__artifacts.size).toBe(0);
     expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.openai.com')).toBe(false);
   });
@@ -2262,6 +2519,49 @@ describe('runSession orchestrator', () => {
     expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
   });
 
+  it('does not let a stale runner event overwrite a concurrent cancellation event', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const cancelEvent = {
+      at: '2026-07-29T00:00:00.000Z',
+      status: 'blocked',
+      message: 'Sessao cancelada pelo operador.',
+    };
+    const realPrepare = db.prepare.bind(db);
+    db.prepare = ((query: string) => {
+      const statement = realPrepare(query);
+      const realBind = statement.bind.bind(statement);
+      statement.bind = (...values: unknown[]) => {
+        const bound = realBind(...values);
+        const realRun = bound.run.bind(bound);
+        bound.run = async () => {
+          if (
+            /UPDATE maestro_ai_sessions/i.test(query) &&
+            values.some((value) => typeof value === 'string' && value.includes('Draft call started.'))
+          ) {
+            const row = db.__sessions.get('run-1');
+            if (row) {
+              row.status = 'blocked_cancelled';
+              row.events_json = JSON.stringify([cancelEvent]);
+            }
+          }
+          return realRun();
+        };
+        return bound;
+      };
+      return statement;
+    }) as typeof db.prepare;
+
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('blocked_cancelled');
+    expect(JSON.parse(String(row?.events_json))).toEqual([cancelEvent]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('does not write a revision artifact when cancelled during a reviewer call', async () => {
     const db = createInMemoryDb({
       sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'codex']), max_cycles: 1 })],
@@ -2289,8 +2589,93 @@ describe('runSession orchestrator', () => {
 
     // The reviewer call happened but the cancelled turn writes no revision artifact;
     // only the draft artifact remains.
-    expect(db.__sessions.get('run-1')?.status).toBe('blocked_cancelled');
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('blocked_cancelled');
     expect(db.__artifacts.size).toBe(1);
+    const draftCost = Number([...db.__artifacts.values()][0]?.cost_usd ?? 0);
+    expect(Number(row?.observed_cost_usd)).toBeGreaterThan(draftCost);
+  });
+
+  it('does not promote initial custody or its accepted event when cancellation wins the draft CAS', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchMock = providerFetch({ claudeText: 'Rascunho valido e robusto.' });
+    vi.stubGlobal('fetch', fetchMock);
+    const realPrepare = db.prepare.bind(db);
+    db.prepare = ((query: string) => {
+      const statement = realPrepare(query);
+      const realBind = statement.bind.bind(statement);
+      statement.bind = (...values: unknown[]) => {
+        const bound = realBind(...values);
+        const realRun = bound.run.bind(bound);
+        bound.run = async () => {
+          if (
+            /UPDATE maestro_ai_sessions/i.test(query) &&
+            values.some((value) => typeof value === 'string' && value.includes('Initial draft produced.'))
+          ) {
+            const row = db.__sessions.get('run-1');
+            if (row) row.status = 'blocked_cancelled';
+          }
+          return realRun();
+        };
+        return bound;
+      };
+      return statement;
+    }) as typeof db.prepare;
+
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('blocked_cancelled');
+    expect(row?.current_author).toBeNull();
+    expect(row?.current_text).toBe('');
+    expect(row?.circular_state_json).toBe('{}');
+    expect(db.__artifacts.size).toBe(1);
+    const events = JSON.parse(String(row?.events_json)) as Array<{ message?: string }>;
+    expect(events.some((event) => event.message === 'Initial draft produced.')).toBe(false);
+  });
+
+  it('keeps prior custody intact when cancellation lands after artifact insert but before state promotion', async () => {
+    const db = createInMemoryDb({ sessions: [runnableSession()] });
+    const fetchMock = providerFetch({ claudeText: 'Rascunho valido e robusto.' });
+    vi.stubGlobal('fetch', fetchMock);
+    const realPrepare = db.prepare.bind(db);
+    db.prepare = ((query: string) => {
+      const statement = realPrepare(query);
+      const realBind = statement.bind.bind(statement);
+      statement.bind = (...values: unknown[]) => {
+        const bound = realBind(...values);
+        const realRun = bound.run.bind(bound);
+        bound.run = async () => {
+          if (
+            /UPDATE maestro_ai_sessions/i.test(query) &&
+            values.some((value) => typeof value === 'string' && value.includes('Reviewer left custody unchanged'))
+          ) {
+            const row = db.__sessions.get('run-1');
+            if (row) row.status = 'blocked_cancelled';
+          }
+          return realRun();
+        };
+        return bound;
+      };
+      return statement;
+    }) as typeof db.prepare;
+
+    await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('blocked_cancelled');
+    expect(row?.final_text ?? null).toBeNull();
+    const state = JSON.parse(String(row?.circular_state_json)) as {
+      artifact_turn: number;
+      previous_artifact_id: string;
+    };
+    expect(state.artifact_turn).toBe(1);
+    expect(state.previous_artifact_id).toMatch(/^artifact-/);
+    expect(db.__artifacts.size).toBe(2);
+    const events = JSON.parse(String(row?.events_json)) as Array<{ message?: string }>;
+    expect(events.some((event) => event.message === 'Reviewer left custody unchanged.')).toBe(false);
   });
 
   it('does not issue the reviewer call when cancelled during the revision start event', async () => {
@@ -2350,7 +2735,9 @@ describe('handleMaestroAiSessionsGet (list)', () => {
       prompt: 'p',
       protocol_text: protocolText,
       initial_agent: 'claude',
+      cycle_lead: 'claude',
       active_agents_json: JSON.stringify(['claude', 'codex']),
+      circular_state_json: '{}',
       current_author: 'claude',
       current_text: 'x',
       final_text: null,
@@ -2465,7 +2852,11 @@ describe('session cancellation and sweeper', () => {
         ...overrides,
       });
 
-    const resumeContext = (sessionId: string, db: ReturnType<typeof createInMemoryDb>) => {
+    const resumeContext = (
+      sessionId: string,
+      db: ReturnType<typeof createInMemoryDb>,
+      body?: { initial_agent: string; active_agents: string[] },
+    ) => {
       const captured: Promise<unknown>[] = [];
       return {
         context: {
@@ -2473,8 +2864,17 @@ describe('session cancellation and sweeper', () => {
             BIGDATA_DB: db,
             MAESTRO_ANTHROPIC_API_KEY: 'k-claude',
             MAESTRO_OPENAI_API_KEY: 'k-codex',
+            MAESTRO_DEEPSEEK_API_KEY: 'k-deepseek',
           },
-          request: new Request(`https://admin.local/api/maestro-ai/sessions/${sessionId}/resume`, { method: 'POST' }),
+          request: new Request(`https://admin.local/api/maestro-ai/sessions/${sessionId}/resume`, {
+            method: 'POST',
+            ...(body
+              ? {
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify(body),
+                }
+              : {}),
+          }),
           waitUntil: (promise: Promise<unknown>) => {
             captured.push(promise);
           },
@@ -2521,6 +2921,285 @@ describe('session cancellation and sweeper', () => {
       expect(fetchMock.mock.calls.some(([u]) => hostOf(u) === 'api.anthropic.com')).toBe(false);
     });
 
+    it('restores persisted approvals and continues from the exact circular turn without repeating Codex', async () => {
+      const currentText = 'Rascunho valido e completo.';
+      const draftArtifact: Row = {
+        id: 'artifact-draft-1',
+        session_id: 'r-1',
+        cycle: 0,
+        turn: 1,
+        agent: 'claude',
+        role: 'draft',
+        status: 'ready',
+        title: 'Sessao',
+        content_md: `# Maestro AI Artifact - Sessao\n\n## Current Text\n\n${currentText}\n`,
+        revision_report_json: 'custody: "created"',
+        link_audit_json: '[]',
+        cost_usd: 0,
+        model: 'claude-test',
+        previous_artifact_id: null,
+        content_bytes: 100,
+        created_at: '2026-05-14T00:00:01.000Z',
+      };
+      const codexApproval: Row = {
+        ...draftArtifact,
+        id: 'artifact-codex-ready-2',
+        cycle: 1,
+        turn: 2,
+        agent: 'codex',
+        role: 'revision',
+        revision_report_json: 'custody: "unchanged"\nchanges: []',
+        previous_artifact_id: 'artifact-draft-1',
+        created_at: '2026-05-14T00:00:02.000Z',
+      };
+      const state = {
+        schema_version: 2,
+        run_id: 'r-1',
+        current_draft_artifact: 'artifact-draft-1',
+        current_draft_author_key: 'claude',
+        current_draft_sha256: await maestroAiTestHooks.circularDraftSha256(currentText),
+        round: 1,
+        turn_index: 1,
+        round_roster: ['codex', 'deepseek', 'claude'],
+        valid_round_agents: ['codex'],
+        stable_serial_approval_agents: ['codex'],
+        artifact_turn: 2,
+        previous_artifact_id: 'artifact-codex-ready-2',
+        updated_at: '2026-05-14T00:00:02.000Z',
+      };
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({
+            active_agents_json: JSON.stringify(['claude', 'codex', 'deepseek']),
+            circular_state_json: JSON.stringify(state),
+          }),
+        ],
+        artifacts: [draftArtifact, codexApproval],
+      });
+      let codexCalls = 0;
+      let deepseekCalls = 0;
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        if (hostOf(url) === 'api.openai.com') {
+          codexCalls += 1;
+          return new Response('', { status: 500 });
+        }
+        if (hostOf(url) === 'api.deepseek.com') {
+          deepseekCalls += 1;
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content:
+                      'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+                  },
+                },
+              ],
+              usage: {},
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response('', { status: 200 });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      expect(db.__sessions.get('r-1')?.status).toBe('converged');
+      expect(codexCalls).toBe(0);
+      expect(deepseekCalls).toBe(1);
+      const lastArtifact = [...db.__artifacts.values()].sort((a, b) => Number(a.turn) - Number(b.turn)).at(-1);
+      expect(lastArtifact?.turn).toBe(3);
+      expect(lastArtifact?.previous_artifact_id).toBe('artifact-codex-ready-2');
+    });
+
+    it('advances past orphan artifact turns on resume without promoting the orphan into custody', async () => {
+      const currentText = 'Rascunho valido e completo.';
+      const draftArtifact: Row = {
+        id: 'artifact-draft-1',
+        session_id: 'r-1',
+        cycle: 0,
+        turn: 1,
+        agent: 'claude',
+        role: 'draft',
+        status: 'ready',
+        title: 'Sessao',
+        content_md: `# Maestro AI Artifact - Sessao\n\n## Current Text\n\n${currentText}\n`,
+        revision_report_json: 'custody: "created"',
+        link_audit_json: '[]',
+        cost_usd: 0,
+        model: 'claude-test',
+        previous_artifact_id: null,
+        content_bytes: 100,
+        created_at: '2026-05-14T00:00:01.000Z',
+      };
+      const orphanArtifact: Row = {
+        ...draftArtifact,
+        id: 'artifact-orphan-2',
+        cycle: 1,
+        turn: 2,
+        agent: 'codex',
+        role: 'revision',
+        revision_report_json: 'custody: "unchanged"\nchanges: []',
+        previous_artifact_id: 'artifact-draft-1',
+        created_at: '2026-05-14T00:00:02.000Z',
+      };
+      const state = {
+        schema_version: 2,
+        run_id: 'r-1',
+        current_draft_artifact: 'artifact-draft-1',
+        current_draft_author_key: 'claude',
+        current_draft_sha256: await maestroAiTestHooks.circularDraftSha256(currentText),
+        round: 1,
+        turn_index: 0,
+        round_roster: ['codex', 'claude'],
+        valid_round_agents: [],
+        stable_serial_approval_agents: [],
+        artifact_turn: 1,
+        previous_artifact_id: 'artifact-draft-1',
+        updated_at: '2026-05-14T00:00:01.000Z',
+      };
+      const db = createInMemoryDb({
+        sessions: [pausedRow({ circular_state_json: JSON.stringify(state) })],
+        artifacts: [draftArtifact, orphanArtifact],
+      });
+      vi.stubGlobal('fetch', reviewerFetch());
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      const artifacts = [...db.__artifacts.values()].sort(
+        (left, right) =>
+          Number(left.turn) - Number(right.turn) || String(left.created_at).localeCompare(String(right.created_at)),
+      );
+      expect(artifacts.map((artifact) => artifact.turn)).toEqual([1, 2, 3]);
+      expect(artifacts[2]?.previous_artifact_id).toBe('artifact-draft-1');
+      expect(db.__sessions.get('r-1')?.status).toBe('converged');
+    });
+
+    it('resumes accepted custody when the article itself contains the Current Text heading', async () => {
+      const currentText =
+        'Introducao preservada.\n\n## Current Text\n\nEste titulo faz parte do artigo e nao delimita o artefato.';
+      const draftArtifact: Row = {
+        id: 'artifact-draft-heading-1',
+        session_id: 'r-1',
+        cycle: 0,
+        turn: 1,
+        agent: 'claude',
+        role: 'draft',
+        status: 'ready',
+        title: 'Sessao',
+        content_md: `# Maestro AI Artifact - Sessao\n\n## Current Text\n\n${currentText}\n`,
+        revision_report_json: 'custody: "created"',
+        link_audit_json: '[]',
+        cost_usd: 0,
+        model: 'claude-test',
+        previous_artifact_id: null,
+        content_bytes: 180,
+        created_at: '2026-05-14T00:00:01.000Z',
+      };
+      const state = {
+        schema_version: 2,
+        run_id: 'r-1',
+        current_draft_artifact: draftArtifact.id,
+        current_draft_author_key: 'claude',
+        current_draft_sha256: await maestroAiTestHooks.circularDraftSha256(currentText),
+        round: 1,
+        turn_index: 0,
+        round_roster: ['codex', 'claude'],
+        valid_round_agents: [],
+        stable_serial_approval_agents: [],
+        artifact_turn: 1,
+        previous_artifact_id: draftArtifact.id,
+        updated_at: '2026-05-14T00:00:01.000Z',
+      };
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({
+            current_text: currentText,
+            circular_state_json: JSON.stringify(state),
+          }),
+        ],
+        artifacts: [draftArtifact],
+      });
+      vi.stubGlobal('fetch', reviewerFetch());
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      expect(db.__sessions.get('r-1')?.status).toBe('converged');
+      expect(db.__sessions.get('r-1')?.final_text).toBe(currentText);
+    });
+
+    it('fails closed when current_text is only a trailing Current Text subsection of the custody artifact', async () => {
+      const completeText =
+        'Introducao que nao pode ser perdida.\n\n## Current Text\n\nSubsecao final que, isoladamente, seria truncada.';
+      const truncatedText = 'Subsecao final que, isoladamente, seria truncada.';
+      const draftArtifact: Row = {
+        id: 'artifact-draft-truncated-suffix-1',
+        session_id: 'r-1',
+        cycle: 0,
+        turn: 1,
+        agent: 'claude',
+        role: 'draft',
+        status: 'ready',
+        title: 'Sessao',
+        content_md: `# Maestro AI Artifact - Sessao\n\n## Current Text\n\n${completeText}\n`,
+        revision_report_json: 'custody: "created"',
+        link_audit_json: '[]',
+        cost_usd: 0,
+        model: 'claude-test',
+        previous_artifact_id: null,
+        content_bytes: 180,
+        created_at: '2026-05-14T00:00:01.000Z',
+      };
+      const state = {
+        schema_version: 2,
+        run_id: 'r-1',
+        current_draft_artifact: draftArtifact.id,
+        current_draft_author_key: 'claude',
+        current_draft_sha256: await maestroAiTestHooks.circularDraftSha256(truncatedText),
+        round: 1,
+        turn_index: 0,
+        round_roster: ['codex', 'claude'],
+        valid_round_agents: [],
+        stable_serial_approval_agents: [],
+        artifact_turn: 1,
+        previous_artifact_id: draftArtifact.id,
+        updated_at: '2026-05-14T00:00:01.000Z',
+      };
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({
+            current_text: truncatedText,
+            circular_state_json: JSON.stringify(state),
+          }),
+        ],
+        artifacts: [draftArtifact],
+      });
+      const fetchMock = reviewerFetch();
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      expect(db.__sessions.get('r-1')?.status).toBe('paused_resume_state_invalid');
+      expect(String(db.__sessions.get('r-1')?.error)).toMatch(/custody|artifact|integrity/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it('anchors the time budget at resume time, not created_at', async () => {
       // created_at is 2 hours in the past with a 1-minute budget: a fresh-run
       // anchor would exhaust immediately; the resume anchor must be `now`.
@@ -2543,6 +3222,194 @@ describe('session cancellation and sweeper', () => {
       vi.unstubAllGlobals();
 
       expect(db.__sessions.get('r-1')?.status).toBe('converged');
+    });
+
+    it('resumes with the operator-selected lead and panel while preserving artifact custody and numbering', async () => {
+      const acceptedArtifact: Row = {
+        id: 'artifact-accepted-7',
+        session_id: 'r-1',
+        cycle: 2,
+        turn: 7,
+        agent: 'codex',
+        role: 'revision',
+        status: 'ready',
+        title: 'Sessao',
+        content_md:
+          '# Maestro AI Artifact - Sessao\n\n## Revision Report\n\ncustody: "revised"\n\n## Current Text\n\nRascunho valido e completo.\n',
+        revision_report_json: 'custody: "revised"',
+        link_audit_json: '[]',
+        cost_usd: 0.1,
+        model: 'gpt-test',
+        previous_artifact_id: 'artifact-accepted-6',
+        content_bytes: 180,
+        created_at: '2026-05-14T00:00:07.000Z',
+      };
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({
+            current_author: 'codex',
+            initial_agent: 'claude',
+            cycle_lead: 'claude',
+            active_agents_json: JSON.stringify(['claude', 'codex']),
+            circular_state_json: '{}',
+          }),
+        ],
+        artifacts: [acceptedArtifact],
+      });
+      const reviewerHosts: string[] = [];
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        if (hostOf(url) === 'api.anthropic.com') {
+          reviewerHosts.push('api.anthropic.com');
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  type: 'text',
+                  text: 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+                },
+              ],
+              usage: {},
+            }),
+            { status: 200 },
+          );
+        }
+        if (hostOf(url) === 'api.deepseek.com') {
+          reviewerHosts.push('api.deepseek.com');
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content:
+                      'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+                  },
+                },
+              ],
+              usage: {},
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response('', { status: 200 });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', db, {
+        initial_agent: 'deepseek',
+        active_agents: ['claude', 'codex', 'deepseek'],
+      });
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      const row = db.__sessions.get('r-1');
+      expect(row?.status).toBe('converged');
+      expect(row?.cycle_lead).toBe('deepseek');
+      expect(row?.initial_agent).toBe('claude');
+      expect(JSON.parse(String(row?.active_agents_json))).toEqual(['claude', 'codex', 'deepseek']);
+      expect(reviewerHosts).toEqual(['api.anthropic.com', 'api.deepseek.com']);
+      const artifacts = [...db.__artifacts.values()].sort((a, b) => Number(a.turn) - Number(b.turn));
+      const resumedArtifacts = artifacts.slice(-2);
+      expect(resumedArtifacts.map((artifact) => artifact.turn)).toEqual([8, 9]);
+      expect(resumedArtifacts[0]?.previous_artifact_id).toBe('artifact-accepted-7');
+      expect(resumedArtifacts[1]?.previous_artifact_id).toBe(resumedArtifacts[0]?.id);
+    });
+
+    it('fails closed before provider work when persisted circular custody is tampered', async () => {
+      const db = createInMemoryDb({
+        sessions: [
+          pausedRow({
+            circular_state_json: JSON.stringify({
+              schema_version: 2,
+              run_id: 'r-1',
+              current_draft_artifact: 'artifact-accepted-1',
+              current_draft_author_key: 'claude',
+              current_draft_sha256: '0'.repeat(64),
+              round: 1,
+              turn_index: 0,
+              round_roster: ['codex', 'claude'],
+              valid_round_agents: [],
+              stable_serial_approval_agents: [],
+              artifact_turn: 1,
+              previous_artifact_id: 'artifact-accepted-1',
+              updated_at: '2026-05-14T00:00:01.000Z',
+            }),
+          }),
+        ],
+        artifacts: [
+          {
+            id: 'artifact-accepted-1',
+            session_id: 'r-1',
+            cycle: 1,
+            turn: 1,
+            agent: 'claude',
+            role: 'draft',
+            status: 'ready',
+            title: 'Sessao',
+            content_md:
+              '# Maestro AI Artifact - Sessao\n\n## Revision Report\n\ncustody: "created"\n\n## Current Text\n\nRascunho valido e completo.\n',
+            revision_report_json: 'custody: "created"',
+            link_audit_json: '[]',
+            cost_usd: 0.1,
+            model: 'claude-test',
+            previous_artifact_id: null,
+            content_bytes: 180,
+            created_at: '2026-05-14T00:00:01.000Z',
+          },
+        ],
+      });
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      expect(db.__sessions.get('r-1')?.status).toBe('paused_resume_state_invalid');
+      expect(String(db.__sessions.get('r-1')?.error)).toMatch(/custody|hash|integrity/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when legacy artifacts contradict the resumable session row', async () => {
+      const db = createInMemoryDb({
+        sessions: [pausedRow({ circular_state_json: '{}' })],
+        artifacts: [
+          {
+            id: 'artifact-legacy-conflict',
+            session_id: 'r-1',
+            cycle: 1,
+            turn: 1,
+            agent: 'claude',
+            role: 'draft',
+            status: 'ready',
+            title: 'Sessao',
+            content_md:
+              '# Maestro AI Artifact - Sessao\n\n## Revision Report\n\ncustody: "created"\n\n## Current Text\n\nTexto divergente do estado D1.\n',
+            revision_report_json: 'custody: "created"',
+            link_audit_json: '[]',
+            cost_usd: 0,
+            model: 'claude-test',
+            previous_artifact_id: null,
+            content_bytes: 160,
+            created_at: '2026-05-14T00:00:01.000Z',
+          },
+        ],
+      });
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const { context, captured } = resumeContext('r-1', db);
+      const response = await handleMaestroAiSessionResumePost(context, 'r-1');
+      expect(response.status).toBe(202);
+      await Promise.all(captured);
+      vi.unstubAllGlobals();
+
+      expect(db.__sessions.get('r-1')?.status).toBe('paused_resume_state_invalid');
+      expect(String(db.__sessions.get('r-1')?.error)).toMatch(/cannot be reconstructed/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(db.__artifacts.size).toBe(1);
     });
 
     it('rejects a concurrent double-resume: the CAS loser gets 409 and never dispatches a second runner', async () => {
@@ -2826,6 +3693,18 @@ describe('handleMaestroAiSessionContentPut', () => {
     const db = createInMemoryDb({ sessions: [{ ...editableSession, status: 'running' }] });
     const response = await handleMaestroAiSessionContentPut(
       contentContext('edit-1', { content: 'novo' }, db),
+      'edit-1',
+    );
+    expect(response.status).toBe(409);
+    expect(db.__sessions.get('edit-1')?.current_text).toBe('CONTEUDO IMPORTANTE');
+  });
+
+  it('rejects out-of-band custody replacement on a resumable session', async () => {
+    const db = createInMemoryDb({
+      sessions: [{ ...editableSession, status: 'paused_cost_limit', final_text: null }],
+    });
+    const response = await handleMaestroAiSessionContentPut(
+      contentContext('edit-1', { content: 'texto substituido fora da cadeia' }, db),
       'edit-1',
     );
     expect(response.status).toBe(409);

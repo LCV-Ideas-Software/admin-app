@@ -49,7 +49,6 @@ type MaestroSettings = {
   protocol_text: string;
   max_cost_usd: number;
   max_runtime_minutes: number | null;
-  max_cycles: number;
   rates: Record<AgentKey, AgentRate>;
   models: Record<AgentKey, string>;
   agents: AgentSettings[];
@@ -78,6 +77,7 @@ type MaestroSession = {
   title: string;
   status: string;
   initial_agent: AgentKey;
+  cycle_lead: AgentKey;
   active_agents: AgentKey[];
   current_author: AgentKey | null;
   current_text: string;
@@ -214,6 +214,7 @@ const statusLabel: Record<string, string> = {
   paused_final_audit: 'Pausada na auditoria final',
   paused_reviewer_outage: 'Pausada por falha de revisor',
   paused_draft_unavailable: 'Pausada sem rascunho inicial',
+  paused_resume_state_invalid: 'Pausada por integridade da retomada',
   blocked_revision_contract: 'Bloqueada por contrato',
   blocked_link_audit: 'Bloqueada por link inválido',
   blocked_cancelled: 'Cancelada',
@@ -230,6 +231,7 @@ const RESUMABLE_STATUSES = new Set([
   'paused_self_review',
   'paused_reviewer_outage',
   'paused_draft_unavailable',
+  'paused_resume_state_invalid',
   'blocked_cancelled',
   'blocked_max_cycles',
   'blocked_link_audit',
@@ -357,7 +359,6 @@ export function MaestroAiModule() {
   const [protocolText, setProtocolText] = useState('');
   const [maxCostUsd, setMaxCostUsd] = useState<number | ''>(0);
   const [maxRuntimeMinutes, setMaxRuntimeMinutes] = useState<number | ''>('');
-  const [maxCycles, setMaxCycles] = useState<number | ''>(2);
   const [rates, setRates] = useState<Record<AgentKey, AgentRate>>(EMPTY_RATES);
   const [models, setModels] = useState<Record<AgentKey, string>>(EMPTY_MODELS);
   const [testResults, setTestResults] = useState<ApiTestResult[]>([]);
@@ -385,7 +386,6 @@ export function MaestroAiModule() {
     setProtocolText(merged.protocol_text);
     setMaxCostUsd(Number(merged.max_cost_usd) || 0);
     setMaxRuntimeMinutes(Number(merged.max_runtime_minutes) > 0 ? Number(merged.max_runtime_minutes) : '');
-    setMaxCycles(Number(merged.max_cycles) || 2);
     setRates(merged.rates);
     setModels(merged.models);
     const firstReady = merged.agents.find((agent) => agent.configured && agent.financially_ready)?.key;
@@ -517,17 +517,12 @@ export function MaestroAiModule() {
     }
     const nextMaxCostUsd = Number(maxCostUsd);
     const nextMaxRuntimeMinutes = maxRuntimeMinutes === '' ? null : Number(maxRuntimeMinutes);
-    const nextMaxCycles = Number(maxCycles);
     if (protocolText.trim().length < 100) {
       showNotification('Protocolo editorial integral deve ter pelo menos 100 caracteres.', 'error');
       return;
     }
     if (!Number.isFinite(nextMaxCostUsd) || nextMaxCostUsd <= 0) {
       showNotification('Teto financeiro em USD deve ser positivo.', 'error');
-      return;
-    }
-    if (!Number.isInteger(nextMaxCycles) || nextMaxCycles < 1 || nextMaxCycles > 5) {
-      showNotification('Ciclos máximos devem ser um inteiro entre 1 e 5.', 'error');
       return;
     }
     if (
@@ -550,7 +545,6 @@ export function MaestroAiModule() {
             protocol_text: protocolText,
             max_cost_usd: nextMaxCostUsd,
             max_runtime_minutes: nextMaxRuntimeMinutes,
-            max_cycles: nextMaxCycles,
             rates,
             models,
             api_keys,
@@ -650,10 +644,26 @@ export function MaestroAiModule() {
   };
 
   const resumeSession = async (sessionId: string) => {
+    const validSelectedAgents = selectedAgents.filter((agent) => readyAgents.some((ready) => ready.key === agent));
+    if (validSelectedAgents.length < 2) {
+      showNotification('Selecione pelo menos dois agentes prontos para retomar o colegiado.', 'error');
+      return;
+    }
+    if (!validSelectedAgents.includes(initialAgent)) {
+      showNotification('O líder da retomada deve participar do colegiado selecionado.', 'error');
+      return;
+    }
     setResuming(true);
     try {
       await readJson<{ ok: true; session: MaestroSession }>(
-        await fetch(`/api/maestro-ai/sessions/${encodeURIComponent(sessionId)}/resume`, { method: 'POST' }),
+        await fetch(`/api/maestro-ai/sessions/${encodeURIComponent(sessionId)}/resume`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            initial_agent: initialAgent,
+            active_agents: validSelectedAgents,
+          }),
+        }),
       );
       await loadSessions(true);
       showNotification('Sessão retomada.', 'success');
@@ -1275,21 +1285,6 @@ export function MaestroAiModule() {
                   onChange={(event) => {
                     const value = event.target.value;
                     setMaxCostUsd(value === '' ? '' : Number(value));
-                  }}
-                />
-              </div>
-              <div className="field-group maestro-cost-field">
-                <label htmlFor="maestro-settings-max-cycles">Ciclos máximos</label>
-                <input
-                  id="maestro-settings-max-cycles"
-                  type="number"
-                  min="1"
-                  max="5"
-                  step="1"
-                  value={maxCycles}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setMaxCycles(value === '' ? '' : Number(value));
                   }}
                 />
               </div>
