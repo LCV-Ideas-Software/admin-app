@@ -366,8 +366,6 @@ Regras:
 3. LIMPEZA: Descarte elementos de UI (Sign in, Settings, botões de menu).
 4. TÍTULO: Infira o título principal da conversa.`;
 
-    let usageMetadata = { promptTokens: 0, outputTokens: 0, cachedTokens: 0 };
-
     const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
@@ -393,7 +391,7 @@ Regras:
         const text = response.text;
 
         if (text) {
-          usageMetadata = {
+          const usageMetadata = {
             promptTokens: response.usageMetadata?.promptTokenCount || 0,
             outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
             cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,

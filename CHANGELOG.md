@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [v02.15.15] - 2026-08-03
+
+### Changed
+
+- **Current application and Maestro AI dependency baseline.** Includes the
+  accumulated post-v02.15.14 updates to `@google/genai` 2.15.0, Tiptap 3.29.2,
+  `@tiptap/y-tiptap` 3.0.8, Lucide React 1.28.0, Vite 8.2.0 and their reviewed
+  type/test integrations.
+- **Current Cloudflare deployment toolchain.** Root and `tlsrpt-motor` now use
+  Wrangler 4.118.0; the TLS test pool moves to 0.20.1. Wrangler remains a
+  current-compatible range instead of a permanently fixed version.
+- **Automation refresh.** CodeQL moves to 4.37.4 and Dependabot automation uses
+  the settled organization controller revision. Biome configuration is aligned
+  with schema 2.5.6 and the current `preset` rule syntax in both root and TLS
+  reporting workspaces.
+
+### Security
+
+- Updates direct Hono to 4.12.34, resolving GHSA-8j4g-w8fx-2239 in CORS
+  `Access-Control-Request-Headers` parsing.
+- Resolves the current `brace-expansion` advisory with 5.0.9.
+- Replaces broad Undici pins with scoped `miniflare → undici` overrides at
+  7.29.0, avoiding cross-family forcing while retaining an audited dependency
+  graph.
+- Updates the TLS reporting test/deploy graph to PostCSS 8.5.25. Both root and
+  nested lockfiles report zero known vulnerabilities.
+
+### Quality
+
+- Removes unreachable scheduler state after the canonical convergence guard,
+  scopes Gemini usage metadata to the successful response that consumes it,
+  and simplifies UI branches already narrowed by their loading/editing guards.
+- The React error boundary keeps only its recovery flag in state while
+  continuing to report the original exception through `componentDidCatch`.
+
+### Validação
+
+- `npm audit --package-lock-only --audit-level=moderate --ignore-scripts`: zero
+  vulnerabilidades nos lockfiles raiz e `tlsrpt-motor`.
+- Frontend: 363 testes; Admin Motor: 535 testes e typecheck 0/0; ESLint, Biome,
+  formatação pública e build de produção passaram.
+- `tlsrpt-motor`: 5 testes, Biome sem avisos e dry-run do Wrangler 4.118.0
+  passaram sem implantação remota.
+
 ## [v02.15.14] - 2026-07-29
 
 ### Maestro AI

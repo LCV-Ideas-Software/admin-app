@@ -235,7 +235,7 @@ export function D1TableBrowser({ database }: D1TableBrowserProps) {
                           type="button"
                           className="ghost-button"
                           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                          disabled={tableLoading || page <= 1}
+                          disabled={page <= 1}
                         >
                           ← Anterior
                         </button>
@@ -246,7 +246,7 @@ export function D1TableBrowser({ database }: D1TableBrowserProps) {
                           type="button"
                           className="ghost-button"
                           onClick={() => setPage((prev) => prev + 1)}
-                          disabled={tableLoading || page >= totalPages}
+                          disabled={page >= totalPages}
                         >
                           Próxima →
                         </button>

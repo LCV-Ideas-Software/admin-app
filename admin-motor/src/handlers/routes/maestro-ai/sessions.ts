@@ -3547,7 +3547,6 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       logSessionEvent(acceptedDraftEvent);
     }
 
-    let converged = false;
     // ── Plan C: operational turn failures (canonical 3-strike escalation) ──
     // A provider/network/timeout failure or an exhausted corrective-retry turn
     // does NOT kill the session: it skips the turn with stable approvals
@@ -3605,7 +3604,6 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       // Desktop parity: convergence is checked at the top of every iteration,
       // so the session finalizes mid-round when the last approval lands.
       if (hasAllIndependentApprovals(order, currentAuthor, stableApprovals)) {
-        converged = true;
         break;
       }
       // Desktop parity (turn cap): serialTurns counts every iteration —
@@ -3999,9 +3997,6 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       }
     }
 
-    if (!converged) {
-      throw new Error('Circular scheduler exited without convergence or an explicit pause status.');
-    }
     {
       // Desktop parity (final release audit, all three canonical stages):
       // bibliographic integrity -> link-audit capacity (> 30 unique URLs) ->

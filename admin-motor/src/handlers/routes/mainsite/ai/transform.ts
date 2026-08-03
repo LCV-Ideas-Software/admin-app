@@ -178,7 +178,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
 
     let finalResponseText = '';
-    let usageMetadata = { promptTokens: 0, outputTokens: 0 };
 
     // Retry loop
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
@@ -204,7 +203,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
         if (responseText) {
           // Usage Metadata Tracking
-          usageMetadata = {
+          const usageMetadata = {
             promptTokens: response.usageMetadata?.promptTokenCount || 0,
             outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
           };

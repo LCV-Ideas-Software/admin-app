@@ -1398,7 +1398,7 @@ export function RecordsTab({ controller, selectedZoneId, selectedZoneName }: Rec
                       aria-label="Selecionar todos os registros da página"
                       checked={allOnPageSelected}
                       onChange={(event) => togglePageRecordsSelection(records, event.target.checked)}
-                      disabled={recordsLoading || batchApplying}
+                      disabled={batchApplying}
                     />
                   </th>
                   {sortableHeader('type', 'Tipo')}
@@ -1506,7 +1506,7 @@ export function RecordsTab({ controller, selectedZoneId, selectedZoneName }: Rec
               <button
                 type="button"
                 className="ghost-button"
-                disabled={recordsLoading || page <= 1}
+                disabled={page <= 1}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
                 Página anterior
@@ -1514,7 +1514,7 @@ export function RecordsTab({ controller, selectedZoneId, selectedZoneName }: Rec
               <button
                 type="button"
                 className="ghost-button"
-                disabled={recordsLoading || page >= pagination.totalPages}
+                disabled={page >= pagination.totalPages}
                 onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))}
               >
                 Próxima página
@@ -1561,7 +1561,7 @@ export function RecordsTab({ controller, selectedZoneId, selectedZoneName }: Rec
                 type="button"
                 className="ghost-button"
                 onClick={() => handlePageJump(pageJumpValue)}
-                disabled={recordsLoading || !pageJumpValue.trim()}
+                disabled={!pageJumpValue.trim()}
               >
                 Ir
               </button>
@@ -1575,8 +1575,7 @@ export function RecordsTab({ controller, selectedZoneId, selectedZoneName }: Rec
           <div className="result-toolbar">
             <div>
               <h4>
-                {isEditing ? <Pencil size={16} /> : <Plus size={16} />}{' '}
-                {isEditing ? 'Editar registro DNS' : 'Novo registro DNS'}
+                <Plus size={16} /> Novo registro DNS
               </h4>
               <p className="field-hint">
                 Crie ou atualize registros com validações inteligentes e confirmação antes de salvar.
@@ -1892,7 +1891,7 @@ export function RecordsTab({ controller, selectedZoneId, selectedZoneName }: Rec
               disabled={saving || !selectedZoneId}
             >
               {saving ? <Loader2 size={18} className="spin" /> : <Save size={18} />}
-              {isEditing ? 'Salvar alterações' : 'Criar registro'}
+              Criar registro
             </button>
           </div>
         </article>

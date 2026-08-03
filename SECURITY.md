@@ -2,7 +2,11 @@
 
 ## Supported status
 
-Latest supported release: v02.15.13. The current main branch is also supported for security fixes until the next release is published.
+Latest supported source/release target: v02.15.15. The current `main` branch is
+also supported for security fixes. This patch resolves the current
+Hono, `brace-expansion`, Undici and PostCSS findings in the root and TLS
+reporting toolchains while preserving scoped overrides for incompatible
+dependency families. Hono 4.12.34 resolves GHSA-8j4g-w8fx-2239.
 
 ## Reporting a vulnerability
 
