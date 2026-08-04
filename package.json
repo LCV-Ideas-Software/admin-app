@@ -86,7 +86,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",
-    "@cloudflare/workers-types": "^5.20260731.1",
+    "@cloudflare/workers-types": "^5.20260801.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@tanstack/react-query-devtools": "^5.101.4",
@@ -94,7 +94,7 @@
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.0.0",
-    "@types/d3-geo": "3.1.0",
+    "@types/d3-geo": "3.1.1",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
