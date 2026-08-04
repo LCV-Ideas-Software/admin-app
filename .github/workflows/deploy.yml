@@ -85,6 +85,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+          check-latest: true
           cache: npm
           cache-dependency-path: ./tlsrpt-motor/package-lock.json
       - name: Install and verify latest Wrangler
@@ -93,8 +94,13 @@ jobs:
         run: | # zizmor: ignore[adhoc-packages] Wrangler latest is an explicit organization policy; signatures are verified below.
           set -euo pipefail
           wrangler_prefix="$RUNNER_TEMP/wrangler-latest"
-          npm install --prefix "$wrangler_prefix" --save-exact --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/ wrangler@latest
-          npm audit signatures --prefix "$wrangler_prefix" --registry=https://registry.npmjs.org/
+          effective_registry="$(npm config get registry --prefix "$wrangler_prefix")"
+          if [ "$effective_registry" != "https://registry.npmjs.org/" ]; then
+            echo "::error::Unexpected npm registry for the isolated Wrangler prefix: $effective_registry" >&2
+            exit 1
+          fi
+          npm install --prefix "$wrangler_prefix" --save-exact --ignore-scripts --no-audit --no-fund wrangler@latest
+          npm audit signatures --prefix "$wrangler_prefix"
 
           WRANGLER_BIN="$wrangler_prefix/node_modules/.bin/wrangler"
           if [ ! -x "$WRANGLER_BIN" ]; then
@@ -114,7 +120,7 @@ jobs:
         run: npm ci
       - name: Audit TLS-RPT Motor
         working-directory: ./tlsrpt-motor
-        run: npm audit --audit-level=high --registry=https://registry.npmjs.org/
+        run: npm audit --audit-level=high
       - name: Lint TLS-RPT Motor
         working-directory: ./tlsrpt-motor
         run: npm run lint
@@ -162,6 +168,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+          check-latest: true
           cache: npm
           cache-dependency-path: ./package-lock.json
       - name: Install and verify latest Wrangler
@@ -170,8 +177,13 @@ jobs:
         run: | # zizmor: ignore[adhoc-packages] Wrangler latest is an explicit organization policy; signatures are verified below.
           set -euo pipefail
           wrangler_prefix="$RUNNER_TEMP/wrangler-latest"
-          npm install --prefix "$wrangler_prefix" --save-exact --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/ wrangler@latest
-          npm audit signatures --prefix "$wrangler_prefix" --registry=https://registry.npmjs.org/
+          effective_registry="$(npm config get registry --prefix "$wrangler_prefix")"
+          if [ "$effective_registry" != "https://registry.npmjs.org/" ]; then
+            echo "::error::Unexpected npm registry for the isolated Wrangler prefix: $effective_registry" >&2
+            exit 1
+          fi
+          npm install --prefix "$wrangler_prefix" --save-exact --ignore-scripts --no-audit --no-fund wrangler@latest
+          npm audit signatures --prefix "$wrangler_prefix"
 
           WRANGLER_BIN="$wrangler_prefix/node_modules/.bin/wrangler"
           if [ ! -x "$WRANGLER_BIN" ]; then
@@ -190,7 +202,7 @@ jobs:
         run: npm ci
         working-directory: ./
       - name: Security Audit — Admin App
-        run: npm audit --audit-level=high --registry=https://registry.npmjs.org/
+        run: npm audit --audit-level=high
         working-directory: ./
       - name: Lint Admin App
         run: npm run lint

@@ -7,6 +7,10 @@ updates:
       interval: 'daily'
       time: '01:00'
       timezone: 'America/Los_Angeles'
+    cooldown:
+      default-days: 3
+      exclude:
+        - '*'
     labels:
       - 'dependencies'
       - 'github-actions'
@@ -124,17 +128,4 @@ updates:
           - 'major'
           - 'minor'
           - 'patch'
-    open-pull-requests-limit: 10
-
-  - package-ecosystem: 'pre-commit'
-    directory: '/'
-    schedule:
-      interval: 'daily'
-      time: '01:00'
-      timezone: 'America/Los_Angeles'
-    labels:
-      - 'dependencies'
-    commit-message:
-      prefix: 'deps'
-      include: 'scope'
     open-pull-requests-limit: 10
