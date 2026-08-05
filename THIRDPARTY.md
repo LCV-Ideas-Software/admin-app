@@ -5,7 +5,6 @@
 | @cloudflare/vitest-pool-workers           | ^0.14.0       | MIT                           | Não         | https://registry.npmjs.org/@cloudflare/vitest-pool-workers/-/vitest-pool-workers-0.14.0.tgz                 |
 | @cloudflare/workers-types                 | ^4.20260331.1 | MIT OR Apache-2.0             | Não         | https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-4.20260331.1.tgz                       |
 | @eslint/js                                | ^9.39.4       | MIT                           | Não         | https://registry.npmjs.org/@eslint/js/-/js-9.39.4.tgz                                                       |
-| @sumup/sdk                                | ^0.1.4        | Apache-2.0                    | Não         | https://registry.npmjs.org/@sumup/sdk/-/sdk-0.1.4.tgz                                                       |
 | @tiptap/extension-bubble-menu             | ^3.21.0       | MIT                           | Não         | https://registry.npmjs.org/@tiptap/extension-bubble-menu/-/extension-bubble-menu-3.21.0.tgz                 |
 | @tiptap/extension-character-count         | ^3.21.0       | MIT                           | Não         | https://registry.npmjs.org/@tiptap/extension-character-count/-/extension-character-count-3.21.0.tgz         |
 | @tiptap/extension-code-block-lowlight     | ^3.21.0       | MIT                           | Não         | https://registry.npmjs.org/@tiptap/extension-code-block-lowlight/-/extension-code-block-lowlight-3.21.0.tgz |
