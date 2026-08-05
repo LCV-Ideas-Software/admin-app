@@ -20,6 +20,11 @@ updates:
     open-pull-requests-limit: 10
     groups:
       codeql-action:
+        applies-to: version-updates
+        patterns:
+          - 'github/codeql-action*'
+      codeql-action-security-updates:
+        applies-to: security-updates
         patterns:
           - 'github/codeql-action*'
 
@@ -29,6 +34,8 @@ updates:
       interval: 'daily'
       time: '01:00'
       timezone: 'America/Los_Angeles'
+    cooldown:
+      default-days: 3
     labels:
       - 'dependencies'
       - 'npm'
@@ -38,6 +45,7 @@ updates:
       include: 'scope'
     versioning-strategy: increase
     ignore:
+      # typescript-eslint 8.66.0 supports TypeScript only below 6.1.0.
       - dependency-name: 'typescript'
         versions:
           - '>=6.1.0'
@@ -96,6 +104,8 @@ updates:
       interval: 'daily'
       time: '01:00'
       timezone: 'America/Los_Angeles'
+    cooldown:
+      default-days: 3
     labels:
       - 'dependencies'
       - 'npm'
