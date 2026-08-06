@@ -129,13 +129,4 @@ updates:
           - 'major'
           - 'minor'
           - 'patch'
-      eslint-ecosystem:
-        patterns:
-          - '@eslint/*'
-          - 'eslint-plugin-*'
-          - 'typescript-eslint'
-        update-types:
-          - 'major'
-          - 'minor'
-          - 'patch'
     open-pull-requests-limit: 10
