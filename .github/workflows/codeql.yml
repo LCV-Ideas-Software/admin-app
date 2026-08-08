@@ -61,11 +61,26 @@ jobs:
             echo "::error::CodeQL produced no SARIF file to enforce." >&2
             exit 1
           fi
-          finding_count="$(
-            jq -s '[.[].runs[]?.results[]?] | length' "${sarif_files[@]}"
+          counts="$(
+            jq -rs '
+              [.[].runs[]?.results[]?] as $results
+              | [
+                  ($results | map(select(((.ruleId // "") | test("^[^/]+/diagnostic/")) | not)) | length),
+                  ($results | map(select((.ruleId // "") | test("^[^/]+/diagnostic/"))) | length)
+                ]
+              | @tsv
+            ' "${sarif_files[@]}"
           )"
-          if [ "$finding_count" -ne 0 ]; then
-            echo "::error::CodeQL reported $finding_count active finding(s); zero are allowed." >&2
+          IFS=$'\t' read -r alert_count diagnostic_count <<< "$counts"
+          if ! [[ "$alert_count" =~ ^[0-9]+$ && "$diagnostic_count" =~ ^[0-9]+$ ]]; then
+            echo "::error::CodeQL SARIF classification did not return valid counts." >&2
             exit 1
           fi
-          echo "CodeQL reported zero active findings."
+          if [ "$diagnostic_count" -ne 0 ]; then
+            echo "::notice::CodeQL reported $diagnostic_count extraction diagnostic(s); diagnostics are not security or quality alerts."
+          fi
+          if [ "$alert_count" -ne 0 ]; then
+            echo "::error::CodeQL reported $alert_count security or quality alert(s); zero are allowed." >&2
+            exit 1
+          fi
+          echo "CodeQL reported zero security or quality alerts."
