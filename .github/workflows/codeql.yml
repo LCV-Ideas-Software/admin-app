@@ -61,26 +61,24 @@ jobs:
             echo "::error::CodeQL produced no SARIF file to enforce." >&2
             exit 1
           fi
-          counts="$(
-            jq -rs '
-              [.[].runs[]?.results[]?] as $results
-              | [
-                  ($results | map(select(((.ruleId // "") | test("^[^/]+/diagnostic/")) | not)) | length),
-                  ($results | map(select((.ruleId // "") | test("^[^/]+/diagnostic/"))) | length)
-                ]
-              | @tsv
-            ' "${sarif_files[@]}"
+          finding_count="$(
+            jq -s '[.[].runs[]?.results[]?] | length' "${sarif_files[@]}"
           )"
-          IFS=$'\t' read -r alert_count diagnostic_count <<< "$counts"
-          if ! [[ "$alert_count" =~ ^[0-9]+$ && "$diagnostic_count" =~ ^[0-9]+$ ]]; then
-            echo "::error::CodeQL SARIF classification did not return valid counts." >&2
+          if [ "$finding_count" -ne 0 ]; then
+            finding_inventory="$(
+              jq -cs '
+                [
+                  .[].runs[]?.results[]?
+                  | {
+                      ruleId: (.ruleId // "unknown"),
+                      level: (.level // "unknown"),
+                      path: (.locations[0]?.physicalLocation?.artifactLocation?.uri // "unknown"),
+                      line: (.locations[0]?.physicalLocation?.region?.startLine // null)
+                    }
+                ]
+              ' "${sarif_files[@]}"
+            )"
+            echo "::error::CodeQL reported $finding_count SARIF result(s); zero are allowed. Inventory: $finding_inventory" >&2
             exit 1
           fi
-          if [ "$diagnostic_count" -ne 0 ]; then
-            echo "::notice::CodeQL reported $diagnostic_count extraction diagnostic(s); diagnostics are not security or quality alerts."
-          fi
-          if [ "$alert_count" -ne 0 ]; then
-            echo "::error::CodeQL reported $alert_count security or quality alert(s); zero are allowed." >&2
-            exit 1
-          fi
-          echo "CodeQL reported zero security or quality alerts."
+          echo "CodeQL reported zero SARIF results."
