@@ -5,6 +5,9 @@ on:
     branches: ['main']
   pull_request:
     branches: ['main']
+  merge_group:
+    types:
+      - checks_requested
   schedule:
     - cron: '11 6 * * 2'
 permissions: write-all
@@ -36,9 +39,33 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          queries: security-extended
+          queries: security-and-quality
           dependency-caching: true
       - name: Perform CodeQL analysis
+        id: analyze
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           category: '/language:${{ matrix.language }}'
+          output: ${{ runner.temp }}/codeql-results
+
+      - name: Enforce zero CodeQL findings
+        shell: bash
+        env:
+          CODEQL_RESULTS: ${{ runner.temp }}/codeql-results
+        run: |
+          set -euo pipefail
+          mapfile -d '' sarif_files < <(
+            find "$CODEQL_RESULTS" -type f -name '*.sarif' -print0
+          )
+          if [ "${#sarif_files[@]}" -eq 0 ]; then
+            echo "::error::CodeQL produced no SARIF file to enforce." >&2
+            exit 1
+          fi
+          finding_count="$(
+            jq -s '[.[].runs[]?.results[]?] | length' "${sarif_files[@]}"
+          )"
+          if [ "$finding_count" -ne 0 ]; then
+            echo "::error::CodeQL reported $finding_count active finding(s); zero are allowed." >&2
+            exit 1
+          fi
+          echo "CodeQL reported zero active findings."
