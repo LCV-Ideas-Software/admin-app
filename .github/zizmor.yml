@@ -11,5 +11,6 @@ rules:
     disable: true
   dangerous-triggers:
     ignore:
-      # API-only controller: no checkout, cache, artifact, or PR code execution.
-      - dependabot-automerge.yml
+      # The workflow_run job consumes only trusted default-branch code and never
+      # checks out or downloads content from the triggering pull request.
+      - native-auto-merge.yml

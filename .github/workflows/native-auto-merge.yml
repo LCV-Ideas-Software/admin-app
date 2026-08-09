@@ -1,0 +1,34 @@
+name: Native Auto-merge
+
+on:
+  workflow_run:
+    workflows:
+      - CodeQL
+    types:
+      - completed
+
+permissions: write-all
+
+concurrency:
+  group: native-auto-merge-${{ github.repository }}-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  enable:
+    name: Enable native auto-merge
+    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions: write-all
+    environment: dependabot-automation
+    timeout-minutes: 5
+    steps:
+      - name: Enable GitHub native auto-merge
+        uses: LCV-Ideas-Software/.github/native-auto-merge@4058fad11eca7c2eb4e9296108667ef6199a6356 # v2.0.0
+        with:
+          automation_token: ${{ secrets.LCV_AUTOMATION_TOKEN }}
+          event_repository: ${{ github.event.repository.full_name }}
+          workflow_name: ${{ github.event.workflow_run.name }}
+          workflow_status: ${{ github.event.workflow_run.status }}
+          workflow_event: ${{ github.event.workflow_run.event }}
+          workflow_head_sha: ${{ github.event.workflow_run.head_sha }}
+          workflow_pull_requests: ${{ toJSON(github.event.workflow_run.pull_requests) }}
