@@ -54,36 +54,6 @@ jobs:
           output: ${{ runner.temp }}/codeql-results
 
       - name: Enforce zero CodeQL findings
-        shell: bash
-        env:
-          CODEQL_RESULTS: ${{ runner.temp }}/codeql-results
-        run: |
-          set -euo pipefail
-          mapfile -d '' sarif_files < <(
-            find "$CODEQL_RESULTS" -type f -name '*.sarif' -print0
-          )
-          if [ "${#sarif_files[@]}" -eq 0 ]; then
-            echo "::error::CodeQL produced no SARIF file to enforce." >&2
-            exit 1
-          fi
-          finding_count="$(
-            jq -s '[.[].runs[]?.results[]?] | length' "${sarif_files[@]}"
-          )"
-          if [ "$finding_count" -ne 0 ]; then
-            finding_inventory="$(
-              jq -cs '
-                [
-                  .[].runs[]?.results[]?
-                  | {
-                      ruleId: (.ruleId // "unknown"),
-                      level: (.level // "unknown"),
-                      path: (.locations[0]?.physicalLocation?.artifactLocation?.uri // "unknown"),
-                      line: (.locations[0]?.physicalLocation?.region?.startLine // null)
-                    }
-                ]
-              ' "${sarif_files[@]}"
-            )"
-            echo "::error::CodeQL reported $finding_count SARIF result(s); zero are allowed. Inventory: $finding_inventory" >&2
-            exit 1
-          fi
-          echo "CodeQL reported zero SARIF results."
+        uses: LCV-Ideas-Software/.github/codeql-sarif-gate@24b0bcc09a48b47f740b8a8bd972374f7289e48e # codeql-sarif-v1.0.0
+        with:
+          sarif-directory: ${{ runner.temp }}/codeql-results
