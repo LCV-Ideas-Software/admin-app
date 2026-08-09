@@ -25,6 +25,10 @@ interface Env {
 
 const DEFAULT_VERTEX_LOCATION = 'global';
 
+// Orçamento da camada de IA: passado o prazo, a sugestão deixa de ser útil para
+// a resposta. O mesmo valor aborta a requisição e corta a corrida no handler.
+const AI_LAYER_BUDGET_MS = 6_000;
+
 interface D1Binding {
   prepare(query: string): {
     bind(...values: unknown[]): { run(): Promise<unknown>; first<T>(): Promise<T | null> };
@@ -1295,7 +1299,7 @@ REGRAS:
         temperature: 0.2,
         maxOutputTokens: 8192,
         responseMimeType: 'application/json',
-        httpOptions: { timeout: 80_000 },
+        httpOptions: { timeout: AI_LAYER_BUDGET_MS },
       },
     });
 
@@ -1547,7 +1551,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     try {
       const geminiResults = await Promise.race([
         discoverWithGemini(query, runtimeEnv, runtimeEnv.BIGDATA_DB as unknown as D1Binding),
-        new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), 6000)),
+        new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), AI_LAYER_BUDGET_MS)),
       ]);
       addUnique(geminiResults);
     } catch {

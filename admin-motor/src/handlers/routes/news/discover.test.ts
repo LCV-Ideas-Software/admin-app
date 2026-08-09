@@ -81,8 +81,14 @@ describe('GET /api/news/discover (camada Vertex opcional)', () => {
     expect(runtime.constructorOptions[0]?.saKeyJson).toBe('{"sa":"x"}');
     const aiItems = body.suggestions.filter((s) => s.source === 'gemini-ai');
     expect(aiItems.map((s) => s.url)).toContain('https://exemplo.com/rss');
-    const gen = runtime.generateRequests[0] as { model: string };
+    const gen = runtime.generateRequests[0] as {
+      model: string;
+      config?: { httpOptions?: { timeout?: number } };
+    };
     expect(gen.model).toBe('gemini-2.5-flash');
+    // A camada descarta o resultado após 6s; abortar a requisição no mesmo
+    // prazo evita deixá-la pendurada no isolate depois de já ser inútil.
+    expect(gen.config?.httpOptions?.timeout).toBe(6_000);
   });
 
   it('falha da IA é silenciosa: responde ok sem itens gemini-ai', async () => {

@@ -101,10 +101,17 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     expect(runtime.listRequests).toHaveLength(1);
     const gen = runtime.generateRequests[0] as {
       model: string;
-      config: { temperature: number; topP: number; maxOutputTokens: number };
+      config: { temperature: number; topP: number; maxOutputTokens: number; httpOptions?: { timeout?: number } };
     };
     expect(gen.model).toBe('gemini-3.1-pro-preview');
-    expect(gen.config).toEqual({ temperature: 0.2, topP: 0.9, maxOutputTokens: 256 });
+    // O timeout do provider vira AbortSignal na própria chamada, não só uma
+    // corrida de Promise — o Vertex agora aborta a requisição em voo.
+    expect(gen.config).toEqual({
+      temperature: 0.2,
+      topP: 0.9,
+      maxOutputTokens: 256,
+      httpOptions: { timeout: 120_000 },
+    });
 
     for (const other of body.results.filter((r) => r.agent !== 'gemini')) {
       expect(other.ok).toBe(false);

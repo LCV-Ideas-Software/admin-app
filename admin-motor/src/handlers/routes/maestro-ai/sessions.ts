@@ -2470,14 +2470,15 @@ async function callProvider(
   const timeoutMs = options?.timeoutMs ?? PROVIDER_TIMEOUT_MS;
   if (agent === 'gemini') {
     // Documented web deviation: this Vertex path keeps the deadline-coupled
-    // timeout but has no 429 retry or in-flight abort (the cooperative cancel
-    // checks around the call cover it).
+    // timeout — repassado ao cliente para virar AbortSignal na requisição — mas
+    // não tem o retry de 429 dos providers HTTP (os checks de cancelamento
+    // cooperativo em volta da chamada cobrem a interrupção da sessão).
     const ai = vertexClient(env);
     const response = await withTimeout(
       ai.models.generateContent({
         model,
         contents: `${system}\n\n${prompt}`,
-        config: { temperature: 0.2, topP: 0.9, maxOutputTokens },
+        config: { temperature: 0.2, topP: 0.9, maxOutputTokens, httpOptions: { timeout: timeoutMs } },
       }),
       timeoutMs,
       `${AGENT_LABELS[agent]} request`,
