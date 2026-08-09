@@ -1,7 +1,11 @@
-import { GoogleGenAI } from '@google/genai';
+import { VertexGenAI } from './_shared/vertex';
+
+const DEFAULT_VERTEX_LOCATION = 'global';
 
 type Env = {
-  GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
 };
 
 type Context = {
@@ -29,17 +33,22 @@ const formatModelName = (id: string): string => {
 
 export const handleOraculoModelosGet = async (context: Context) => {
   const { env } = context;
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 500);
+  const saKeyJson = env.VERTEX_SA_KEY;
+  if (!saKeyJson) return json({ ok: false, error: 'VERTEX_SA_KEY não configurada.' }, 500);
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new VertexGenAI({
+      saKeyJson,
+      project: env.VERTEX_PROJECT,
+      location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+    });
     const allModels = new Map<string, { id: string; displayName: string; api: string; vision: boolean }>();
 
     const pager = await ai.models.list({ config: { pageSize: 1000 } });
     for await (const m of pager) {
       if (!m.name) continue;
-      const id = m.name.replace('models/', '');
+      // Vertex retorna "publishers/google/models/<id>" (AI Studio retornava "models/<id>").
+      const id = m.name.split('/').pop() ?? '';
       const lower = id.toLowerCase();
       const isFlashOrPro = lower.includes('flash') || lower.includes('pro');
       const isGemini = lower.startsWith('gemini');
@@ -50,7 +59,7 @@ export const handleOraculoModelosGet = async (context: Context) => {
         allModels.set(id, {
           id,
           displayName: m.displayName || formatModelName(id),
-          api: 'sdk',
+          api: 'vertex',
           vision: hasVision,
         });
       }

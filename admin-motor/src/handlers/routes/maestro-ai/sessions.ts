@@ -1,5 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
 import { toHeaders } from '../../../../../functions/api/_lib/mainsite-admin';
+import { VertexGenAI } from '../../_shared/vertex';
 import { formatBlockManifestForPrompt, validateRevisionContentLock } from './content-lock.ts';
 
 type D1Database = {
@@ -20,7 +20,9 @@ export type MaestroAiEnv = {
   MAESTRO_SECRET_STORE_ID?: string;
   MAESTRO_OPENAI_API_KEY?: string;
   MAESTRO_ANTHROPIC_API_KEY?: string;
-  MAESTRO_GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
   MAESTRO_DEEPSEEK_API_KEY?: string;
   MAESTRO_GROK_API_KEY?: string;
   MAESTRO_PERPLEXITY_API_KEY?: string;
@@ -282,7 +284,9 @@ const API_TEST_PROMPT = 'Reply with exactly: OK';
 const SECRET_NAMES: Record<ProviderKey, string> = {
   claude: 'MAESTRO_ANTHROPIC_API_KEY',
   codex: 'MAESTRO_OPENAI_API_KEY',
-  gemini: 'MAESTRO_GEMINI_API_KEY',
+  // Gemini migra para Vertex AI: o "secret" é a service account JSON
+  // compartilhada da frota (Secrets Store `vertex-sa-key`) — ver README.
+  gemini: 'VERTEX_SA_KEY',
   deepseek: 'MAESTRO_DEEPSEEK_API_KEY',
   grok: 'MAESTRO_GROK_API_KEY',
   perplexity: 'MAESTRO_PERPLEXITY_API_KEY',
@@ -833,7 +837,7 @@ function secretForAgent(env: MaestroAiEnv, agent: ProviderKey): string | undefin
       : agent === 'codex'
         ? env.MAESTRO_OPENAI_API_KEY
         : agent === 'gemini'
-          ? env.MAESTRO_GEMINI_API_KEY
+          ? env.VERTEX_SA_KEY
           : agent === 'deepseek'
             ? env.MAESTRO_DEEPSEEK_API_KEY
             : agent === 'grok'
@@ -2349,12 +2353,6 @@ const MODEL_RESOLUTION: Partial<
     ],
     fallback: 'claude-fable-5',
   },
-  gemini: {
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
-    auth: 'query-key',
-    candidates: ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'],
-    fallback: 'gemini-2.5-pro',
-  },
   deepseek: {
     endpoint: 'https://api.deepseek.com/models',
     auth: 'bearer',
@@ -2369,6 +2367,33 @@ const MODEL_RESOLUTION: Partial<
     fallback: 'grok-4.5',
   },
 };
+
+const VERTEX_GEMINI_CANDIDATES = ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'];
+const VERTEX_GEMINI_FALLBACK = 'gemini-2.5-pro';
+const DEFAULT_VERTEX_LOCATION = 'global';
+
+function vertexClient(env: MaestroAiEnv): VertexGenAI {
+  return new VertexGenAI({
+    saKeyJson: env.VERTEX_SA_KEY ?? '',
+    project: env.VERTEX_PROJECT,
+    location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+  });
+}
+
+/** Vertex publisher-model catalog (v1beta1 global) em vez do /models do AI
+ *  Studio; qualquer falha cai no default canônico, como nos demais providers. */
+async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
+  try {
+    const ids: string[] = [];
+    for await (const model of vertexClient(env).models.list({ config: { pageSize: 1000 } })) {
+      const id = model.name?.split('/').pop();
+      if (id?.toLowerCase().startsWith('gemini')) ids.push(id);
+    }
+    return choosePreferredModel(ids, VERTEX_GEMINI_CANDIDATES, VERTEX_GEMINI_FALLBACK);
+  } catch {
+    return VERTEX_GEMINI_FALLBACK;
+  }
+}
 
 /** Port of choose_preferred_model: first candidate present in the live list;
  *  else the first live model; else the fallback. */
@@ -2432,7 +2457,9 @@ async function callProvider(
   if (!model) {
     model = options?.modelCache?.get(agent) ?? '';
     if (!model) {
-      model = await resolveProviderModel(agent, apiKey);
+      // Gemini resolve pelo catálogo do Vertex (v1beta1 global), que precisa da
+      // service account; os demais providers usam seu próprio /models.
+      model = agent === 'gemini' ? await resolveVertexModel(env) : await resolveProviderModel(agent, apiKey);
       options?.modelCache?.set(agent, model);
     }
   }
@@ -2442,10 +2469,10 @@ async function callProvider(
 
   const timeoutMs = options?.timeoutMs ?? PROVIDER_TIMEOUT_MS;
   if (agent === 'gemini') {
-    // Documented web deviation: the Gemini SDK exposes no Response/AbortSignal,
-    // so this path keeps the deadline-coupled timeout but has no 429 retry or
-    // in-flight abort (the cooperative cancel checks around the call cover it).
-    const ai = new GoogleGenAI({ apiKey });
+    // Documented web deviation: this Vertex path keeps the deadline-coupled
+    // timeout but has no 429 retry or in-flight abort (the cooperative cancel
+    // checks around the call cover it).
+    const ai = vertexClient(env);
     const response = await withTimeout(
       ai.models.generateContent({
         model,
@@ -4328,6 +4355,19 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
     for (const agent of PROVIDER_KEYS) {
       const value = apiKeys[agent];
       if (typeof value === 'string' && value.trim()) {
+        // Gemini usa Vertex AI: a credencial é a service account JSON
+        // compartilhada por toda a frota, provisionada na infraestrutura — não
+        // é uma API key digitável, e gravá-la aqui rotacionaria os outros apps.
+        if (agent === 'gemini') {
+          return json(
+            {
+              ok: false,
+              error:
+                'Gemini usa Vertex AI: a credencial é a service account JSON compartilhada da frota (secret vertex-sa-key no Secrets Store, exposta pelo binding VERTEX_SA_KEY em admin-motor/wrangler.json) e não é gravável por este painel.',
+            },
+            400,
+          );
+        }
         await upsertSecretStoreSecret(context.env, agent, value);
         configuredSecrets[agent] = true;
       }

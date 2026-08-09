@@ -44,6 +44,11 @@
       "secret_name": "gemini-api-key"
     },
     {
+      "binding": "VERTEX_SA_KEY",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "vertex-sa-key"
+    },
+    {
       "binding": "MAESTRO_DEEPSEEK_API_KEY",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "MAESTRO_DEEPSEEK_API_KEY"

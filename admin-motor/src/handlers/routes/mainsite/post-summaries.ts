@@ -6,7 +6,7 @@
  * Usa D1 direto (BIGDATA_DB) — padrão admin-app.
  */
 
-import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
+import { VertexGenAI } from '../../_shared/vertex';
 import { logAiUsage } from '../_lib/ai-telemetry';
 import { toHeaders } from '../_lib/mainsite-admin';
 import { logModuleOperationalEvent } from '../_lib/operational';
@@ -19,8 +19,12 @@ interface SummaryEnv {
   AI?: {
     run?: (model: string, payload: unknown, options?: unknown) => Promise<unknown>;
   };
-  GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
 }
+
+const DEFAULT_VERTEX_LOCATION = 'global';
 
 interface SummaryContext {
   request: Request;
@@ -63,18 +67,17 @@ function structuredLog(level: 'INFO' | 'WARN' | 'ERROR', message: string, contex
 
 const GEMINI_CONFIG = {
   model: 'gemini-2.5-flash',
-  apiVersion: 'v1beta',
   maxOutputTokens: 8192,
   temperature: 0.3,
 };
 
-// ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
+// ── Safety Settings como literais REST v1 (BLOCK_ONLY_HIGH) ──
 const SUMMARY_SAFETY_SETTINGS = [
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_ONLY_HIGH' },
 ];
 
 function stripHtml(html: string): string {
@@ -113,11 +116,12 @@ function extractJsonFromText(rawText: string): string {
   return str;
 }
 
-async function estimateTokenCount(ai: GoogleGenAI, prompt: string, model: string): Promise<number> {
+async function estimateTokenCount(ai: VertexGenAI, prompt: string, model: string): Promise<number> {
   try {
     const resp = await ai.models.countTokens({
       model,
       contents: prompt,
+      config: { httpOptions: { timeout: 20_000 } },
     });
     return resp.totalTokens ?? -1;
   } catch (err) {
@@ -135,13 +139,17 @@ async function generateShareSummary(
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const telStart = Date.now();
   const cleanContent = stripHtml(htmlContent);
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) {
-    structuredLog('ERROR', 'GEMINI_API_KEY não configurada');
-    return { error: 'GEMINI_API_KEY não configurada.' };
+  const saKeyJson = env.VERTEX_SA_KEY;
+  if (!saKeyJson) {
+    structuredLog('ERROR', 'VERTEX_SA_KEY não configurada');
+    return { error: 'VERTEX_SA_KEY não configurada.' };
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new VertexGenAI({
+    saKeyJson,
+    project: env.VERTEX_PROJECT,
+    location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+  });
   const targetModel = model || GEMINI_CONFIG.model;
 
   const systemPrompt = `Você é um editor especializado em SEO e compartilhamento social.
@@ -181,6 +189,7 @@ REGRAS:
           temperature: GEMINI_CONFIG.temperature,
           maxOutputTokens: GEMINI_CONFIG.maxOutputTokens,
           responseMimeType: 'application/json',
+          httpOptions: { timeout: 80_000 },
         },
       });
       break;

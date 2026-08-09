@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [v02.15.16] - 2026-08-09
+
+### Changed
+
+- **Migração Gemini AI Studio → Vertex AI (service account OAuth).** Todo consumo
+  de IA do `admin-motor` passa a autenticar por Service Account (JWT RS256 →
+  OAuth2, escopo `cloud-platform`) contra `aiplatform.googleapis.com`, sem API
+  key: catálogos de modelos (`/api/{oraculo,astrologo,mainsite,calculadora}/modelos`),
+  transformação de texto do editor MainSite, importação de conversas do Gemini
+  Share, resumos de post, camada opcional de descoberta de feeds e o provider
+  `gemini` do Maestro AI. Prompts, contratos de rota, códigos de status e
+  mensagens de negócio permanecem inalterados.
+- **Cliente Vertex compartilhado** (`admin-motor/src/handlers/_shared/vertex.ts`):
+  cache de token com margem de 300s, single-flight na mint, timeouts por chamada
+  (20s `countTokens`, 80s `generateContent`), erros `VertexHttpError` com status e
+  operação de origem. Catálogo de publisher models via `models.list`, que existe
+  apenas no host global `v1beta1` (`publishers/google/models`) — a geração segue
+  no `v1` regional/global.
+- **Safety settings e schema de saída em literais REST.** Os enums `HarmCategory`/
+  `HarmBlockThreshold` do SDK dão lugar às strings equivalentes da API v1, e o
+  `responseSchema` (OpenAPI) do import de conversas trafega no `generationConfig`.
+- **Credencial do Gemini no Maestro AI.** O painel passa a exibir `VERTEX_SA_KEY`
+  como secret do provider e recusa gravação de chave Gemini pela UI: a Service
+  Account é compartilhada por toda a frota (secret `vertex-sa-key` no Secrets
+  Store, exposto pelo novo binding `VERTEX_SA_KEY` em `admin-motor/wrangler.json`),
+  e gravá-la pelo painel rotacionaria a credencial dos demais apps.
+  `VERTEX_PROJECT` (default: `project_id` da própria SA) e `VERTEX_LOCATION`
+  (default: `global`) são opcionais.
+
+### Removed
+
+- Dependência direta `@google/genai` e o override órfão de `protobufjs`, que só
+  existia para essa árvore.
+
 ## [v02.15.15] - 2026-08-03
 
 ### Changed

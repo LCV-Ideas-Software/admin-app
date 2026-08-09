@@ -1,18 +1,22 @@
-import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
+import { VertexGenAI } from '../../_shared/vertex';
 import { logAiUsage } from '../_lib/ai-telemetry';
 
 /**
  * gemini-import.ts — Cloudflare Pages Function
  * POST /api/mainsite/gemini-import
- * Fetches a Gemini share URL directly and utilizes Gemini SDK to cleanly parse its conversation.
+ * Fetches a Gemini share URL directly and uses Vertex AI (SA OAuth) to cleanly parse its conversation.
  */
 
 interface Env {
-  GEMINI_API_KEY: string;
+  VERTEX_SA_KEY: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
   JINA_API_KEY?: string;
   BIGDATA_DB?: D1Database;
 }
+
+const DEFAULT_VERTEX_LOCATION = 'global';
 
 interface PagesContext<E = Env> {
   request: Request;
@@ -341,8 +345,8 @@ async function handleGeminiImport(
     );
   }
 
-  if (!env?.GEMINI_API_KEY) {
-    return new Response(JSON.stringify({ error: 'Falta variável GEMINI_API_KEY no deploy.' }), {
+  if (!env?.VERTEX_SA_KEY) {
+    return new Response(JSON.stringify({ error: 'Falta variável VERTEX_SA_KEY no deploy.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -366,7 +370,11 @@ Regras:
 3. LIMPEZA: Descarte elementos de UI (Sign in, Settings, botões de menu).
 4. TÍTULO: Infira o título principal da conversa.`;
 
-    const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+    const ai = new VertexGenAI({
+      saKeyJson: env.VERTEX_SA_KEY,
+      project: env.VERTEX_PROJECT,
+      location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+    });
 
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
       try {
@@ -385,6 +393,7 @@ Regras:
               },
               required: ['title', 'markdown'],
             },
+            httpOptions: { timeout: 80_000 },
           },
         });
 

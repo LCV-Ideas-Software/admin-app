@@ -16,12 +16,13 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release target: **v02.15.15**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+**Status.** Stable. Current release target: **v02.15.16**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 The version history at a glance:
 
 | Release         | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`v02.15.16`** | **Gemini AI Studio → Vertex AI (service account OAuth).** Every AI endpoint in `admin-motor` authenticates with a Service Account instead of an API key: model catalogs, MainSite editor transform, Gemini share import, post summaries, the optional news-discovery layer and the Maestro AI Gemini provider. Adds the shared Vertex client (token cache, per-call timeouts, publisher-model catalog on the global `v1beta1` host) and drops the direct `@google/genai` dependency. |
 | **`v02.15.15`** | **Security and current dependency baseline.** Ships the accumulated Maestro AI/editor updates with current Cloudflare tooling, scoped Undici and PostCSS remediations, brace-expansion 5.0.9, CodeQL 4.37.4 and the settled organization Dependabot controller. |
 | **`v02.15.14`** | **Maestro AI parity with desktop v0.5.56.** Persists the complete circular chain of custody and version-bound approvals, resumes without losing progress, keeps rejected attempts as append-only evidence and converges only after every eligible non-author approves the current version. |
 | **`v02.15.13`** | **Maestro AI: gate de retenção OpenAI alinhado à lista oficial.** `gpt-5.5*`/`gpt-5.4*` passam a receber `prompt_cache_retention: "24h"` (doc oficial); família 5.6 segue sem o campo (só `30m` é suportado). |
@@ -94,10 +95,11 @@ Provider API keys can be entered in `Configurações`, but raw values are used o
 | ---------------------------- | ---------------------------- |
 | `MAESTRO_OPENAI_API_KEY`     | `MAESTRO_OPENAI_API_KEY`     |
 | `MAESTRO_ANTHROPIC_API_KEY`  | `MAESTRO_ANTHROPIC_API_KEY`  |
-| `MAESTRO_GEMINI_API_KEY`     | `MAESTRO_GEMINI_API_KEY`     |
 | `MAESTRO_DEEPSEEK_API_KEY`   | `MAESTRO_DEEPSEEK_API_KEY`   |
 | `MAESTRO_GROK_API_KEY`       | `MAESTRO_GROK_API_KEY`       |
 | `MAESTRO_PERPLEXITY_API_KEY` | `MAESTRO_PERPLEXITY_API_KEY` |
+
+Gemini is the exception: it runs on Vertex AI with service-account OAuth, so its credential is not a typed-in API key but the fleet-wide Service Account JSON — Secret Store entry `vertex-sa-key`, bound as `VERTEX_SA_KEY`. `Configurações` reports the provider secret as `VERTEX_SA_KEY` and rejects attempts to save a Gemini key through the panel, since writing it there would rotate the credential for every other app that shares it.
 
 The Worker also uses infrastructure-only bindings/vars to write provider keys into the same Secret Store:
 
@@ -223,7 +225,9 @@ npx wrangler secret put ENFORCE_JWT_VALIDATION --config admin-motor/wrangler.jso
 
 ### 6. Configure additional secrets
 
-Per `admin-motor/wrangler.json`'s `secrets_store_secrets` list, set values for the keys you intend to use (Gemini, Resend, GCP, JINA, Cloudflare DNS/Cache/Account-ID tokens, etc.). `GCP_SA_KEY` (Service Account JSON, >1024 chars) cannot live in Secrets Store and must be a native Worker secret:
+Per `admin-motor/wrangler.json`'s `secrets_store_secrets` list, set values for the keys you intend to use (Vertex AI, Resend, JINA, Cloudflare DNS/Cache/Account-ID tokens, etc.). `VERTEX_SA_KEY` (Secret Store `vertex-sa-key`, the same Service Account the other LCV apps use) is required by every AI endpoint: `/api/{oraculo,astrologo,mainsite,calculadora}/modelos`, the MainSite editor transform, Gemini share import, post summaries, the optional news-discovery layer and the Maestro AI Gemini provider. Optional companions: `VERTEX_PROJECT` (defaults to the `project_id` inside the Service Account JSON) and `VERTEX_LOCATION` (defaults to `global`).
+
+`GCP_SA_KEY` (Cloud Monitoring Service Account) is provisioned as a native Worker secret instead:
 
 ```bash
 npx wrangler secret put GCP_SA_KEY --config admin-motor/wrangler.json

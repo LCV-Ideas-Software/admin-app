@@ -1,17 +1,21 @@
 /// <reference types="@cloudflare/workers-types" />
 
 /**
- * POST /api/mainsite/ai/transform — Transformação de texto via Gemini SDK.
- * Migrado de REST fetch direto para @google/genai SDK oficial.
+ * POST /api/mainsite/ai/transform — Transformação de texto via Vertex AI
+ * (service account OAuth), cliente compartilhado _shared/vertex.
  */
 
-import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
+import { VertexGenAI } from '../../../_shared/vertex';
 import { logAiUsage } from '../../_lib/ai-telemetry';
 
 export interface Env {
-  GEMINI_API_KEY: string;
+  VERTEX_SA_KEY: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
   BIGDATA_DB?: D1Database;
 }
+
+const DEFAULT_VERTEX_LOCATION = 'global';
 
 /** Fallback usado quando BIGDATA_DB não retorna modelo configurado para 'chat'. */
 const FALLBACK_MODEL = 'gemini-2.5-pro';
@@ -74,11 +78,12 @@ async function resolveModel(db: D1Database | undefined): Promise<string> {
 /**
  * Estima contagem de tokens via SDK countTokens
  */
-async function estimateTokenCount(ai: GoogleGenAI, text: string, model: string): Promise<number> {
+async function estimateTokenCount(ai: VertexGenAI, text: string, model: string): Promise<number> {
   try {
     const resp = await ai.models.countTokens({
       model,
       contents: text,
+      config: { httpOptions: { timeout: 20_000 } },
     });
     return resp.totalTokens ?? 0;
   } catch (error) {
@@ -103,20 +108,20 @@ function validateInputTokens(
   return { shouldReject: false };
 }
 
-// Safety settings via SDK enums
+// Safety settings como literais REST v1 (mesmos valores dos enums do SDK).
 const TRANSFORM_SAFETY_SETTINGS = [
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
 ];
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const resolvedEnv = ((context as { data?: { env?: Env } }).data?.env ?? context.env) as Env;
 
-  if (!resolvedEnv.GEMINI_API_KEY) {
-    structuredLog('error', 'GEMINI_API_KEY missing');
-    return new Response(JSON.stringify({ error: 'GEMINI_API_KEY não configurada.' }), { status: 500 });
+  if (!resolvedEnv.VERTEX_SA_KEY) {
+    structuredLog('error', 'VERTEX_SA_KEY missing');
+    return new Response(JSON.stringify({ error: 'VERTEX_SA_KEY não configurada.' }), { status: 500 });
   }
 
   const _telemetryStart = Date.now();
@@ -130,7 +135,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     );
   }
 
-  const ai = new GoogleGenAI({ apiKey: resolvedEnv.GEMINI_API_KEY });
+  const ai = new VertexGenAI({
+    saKeyJson: resolvedEnv.VERTEX_SA_KEY,
+    project: resolvedEnv.VERTEX_PROJECT,
+    location: resolvedEnv.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+  });
 
   try {
     const body = (await context.request.json()) as { action: string; text: string; instruction?: string };
@@ -196,6 +205,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             temperature: GEMINI_CONFIG.endpoints.transform.temperature,
             topP: GEMINI_CONFIG.endpoints.transform.topP,
             maxOutputTokens: GEMINI_CONFIG.endpoints.transform.maxOutputTokens,
+            httpOptions: { timeout: 80_000 },
           },
         });
 
