@@ -81,7 +81,7 @@
     "topojson-client": "3.1.0",
     "world-atlas": "2.0.2",
     "y-protocols": "^1.0.7",
-    "yjs": "^13.6.31"
+    "yjs": "^13.6.32"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",
