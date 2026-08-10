@@ -56,12 +56,12 @@ const POST_ROW = {
   content: `<p>${'Conteúdo relevante do post para resumo. '.repeat(4)}</p>`,
 };
 
-const createDb = () => {
+const createDb = (posts: (typeof POST_ROW)[] = []) => {
   const makeStmt = (sql: string) => {
     const stmt = {
       bind: (..._args: unknown[]) => stmt,
       run: async () => ({}),
-      all: async () => ({ results: [] as unknown[] }),
+      all: async () => ({ results: sql.includes('SELECT id, title, content FROM mainsite_posts') ? posts : [] }),
       first: async () => (sql.includes('FROM mainsite_posts WHERE id') ? POST_ROW : null),
     };
     return stmt;
@@ -69,14 +69,14 @@ const createDb = () => {
   return { prepare: makeStmt };
 };
 
-const context = (body: unknown, env: Record<string, unknown>) =>
+const context = (body: unknown, env: Record<string, unknown>, posts: (typeof POST_ROW)[] = []) =>
   ({
     request: new Request('https://admin.example/api/mainsite/post-summaries', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
     }),
-    env: { BIGDATA_DB: createDb(), ...env },
+    env: { BIGDATA_DB: createDb(posts), ...env },
   }) as unknown as Parameters<typeof onRequestPost>[0];
 
 beforeEach(() => {
@@ -128,6 +128,26 @@ describe('POST /api/mainsite/post-summaries action=regenerate (Vertex)', () => {
       { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_ONLY_HIGH' },
     ]);
+  });
+
+  it('generate-all limita cada chamada ao tempo que resta do teto do lote', async () => {
+    const res = await onRequestPost(
+      context({ action: 'generate-all', mode: 'all', model: 'gemini-2.5-flash' }, { VERTEX_SA_KEY: '{"sa":"x"}' }, [
+        POST_ROW,
+      ]),
+    );
+    expect(res.status).toBe(200);
+
+    const count = runtime.countRequests[0] as { config?: { httpOptions?: { timeout?: number } } };
+    const gen = runtime.generateRequests[0] as { config?: { httpOptions?: { timeout?: number } } };
+    const countTimeout = count.config?.httpOptions?.timeout ?? 0;
+    const genTimeout = gen.config?.httpOptions?.timeout ?? 0;
+    // O lote inteiro tem 40s antes do 524 do proxy; nenhuma chamada individual
+    // pode pedir mais do que resta dele (o single-post segue com 20s/80s).
+    expect(countTimeout).toBeGreaterThan(0);
+    expect(countTimeout).toBeLessThanOrEqual(40_000);
+    expect(genTimeout).toBeGreaterThan(0);
+    expect(genTimeout).toBeLessThanOrEqual(40_000);
   });
 
   it('retorna 500 com "AI falhou." após esgotar retries', async () => {

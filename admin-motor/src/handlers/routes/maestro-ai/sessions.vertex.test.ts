@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtime = vi.hoisted(() => {
   class MockVertexHttpError extends Error {
@@ -53,6 +53,15 @@ vi.mock('../../_shared/vertex', () => ({
 
 import { handleMaestroAiSettingsGet, handleMaestroAiSettingsPut, handleMaestroAiSettingsTestPost } from './sessions';
 
+/** Registra gravações no Secrets Store para provar atomicidade do PUT. */
+const upsertedSecrets: string[] = [];
+
+const SECRET_STORE_ENV = {
+  CLOUDFLARE_PW: 'token-cf',
+  CF_ACCOUNT_ID: 'acct-1',
+  MAESTRO_SECRET_STORE_ID: 'store-1',
+};
+
 const createDb = () => {
   const makeStmt = () => {
     const stmt = {
@@ -86,6 +95,22 @@ beforeEach(() => {
   runtime.generateRequests.length = 0;
   runtime.generateText = 'OK';
   runtime.generateError = null;
+  upsertedSecrets.length = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/secrets_store/') && init?.method && init.method !== 'GET') {
+        const body = String(init.body ?? '');
+        upsertedSecrets.push(body.slice(0, 200));
+      }
+      return new Response(JSON.stringify({ success: true, result: [] }), { status: 200 });
+    }),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
@@ -124,6 +149,19 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     }
   });
 
+  it('test-api: com location regional não usa o catálogo global (modelos global-only não existem lá)', async () => {
+    const res = await handleMaestroAiSettingsTestPost(
+      context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us-central1' }),
+    );
+    const body = (await res.json()) as TestResults;
+    const gemini = body.results.find((r) => r.agent === 'gemini');
+    expect(gemini?.ok).toBe(true);
+    expect(gemini?.model).toBe('gemini-2.5-pro');
+    // Nada de consultar o catálogo global para escolher um modelo que será
+    // chamado numa região onde ele pode não existir.
+    expect(runtime.listRequests).toHaveLength(0);
+  });
+
   it('test-api: falha na listagem cai no fallback gemini-2.5-pro', async () => {
     runtime.listError = new runtime.MockVertexHttpError('Vertex listModels falhou (HTTP 403): x', 403, 'listModels');
     const res = await handleMaestroAiSettingsTestPost(context({ VERTEX_SA_KEY: '{"sa":"x"}' }));
@@ -152,6 +190,24 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     const gemini = body.settings.agents.find((a) => a.key === 'gemini');
     expect(gemini?.secret_name).toBe('VERTEX_SA_KEY');
     expect(gemini?.runtime_ready).toBe(true);
+  });
+
+  it('settings PUT: rejeita o gemini ANTES de gravar qualquer outro secret (atomicidade)', async () => {
+    const res = await handleMaestroAiSettingsPut(
+      context(
+        { VERTEX_SA_KEY: '{"sa":"x"}', ...SECRET_STORE_ENV },
+        {
+          protocol_text: 'p'.repeat(120),
+          max_cost_usd: 10,
+          max_cycles: 2,
+          // claude vem antes de gemini na ordem de PROVIDER_KEYS: sem validação
+          // prévia, ele seria rotacionado e só então o gemini falharia.
+          api_keys: { claude: 'chave-claude', gemini: 'alguma-coisa' },
+        },
+      ),
+    );
+    expect(res.status).toBe(400);
+    expect(upsertedSecrets).toEqual([]);
   });
 
   it('settings PUT: gravação de api_key do gemini via painel é rejeitada com diagnóstico', async () => {

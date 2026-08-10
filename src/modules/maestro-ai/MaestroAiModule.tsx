@@ -1213,6 +1213,7 @@ export function MaestroAiModule() {
                   // aqui rotacionaria a chave dos demais apps, então o campo fica
                   // apenas informativo.
                   const infraManaged = agent.key === 'gemini';
+                  const infraNoteId = `maestro-key-note-${agent.key}`;
                   return (
                     <div
                       key={agent.key}
@@ -1225,9 +1226,10 @@ export function MaestroAiModule() {
                         value={infraManaged ? '' : apiKeys[agent.key]}
                         onChange={(event) => setApiKeys((current) => ({ ...current, [agent.key]: event.target.value }))}
                         disabled={infraManaged}
+                        {...(infraManaged ? { 'aria-describedby': infraNoteId } : {})}
                         placeholder={
                           infraManaged
-                            ? `Credencial de infraestrutura (${saved?.secret_name ?? 'VERTEX_SA_KEY'}): service account do Vertex AI, compartilhada pela frota`
+                            ? `Credencial de infraestrutura (${saved?.secret_name ?? 'VERTEX_SA_KEY'})`
                             : saved?.configured
                               ? 'Chave já configurada; preencha apenas para substituir'
                               : 'Informe a chave'
@@ -1237,6 +1239,13 @@ export function MaestroAiModule() {
                       <span className="status-pill">
                         {saved?.runtime_ready ? 'ativa' : saved?.configured ? 'salva' : 'pendente'}
                       </span>
+                      {infraManaged ? (
+                        <p id={infraNoteId} style={{ gridColumn: '2 / -1', margin: 0, color: '#64748b', fontSize: 13 }}>
+                          Credencial de infraestrutura: a service account do Vertex AI (
+                          {saved?.secret_name ?? 'VERTEX_SA_KEY'}) é compartilhada por todos os apps da frota e
+                          provisionada fora deste painel.
+                        </p>
+                      ) : null}
                     </div>
                   );
                 })}

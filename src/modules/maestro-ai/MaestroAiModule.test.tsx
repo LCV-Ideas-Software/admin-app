@@ -92,6 +92,15 @@ describe('MaestroAiModule — credencial do Gemini é gerida pela infraestrutura
     });
     expect(campo.disabled).toBe(true);
     expect(campo.placeholder).toContain('VERTEX_SA_KEY');
+
+    // O aviso não pode viver só no placeholder: campo desabilitado não recebe
+    // foco de teclado e o texto fica visualmente cortado. Precisa ser texto
+    // visível e associado ao campo para leitores de tela.
+    const aviso = screen.getByText(/credencial de infraestrutura/i);
+    expect(aviso).toBeVisible();
+    expect(aviso.textContent).toContain('VERTEX_SA_KEY');
+    expect(campo.getAttribute('aria-describedby')).toBe(aviso.id);
+    expect(aviso.id).toBeTruthy();
   });
 
   it('salvar continua funcionando com os demais ajustes, sem chave do Gemini no payload', async () => {

@@ -25,6 +25,10 @@ interface SummaryEnv {
 }
 
 const DEFAULT_VERTEX_LOCATION = 'global';
+const COUNT_TOKENS_TIMEOUT_MS = 20_000;
+const GENERATE_TIMEOUT_MS = 80_000;
+// Teto do lote em generate-all: o proxy do Pages devolve 524 além disso.
+const BATCH_TIMEOUT_LIMIT_MS = 40_000;
 
 interface SummaryContext {
   request: Request;
@@ -116,12 +120,17 @@ function extractJsonFromText(rawText: string): string {
   return str;
 }
 
-async function estimateTokenCount(ai: VertexGenAI, prompt: string, model: string): Promise<number> {
+async function estimateTokenCount(
+  ai: VertexGenAI,
+  prompt: string,
+  model: string,
+  timeoutMs = COUNT_TOKENS_TIMEOUT_MS,
+): Promise<number> {
   try {
     const resp = await ai.models.countTokens({
       model,
       contents: prompt,
-      config: { httpOptions: { timeout: 20_000 } },
+      config: { httpOptions: { timeout: timeoutMs } },
     });
     return resp.totalTokens ?? -1;
   } catch (err) {
@@ -136,6 +145,9 @@ async function generateShareSummary(
   env: SummaryEnv,
   model: string,
   db?: D1Database,
+  /** Teto opcional para esta chamada: no generate-all é o que resta do lote,
+   * de modo que nenhum post sozinho estoure o limite que evita o 524. */
+  budgetMs?: number,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const telStart = Date.now();
   const cleanContent = stripHtml(htmlContent);
@@ -165,8 +177,14 @@ REGRAS:
   const userPrompt = `TÍTULO: ${title}\nCONTEÚDO: ${cleanContent}`;
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
+  // Sem orçamento (ação de post único) valem os tetos padrão; no lote, cada
+  // chamada recebe o que ainda resta antes do 524.
+  const remaining = () => (budgetMs === undefined ? undefined : Math.max(0, budgetMs - (Date.now() - telStart)));
+  const countTimeout = Math.min(COUNT_TOKENS_TIMEOUT_MS, remaining() ?? COUNT_TOKENS_TIMEOUT_MS);
+  if (countTimeout <= 0) return { error: 'Tempo do lote esgotado antes de processar este post.' };
+
   // 1. Validation de Contexto API e Pre-req Token Counting
-  const tokenCount = await estimateTokenCount(ai, fullPrompt, targetModel);
+  const tokenCount = await estimateTokenCount(ai, fullPrompt, targetModel, countTimeout);
   if (tokenCount > 120000) {
     structuredLog('ERROR', 'Conteúdo muito extenso para processar', { tokens: tokenCount });
     return { error: 'Dados muito extensos para geração do resumo.' };
@@ -179,6 +197,11 @@ REGRAS:
   let parsedResponse: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const generateTimeout = Math.min(GENERATE_TIMEOUT_MS, remaining() ?? GENERATE_TIMEOUT_MS);
+    if (generateTimeout <= 0) {
+      lastErrorMsg = 'Tempo do lote esgotado durante a geração.';
+      break;
+    }
     try {
       parsedResponse = await ai.models.generateContent({
         model: targetModel,
@@ -189,7 +212,7 @@ REGRAS:
           temperature: GEMINI_CONFIG.temperature,
           maxOutputTokens: GEMINI_CONFIG.maxOutputTokens,
           responseMimeType: 'application/json',
-          httpOptions: { timeout: 80_000 },
+          httpOptions: { timeout: generateTimeout },
         },
       });
       break;
@@ -439,7 +462,7 @@ export async function onRequestPost(context: SummaryContext) {
       const details: Array<{ postId: number; title: string; status: string }> = [];
       const resolvedModel = await resolveSummaryModel(db, body.model);
 
-      const TIMEOUT_LIMIT = 40000; // 40 seconds max to prevent 524 Timeout
+      const TIMEOUT_LIMIT = BATCH_TIMEOUT_LIMIT_MS;
       const startTime = Date.now();
 
       for (const post of allPosts) {
@@ -472,7 +495,17 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel, db);
+          // O teto do lote é verificado entre posts; sem repassar o que resta,
+          // um único post poderia consumir 20s de contagem + 2x80s de geração
+          // e estourar justamente o 524 que essa proteção evita.
+          const result = await generateShareSummary(
+            post.title,
+            post.content,
+            runtimeEnv,
+            resolvedModel,
+            db,
+            Math.max(0, TIMEOUT_LIMIT - (Date.now() - startTime)),
+          );
           if ('error' in result) {
             failed++;
             details.push({ postId: post.id, title: post.title, status: result.error });

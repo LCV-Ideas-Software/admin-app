@@ -229,23 +229,49 @@ const mintAccessToken = async (
   return { token: data.access_token, expiresInS: data.expires_in ?? JWT_LIFETIME_S };
 };
 
-const getAccessToken = async (sa: ServiceAccountKey, fetchImpl: typeof fetch, now: () => number): Promise<string> => {
+/** Espera a mint sem nunca abortá-la: ela é compartilhada por single-flight e
+ * outro caller pode ter orçamento maior. Quem estourou desiste sozinho. */
+const awaitWithinBudget = async <T>(promise: Promise<T>, budgetMs: number, operation: VertexOperation): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const budget = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(new Error(`Vertex ${operation}: orçamento de ${budgetMs}ms esgotado durante a mint do access token.`)),
+      budgetMs,
+    );
+  });
+  try {
+    return await Promise.race([promise, budget]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+const getAccessToken = async (
+  sa: ServiceAccountKey,
+  fetchImpl: typeof fetch,
+  now: () => number,
+  budget?: { ms: number; operation: VertexOperation },
+): Promise<string> => {
   const cacheKey = `${sa.client_email}|${sa.private_key_id}|${sa.token_uri}`;
   const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAtMs > now()) return cached.token;
   const existing = inflightMints.get(cacheKey);
-  if (existing) return existing;
+  if (existing) return budget ? awaitWithinBudget(existing, budget.ms, budget.operation) : existing;
   const mint = (async () => {
     const { token, expiresInS } = await mintAccessToken(sa, fetchImpl, now());
     tokenCache.set(cacheKey, { token, expiresAtMs: now() + (expiresInS - TOKEN_SAFETY_MARGIN_S) * 1000 });
     return token;
   })();
   inflightMints.set(cacheKey, mint);
-  try {
-    return await mint;
-  } finally {
+  // A limpeza trata os dois desfechos: com `.finally` a rejeição da mint
+  // sobreviveria na promise derivada e viraria unhandled rejection quando o
+  // caller já tivesse desistido por orçamento.
+  const cleanup = () => {
     inflightMints.delete(cacheKey);
-  }
+  };
+  mint.then(cleanup, cleanup);
+  return budget ? awaitWithinBudget(mint, budget.ms, budget.operation) : mint;
 };
 
 const isContent = (item: unknown): boolean =>
@@ -380,7 +406,22 @@ export class VertexGenAI {
     timeoutMs?: number,
   ): Promise<unknown> {
     const sa = parseServiceAccountKey(this.options.saKeyJson);
-    const token = await getAccessToken(sa, this.fetchImpl, this.now);
+    // O timeout do caller é orçamento da chamada INTEIRA (mint + requisição):
+    // com cache frio, gastar o orçamento na mint e ainda disparar a geração
+    // deixaria trabalho faturável correndo depois do prazo do handler.
+    const hasBudget = Number.isFinite(timeoutMs) && Number(timeoutMs) > 0;
+    const budgetMs = hasBudget ? Number(timeoutMs) : 0;
+    const startedAt = this.now();
+    const token = await getAccessToken(
+      sa,
+      this.fetchImpl,
+      this.now,
+      hasBudget ? { ms: budgetMs, operation: verb } : undefined,
+    );
+    const remainingMs = hasBudget ? budgetMs - (this.now() - startedAt) : 0;
+    if (hasBudget && remainingMs <= 0) {
+      throw new Error(`Vertex ${verb}: orçamento de ${budgetMs}ms esgotado antes da requisição.`);
+    }
     const { location } = this.options;
     // Deploys de terceiros (forks) configuram apenas VERTEX_SA_KEY: sem project
     // explícito, o correto é o projeto dono da própria service account.
@@ -395,9 +436,7 @@ export class VertexGenAI {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      ...(Number.isFinite(timeoutMs) && Number(timeoutMs) > 0
-        ? { signal: AbortSignal.timeout(Number(timeoutMs)) }
-        : {}),
+      ...(hasBudget ? { signal: AbortSignal.timeout(remainingMs) } : {}),
     });
     if (!res.ok) {
       const detail = (await res.text()).slice(0, ERROR_BODY_EXCERPT);

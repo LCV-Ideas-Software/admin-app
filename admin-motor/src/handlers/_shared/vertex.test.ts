@@ -290,6 +290,35 @@ describe('montagem das requisições REST do Vertex', () => {
     });
   });
 
+  it('o httpOptions.timeout é orçamento da chamada inteira: uma mint pendurada estoura antes de chamar a API', async () => {
+    const sa = await makeTestSa('kid-budget');
+    const apiCalls: string[] = [];
+    let liberar: () => void = () => {};
+    const mintPendurada = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const fetchImpl = (async (url: string | URL) => {
+      if (String(url).includes('oauth2.test.invalid')) {
+        await mintPendurada;
+        return jsonResponse(200, { access_token: 'tok-1', expires_in: 3600 });
+      }
+      apiCalls.push(String(url));
+      return jsonResponse(200, { candidates: [] });
+    }) as unknown as typeof fetch;
+
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, project: 'proj-x', location: 'global', fetchImpl });
+    const erro = await ai.models
+      .generateContent({ model: 'm', contents: 'oi', config: { httpOptions: { timeout: 60 } } })
+      .then(() => null)
+      .catch((err: unknown) => err);
+
+    expect(erro).toBeInstanceOf(Error);
+    expect((erro as Error).message).toContain('orçamento');
+    // A chamada da API nunca acontece: o orçamento acabou ainda na mint.
+    expect(apiCalls).toHaveLength(0);
+    liberar();
+  });
+
   it('normaliza array misto de parts (inlineData + string) em um único content de usuário', async () => {
     const sa = await makeTestSa('kid-multimodal');
     const mock = makeFetchMock();

@@ -2386,6 +2386,12 @@ function vertexClient(env: MaestroAiEnv): VertexGenAI {
 /** Vertex publisher-model catalog (v1beta1 global) em vez do /models do AI
  *  Studio; qualquer falha cai no default canônico, como nos demais providers. */
 async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
+  // O catálogo só existe no host global e lista modelos que podem não estar
+  // publicados numa região específica (os previews, por exemplo). Se a geração
+  // vai para uma região, escolher por esse catálogo produziria um modelo que
+  // depois falha com 404 — melhor ficar no default, que é regionalmente amplo.
+  const location = env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION;
+  if (location !== DEFAULT_VERTEX_LOCATION) return VERTEX_GEMINI_FALLBACK;
   try {
     const ids: string[] = [];
     const catalog = vertexClient(env).models.list({
@@ -4359,22 +4365,23 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
     const models = sanitizeModels(body.models ?? parseJson(current.models_json, DEFAULT_MODELS));
     const configuredSecrets = parseJson<Partial<Record<ProviderKey, boolean>>>(current.configured_secrets_json, {});
     const apiKeys = body.api_keys && typeof body.api_keys === 'object' ? body.api_keys : {};
+    // Validação ANTES de qualquer efeito colateral: rejeitar no meio do laço
+    // deixaria os secrets anteriores já rotacionados num request que responde
+    // 400. Gemini usa Vertex AI, cuja credencial é a service account JSON
+    // compartilhada pela frota, provisionada na infraestrutura.
+    if (typeof apiKeys.gemini === 'string' && apiKeys.gemini.trim()) {
+      return json(
+        {
+          ok: false,
+          error:
+            'Gemini usa Vertex AI: a credencial é a service account JSON compartilhada da frota (secret vertex-sa-key no Secrets Store, exposta pelo binding VERTEX_SA_KEY em admin-motor/wrangler.json) e não é gravável por este painel.',
+        },
+        400,
+      );
+    }
     for (const agent of PROVIDER_KEYS) {
       const value = apiKeys[agent];
       if (typeof value === 'string' && value.trim()) {
-        // Gemini usa Vertex AI: a credencial é a service account JSON
-        // compartilhada por toda a frota, provisionada na infraestrutura — não
-        // é uma API key digitável, e gravá-la aqui rotacionaria os outros apps.
-        if (agent === 'gemini') {
-          return json(
-            {
-              ok: false,
-              error:
-                'Gemini usa Vertex AI: a credencial é a service account JSON compartilhada da frota (secret vertex-sa-key no Secrets Store, exposta pelo binding VERTEX_SA_KEY em admin-motor/wrangler.json) e não é gravável por este painel.',
-            },
-            400,
-          );
-        }
         await upsertSecretStoreSecret(context.env, agent, value);
         configuredSecrets[agent] = true;
       }
