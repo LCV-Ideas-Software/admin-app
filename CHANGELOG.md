@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [v02.15.22] - 2026-08-10
+
+### Fixed
+
+- **Atribuição da baseline de segurança no `SECURITY.md`.** O parágrafo de
+  _Supported status_ dizia "this patch resolves" acompanhando o número da
+  release corrente, de modo que a v02.15.21 — que só remove bindings legados de
+  credencial — passava a reivindicar as correções de Hono, `brace-expansion`,
+  Undici e PostCSS entregues na v02.15.15. O texto agora nomeia a release de
+  origem.
+
 ## [v02.15.21] - 2026-08-10
 
 ### Removido
