@@ -1,6 +1,5 @@
 const SECRET_ALIASES = {
   CLOUDFLARE_PW: ['cloudflare-pw'],
-  GEMINI_API_KEY: ['gemini-api-key'],
   RESEND_API_KEY: ['resend-api-key'],
   RESEND_APPKEY: ['resend-appkey', 'resend-app-key'],
   GCP_SA_KEY: ['gcp-sa-key'],
@@ -16,7 +15,7 @@ const SECRET_ALIASES = {
   ADMINHUB_BEARER_TOKEN: ['adminhub-bearer-token'],
 } as const;
 
-const CRITICAL_KEYS = ['CLOUDFLARE_PW', 'GEMINI_API_KEY'] as const;
+const CRITICAL_KEYS = ['CLOUDFLARE_PW'] as const;
 
 const toOptionalString = async (raw: unknown): Promise<string | undefined> => {
   if (typeof raw === 'string') {

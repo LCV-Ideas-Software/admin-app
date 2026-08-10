@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [v02.15.21] - 2026-08-10
+
+### Removido
+
+- **Bindings legados do AI Studio.** Com toda a IA do `admin-motor` autenticando
+  por service account desde a v02.15.16, saem `GEMINI_API_KEY` e
+  `MAESTRO_GEMINI_API_KEY` do `admin-motor/wrangler.json`, suas declarações de
+  tipo e resolução em `index.ts`, e o alias `gemini-api-key` do resolver de
+  secrets das Pages Functions — que também deixa de listar a chave entre as
+  credenciais críticas. A varredura do repositório não encontra nenhuma leitura
+  dessas variáveis: restavam apenas declarações.
+
 ## [v02.15.20] - 2026-08-10
 
 ### Fixed
