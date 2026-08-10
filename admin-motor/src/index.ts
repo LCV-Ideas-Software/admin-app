@@ -254,11 +254,9 @@ type AdminMotorEnv = {
   MAESTRO_OPENAI_API_KEY?: unknown;
   MAESTRO_SECRET_STORE_ID?: unknown;
   MAESTRO_ANTHROPIC_API_KEY?: unknown;
-  MAESTRO_GEMINI_API_KEY?: unknown;
   MAESTRO_DEEPSEEK_API_KEY?: unknown;
   MAESTRO_GROK_API_KEY?: unknown;
   MAESTRO_PERPLEXITY_API_KEY?: unknown;
-  GEMINI_API_KEY?: unknown;
   VERTEX_SA_KEY?: unknown;
   VERTEX_PROJECT?: unknown;
   VERTEX_LOCATION?: unknown;
@@ -284,11 +282,9 @@ type ResolvedAdminMotorEnv = {
   MAESTRO_OPENAI_API_KEY?: string;
   MAESTRO_SECRET_STORE_ID?: string;
   MAESTRO_ANTHROPIC_API_KEY?: string;
-  MAESTRO_GEMINI_API_KEY?: string;
   MAESTRO_DEEPSEEK_API_KEY?: string;
   MAESTRO_GROK_API_KEY?: string;
   MAESTRO_PERPLEXITY_API_KEY?: string;
-  GEMINI_API_KEY?: string;
   VERTEX_SA_KEY?: string;
   VERTEX_PROJECT?: string;
   VERTEX_LOCATION?: string;
@@ -382,11 +378,9 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   MAESTRO_OPENAI_API_KEY: await readSecretString(env.MAESTRO_OPENAI_API_KEY),
   MAESTRO_SECRET_STORE_ID: await readSecretString(env.MAESTRO_SECRET_STORE_ID),
   MAESTRO_ANTHROPIC_API_KEY: await readSecretString(env.MAESTRO_ANTHROPIC_API_KEY),
-  MAESTRO_GEMINI_API_KEY: await readSecretString(env.MAESTRO_GEMINI_API_KEY),
   MAESTRO_DEEPSEEK_API_KEY: await readSecretString(env.MAESTRO_DEEPSEEK_API_KEY),
   MAESTRO_GROK_API_KEY: await readSecretString(env.MAESTRO_GROK_API_KEY),
   MAESTRO_PERPLEXITY_API_KEY: await readSecretString(env.MAESTRO_PERPLEXITY_API_KEY),
-  GEMINI_API_KEY: await readSecretString(env.GEMINI_API_KEY),
   VERTEX_SA_KEY: await readSecretString(env.VERTEX_SA_KEY),
   VERTEX_PROJECT: await readSecretString(env.VERTEX_PROJECT),
   VERTEX_LOCATION: await readSecretString(env.VERTEX_LOCATION),
