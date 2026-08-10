@@ -109,7 +109,11 @@ describe('POST /api/mainsite/gemini-import (Vertex)', () => {
     expect(gen.config.responseSchema?.type).toBe('OBJECT');
     expect(gen.config.responseSchema?.required).toEqual(['title', 'markdown']);
     expect(gen.config.temperature).toBe(0.1);
-    expect(gen.config.httpOptions?.timeout).toBe(80_000);
+    // O prazo é o que resta do orçamento do request (95s): a busca via Jina
+    // divide o mesmo relógio, então a geração nunca leva 80s fixos por cima.
+    const genTimeout = gen.config.httpOptions?.timeout ?? 0;
+    expect(genTimeout).toBeGreaterThan(0);
+    expect(genTimeout).toBeLessThanOrEqual(95_000);
     expect(gen.config.systemInstruction).toContain('FIDELIDADE');
   });
 

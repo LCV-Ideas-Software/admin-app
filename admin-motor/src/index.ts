@@ -6,7 +6,7 @@ import { handleAstrologoEnviarEmailPost } from './handlers/astrologoEmail';
 import { handleCfdnsZonesGet } from './handlers/cfdnsZones';
 import { handleCleanupDeploymentsGet, handleCleanupDeploymentsPost } from './handlers/cfpwCleanup';
 import { handleOraculoCronGet, handleOraculoCronPut } from './handlers/oraculoCron';
-import { handleOraculoModelosGet } from './handlers/oraculoModelos';
+import { handleOraculoModelosGet, isGlobalOnlyModelId } from './handlers/oraculoModelos';
 import { resolveAdminBearerToken, validatePutAuth } from './handlers/routes/_lib/auth';
 import {
   onRequestGet as handleAdminhubConfigGet,
@@ -413,11 +413,9 @@ const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMo
     throw new Error('VERTEX_SA_KEY não configurada.');
   }
 
-  const ai = new VertexGenAI({
-    saKeyJson,
-    project: env.VERTEX_PROJECT,
-    location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
-  });
+  const location = env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION;
+  const regional = location !== DEFAULT_VERTEX_LOCATION;
+  const ai = new VertexGenAI({ saKeyJson, project: env.VERTEX_PROJECT, location });
 
   const allModels = new Map<string, ModelOption>();
 
@@ -431,6 +429,9 @@ const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMo
     const isFlashOrPro = lower.includes('flash') || lower.includes('pro');
     const isGemini = lower.startsWith('gemini');
     if (!isGemini || !isFlashOrPro) continue;
+    // O modelo escolhido aqui é persistido e depois chamado na location
+    // configurada: numa região, preview/exp do catálogo global dariam 404.
+    if (regional && isGlobalOnlyModelId(id)) continue;
 
     const hasVision = lower.includes('vision') || lower.includes('pro') || lower.includes('flash');
 

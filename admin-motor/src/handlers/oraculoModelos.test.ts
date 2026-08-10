@@ -90,6 +90,19 @@ describe('handleOraculoModelosGet (catálogo via Vertex)', () => {
     });
   });
 
+  it('com location regional omite modelos preview/exp, que só existem no endpoint global', async () => {
+    runtime.listModels = [
+      { name: 'publishers/google/models/gemini-3.1-pro-preview' },
+      { name: 'publishers/google/models/gemini-2.0-flash-exp' },
+      { name: 'publishers/google/models/gemini-2.5-flash' },
+      { name: 'publishers/google/models/gemini-2.5-pro' },
+    ];
+    const res = await handleOraculoModelosGet(context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us-central1' }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { models: ModelPayload[]; total: number };
+    expect(body.models.map((m) => m.id)).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash']);
+  });
+
   it('retorna 500 com a mensagem do erro quando a listagem falha', async () => {
     runtime.listError = new runtime.MockVertexHttpError(
       'Vertex listModels falhou (HTTP 403): sem permissão',

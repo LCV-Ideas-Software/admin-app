@@ -679,6 +679,42 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
     expect(mock.calls[0]).toMatch(/^https:\/\/aiplatform\.googleapis\.com\/v1beta1\//u);
   });
 
+  it('o orçamento do catálogo cobre a mint: uma mint pendurada estoura antes de pedir a primeira página', async () => {
+    const sa = await makeTestSa('kid-list-budget');
+    const paginas: string[] = [];
+    let liberar: () => void = () => {};
+    const mintPendurada = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const fetchImpl = (async (url: string | URL) => {
+      if (String(url).includes('oauth2.test.invalid')) {
+        await mintPendurada;
+        return jsonResponse(200, { access_token: 'tok-1', expires_in: 3600 });
+      }
+      paginas.push(String(url));
+      return jsonResponse(200, { publisherModels: [] });
+    }) as unknown as typeof fetch;
+
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl });
+    const emitidos: PublisherModelSummary[] = [];
+    const erro = await (async () => {
+      try {
+        for await (const model of ai.models.list({ config: { httpOptions: { timeout: 60 } } })) {
+          emitidos.push(model);
+        }
+        return null;
+      } catch (err) {
+        return err;
+      }
+    })();
+    expect(emitidos).toHaveLength(0);
+
+    expect(erro).toBeInstanceOf(Error);
+    expect((erro as Error).message).toContain('orçamento');
+    expect(paginas).toHaveLength(0);
+    liberar();
+  });
+
   it('falha HTTP vira VertexHttpError com operation listModels', async () => {
     const sa = await makeTestSa('kid-list-err');
     const mock = listFetch([{}], 403);

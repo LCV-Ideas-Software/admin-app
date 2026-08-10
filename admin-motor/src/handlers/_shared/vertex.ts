@@ -371,9 +371,21 @@ export class VertexGenAI {
 
   private async *listModels(args: ListModelsArgs): AsyncGenerator<PublisherModelSummary, void, undefined> {
     const sa = parseServiceAccountKey(this.options.saKeyJson);
-    const token = await getAccessToken(sa, this.fetchImpl, this.now);
-    const pageSize = args.config?.pageSize;
     const timeoutMs = args.config?.httpOptions?.timeout;
+    // Mesmo contrato do request(): o timeout é orçamento da listagem inteira,
+    // mint incluída — senão uma mint fria consumiria o teto do caller (15s no
+    // Maestro) e ainda somaria o prazo próprio de cada página.
+    const hasBudget = Number.isFinite(timeoutMs) && Number(timeoutMs) > 0;
+    const budgetMs = hasBudget ? Number(timeoutMs) : 0;
+    const startedAt = this.now();
+    const remainingMs = () => budgetMs - (this.now() - startedAt);
+    const token = await getAccessToken(
+      sa,
+      this.fetchImpl,
+      this.now,
+      hasBudget ? { ms: budgetMs, operation: 'listModels' } : undefined,
+    );
+    const pageSize = args.config?.pageSize;
     let pageToken: string | undefined;
     do {
       const params = new URLSearchParams();
@@ -381,11 +393,13 @@ export class VertexGenAI {
       if (pageToken) params.set('pageToken', pageToken);
       const qs = params.toString();
       const url = `${LIST_MODELS_BASE_URL}${qs ? `?${qs}` : ''}`;
-      // O timeout vale por página: um catálogo que aceita a conexão e nunca
-      // responde travaria o caller (rota de catálogo ou resolução de modelo).
+      const pageBudget = hasBudget ? remainingMs() : 0;
+      if (hasBudget && pageBudget <= 0) {
+        throw new Error(`Vertex listModels: orçamento de ${budgetMs}ms esgotado antes de pedir a próxima página.`);
+      }
       const res = await this.fetchImpl(url, {
         headers: { Authorization: `Bearer ${token}` },
-        ...(timeoutMs !== undefined ? { signal: AbortSignal.timeout(Number(timeoutMs)) } : {}),
+        ...(hasBudget ? { signal: AbortSignal.timeout(pageBudget) } : {}),
       });
       if (!res.ok) {
         const detail = (await res.text()).slice(0, ERROR_BODY_EXCERPT);

@@ -75,6 +75,12 @@ const JINA_BASE_URL = 'https://r.jina.ai/';
 // Reservamos 15s para Gemini API + overhead → 85s de budget para Jina.
 const JINA_TOTAL_BUDGET_MS = 85_000;
 
+// ── Orçamento do request inteiro
+// O proxy do Pages devolve 524 além de ~100s. Jina e geração dividem o mesmo
+// relógio: o que a busca consumir sai do que resta para a IA, e as tentativas
+// de geração nunca podem, somadas, empurrar o request além desse teto.
+const REQUEST_TOTAL_BUDGET_MS = 95_000;
+
 // ── Timeouts ideais para browser-only
 // browser engine renderiza via Chromium headless (~15-25s para SPAs como Gemini)
 const JINA_IDEAL_SERVER_S = 45; // X-Timeout para Jina server
@@ -352,6 +358,7 @@ async function handleGeminiImport(
     });
   }
 
+  const requestDeadlineAt = Date.now() + REQUEST_TOTAL_BUDGET_MS;
   const activeModel = await resolveModel(env?.BIGDATA_DB);
 
   const _telemetryStart = Date.now();
@@ -377,6 +384,12 @@ Regras:
     });
 
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
+      // O que a Jina consumiu já saiu do relógio: cada tentativa recebe apenas
+      // o que ainda cabe antes do 524, nunca 80s fixos.
+      const generateTimeout = requestDeadlineAt - Date.now();
+      if (generateTimeout <= 0) {
+        throw new Error('Tempo do request esgotado após a busca da página; a extração não foi tentada.');
+      }
       try {
         const response = await ai.models.generateContent({
           model: activeModel,
@@ -393,7 +406,7 @@ Regras:
               },
               required: ['title', 'markdown'],
             },
-            httpOptions: { timeout: 80_000 },
+            httpOptions: { timeout: generateTimeout },
           },
         });
 

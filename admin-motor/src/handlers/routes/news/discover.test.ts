@@ -86,9 +86,11 @@ describe('GET /api/news/discover (camada Vertex opcional)', () => {
       config?: { httpOptions?: { timeout?: number } };
     };
     expect(gen.model).toBe('gemini-2.5-flash');
-    // A camada descarta o resultado após 6s; abortar a requisição no mesmo
-    // prazo evita deixá-la pendurada no isolate depois de já ser inútil.
-    expect(gen.config?.httpOptions?.timeout).toBe(6_000);
+    // A camada descarta o resultado após 6s; a requisição é abortada no mesmo
+    // instante-limite, descontado o que a resolução de modelo já consumiu.
+    const genTimeout = gen.config?.httpOptions?.timeout ?? 0;
+    expect(genTimeout).toBeGreaterThan(0);
+    expect(genTimeout).toBeLessThanOrEqual(6_000);
   });
 
   it('falha da IA é silenciosa: responde ok sem itens gemini-ai', async () => {

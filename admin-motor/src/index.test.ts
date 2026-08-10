@@ -93,6 +93,21 @@ describe('GET /api/mainsite/modelos e /api/calculadora/modelos (catálogo via Ve
     });
   });
 
+  it('com location regional omite modelos preview/exp (global-only) também aqui', async () => {
+    runtime.listModels = [
+      { name: 'publishers/google/models/gemini-3.1-pro-preview' },
+      { name: 'publishers/google/models/gemini-2.5-flash' },
+    ];
+    const res = await dispatch('/api/mainsite/modelos', {
+      ADMIN_BEARER_TOKEN: TOKEN,
+      VERTEX_SA_KEY: '{"sa":"x"}',
+      VERTEX_LOCATION: 'us-central1',
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { models: ModelPayload[] };
+    expect(body.models.map((m) => m.id)).toEqual(['gemini-2.5-flash']);
+  });
+
   it('serve o mesmo catálogo na rota calculadora', async () => {
     runtime.listModels = [{ name: 'publishers/google/models/gemini-2.5-flash' }];
     const res = await dispatch('/api/calculadora/modelos', {

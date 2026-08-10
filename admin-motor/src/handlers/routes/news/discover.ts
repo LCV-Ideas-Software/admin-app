@@ -1269,9 +1269,19 @@ function buildGoogleNewsSuggestion(query: string): RssSuggestion | null {
 // Layer 3: Gemini AI — descoberta inteligente de feeds
 // ══════════════════════════════════════════════════════════
 
-async function discoverWithGemini(query: string, env: Env, db?: D1Binding): Promise<RssSuggestion[]> {
+async function discoverWithGemini(
+  query: string,
+  env: Env,
+  db?: D1Binding,
+  /** Instante-limite absoluto da camada; tudo que sobrar dele é o que a IA tem. */
+  deadlineAt = Date.now() + AI_LAYER_BUDGET_MS,
+): Promise<RssSuggestion[]> {
   const _telStart = Date.now();
   const activeModel = await resolveModel(db);
+  // resolveModel consulta o D1 antes da IA: sem descontar esse tempo, o abort
+  // começaria a contar depois que a corrida do handler já tivesse terminado.
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) return [];
   const ai = new VertexGenAI({
     saKeyJson: env.VERTEX_SA_KEY ?? '',
     project: env.VERTEX_PROJECT,
@@ -1299,7 +1309,7 @@ REGRAS:
         temperature: 0.2,
         maxOutputTokens: 8192,
         responseMimeType: 'application/json',
-        httpOptions: { timeout: AI_LAYER_BUDGET_MS },
+        httpOptions: { timeout: remainingMs },
       },
     });
 
@@ -1549,8 +1559,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const saKeyJson = runtimeEnv.VERTEX_SA_KEY;
   if (saKeyJson && query.length >= 3) {
     try {
+      // Um único instante-limite governa a corrida e o abort da chamada.
+      const deadlineAt = Date.now() + AI_LAYER_BUDGET_MS;
       const geminiResults = await Promise.race([
-        discoverWithGemini(query, runtimeEnv, runtimeEnv.BIGDATA_DB as unknown as D1Binding),
+        discoverWithGemini(query, runtimeEnv, runtimeEnv.BIGDATA_DB as unknown as D1Binding, deadlineAt),
         new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), AI_LAYER_BUDGET_MS)),
       ]);
       addUnique(geminiResults);
