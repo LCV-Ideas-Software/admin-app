@@ -1,6 +1,6 @@
 import { toHeaders } from '../../../../../functions/api/_lib/mainsite-admin';
 import { VertexGenAI } from '../../_shared/vertex';
-import { isGlobalOnlyModelId } from '../../oraculoModelos';
+import { isGlobalOnlyModelId, VERTEX_CATALOG_PAGE_SIZE } from '../../oraculoModelos';
 import { formatBlockManifestForPrompt, validateRevisionContentLock } from './content-lock.ts';
 
 type D1Database = {
@@ -680,7 +680,16 @@ function publicSettings(env: MaestroAiEnv, row: MaestroSettingsRow) {
       key: agent,
       label: AGENT_LABELS[agent],
       secret_name: SECRET_NAMES[agent],
-      configured: Boolean(secretForAgent(env, agent)) || configuredSecrets[agent] === true,
+      // O flag persistido registra "alguém já gravou a chave por aqui". Para o
+      // gemini isso ficou obsoleto com a migração: linhas antigas trazem
+      // `gemini: true` de uma chave que nenhum código lê mais, e honrá-lo faria
+      // o painel anunciar a credencial nova como salva — e o frontend eleger o
+      // agente para uma sessão que falharia na primeira chamada. Aqui só vale o
+      // que existe em runtime.
+      configured:
+        agent === 'gemini'
+          ? Boolean(secretForAgent(env, agent))
+          : Boolean(secretForAgent(env, agent)) || configuredSecrets[agent] === true,
       runtime_ready: Boolean(secretForAgent(env, agent)),
       financially_ready: hasPositiveRates(rates[agent]),
       model: models[agent],
@@ -2398,7 +2407,7 @@ async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
   try {
     const ids: string[] = [];
     const catalog = vertexClient(env).models.list({
-      config: { pageSize: 1000, httpOptions: { timeout: VERTEX_CATALOG_TIMEOUT_MS } },
+      config: { pageSize: VERTEX_CATALOG_PAGE_SIZE, httpOptions: { timeout: VERTEX_CATALOG_TIMEOUT_MS } },
     });
     for await (const model of catalog) {
       const id = model.name?.split('/').pop();

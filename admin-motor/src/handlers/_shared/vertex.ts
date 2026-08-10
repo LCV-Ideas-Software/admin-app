@@ -100,6 +100,12 @@ interface ListModelsArgs {
 // Catálogo de publisher models: existe apenas no v1beta1 e apenas no host
 // global — o v1 e os hosts regionais respondem 404 (provado empiricamente).
 const LIST_MODELS_BASE_URL = 'https://aiplatform.googleapis.com/v1beta1/publishers/google/models';
+// Teto do endpoint, verificado contra a API em 2026-08-10: pageSize=1000 volta
+// HTTP 400 ("Page size should be non-negative and the maximum size is 300") e
+// derruba a rota de catálogo inteira; 300 responde 200. O cliente limita aqui
+// porque esse é um contrato da API, não uma preferência do caller — a
+// paginação por nextPageToken continua trazendo o catálogo completo.
+const LIST_MODELS_MAX_PAGE_SIZE = 300;
 
 /** Erro HTTP com status numérico e operação de origem preservados para o classificador de retry/fallback do caller. */
 export class VertexHttpError extends Error {
@@ -374,9 +380,13 @@ export class VertexGenAI {
     const timeoutMs = args.config?.httpOptions?.timeout;
     // Mesmo contrato do request(): o timeout é orçamento da listagem inteira,
     // mint incluída — senão uma mint fria consumiria o teto do caller (15s no
-    // Maestro) e ainda somaria o prazo próprio de cada página.
-    const hasBudget = Number.isFinite(timeoutMs) && Number(timeoutMs) > 0;
+    // Maestro) e ainda somaria o prazo próprio de cada página. Um valor <= 0
+    // significa prazo já esgotado, não ausência de prazo.
+    const hasBudget = timeoutMs !== undefined && Number.isFinite(timeoutMs);
     const budgetMs = hasBudget ? Number(timeoutMs) : 0;
+    if (hasBudget && budgetMs <= 0) {
+      throw new Error('Vertex listModels: orçamento de tempo já esgotado quando a listagem foi solicitada.');
+    }
     const startedAt = this.now();
     const remainingMs = () => budgetMs - (this.now() - startedAt);
     const token = await getAccessToken(
@@ -389,7 +399,7 @@ export class VertexGenAI {
     let pageToken: string | undefined;
     do {
       const params = new URLSearchParams();
-      if (pageSize !== undefined) params.set('pageSize', String(pageSize));
+      if (pageSize !== undefined) params.set('pageSize', String(Math.min(pageSize, LIST_MODELS_MAX_PAGE_SIZE)));
       if (pageToken) params.set('pageToken', pageToken);
       const qs = params.toString();
       const url = `${LIST_MODELS_BASE_URL}${qs ? `?${qs}` : ''}`;
@@ -423,8 +433,14 @@ export class VertexGenAI {
     // O timeout do caller é orçamento da chamada INTEIRA (mint + requisição):
     // com cache frio, gastar o orçamento na mint e ainda disparar a geração
     // deixaria trabalho faturável correndo depois do prazo do handler.
-    const hasBudget = Number.isFinite(timeoutMs) && Number(timeoutMs) > 0;
+    // Um timeout presente porém <= 0 significa prazo JÁ esgotado. Tratar isso
+    // como "sem orçamento" faria a chamada sair sem AbortSignal exatamente no
+    // caso em que ela não deveria sair.
+    const hasBudget = timeoutMs !== undefined && Number.isFinite(timeoutMs);
     const budgetMs = hasBudget ? Number(timeoutMs) : 0;
+    if (hasBudget && budgetMs <= 0) {
+      throw new Error(`Vertex ${verb}: orçamento de tempo já esgotado quando a chamada foi solicitada.`);
+    }
     const startedAt = this.now();
     const token = await getAccessToken(
       sa,

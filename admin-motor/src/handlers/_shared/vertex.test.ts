@@ -319,6 +319,22 @@ describe('montagem das requisições REST do Vertex', () => {
     liberar();
   });
 
+  it('timeout zero significa prazo esgotado, não ausência de prazo: não dispara a requisição', async () => {
+    const sa = await makeTestSa('kid-zero-budget');
+    const mock = makeFetchMock();
+    const ai = client(sa, mock);
+
+    const erro = await ai.models
+      .countTokens({ model: 'm', contents: 'oi', config: { httpOptions: { timeout: 0 } } })
+      .then(() => null)
+      .catch((err: unknown) => err);
+
+    expect(erro).toBeInstanceOf(Error);
+    expect((erro as Error).message).toContain('orçamento');
+    // Nada de sair sem AbortSignal depois do prazo: a chamada nem acontece.
+    expect(mock.calls.api).toHaveLength(0);
+  });
+
   it('normaliza array misto de parts (inlineData + string) em um único content de usuário', async () => {
     const sa = await makeTestSa('kid-multimodal');
     const mock = makeFetchMock();
@@ -588,6 +604,21 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
     return { fetchImpl, calls, inits };
   };
 
+  it('pageSize é limitado a 300, o máximo aceito pelo endpoint', async () => {
+    const sa = await makeTestSa('kid-pagesize');
+    const mock = listFetch([{ publisherModels: [] }]);
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: mock.fetchImpl });
+    const vistos: PublisherModelSummary[] = [];
+    for await (const model of ai.models.list({ config: { pageSize: 1000 } })) {
+      vistos.push(model);
+    }
+    // O endpoint responde 400 ("maximum size is 300") para valores maiores, o
+    // que derruba a rota de catálogo inteira. O cliente conhece esse contrato.
+    expect(mock.calls[0]).toContain('pageSize=300');
+    expect(mock.calls[0]).not.toContain('pageSize=1000');
+    expect(vistos).toHaveLength(0);
+  });
+
   it('sem timeout configurado não envia signal; com timeout, cada página vai com AbortSignal', async () => {
     const sa = await makeTestSa('kid-list-timeout');
     const semTimeout = listFetch([{ publisherModels: [] }]);
@@ -632,13 +663,13 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
       fetchImpl: mock.fetchImpl,
     });
     const names: string[] = [];
-    const pager = await ai.models.list({ config: { pageSize: 1000 } });
+    const pager = await ai.models.list({ config: { pageSize: 300 } });
     for await (const m of pager) {
       if (m.name) names.push(m.name);
     }
     expect(names).toEqual(['publishers/google/models/gemini-2.5-pro', 'publishers/google/models/gemini-2.5-flash']);
     expect(mock.calls).toHaveLength(1);
-    expect(mock.calls[0]).toBe('https://aiplatform.googleapis.com/v1beta1/publishers/google/models?pageSize=1000');
+    expect(mock.calls[0]).toBe('https://aiplatform.googleapis.com/v1beta1/publishers/google/models?pageSize=300');
   });
 
   it('pagina com pageToken até esgotar e agrega todas as páginas', async () => {

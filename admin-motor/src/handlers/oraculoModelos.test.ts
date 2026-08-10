@@ -86,7 +86,7 @@ describe('handleOraculoModelosGet (catálogo via Vertex)', () => {
     expect(body.models[1]?.displayName).toBe('Gemini 3.1 Pro (Preview)');
     expect(runtime.constructorOptions[0]?.saKeyJson).toBe('{"sa":"x"}');
     expect(runtime.listRequests[0]).toEqual({
-      config: { pageSize: 1000, httpOptions: { timeout: 20_000 } },
+      config: { pageSize: 300, httpOptions: { timeout: 20_000 } },
     });
   });
 
