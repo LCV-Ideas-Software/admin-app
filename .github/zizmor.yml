@@ -11,6 +11,7 @@ rules:
     disable: true
   dangerous-triggers:
     ignore:
-      # The workflow_run job consumes only trusted default-branch code and never
-      # checks out or downloads content from the triggering pull request.
+      # The workflow_run and pull_request_target jobs consume only the pinned
+      # central Action, validate live GitHub state, and never check out or
+      # execute pull-request content.
       - native-auto-merge.yml
