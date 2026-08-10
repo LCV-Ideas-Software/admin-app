@@ -21,13 +21,18 @@
   (sem abortar a mint, que é compartilhada) e a requisição recebe apenas o tempo
   restante, de modo que nada continue faturando depois do prazo do handler.
   Padrões: 20s em `countTokens`, 80s em `generateContent`, 20s no catálogo das
-  rotas de modelos e 15s na resolução de modelo do Maestro; em `generate-all` de
-  resumos, cada post recebe o que resta do teto de 40s do lote.
-- **Catálogo de publisher models** via `models.list` (paginado, com abort por
-  página): existe apenas no host global `v1beta1` (`publishers/google/models`),
-  enquanto a geração segue no `v1` regional/global. Com `VERTEX_LOCATION`
-  regional o Maestro não consulta esse catálogo, já que ele anuncia modelos
-  (previews) que a região pode não servir.
+  rotas de modelos e 15s na resolução de modelo do Maestro. Onde o handler já
+  tinha um prazo próprio, vale o instante-limite dele: `generate-all` de resumos
+  reparte o teto de 40s do lote entre os posts, a descoberta de feeds desconta o
+  tempo da consulta ao D1 dos seus 6s, e o import de conversas divide um único
+  orçamento de 95s entre a busca via Jina e as tentativas de extração.
+- **Catálogo de publisher models** via `models.list` (paginado, com o mesmo
+  orçamento cobrindo mint e páginas): existe apenas no host global `v1beta1`
+  (`publishers/google/models`), enquanto a geração segue no `v1`
+  regional/global. Com `VERTEX_LOCATION` regional, o Maestro não consulta o
+  catálogo e as rotas de modelos omitem ids preview/exp — verificado no projeto
+  `lcv-ideas-and-software` que `gemini-3.1-pro-preview` responde 200 em `global`
+  e 404 em `us-central1`, enquanto `gemini-2.5-pro` responde 200 nos dois.
 - **Safety settings e schema de saída em literais REST.** Os enums `HarmCategory`/
   `HarmBlockThreshold` do SDK dão lugar às strings equivalentes da API v1, e o
   `responseSchema` (OpenAPI) do import de conversas trafega no `generationConfig`.
