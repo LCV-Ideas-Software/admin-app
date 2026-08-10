@@ -2,7 +2,7 @@
 
 ## Supported status
 
-Latest supported source/release target: v02.15.18. The current `main` branch is
+Latest supported source/release target: v02.15.19. The current `main` branch is
 also supported for security fixes. This patch resolves the current
 Hono, `brace-expansion`, Undici and PostCSS findings in the root and TLS
 reporting toolchains while preserving scoped overrides for incompatible

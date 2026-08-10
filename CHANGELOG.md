@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [v02.15.19] - 2026-08-10
+
+### Fixed
+
+- **`pageSize` não finito cai no padrão do servidor.** `Math.trunc`, `Math.max` e
+  `Math.min` propagam `NaN`, então `models.list({ config: { pageSize: NaN } })`
+  serializava `pageSize=NaN` e o endpoint devolvia o mesmo HTTP 400 que a
+  normalização da v02.15.18 existe para evitar (achado do Copilot no PR #452).
+  Qualquer valor não finito passa a cair em `0` — o padrão do servidor, o mais
+  próximo de "não especificado". `Infinity` e `-Infinity` já eram tratados
+  corretamente pelo par `min`/`max`.
+
+### Added
+
+- Cobertura de regressão para a truncagem de frações documentada na v02.15.18
+  (`pageSize: 12.9` produz `pageSize=12`), que era contrato sem teste.
+
 ## [v02.15.18] - 2026-08-10
 
 ### Fixed

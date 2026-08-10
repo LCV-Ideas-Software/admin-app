@@ -587,6 +587,10 @@ describe('regressão workerd e erros diagnósticos', () => {
 });
 
 describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
+  /** Lê o valor exato de pageSize na URL. Comparar por substring deixaria
+   * passar truncagem removida (`pageSize=12.9` contém `pageSize=12`). */
+  const pageSizeParam = (url: string): string | null => new URL(url).searchParams.get('pageSize');
+
   const listFetch = (pages: Array<{ publisherModels?: unknown[]; nextPageToken?: string }>, status = 200) => {
     const calls: string[] = [];
     const inits: RequestInit[] = [];
@@ -614,8 +618,7 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
     }
     // O endpoint responde 400 ("maximum size is 300") para valores maiores, o
     // que derruba a rota de catálogo inteira. O cliente conhece esse contrato.
-    expect(mock.calls[0]).toContain('pageSize=300');
-    expect(mock.calls[0]).not.toContain('pageSize=1000');
+    expect(pageSizeParam(mock.calls[0] ?? '')).toBe('300');
     expect(vistos).toHaveLength(0);
   });
 
@@ -629,8 +632,33 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
     }
     // Verificado contra a API: -1 responde 400, 0 responde 200 (padrão do
     // servidor). O intervalo aceito é [0, 300] e o cliente preserva isso.
-    expect(mock.calls[0]).toContain('pageSize=0');
-    expect(mock.calls[0]).not.toContain('pageSize=-1');
+    expect(pageSizeParam(mock.calls[0] ?? '')).toBe('0');
+    expect(vistos).toHaveLength(0);
+  });
+
+  it('pageSize NaN não escapa na URL: vira 0, o padrão do servidor', async () => {
+    const sa = await makeTestSa('kid-pagesize-nan');
+    const mock = listFetch([{ publisherModels: [] }]);
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: mock.fetchImpl });
+    const vistos: PublisherModelSummary[] = [];
+    for await (const model of ai.models.list({ config: { pageSize: Number.NaN } })) {
+      vistos.push(model);
+    }
+    // Math.trunc/min/max propagam NaN; sem tratamento, a URL sairia com
+    // `pageSize=NaN` e o endpoint devolveria o mesmo 400 que o clamp evita.
+    expect(pageSizeParam(mock.calls[0] ?? '')).toBe('0');
+    expect(vistos).toHaveLength(0);
+  });
+
+  it('pageSize fracionário é truncado (contrato documentado do clamp)', async () => {
+    const sa = await makeTestSa('kid-pagesize-frac');
+    const mock = listFetch([{ publisherModels: [] }]);
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: mock.fetchImpl });
+    const vistos: PublisherModelSummary[] = [];
+    for await (const model of ai.models.list({ config: { pageSize: 12.9 } })) {
+      vistos.push(model);
+    }
+    expect(pageSizeParam(mock.calls[0] ?? '')).toBe('12');
     expect(vistos).toHaveLength(0);
   });
 
