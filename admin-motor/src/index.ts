@@ -421,7 +421,7 @@ const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMo
 
   const allModels = new Map<string, ModelOption>();
 
-  const pager = await ai.models.list({ config: { pageSize: 1000 } });
+  const pager = await ai.models.list({ config: { pageSize: 1000, httpOptions: { timeout: 20_000 } } });
   for await (const m of pager) {
     if (!m.name) continue;
 

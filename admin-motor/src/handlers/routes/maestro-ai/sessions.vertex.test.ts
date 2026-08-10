@@ -99,6 +99,11 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
 
     expect(runtime.constructorOptions.every((o) => o.saKeyJson === '{"sa":"x"}')).toBe(true);
     expect(runtime.listRequests).toHaveLength(1);
+    // O catálogo precisa de prazo próprio: ele roda antes da geração e um
+    // catálogo travado impediria o health check de chegar à chamada.
+    expect(runtime.listRequests[0]).toEqual({
+      config: { pageSize: 1000, httpOptions: { timeout: 15_000 } },
+    });
     const gen = runtime.generateRequests[0] as {
       model: string;
       config: { temperature: number; topP: number; maxOutputTokens: number; httpOptions?: { timeout?: number } };

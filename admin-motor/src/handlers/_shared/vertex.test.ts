@@ -544,18 +544,47 @@ describe('regressão workerd e erros diagnósticos', () => {
 describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
   const listFetch = (pages: Array<{ publisherModels?: unknown[]; nextPageToken?: string }>, status = 200) => {
     const calls: string[] = [];
+    const inits: RequestInit[] = [];
     let page = 0;
-    const fetchImpl = (async (url: string | URL) => {
+    const fetchImpl = (async (url: string | URL, init: RequestInit) => {
       if (String(url).includes('oauth2.test.invalid')) {
         return jsonResponse(200, { access_token: 'tok-1', expires_in: 3600 });
       }
       calls.push(String(url));
+      inits.push(init);
       const payload = pages[Math.min(page, pages.length - 1)] ?? {};
       page += 1;
       return jsonResponse(status, status === 200 ? payload : { error: { code: status, message: 'boom' } });
     }) as unknown as typeof fetch;
-    return { fetchImpl, calls };
+    return { fetchImpl, calls, inits };
   };
+
+  it('sem timeout configurado não envia signal; com timeout, cada página vai com AbortSignal', async () => {
+    const sa = await makeTestSa('kid-list-timeout');
+    const semTimeout = listFetch([{ publisherModels: [] }]);
+    const semLimite = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: semTimeout.fetchImpl });
+    const semLimiteVistos: PublisherModelSummary[] = [];
+    for await (const model of semLimite.models.list()) {
+      semLimiteVistos.push(model);
+    }
+    expect(semLimiteVistos).toHaveLength(0);
+    expect(semTimeout.inits[0]?.signal).toBeUndefined();
+
+    const comTimeout = listFetch([
+      { publisherModels: [{ name: 'publishers/google/models/a' }], nextPageToken: 'tok-2' },
+      { publisherModels: [{ name: 'publishers/google/models/b' }] },
+    ]);
+    const comLimite = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: comTimeout.fetchImpl });
+    const comLimiteVistos: PublisherModelSummary[] = [];
+    for await (const model of comLimite.models.list({ config: { pageSize: 10, httpOptions: { timeout: 15_000 } } })) {
+      comLimiteVistos.push(model);
+    }
+    expect(comLimiteVistos).toHaveLength(2);
+    expect(comTimeout.calls).toHaveLength(2);
+    for (const init of comTimeout.inits) {
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
 
   it('monta a URL v1beta1 global sem projeto no path, com bearer token, e itera os publisherModels', async () => {
     const sa = await makeTestSa('kid-list');

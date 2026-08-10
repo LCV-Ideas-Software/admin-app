@@ -535,7 +535,9 @@ export function MaestroAiModule() {
     setSavingSettings(true);
     try {
       const api_keys = Object.fromEntries(
-        AGENTS.map((agent) => [agent.key, apiKeys[agent.key].trim()]).filter(([, value]) => Boolean(value)),
+        AGENTS.filter((agent) => agent.key !== 'gemini')
+          .map((agent) => [agent.key, apiKeys[agent.key].trim()])
+          .filter(([, value]) => Boolean(value)),
       );
       const data = await readJson<{ ok: true; settings: MaestroSettings }>(
         await fetch('/api/maestro-ai/settings', {
@@ -1206,6 +1208,11 @@ export function MaestroAiModule() {
               <div style={{ display: 'grid', gap: 10 }}>
                 {AGENTS.map((agent) => {
                   const saved = settings?.agents.find((item) => item.key === agent.key);
+                  // O Gemini roda no Vertex AI: a credencial é a service account
+                  // compartilhada da frota, provisionada na infraestrutura. Editá-la
+                  // aqui rotacionaria a chave dos demais apps, então o campo fica
+                  // apenas informativo.
+                  const infraManaged = agent.key === 'gemini';
                   return (
                     <div
                       key={agent.key}
@@ -1215,12 +1222,15 @@ export function MaestroAiModule() {
                       <strong>{agent.label}</strong>
                       <input
                         type="password"
-                        value={apiKeys[agent.key]}
+                        value={infraManaged ? '' : apiKeys[agent.key]}
                         onChange={(event) => setApiKeys((current) => ({ ...current, [agent.key]: event.target.value }))}
+                        disabled={infraManaged}
                         placeholder={
-                          saved?.configured
-                            ? 'Chave já configurada; preencha apenas para substituir'
-                            : 'Informe a chave'
+                          infraManaged
+                            ? `Credencial de infraestrutura (${saved?.secret_name ?? 'VERTEX_SA_KEY'}): service account do Vertex AI, compartilhada pela frota`
+                            : saved?.configured
+                              ? 'Chave já configurada; preencha apenas para substituir'
+                              : 'Informe a chave'
                         }
                         autoComplete="off"
                       />

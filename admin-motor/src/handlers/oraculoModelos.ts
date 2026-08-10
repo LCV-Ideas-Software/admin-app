@@ -44,7 +44,7 @@ export const handleOraculoModelosGet = async (context: Context) => {
     });
     const allModels = new Map<string, { id: string; displayName: string; api: string; vision: boolean }>();
 
-    const pager = await ai.models.list({ config: { pageSize: 1000 } });
+    const pager = await ai.models.list({ config: { pageSize: 1000, httpOptions: { timeout: 20_000 } } });
     for await (const m of pager) {
       if (!m.name) continue;
       // Vertex retorna "publishers/google/models/<id>" (AI Studio retornava "models/<id>").

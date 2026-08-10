@@ -2371,6 +2371,9 @@ const MODEL_RESOLUTION: Partial<
 const VERTEX_GEMINI_CANDIDATES = ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'];
 const VERTEX_GEMINI_FALLBACK = 'gemini-2.5-pro';
 const DEFAULT_VERTEX_LOCATION = 'global';
+// Mesmo teto que o fetchWithTimeout dos demais providers usa no /models: a
+// resolução roda antes da geração e não pode consumir o prazo da sessão.
+const VERTEX_CATALOG_TIMEOUT_MS = 15_000;
 
 function vertexClient(env: MaestroAiEnv): VertexGenAI {
   return new VertexGenAI({
@@ -2385,7 +2388,10 @@ function vertexClient(env: MaestroAiEnv): VertexGenAI {
 async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
   try {
     const ids: string[] = [];
-    for await (const model of vertexClient(env).models.list({ config: { pageSize: 1000 } })) {
+    const catalog = vertexClient(env).models.list({
+      config: { pageSize: 1000, httpOptions: { timeout: VERTEX_CATALOG_TIMEOUT_MS } },
+    });
+    for await (const model of catalog) {
       const id = model.name?.split('/').pop();
       if (id?.toLowerCase().startsWith('gemini')) ids.push(id);
     }

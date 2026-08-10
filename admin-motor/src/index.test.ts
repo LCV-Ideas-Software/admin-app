@@ -88,7 +88,9 @@ describe('GET /api/mainsite/modelos e /api/calculadora/modelos (catálogo via Ve
     expect(body.models.map((m) => m.id)).toEqual(['gemini-2.5-flash', 'gemini-3.1-pro-preview']);
     expect(body.models[0]?.api).toBe('vertex');
     expect(runtime.constructorOptions[0]?.saKeyJson).toBe('{"sa":"x"}');
-    expect(runtime.listRequests[0]).toEqual({ config: { pageSize: 1000 } });
+    expect(runtime.listRequests[0]).toEqual({
+      config: { pageSize: 1000, httpOptions: { timeout: 20_000 } },
+    });
   });
 
   it('serve o mesmo catálogo na rota calculadora', async () => {

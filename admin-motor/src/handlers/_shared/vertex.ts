@@ -94,7 +94,7 @@ export interface PublisherModelSummary {
 }
 
 interface ListModelsArgs {
-  config?: { pageSize?: number };
+  config?: { pageSize?: number; httpOptions?: HttpOptions };
 }
 
 // Catálogo de publisher models: existe apenas no v1beta1 e apenas no host
@@ -347,6 +347,7 @@ export class VertexGenAI {
     const sa = parseServiceAccountKey(this.options.saKeyJson);
     const token = await getAccessToken(sa, this.fetchImpl, this.now);
     const pageSize = args.config?.pageSize;
+    const timeoutMs = args.config?.httpOptions?.timeout;
     let pageToken: string | undefined;
     do {
       const params = new URLSearchParams();
@@ -354,8 +355,11 @@ export class VertexGenAI {
       if (pageToken) params.set('pageToken', pageToken);
       const qs = params.toString();
       const url = `${LIST_MODELS_BASE_URL}${qs ? `?${qs}` : ''}`;
+      // O timeout vale por página: um catálogo que aceita a conexão e nunca
+      // responde travaria o caller (rota de catálogo ou resolução de modelo).
       const res = await this.fetchImpl(url, {
         headers: { Authorization: `Bearer ${token}` },
+        ...(timeoutMs !== undefined ? { signal: AbortSignal.timeout(Number(timeoutMs)) } : {}),
       });
       if (!res.ok) {
         const detail = (await res.text()).slice(0, ERROR_BODY_EXCERPT);
