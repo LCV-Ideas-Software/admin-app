@@ -1,7 +1,7 @@
 {
   "name": "admin-app",
   "private": true,
-  "version": "2.15.15",
+  "version": "2.15.16",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,7 +25,6 @@
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.5",
-    "@google/genai": "^2.15.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@tanstack/react-query": "^5.101.4",
     "@tiptap/core": "^3.29.2",
@@ -136,7 +135,6 @@
     "@xmldom/xmldom": "^0.9.10",
     "ws": "8.21.0",
     "esbuild": "0.28.1",
-    "protobufjs": "7.6.5",
     "@babel/core": "7.29.6",
     "linkify-it": "5.0.2",
     "sharp": "0.35.3"

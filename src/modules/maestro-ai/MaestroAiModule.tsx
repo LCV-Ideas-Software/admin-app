@@ -535,7 +535,9 @@ export function MaestroAiModule() {
     setSavingSettings(true);
     try {
       const api_keys = Object.fromEntries(
-        AGENTS.map((agent) => [agent.key, apiKeys[agent.key].trim()]).filter(([, value]) => Boolean(value)),
+        AGENTS.filter((agent) => agent.key !== 'gemini')
+          .map((agent) => [agent.key, apiKeys[agent.key].trim()])
+          .filter(([, value]) => Boolean(value)),
       );
       const data = await readJson<{ ok: true; settings: MaestroSettings }>(
         await fetch('/api/maestro-ai/settings', {
@@ -1206,6 +1208,12 @@ export function MaestroAiModule() {
               <div style={{ display: 'grid', gap: 10 }}>
                 {AGENTS.map((agent) => {
                   const saved = settings?.agents.find((item) => item.key === agent.key);
+                  // O Gemini roda no Vertex AI: a credencial é a service account
+                  // compartilhada da frota, provisionada na infraestrutura. Editá-la
+                  // aqui rotacionaria a chave dos demais apps, então o campo fica
+                  // apenas informativo.
+                  const infraManaged = agent.key === 'gemini';
+                  const infraNoteId = `maestro-key-note-${agent.key}`;
                   return (
                     <div
                       key={agent.key}
@@ -1215,18 +1223,29 @@ export function MaestroAiModule() {
                       <strong>{agent.label}</strong>
                       <input
                         type="password"
-                        value={apiKeys[agent.key]}
+                        value={infraManaged ? '' : apiKeys[agent.key]}
                         onChange={(event) => setApiKeys((current) => ({ ...current, [agent.key]: event.target.value }))}
+                        disabled={infraManaged}
+                        {...(infraManaged ? { 'aria-describedby': infraNoteId } : {})}
                         placeholder={
-                          saved?.configured
-                            ? 'Chave já configurada; preencha apenas para substituir'
-                            : 'Informe a chave'
+                          infraManaged
+                            ? `Credencial de infraestrutura (${saved?.secret_name ?? 'VERTEX_SA_KEY'})`
+                            : saved?.configured
+                              ? 'Chave já configurada; preencha apenas para substituir'
+                              : 'Informe a chave'
                         }
                         autoComplete="off"
                       />
                       <span className="status-pill">
                         {saved?.runtime_ready ? 'ativa' : saved?.configured ? 'salva' : 'pendente'}
                       </span>
+                      {infraManaged ? (
+                        <p id={infraNoteId} style={{ gridColumn: '2 / -1', margin: 0, color: '#64748b', fontSize: 13 }}>
+                          Credencial de infraestrutura: a service account do Vertex AI (
+                          {saved?.secret_name ?? 'VERTEX_SA_KEY'}) é compartilhada por todos os apps da frota e
+                          provisionada fora deste painel.
+                        </p>
+                      ) : null}
                     </div>
                   );
                 })}

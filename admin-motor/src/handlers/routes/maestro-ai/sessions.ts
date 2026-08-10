@@ -1,5 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
 import { toHeaders } from '../../../../../functions/api/_lib/mainsite-admin';
+import { VertexGenAI } from '../../_shared/vertex';
+import { isGlobalOnlyModelId } from '../../oraculoModelos';
 import { formatBlockManifestForPrompt, validateRevisionContentLock } from './content-lock.ts';
 
 type D1Database = {
@@ -20,7 +21,9 @@ export type MaestroAiEnv = {
   MAESTRO_SECRET_STORE_ID?: string;
   MAESTRO_OPENAI_API_KEY?: string;
   MAESTRO_ANTHROPIC_API_KEY?: string;
-  MAESTRO_GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
   MAESTRO_DEEPSEEK_API_KEY?: string;
   MAESTRO_GROK_API_KEY?: string;
   MAESTRO_PERPLEXITY_API_KEY?: string;
@@ -282,7 +285,9 @@ const API_TEST_PROMPT = 'Reply with exactly: OK';
 const SECRET_NAMES: Record<ProviderKey, string> = {
   claude: 'MAESTRO_ANTHROPIC_API_KEY',
   codex: 'MAESTRO_OPENAI_API_KEY',
-  gemini: 'MAESTRO_GEMINI_API_KEY',
+  // Gemini migra para Vertex AI: o "secret" é a service account JSON
+  // compartilhada da frota (Secrets Store `vertex-sa-key`) — ver README.
+  gemini: 'VERTEX_SA_KEY',
   deepseek: 'MAESTRO_DEEPSEEK_API_KEY',
   grok: 'MAESTRO_GROK_API_KEY',
   perplexity: 'MAESTRO_PERPLEXITY_API_KEY',
@@ -833,7 +838,7 @@ function secretForAgent(env: MaestroAiEnv, agent: ProviderKey): string | undefin
       : agent === 'codex'
         ? env.MAESTRO_OPENAI_API_KEY
         : agent === 'gemini'
-          ? env.MAESTRO_GEMINI_API_KEY
+          ? env.VERTEX_SA_KEY
           : agent === 'deepseek'
             ? env.MAESTRO_DEEPSEEK_API_KEY
             : agent === 'grok'
@@ -2349,12 +2354,6 @@ const MODEL_RESOLUTION: Partial<
     ],
     fallback: 'claude-fable-5',
   },
-  gemini: {
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
-    auth: 'query-key',
-    candidates: ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'],
-    fallback: 'gemini-2.5-pro',
-  },
   deepseek: {
     endpoint: 'https://api.deepseek.com/models',
     auth: 'bearer',
@@ -2369,6 +2368,47 @@ const MODEL_RESOLUTION: Partial<
     fallback: 'grok-4.5',
   },
 };
+
+const VERTEX_GEMINI_CANDIDATES = ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'];
+const VERTEX_GEMINI_FALLBACK = 'gemini-2.5-pro';
+const DEFAULT_VERTEX_LOCATION = 'global';
+// Mesmo teto que o fetchWithTimeout dos demais providers usa no /models: a
+// resolução roda antes da geração e não pode consumir o prazo da sessão.
+const VERTEX_CATALOG_TIMEOUT_MS = 15_000;
+
+const vertexLocationIsRegional = (env: MaestroAiEnv): boolean =>
+  (env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION) !== DEFAULT_VERTEX_LOCATION;
+
+function vertexClient(env: MaestroAiEnv): VertexGenAI {
+  return new VertexGenAI({
+    saKeyJson: env.VERTEX_SA_KEY ?? '',
+    project: env.VERTEX_PROJECT,
+    location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+  });
+}
+
+/** Vertex publisher-model catalog (v1beta1 global) em vez do /models do AI
+ *  Studio; qualquer falha cai no default canônico, como nos demais providers. */
+async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
+  // O catálogo só existe no host global e lista modelos que podem não estar
+  // publicados numa região específica (os previews, por exemplo). Se a geração
+  // vai para uma região, escolher por esse catálogo produziria um modelo que
+  // depois falha com 404 — melhor ficar no default, que é regionalmente amplo.
+  if (vertexLocationIsRegional(env)) return VERTEX_GEMINI_FALLBACK;
+  try {
+    const ids: string[] = [];
+    const catalog = vertexClient(env).models.list({
+      config: { pageSize: 1000, httpOptions: { timeout: VERTEX_CATALOG_TIMEOUT_MS } },
+    });
+    for await (const model of catalog) {
+      const id = model.name?.split('/').pop();
+      if (id?.toLowerCase().startsWith('gemini')) ids.push(id);
+    }
+    return choosePreferredModel(ids, VERTEX_GEMINI_CANDIDATES, VERTEX_GEMINI_FALLBACK);
+  } catch {
+    return VERTEX_GEMINI_FALLBACK;
+  }
+}
 
 /** Port of choose_preferred_model: first candidate present in the live list;
  *  else the first live model; else the fallback. */
@@ -2428,11 +2468,19 @@ async function callProvider(
   // seeded default) wins; otherwise resolve live against the provider's
   // /models list (canonical), memoized per execution via options.modelCache.
   const configured = sanitizeText(models[agent], 120);
-  let model = configured && configured !== DEFAULT_MODELS[agent] ? configured : '';
+  // Uma escolha persistida vence a resolução ao vivo — mas o catálogo do Vertex
+  // é global e anuncia previews que uma região não serve. Sem esta checagem, um
+  // `gemini-3.1-pro-preview` salvo antes contornaria o fallback regional e toda
+  // chamada seguinte voltaria 404.
+  const configuredIsUnusableHere =
+    agent === 'gemini' && vertexLocationIsRegional(env) && isGlobalOnlyModelId(configured ?? '');
+  let model = configured && configured !== DEFAULT_MODELS[agent] && !configuredIsUnusableHere ? configured : '';
   if (!model) {
     model = options?.modelCache?.get(agent) ?? '';
     if (!model) {
-      model = await resolveProviderModel(agent, apiKey);
+      // Gemini resolve pelo catálogo do Vertex (v1beta1 global), que precisa da
+      // service account; os demais providers usam seu próprio /models.
+      model = agent === 'gemini' ? await resolveVertexModel(env) : await resolveProviderModel(agent, apiKey);
       options?.modelCache?.set(agent, model);
     }
   }
@@ -2442,15 +2490,16 @@ async function callProvider(
 
   const timeoutMs = options?.timeoutMs ?? PROVIDER_TIMEOUT_MS;
   if (agent === 'gemini') {
-    // Documented web deviation: the Gemini SDK exposes no Response/AbortSignal,
-    // so this path keeps the deadline-coupled timeout but has no 429 retry or
-    // in-flight abort (the cooperative cancel checks around the call cover it).
-    const ai = new GoogleGenAI({ apiKey });
+    // Documented web deviation: this Vertex path keeps the deadline-coupled
+    // timeout — repassado ao cliente para virar AbortSignal na requisição — mas
+    // não tem o retry de 429 dos providers HTTP (os checks de cancelamento
+    // cooperativo em volta da chamada cobrem a interrupção da sessão).
+    const ai = vertexClient(env);
     const response = await withTimeout(
       ai.models.generateContent({
         model,
         contents: `${system}\n\n${prompt}`,
-        config: { temperature: 0.2, topP: 0.9, maxOutputTokens },
+        config: { temperature: 0.2, topP: 0.9, maxOutputTokens, httpOptions: { timeout: timeoutMs } },
       }),
       timeoutMs,
       `${AGENT_LABELS[agent]} request`,
@@ -4325,6 +4374,20 @@ export async function handleMaestroAiSettingsPut(context: RequestContext): Promi
     const models = sanitizeModels(body.models ?? parseJson(current.models_json, DEFAULT_MODELS));
     const configuredSecrets = parseJson<Partial<Record<ProviderKey, boolean>>>(current.configured_secrets_json, {});
     const apiKeys = body.api_keys && typeof body.api_keys === 'object' ? body.api_keys : {};
+    // Validação ANTES de qualquer efeito colateral: rejeitar no meio do laço
+    // deixaria os secrets anteriores já rotacionados num request que responde
+    // 400. Gemini usa Vertex AI, cuja credencial é a service account JSON
+    // compartilhada pela frota, provisionada na infraestrutura.
+    if (typeof apiKeys.gemini === 'string' && apiKeys.gemini.trim()) {
+      return json(
+        {
+          ok: false,
+          error:
+            'Gemini usa Vertex AI: a credencial é a service account JSON compartilhada da frota (secret vertex-sa-key no Secrets Store, exposta pelo binding VERTEX_SA_KEY em admin-motor/wrangler.json) e não é gravável por este painel.',
+        },
+        400,
+      );
+    }
     for (const agent of PROVIDER_KEYS) {
       const value = apiKeys[agent];
       if (typeof value === 'string' && value.trim()) {

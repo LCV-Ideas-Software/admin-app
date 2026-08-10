@@ -1,18 +1,23 @@
-import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
+import { msUntil, PROXY_REQUEST_BUDGET_MS, stageBudget } from '../../_shared/deadlines';
+import { VertexGenAI } from '../../_shared/vertex';
 import { logAiUsage } from '../_lib/ai-telemetry';
 
 /**
  * gemini-import.ts — Cloudflare Pages Function
  * POST /api/mainsite/gemini-import
- * Fetches a Gemini share URL directly and utilizes Gemini SDK to cleanly parse its conversation.
+ * Fetches a Gemini share URL directly and uses Vertex AI (SA OAuth) to cleanly parse its conversation.
  */
 
 interface Env {
-  GEMINI_API_KEY: string;
+  VERTEX_SA_KEY: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
   JINA_API_KEY?: string;
   BIGDATA_DB?: D1Database;
 }
+
+const DEFAULT_VERTEX_LOCATION = 'global';
 
 interface PagesContext<E = Env> {
   request: Request;
@@ -66,10 +71,13 @@ async function resolveModel(db: D1Database | undefined): Promise<string> {
 //   entrega qualidade equivalente com metade da latência e zero 503s.
 const JINA_BASE_URL = 'https://r.jina.ai/';
 
-// ── Orçamento de tempo (deadline)
-// Cloudflare Pages proxy retorna 524 se a Pages Function demorar > 100s.
-// Reservamos 15s para Gemini API + overhead → 85s de budget para Jina.
-const JINA_TOTAL_BUDGET_MS = 85_000;
+// ── Orçamento do request inteiro
+// O proxy do Pages devolve 524 além de ~100s. Busca e geração dividem o mesmo
+// relógio: o que a Jina consumir sai do que resta para a IA, e nenhuma etapa
+// reinicia o teto. O instante-limite é fixado no início do handler.
+const REQUEST_TOTAL_BUDGET_MS = PROXY_REQUEST_BUDGET_MS;
+// Fatia máxima da busca; o que vale é sempre o menor entre ela e o restante.
+const JINA_STAGE_CEILING_MS = 85_000;
 
 // ── Timeouts ideais para browser-only
 // browser engine renderiza via Chromium headless (~15-25s para SPAs como Gemini)
@@ -96,13 +104,22 @@ const JINA_RETRY_BASE_DELAY_MS = 1_500;
  *  - Com API key: 500 RPM por key
  * Solução: JINA_API_KEY sempre presente via Cloudflare Secrets.
  */
-async function fetchSharePageContent(url: string, jinaApiKey?: string): Promise<string> {
-  const deadline = Date.now() + JINA_TOTAL_BUDGET_MS;
+async function fetchSharePageContent(
+  url: string,
+  jinaApiKey: string | undefined,
+  requestDeadlineAt: number,
+): Promise<string> {
+  // A busca não tem relógio próprio: ela recebe a menor fatia entre seu teto e
+  // o que resta do request, de modo que o tempo já gasto (resolveModel, por
+  // exemplo) saia do orçamento dela e sobre prazo para a extração por IA.
+  const stageMs = stageBudget(requestDeadlineAt, JINA_STAGE_CEILING_MS);
+  const deadline = Date.now() + stageMs;
 
   structuredLog('info', 'Jina fetch iniciado (browser-only)', {
     hasApiKey: Boolean(jinaApiKey && jinaApiKey.length > 0),
     url: url.substring(0, 80),
-    budgetMs: JINA_TOTAL_BUDGET_MS,
+    budgetMs: stageMs,
+    requestRemainingMs: msUntil(requestDeadlineAt),
   });
 
   // Headers base para browser-only (X-Timeout atualizado dinamicamente por tentativa)
@@ -120,7 +137,8 @@ async function fetchSharePageContent(url: string, jinaApiKey?: string): Promise<
 
     // ── Recalcula timeout DINAMICAMENTE a cada tentativa baseado no budget restante ──
     // (Fix: usar valor stale pre-loop causava overshoot do deadline de 100s do CF proxy → 524)
-    const remainingMs = deadline - Date.now();
+    // Duplo limite: o da etapa e o do request, o que vencer primeiro.
+    const remainingMs = Math.min(deadline - Date.now(), msUntil(requestDeadlineAt));
     const clientTimeoutMs = Math.min(JINA_IDEAL_CLIENT_MS, remainingMs - 2_000);
     const serverTimeoutS = Math.min(JINA_IDEAL_SERVER_S, Math.floor((clientTimeoutMs - 5_000) / 1000));
 
@@ -196,7 +214,7 @@ async function fetchSharePageContent(url: string, jinaApiKey?: string): Promise<
         attempt,
         url: url.substring(0, 80),
         contentLength: content.length,
-        elapsedMs: Date.now() - (deadline - JINA_TOTAL_BUDGET_MS),
+        elapsedMs: Date.now() - (deadline - stageMs),
       });
       return content;
     } catch (err) {
@@ -341,13 +359,14 @@ async function handleGeminiImport(
     );
   }
 
-  if (!env?.GEMINI_API_KEY) {
-    return new Response(JSON.stringify({ error: 'Falta variável GEMINI_API_KEY no deploy.' }), {
+  if (!env?.VERTEX_SA_KEY) {
+    return new Response(JSON.stringify({ error: 'Falta variável VERTEX_SA_KEY no deploy.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
+  const requestDeadlineAt = Date.now() + REQUEST_TOTAL_BUDGET_MS;
   const activeModel = await resolveModel(env?.BIGDATA_DB);
 
   const _telemetryStart = Date.now();
@@ -356,7 +375,7 @@ async function handleGeminiImport(
 
   try {
     // 1. Fetch page content as clean markdown via Jina Reader
-    const pageContent = await fetchSharePageContent(url, env?.JINA_API_KEY);
+    const pageContent = await fetchSharePageContent(url, env?.JINA_API_KEY, requestDeadlineAt);
 
     // 2. Prompt Gemini Flash to extract structured conversation from markdown
     const systemInstructionConfig = `Você é um sistema de extração inteligente. Analise o conteúdo markdown de uma página de compartilhamento do Gemini.
@@ -366,9 +385,19 @@ Regras:
 3. LIMPEZA: Descarte elementos de UI (Sign in, Settings, botões de menu).
 4. TÍTULO: Infira o título principal da conversa.`;
 
-    const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+    const ai = new VertexGenAI({
+      saKeyJson: env.VERTEX_SA_KEY,
+      project: env.VERTEX_PROJECT,
+      location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+    });
 
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
+      // O que a Jina consumiu já saiu do relógio: cada tentativa recebe apenas
+      // o que ainda cabe antes do 524, nunca 80s fixos.
+      const generateTimeout = msUntil(requestDeadlineAt);
+      if (generateTimeout <= 0) {
+        throw new Error('Tempo do request esgotado após a busca da página; a extração não foi tentada.');
+      }
       try {
         const response = await ai.models.generateContent({
           model: activeModel,
@@ -385,6 +414,7 @@ Regras:
               },
               required: ['title', 'markdown'],
             },
+            httpOptions: { timeout: generateTimeout },
           },
         });
 

@@ -1,12 +1,12 @@
-import { GoogleGenAI } from '@google/genai';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { toHeaders } from '../../functions/api/_lib/mainsite-admin';
+import { VertexGenAI } from './handlers/_shared/vertex';
 import { handleAstrologoEnviarEmailPost } from './handlers/astrologoEmail';
 import { handleCfdnsZonesGet } from './handlers/cfdnsZones';
 import { handleCleanupDeploymentsGet, handleCleanupDeploymentsPost } from './handlers/cfpwCleanup';
 import { handleOraculoCronGet, handleOraculoCronPut } from './handlers/oraculoCron';
-import { handleOraculoModelosGet } from './handlers/oraculoModelos';
+import { handleOraculoModelosGet, isGlobalOnlyModelId } from './handlers/oraculoModelos';
 import { resolveAdminBearerToken, validatePutAuth } from './handlers/routes/_lib/auth';
 import {
   onRequestGet as handleAdminhubConfigGet,
@@ -259,6 +259,9 @@ type AdminMotorEnv = {
   MAESTRO_GROK_API_KEY?: unknown;
   MAESTRO_PERPLEXITY_API_KEY?: unknown;
   GEMINI_API_KEY?: unknown;
+  VERTEX_SA_KEY?: unknown;
+  VERTEX_PROJECT?: unknown;
+  VERTEX_LOCATION?: unknown;
   CLOUDFLARE_PW?: unknown;
   CF_ACCOUNT_ID?: unknown;
   RESEND_API_KEY?: unknown;
@@ -286,6 +289,9 @@ type ResolvedAdminMotorEnv = {
   MAESTRO_GROK_API_KEY?: string;
   MAESTRO_PERPLEXITY_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
   CLOUDFLARE_PW?: string;
   CF_ACCOUNT_ID?: string;
   RESEND_API_KEY?: string;
@@ -381,6 +387,9 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   MAESTRO_GROK_API_KEY: await readSecretString(env.MAESTRO_GROK_API_KEY),
   MAESTRO_PERPLEXITY_API_KEY: await readSecretString(env.MAESTRO_PERPLEXITY_API_KEY),
   GEMINI_API_KEY: await readSecretString(env.GEMINI_API_KEY),
+  VERTEX_SA_KEY: await readSecretString(env.VERTEX_SA_KEY),
+  VERTEX_PROJECT: await readSecretString(env.VERTEX_PROJECT),
+  VERTEX_LOCATION: await readSecretString(env.VERTEX_LOCATION),
   CLOUDFLARE_PW: await readSecretString(env.CLOUDFLARE_PW),
   CF_ACCOUNT_ID: await readSecretString(env.CF_ACCOUNT_ID),
   RESEND_API_KEY: await readSecretString(env.RESEND_API_KEY),
@@ -396,25 +405,33 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   ADMIN_BEARER_TOKEN: await readSecretString(env.ADMIN_BEARER_TOKEN),
 });
 
+const DEFAULT_VERTEX_LOCATION = 'global';
+
 const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMotorEnv): Promise<ModelOption[]> => {
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY não configurada.');
+  const saKeyJson = env.VERTEX_SA_KEY;
+  if (!saKeyJson) {
+    throw new Error('VERTEX_SA_KEY não configurada.');
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const location = env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION;
+  const regional = location !== DEFAULT_VERTEX_LOCATION;
+  const ai = new VertexGenAI({ saKeyJson, project: env.VERTEX_PROJECT, location });
 
   const allModels = new Map<string, ModelOption>();
 
-  const pager = await ai.models.list({ config: { pageSize: 1000 } });
+  const pager = await ai.models.list({ config: { pageSize: 1000, httpOptions: { timeout: 20_000 } } });
   for await (const m of pager) {
     if (!m.name) continue;
 
-    const id = m.name.replace('models/', '');
+    // Vertex retorna "publishers/google/models/<id>" (AI Studio retornava "models/<id>").
+    const id = m.name.split('/').pop() ?? '';
     const lower = id.toLowerCase();
     const isFlashOrPro = lower.includes('flash') || lower.includes('pro');
     const isGemini = lower.startsWith('gemini');
     if (!isGemini || !isFlashOrPro) continue;
+    // O modelo escolhido aqui é persistido e depois chamado na location
+    // configurada: numa região, preview/exp do catálogo global dariam 404.
+    if (regional && isGlobalOnlyModelId(id)) continue;
 
     const hasVision = lower.includes('vision') || lower.includes('pro') || lower.includes('flash');
 
@@ -422,7 +439,7 @@ const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMo
       allModels.set(id, {
         id,
         displayName: m.displayName || formatModelName(id),
-        api: 'sdk',
+        api: 'vertex',
         vision: hasVision,
       });
     }

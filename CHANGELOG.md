@@ -2,6 +2,56 @@
 
 ## [Unreleased]
 
+## [v02.15.16] - 2026-08-09
+
+### Changed
+
+- **Migração Gemini AI Studio → Vertex AI (service account OAuth).** Todo consumo
+  de IA do `admin-motor` passa a autenticar por Service Account (JWT RS256 →
+  OAuth2, escopo `cloud-platform`) contra `aiplatform.googleapis.com`, sem API
+  key: catálogos de modelos (`/api/{oraculo,astrologo,mainsite,calculadora}/modelos`),
+  transformação de texto do editor MainSite, importação de conversas do Gemini
+  Share, resumos de post, camada opcional de descoberta de feeds e o provider
+  `gemini` do Maestro AI. Prompts, contratos de rota, códigos de status e
+  mensagens de negócio permanecem inalterados.
+- **Cliente Vertex compartilhado** (`admin-motor/src/handlers/_shared/vertex.ts`):
+  cache de token com margem de 300s, single-flight na mint e erros
+  `VertexHttpError` com status e operação de origem. O `httpOptions.timeout` é o
+  orçamento da **chamada inteira** — a espera pela mint OAuth é limitada por ele
+  (sem abortar a mint, que é compartilhada) e a requisição recebe apenas o tempo
+  restante, de modo que nada continue faturando depois do prazo do handler.
+  Padrões: 20s em `countTokens`, 80s em `generateContent`, 20s no catálogo das
+  rotas de modelos e 15s na resolução de modelo do Maestro. Onde o handler já
+  tinha um prazo próprio, vale o instante-limite dele: `generate-all` de resumos
+  reparte o teto de 40s do lote entre os posts, a descoberta de feeds desconta o
+  tempo da consulta ao D1 dos seus 6s, e o import de conversas divide um único
+  orçamento de 95s entre a busca via Jina e as tentativas de extração.
+- **Catálogo de publisher models** via `models.list` (paginado, com o mesmo
+  orçamento cobrindo mint e páginas): existe apenas no host global `v1beta1`
+  (`publishers/google/models`), enquanto a geração segue no `v1`
+  regional/global. Com `VERTEX_LOCATION` regional, o Maestro não consulta o
+  catálogo e as rotas de modelos omitem ids preview/exp — verificado no projeto
+  `lcv-ideas-and-software` que `gemini-3.1-pro-preview` responde 200 em `global`
+  e 404 em `us-central1`, enquanto `gemini-2.5-pro` responde 200 nos dois.
+- **Safety settings e schema de saída em literais REST.** Os enums `HarmCategory`/
+  `HarmBlockThreshold` do SDK dão lugar às strings equivalentes da API v1, e o
+  `responseSchema` (OpenAPI) do import de conversas trafega no `generationConfig`.
+- **Credencial do Gemini no Maestro AI.** O painel passa a exibir `VERTEX_SA_KEY`
+  como secret do provider, com o campo de chave desabilitado e uma nota visível
+  (associada por `aria-describedby`) explicando que a credencial é de
+  infraestrutura: a Service Account é compartilhada por toda a frota (secret
+  `vertex-sa-key` no Secrets Store, exposto pelo novo binding `VERTEX_SA_KEY` em
+  `admin-motor/wrangler.json`), e gravá-la pelo painel rotacionaria a credencial
+  dos demais apps. O backend rejeita a chave do Gemini **antes** de gravar
+  qualquer secret, mantendo a atualização atômica. `VERTEX_PROJECT` (default:
+  `project_id` da própria SA) e `VERTEX_LOCATION` (default: `global`) são
+  opcionais.
+
+### Removed
+
+- Dependência direta `@google/genai` e o override órfão de `protobufjs`, que só
+  existia para essa árvore.
+
 ## [v02.15.15] - 2026-08-03
 
 ### Changed

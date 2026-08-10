@@ -6,7 +6,8 @@
  * Usa D1 direto (BIGDATA_DB) — padrão admin-app.
  */
 
-import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from '@google/genai';
+import { PROXY_REQUEST_BUDGET_MS, stageBudget } from '../../_shared/deadlines';
+import { VertexGenAI } from '../../_shared/vertex';
 import { logAiUsage } from '../_lib/ai-telemetry';
 import { toHeaders } from '../_lib/mainsite-admin';
 import { logModuleOperationalEvent } from '../_lib/operational';
@@ -19,8 +20,16 @@ interface SummaryEnv {
   AI?: {
     run?: (model: string, payload: unknown, options?: unknown) => Promise<unknown>;
   };
-  GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
 }
+
+const DEFAULT_VERTEX_LOCATION = 'global';
+const COUNT_TOKENS_TIMEOUT_MS = 20_000;
+const GENERATE_TIMEOUT_MS = 80_000;
+// Teto do lote em generate-all: o proxy do Pages devolve 524 além disso.
+const BATCH_TIMEOUT_LIMIT_MS = 40_000;
 
 interface SummaryContext {
   request: Request;
@@ -63,18 +72,17 @@ function structuredLog(level: 'INFO' | 'WARN' | 'ERROR', message: string, contex
 
 const GEMINI_CONFIG = {
   model: 'gemini-2.5-flash',
-  apiVersion: 'v1beta',
   maxOutputTokens: 8192,
   temperature: 0.3,
 };
 
-// ── v1beta: Safety Settings (BLOCK_ONLY_HIGH) ──
+// ── Safety Settings como literais REST v1 (BLOCK_ONLY_HIGH) ──
 const SUMMARY_SAFETY_SETTINGS = [
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_ONLY_HIGH' },
 ];
 
 function stripHtml(html: string): string {
@@ -113,11 +121,17 @@ function extractJsonFromText(rawText: string): string {
   return str;
 }
 
-async function estimateTokenCount(ai: GoogleGenAI, prompt: string, model: string): Promise<number> {
+async function estimateTokenCount(
+  ai: VertexGenAI,
+  prompt: string,
+  model: string,
+  timeoutMs = COUNT_TOKENS_TIMEOUT_MS,
+): Promise<number> {
   try {
     const resp = await ai.models.countTokens({
       model,
       contents: prompt,
+      config: { httpOptions: { timeout: timeoutMs } },
     });
     return resp.totalTokens ?? -1;
   } catch (err) {
@@ -132,16 +146,24 @@ async function generateShareSummary(
   env: SummaryEnv,
   model: string,
   db?: D1Database,
+  /** Teto desta chamada: no generate-all é o que resta do lote; no post único
+   * é o orçamento do request. Em ambos os casos as tentativas dividem o mesmo
+   * relógio, senão dois retries de 80s já estouram o 524 do proxy. */
+  budgetMs: number = PROXY_REQUEST_BUDGET_MS,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const telStart = Date.now();
   const cleanContent = stripHtml(htmlContent);
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) {
-    structuredLog('ERROR', 'GEMINI_API_KEY não configurada');
-    return { error: 'GEMINI_API_KEY não configurada.' };
+  const saKeyJson = env.VERTEX_SA_KEY;
+  if (!saKeyJson) {
+    structuredLog('ERROR', 'VERTEX_SA_KEY não configurada');
+    return { error: 'VERTEX_SA_KEY não configurada.' };
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new VertexGenAI({
+    saKeyJson,
+    project: env.VERTEX_PROJECT,
+    location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+  });
   const targetModel = model || GEMINI_CONFIG.model;
 
   const systemPrompt = `Você é um editor especializado em SEO e compartilhamento social.
@@ -157,8 +179,12 @@ REGRAS:
   const userPrompt = `TÍTULO: ${title}\nCONTEÚDO: ${cleanContent}`;
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
+  const deadlineAt = telStart + budgetMs;
+  const countTimeout = stageBudget(deadlineAt, COUNT_TOKENS_TIMEOUT_MS);
+  if (countTimeout <= 0) return { error: 'Tempo do lote esgotado antes de processar este post.' };
+
   // 1. Validation de Contexto API e Pre-req Token Counting
-  const tokenCount = await estimateTokenCount(ai, fullPrompt, targetModel);
+  const tokenCount = await estimateTokenCount(ai, fullPrompt, targetModel, countTimeout);
   if (tokenCount > 120000) {
     structuredLog('ERROR', 'Conteúdo muito extenso para processar', { tokens: tokenCount });
     return { error: 'Dados muito extensos para geração do resumo.' };
@@ -171,6 +197,11 @@ REGRAS:
   let parsedResponse: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const generateTimeout = stageBudget(deadlineAt, GENERATE_TIMEOUT_MS);
+    if (generateTimeout <= 0) {
+      lastErrorMsg = 'Tempo do lote esgotado durante a geração.';
+      break;
+    }
     try {
       parsedResponse = await ai.models.generateContent({
         model: targetModel,
@@ -181,6 +212,7 @@ REGRAS:
           temperature: GEMINI_CONFIG.temperature,
           maxOutputTokens: GEMINI_CONFIG.maxOutputTokens,
           responseMimeType: 'application/json',
+          httpOptions: { timeout: generateTimeout },
         },
       });
       break;
@@ -430,7 +462,7 @@ export async function onRequestPost(context: SummaryContext) {
       const details: Array<{ postId: number; title: string; status: string }> = [];
       const resolvedModel = await resolveSummaryModel(db, body.model);
 
-      const TIMEOUT_LIMIT = 40000; // 40 seconds max to prevent 524 Timeout
+      const TIMEOUT_LIMIT = BATCH_TIMEOUT_LIMIT_MS;
       const startTime = Date.now();
 
       for (const post of allPosts) {
@@ -463,7 +495,17 @@ export async function onRequestPost(context: SummaryContext) {
         }
 
         try {
-          const result = await generateShareSummary(post.title, post.content, runtimeEnv, resolvedModel, db);
+          // O teto do lote é verificado entre posts; sem repassar o que resta,
+          // um único post poderia consumir 20s de contagem + 2x80s de geração
+          // e estourar justamente o 524 que essa proteção evita.
+          const result = await generateShareSummary(
+            post.title,
+            post.content,
+            runtimeEnv,
+            resolvedModel,
+            db,
+            Math.max(0, TIMEOUT_LIMIT - (Date.now() - startTime)),
+          );
           if ('error' in result) {
             failed++;
             details.push({ postId: post.id, title: post.title, status: result.error });

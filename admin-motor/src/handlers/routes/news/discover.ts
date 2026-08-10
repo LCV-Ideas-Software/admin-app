@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import { GoogleGenAI } from '@google/genai';
+import { VertexGenAI } from '../../_shared/vertex';
 
 /**
  * /api/news/discover — Pages Function
@@ -13,13 +13,21 @@ import { GoogleGenAI } from '@google/genai';
  * - q (string): Termo de busca
  * - field (name|url|category): Qual campo originou a busca
  *
- * A camada Gemini é opcional — funciona apenas se GEMINI_API_KEY estiver configurada.
+ * A camada de IA é opcional — funciona apenas se VERTEX_SA_KEY estiver configurada.
  */
 
 interface Env {
   BIGDATA_DB: D1Database;
-  GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
 }
+
+const DEFAULT_VERTEX_LOCATION = 'global';
+
+// Orçamento da camada de IA: passado o prazo, a sugestão deixa de ser útil para
+// a resposta. O mesmo valor aborta a requisição e corta a corrida no handler.
+const AI_LAYER_BUDGET_MS = 6_000;
 
 interface D1Binding {
   prepare(query: string): {
@@ -1261,10 +1269,24 @@ function buildGoogleNewsSuggestion(query: string): RssSuggestion | null {
 // Layer 3: Gemini AI — descoberta inteligente de feeds
 // ══════════════════════════════════════════════════════════
 
-async function discoverWithGemini(query: string, apiKey: string, db?: D1Binding): Promise<RssSuggestion[]> {
+async function discoverWithGemini(
+  query: string,
+  env: Env,
+  db?: D1Binding,
+  /** Instante-limite absoluto da camada; tudo que sobrar dele é o que a IA tem. */
+  deadlineAt = Date.now() + AI_LAYER_BUDGET_MS,
+): Promise<RssSuggestion[]> {
   const _telStart = Date.now();
   const activeModel = await resolveModel(db);
-  const ai = new GoogleGenAI({ apiKey });
+  // resolveModel consulta o D1 antes da IA: sem descontar esse tempo, o abort
+  // começaria a contar depois que a corrida do handler já tivesse terminado.
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) return [];
+  const ai = new VertexGenAI({
+    saKeyJson: env.VERTEX_SA_KEY ?? '',
+    project: env.VERTEX_PROJECT,
+    location: env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION,
+  });
   try {
     const prompt = `Você é um especialista em feeds RSS de notícias.
 O usuário está buscando fontes de notícias para o termo: "${query}"
@@ -1287,6 +1309,7 @@ REGRAS:
         temperature: 0.2,
         maxOutputTokens: 8192,
         responseMimeType: 'application/json',
+        httpOptions: { timeout: remainingMs },
       },
     });
 
@@ -1531,14 +1554,16 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     if (gnews) addUnique([gnews]);
   }
 
-  // Layer 3: Gemini AI (se API key disponível e query ≥3 chars)
+  // Layer 3: IA via Vertex (se service account disponível e query ≥3 chars)
   const runtimeEnv = (context as unknown as { data?: { env?: Env } }).data?.env || context.env;
-  const apiKey = runtimeEnv.GEMINI_API_KEY;
-  if (apiKey && query.length >= 3) {
+  const saKeyJson = runtimeEnv.VERTEX_SA_KEY;
+  if (saKeyJson && query.length >= 3) {
     try {
+      // Um único instante-limite governa a corrida e o abort da chamada.
+      const deadlineAt = Date.now() + AI_LAYER_BUDGET_MS;
       const geminiResults = await Promise.race([
-        discoverWithGemini(query, apiKey, runtimeEnv.BIGDATA_DB as unknown as D1Binding),
-        new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), 6000)),
+        discoverWithGemini(query, runtimeEnv, runtimeEnv.BIGDATA_DB as unknown as D1Binding, deadlineAt),
+        new Promise<RssSuggestion[]>((resolve) => setTimeout(() => resolve([]), AI_LAYER_BUDGET_MS)),
       ]);
       addUnique(geminiResults);
     } catch {
@@ -1555,7 +1580,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       layers: {
         curated: true,
         googleNews: !isUrl,
-        geminiAi: Boolean(apiKey),
+        geminiAi: Boolean(saKeyJson),
         autoDetect: field === 'url' && isUrl,
       },
     }),

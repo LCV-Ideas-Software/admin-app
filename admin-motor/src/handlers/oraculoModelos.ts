@@ -1,7 +1,18 @@
-import { GoogleGenAI } from '@google/genai';
+import { VertexGenAI } from './_shared/vertex';
+
+const DEFAULT_VERTEX_LOCATION = 'global';
+
+/** O catálogo só existe no host global e anuncia modelos que uma região pode
+ * não servir. Provado em 2026-08-09 no projeto lcv-ideas-and-software:
+ * `gemini-3.1-pro-preview` responde 200 em `global` e 404 em `us-central1`,
+ * enquanto `gemini-2.5-pro` responde 200 nos dois. Numa location regional,
+ * oferecer preview/exp na UI é oferecer uma escolha que falha na geração. */
+export const isGlobalOnlyModelId = (id: string): boolean => /preview|exp/i.test(id);
 
 type Env = {
-  GEMINI_API_KEY?: string;
+  VERTEX_SA_KEY?: string;
+  VERTEX_PROJECT?: string;
+  VERTEX_LOCATION?: string;
 };
 
 type Context = {
@@ -29,28 +40,33 @@ const formatModelName = (id: string): string => {
 
 export const handleOraculoModelosGet = async (context: Context) => {
   const { env } = context;
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY não configurada.' }, 500);
+  const saKeyJson = env.VERTEX_SA_KEY;
+  if (!saKeyJson) return json({ ok: false, error: 'VERTEX_SA_KEY não configurada.' }, 500);
+
+  const location = env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION;
+  const regional = location !== DEFAULT_VERTEX_LOCATION;
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new VertexGenAI({ saKeyJson, project: env.VERTEX_PROJECT, location });
     const allModels = new Map<string, { id: string; displayName: string; api: string; vision: boolean }>();
 
-    const pager = await ai.models.list({ config: { pageSize: 1000 } });
+    const pager = await ai.models.list({ config: { pageSize: 1000, httpOptions: { timeout: 20_000 } } });
     for await (const m of pager) {
       if (!m.name) continue;
-      const id = m.name.replace('models/', '');
+      // Vertex retorna "publishers/google/models/<id>" (AI Studio retornava "models/<id>").
+      const id = m.name.split('/').pop() ?? '';
       const lower = id.toLowerCase();
       const isFlashOrPro = lower.includes('flash') || lower.includes('pro');
       const isGemini = lower.startsWith('gemini');
       if (!isGemini || !isFlashOrPro) continue;
+      if (regional && isGlobalOnlyModelId(id)) continue;
 
       const hasVision = lower.includes('vision') || lower.includes('pro') || lower.includes('flash');
       if (!allModels.has(id)) {
         allModels.set(id, {
           id,
           displayName: m.displayName || formatModelName(id),
-          api: 'sdk',
+          api: 'vertex',
           vision: hasVision,
         });
       }
