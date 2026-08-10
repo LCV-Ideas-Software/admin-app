@@ -650,6 +650,30 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
     expect(vistos).toHaveLength(0);
   });
 
+  it('pageSize Infinity satura no teto; -Infinity cai no piso', async () => {
+    const sa = await makeTestSa('kid-pagesize-inf');
+
+    const positivo = listFetch([{ publisherModels: [] }]);
+    const aiPos = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: positivo.fetchImpl });
+    const emitidosPos: PublisherModelSummary[] = [];
+    for await (const model of aiPos.models.list({ config: { pageSize: Number.POSITIVE_INFINITY } })) {
+      emitidosPos.push(model);
+    }
+    expect(emitidosPos).toHaveLength(0);
+    // "o máximo possível" satura em 300; mandar 0 (padrão do servidor) reduziria
+    // a página e multiplicaria as requisições de catálogo em silêncio.
+    expect(pageSizeParam(positivo.calls[0] ?? '')).toBe('300');
+
+    const negativo = listFetch([{ publisherModels: [] }]);
+    const aiNeg = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: negativo.fetchImpl });
+    const emitidosNeg: PublisherModelSummary[] = [];
+    for await (const model of aiNeg.models.list({ config: { pageSize: Number.NEGATIVE_INFINITY } })) {
+      emitidosNeg.push(model);
+    }
+    expect(emitidosNeg).toHaveLength(0);
+    expect(pageSizeParam(negativo.calls[0] ?? '')).toBe('0');
+  });
+
   it('pageSize fracionário é truncado (contrato documentado do clamp)', async () => {
     const sa = await makeTestSa('kid-pagesize-frac');
     const mock = listFetch([{ publisherModels: [] }]);

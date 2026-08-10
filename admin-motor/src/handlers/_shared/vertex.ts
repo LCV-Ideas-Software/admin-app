@@ -108,14 +108,16 @@ const LIST_MODELS_BASE_URL = 'https://aiplatform.googleapis.com/v1beta1/publishe
 // nextPageToken continua trazendo o catálogo completo.
 const LIST_MODELS_MIN_PAGE_SIZE = 0;
 const LIST_MODELS_MAX_PAGE_SIZE = 300;
-// `number` também admite NaN e Infinity, e Math.trunc/min/max propagam NaN —
-// sem o guard, `pageSize=NaN` chegaria à URL e produziria o mesmo 400 que esta
-// normalização existe para evitar. Um valor não finito cai no padrão do
-// servidor (0), que é o comportamento mais próximo de "não especificado".
+// `number` também admite NaN, e Math.trunc/min/max o propagam — sem o guard,
+// `pageSize=NaN` chegaria à URL e produziria o mesmo 400 que esta normalização
+// existe para evitar. Só o NaN precisa de tratamento à parte: ele é o único
+// valor sem ordem definida. Os infinitos têm ordem e o par min/max já os
+// resolve corretamente — +Infinity satura no teto (é o pedido "o máximo
+// possível") e -Infinity cai no piso.
 const clampPageSize = (value: number): number =>
-  Number.isFinite(value)
-    ? Math.min(Math.max(Math.trunc(value), LIST_MODELS_MIN_PAGE_SIZE), LIST_MODELS_MAX_PAGE_SIZE)
-    : LIST_MODELS_MIN_PAGE_SIZE;
+  Number.isNaN(value)
+    ? LIST_MODELS_MIN_PAGE_SIZE
+    : Math.min(Math.max(Math.trunc(value), LIST_MODELS_MIN_PAGE_SIZE), LIST_MODELS_MAX_PAGE_SIZE);
 
 /** Erro HTTP com status numérico e operação de origem preservados para o classificador de retry/fallback do caller. */
 export class VertexHttpError extends Error {
