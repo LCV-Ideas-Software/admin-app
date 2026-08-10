@@ -634,6 +634,33 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
     expect(vistos).toHaveLength(0);
   });
 
+  it('pageSize NaN não escapa na URL: vira 0, o padrão do servidor', async () => {
+    const sa = await makeTestSa('kid-pagesize-nan');
+    const mock = listFetch([{ publisherModels: [] }]);
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: mock.fetchImpl });
+    const vistos: PublisherModelSummary[] = [];
+    for await (const model of ai.models.list({ config: { pageSize: Number.NaN } })) {
+      vistos.push(model);
+    }
+    // Math.trunc/min/max propagam NaN; sem tratamento, a URL sairia com
+    // `pageSize=NaN` e o endpoint devolveria o mesmo 400 que o clamp evita.
+    expect(mock.calls[0]).toContain('pageSize=0');
+    expect(mock.calls[0]).not.toContain('NaN');
+    expect(vistos).toHaveLength(0);
+  });
+
+  it('pageSize fracionário é truncado (contrato documentado do clamp)', async () => {
+    const sa = await makeTestSa('kid-pagesize-frac');
+    const mock = listFetch([{ publisherModels: [] }]);
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: mock.fetchImpl });
+    const vistos: PublisherModelSummary[] = [];
+    for await (const model of ai.models.list({ config: { pageSize: 12.9 } })) {
+      vistos.push(model);
+    }
+    expect(mock.calls[0]).toContain('pageSize=12');
+    expect(vistos).toHaveLength(0);
+  });
+
   it('sem timeout configurado não envia signal; com timeout, cada página vai com AbortSignal', async () => {
     const sa = await makeTestSa('kid-list-timeout');
     const semTimeout = listFetch([{ publisherModels: [] }]);

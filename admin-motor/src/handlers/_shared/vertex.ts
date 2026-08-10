@@ -108,8 +108,14 @@ const LIST_MODELS_BASE_URL = 'https://aiplatform.googleapis.com/v1beta1/publishe
 // nextPageToken continua trazendo o catálogo completo.
 const LIST_MODELS_MIN_PAGE_SIZE = 0;
 const LIST_MODELS_MAX_PAGE_SIZE = 300;
+// `number` também admite NaN e Infinity, e Math.trunc/min/max propagam NaN —
+// sem o guard, `pageSize=NaN` chegaria à URL e produziria o mesmo 400 que esta
+// normalização existe para evitar. Um valor não finito cai no padrão do
+// servidor (0), que é o comportamento mais próximo de "não especificado".
 const clampPageSize = (value: number): number =>
-  Math.min(Math.max(Math.trunc(value), LIST_MODELS_MIN_PAGE_SIZE), LIST_MODELS_MAX_PAGE_SIZE);
+  Number.isFinite(value)
+    ? Math.min(Math.max(Math.trunc(value), LIST_MODELS_MIN_PAGE_SIZE), LIST_MODELS_MAX_PAGE_SIZE)
+    : LIST_MODELS_MIN_PAGE_SIZE;
 
 /** Erro HTTP com status numérico e operação de origem preservados para o classificador de retry/fallback do caller. */
 export class VertexHttpError extends Error {
