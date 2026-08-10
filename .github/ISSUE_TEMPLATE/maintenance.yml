@@ -1,0 +1,33 @@
+name: Maintenance
+description: Dependency bumps, lockfiles, version bumps and routine upkeep
+title: "[Maintenance]: "
+labels: ["dependencies"]
+type: Maintenance
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs upkeep
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now
+      description: Advisory, deprecation, drift, or scheduled upkeep.
+    validations:
+      required: true
+  - type: textarea
+    id: surfaces
+    attributes:
+      label: Surfaces touched
+      description: Every file or configuration that must change together.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: How it will be verified
+      description: Which gates must pass before this is considered done.
+    validations:
+      required: true
