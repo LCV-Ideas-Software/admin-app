@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [v02.15.20] - 2026-08-10
+
+### Fixed
+
+- **`pageSize: Infinity` volta a saturar no teto de 300.** O guard introduzido
+  na v02.15.19 para conter o `NaN` usava `Number.isFinite`, e com isso mandava
+  também `+Infinity` para `0` — trocando em silêncio um pedido de "o máximo
+  possível" pelo padrão do servidor, o que reduz a página e multiplica as
+  requisições de catálogo (achado do codex no PR #453). Só o `NaN` precisa de
+  tratamento à parte, por ser o único valor sem ordem definida: os infinitos têm
+  ordem e o par `min`/`max` já os resolvia corretamente. Testes cobrem agora
+  `+Infinity` → 300 e `-Infinity` → 0.
+
 ## [v02.15.19] - 2026-08-10
 
 ### Fixed
