@@ -62,27 +62,27 @@ const SECRET_STORE_ENV = {
   MAESTRO_SECRET_STORE_ID: 'store-1',
 };
 
-const createDb = () => {
-  const makeStmt = () => {
+const createDb = (settingsRow: Record<string, unknown> | null = null) => {
+  const makeStmt = (sql: string) => {
     const stmt = {
       bind: (..._args: unknown[]) => stmt,
       run: async () => ({}),
       all: async () => ({ results: [] as unknown[] }),
-      first: async () => null,
+      first: async () => (sql.includes('FROM maestro_ai_settings') ? settingsRow : null),
     };
     return stmt;
   };
   return { prepare: makeStmt };
 };
 
-const context = (env: Record<string, unknown>, body?: unknown) =>
+const context = (env: Record<string, unknown>, body?: unknown, settingsRow: Record<string, unknown> | null = null) =>
   ({
     request: new Request('https://admin.example/api/maestro-ai/settings', {
       method: body === undefined ? 'GET' : 'POST',
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       headers: { 'Content-Type': 'application/json' },
     }),
-    env: { BIGDATA_DB: createDb(), ...env },
+    env: { BIGDATA_DB: createDb(settingsRow), ...env },
   }) as unknown as Parameters<typeof handleMaestroAiSettingsTestPost>[0];
 
 type TestResults = { ok: boolean; results: { agent: string; ok: boolean; message: string; model?: string }[] };
@@ -160,6 +160,39 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     // Nada de consultar o catálogo global para escolher um modelo que será
     // chamado numa região onde ele pode não existir.
     expect(runtime.listRequests).toHaveLength(0);
+  });
+
+  it('test-api: modelo global-only já persistido não é usado numa location regional', async () => {
+    const settingsRow = {
+      id: 'default',
+      protocol_text: 'p'.repeat(120),
+      max_cost_usd: 10,
+      max_runtime_minutes: null,
+      max_cycles: 2,
+      configured_secrets_json: '{}',
+      rates_json: JSON.stringify(
+        Object.fromEntries(
+          ['claude', 'codex', 'gemini', 'deepseek', 'grok', 'perplexity'].map((k) => [
+            k,
+            { input_usd_per_million: 1, output_usd_per_million: 2 },
+          ]),
+        ),
+      ),
+      // O operador escolheu um preview: ele só existe no endpoint global.
+      models_json: JSON.stringify({ gemini: 'gemini-3.1-pro-preview' }),
+      updated_at: '2026-08-09T00:00:00Z',
+    };
+
+    const res = await handleMaestroAiSettingsTestPost(
+      context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us-central1' }, undefined, settingsRow),
+    );
+    const body = (await res.json()) as TestResults;
+    const gemini = body.results.find((r) => r.agent === 'gemini');
+    expect(gemini?.ok).toBe(true);
+    // Sem essa checagem, a escolha persistida chegaria à região e devolveria 404.
+    expect(gemini?.model).toBe('gemini-2.5-pro');
+    const gen = runtime.generateRequests[0] as { model: string };
+    expect(gen.model).toBe('gemini-2.5-pro');
   });
 
   it('test-api: falha na listagem cai no fallback gemini-2.5-pro', async () => {

@@ -20,6 +20,7 @@ const runtime = vi.hoisted(() => {
       thought?: boolean;
     }[],
     generateError: null as Error | null,
+    onGenerate: null as (() => void) | null,
     MockVertexHttpError,
   };
 });
@@ -37,6 +38,7 @@ vi.mock('../../_shared/vertex', () => ({
       },
       generateContent: async (request: Record<string, unknown>) => {
         runtime.generateRequests.push(request);
+        runtime.onGenerate?.();
         if (runtime.generateError) throw runtime.generateError;
         return {
           candidates: [{ content: { parts: runtime.generateParts } }],
@@ -85,6 +87,7 @@ beforeEach(() => {
   runtime.generateRequests.length = 0;
   runtime.generateParts = [{ text: JSON.stringify({ summary_og: 'resumo curto', summary_ld: 'resumo longo' }) }];
   runtime.generateError = null;
+  runtime.onGenerate = null;
 });
 
 describe('POST /api/mainsite/post-summaries action=regenerate (Vertex)', () => {
@@ -148,6 +151,33 @@ describe('POST /api/mainsite/post-summaries action=regenerate (Vertex)', () => {
     expect(countTimeout).toBeLessThanOrEqual(40_000);
     expect(genTimeout).toBeGreaterThan(0);
     expect(genTimeout).toBeLessThanOrEqual(40_000);
+  });
+
+  it('regenerate (post único) também tem prazo total: a 2a tentativa recebe o que resta', async () => {
+    let clock = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    runtime.onGenerate = () => {
+      clock += 50_000;
+    };
+    runtime.generateError = new runtime.MockVertexHttpError(
+      'Vertex generateContent falhou (HTTP 500): interno',
+      500,
+      'generateContent',
+    );
+
+    await onRequestPost(
+      context({ action: 'regenerate', postId: 7, model: 'gemini-2.5-flash' }, { VERTEX_SA_KEY: '{"sa":"x"}' }),
+    );
+
+    expect(runtime.generateRequests).toHaveLength(2);
+    const [primeira, segunda] = runtime.generateRequests as Array<{ config?: { httpOptions?: { timeout?: number } } }>;
+    const t1 = primeira?.config?.httpOptions?.timeout ?? 0;
+    const t2 = segunda?.config?.httpOptions?.timeout ?? 0;
+    // Sem prazo total, cada tentativa pediria 80s novos e o request passaria
+    // dos 100s do proxy, virando 524 no lugar do JSON de erro do handler.
+    expect(t1).toBe(80_000);
+    expect(t2).toBe(45_000);
+    vi.restoreAllMocks();
   });
 
   it('retorna 500 com "AI falhou." após esgotar retries', async () => {

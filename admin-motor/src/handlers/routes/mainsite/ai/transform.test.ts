@@ -18,6 +18,7 @@ const runtime = vi.hoisted(() => {
     totalTokens: 10,
     generateText: 'texto transformado',
     generateError: null as Error | null,
+    onGenerate: null as (() => void) | null,
     MockVertexHttpError,
   };
 });
@@ -35,6 +36,7 @@ vi.mock('../../../_shared/vertex', () => ({
       },
       generateContent: async (request: Record<string, unknown>) => {
         runtime.generateRequests.push(request);
+        runtime.onGenerate?.();
         if (runtime.generateError) throw runtime.generateError;
         return {
           text: runtime.generateText,
@@ -65,6 +67,7 @@ beforeEach(() => {
   runtime.totalTokens = 10;
   runtime.generateText = 'texto transformado';
   runtime.generateError = null;
+  runtime.onGenerate = null;
 });
 
 describe('POST /api/mainsite/ai/transform (Vertex)', () => {
@@ -93,7 +96,10 @@ describe('POST /api/mainsite/ai/transform (Vertex)', () => {
       };
     };
     expect(gen.model).toBe('gemini-2.5-pro');
-    expect(gen.config.httpOptions?.timeout).toBe(80_000);
+    // Teto da etapa dentro do orçamento do request (95s), não um valor fixo.
+    const genTimeout = gen.config.httpOptions?.timeout ?? 0;
+    expect(genTimeout).toBeGreaterThan(0);
+    expect(genTimeout).toBeLessThanOrEqual(80_000);
     expect(gen.config.temperature).toBe(0.3);
     expect(gen.config.safetySettings).toEqual([
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -113,6 +119,32 @@ describe('POST /api/mainsite/ai/transform (Vertex)', () => {
     const res = await onRequestPost(context({ action: 'grammar', text: 'ola' }, { VERTEX_SA_KEY: '{"sa":"x"}' }));
     expect(res.status).toBe(413);
     expect(runtime.generateRequests).toHaveLength(0);
+  });
+
+  it('as tentativas dividem um único prazo em vez de reiniciar 80s cada', async () => {
+    // Relógio controlado: cada tentativa "gasta" 50s, como numa geração lenta.
+    let clock = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    runtime.onGenerate = () => {
+      clock += 50_000;
+    };
+    runtime.generateError = new runtime.MockVertexHttpError(
+      'Vertex generateContent falhou (HTTP 500): interno',
+      500,
+      'generateContent',
+    );
+
+    await onRequestPost(context({ action: 'grammar', text: 'ola' }, { VERTEX_SA_KEY: '{"sa":"x"}' }));
+
+    expect(runtime.generateRequests).toHaveLength(2);
+    const [primeira, segunda] = runtime.generateRequests as Array<{ config: { httpOptions?: { timeout?: number } } }>;
+    const t1 = primeira?.config.httpOptions?.timeout ?? 0;
+    const t2 = segunda?.config.httpOptions?.timeout ?? 0;
+    // Orçamento de 95s: a 1a tentativa pega o teto de 80s; gastos 50s, a 2a
+    // recebe exatamente os 45s que restam — nunca um 80s novo em folha.
+    expect(t1).toBe(80_000);
+    expect(t2).toBe(45_000);
+    vi.restoreAllMocks();
   });
 
   it('retorna 500 após esgotar retries quando a geração falha', async () => {

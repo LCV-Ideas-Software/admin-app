@@ -1,5 +1,6 @@
 import { toHeaders } from '../../../../../functions/api/_lib/mainsite-admin';
 import { VertexGenAI } from '../../_shared/vertex';
+import { isGlobalOnlyModelId } from '../../oraculoModelos';
 import { formatBlockManifestForPrompt, validateRevisionContentLock } from './content-lock.ts';
 
 type D1Database = {
@@ -2375,6 +2376,9 @@ const DEFAULT_VERTEX_LOCATION = 'global';
 // resolução roda antes da geração e não pode consumir o prazo da sessão.
 const VERTEX_CATALOG_TIMEOUT_MS = 15_000;
 
+const vertexLocationIsRegional = (env: MaestroAiEnv): boolean =>
+  (env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION) !== DEFAULT_VERTEX_LOCATION;
+
 function vertexClient(env: MaestroAiEnv): VertexGenAI {
   return new VertexGenAI({
     saKeyJson: env.VERTEX_SA_KEY ?? '',
@@ -2390,8 +2394,7 @@ async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
   // publicados numa região específica (os previews, por exemplo). Se a geração
   // vai para uma região, escolher por esse catálogo produziria um modelo que
   // depois falha com 404 — melhor ficar no default, que é regionalmente amplo.
-  const location = env.VERTEX_LOCATION || DEFAULT_VERTEX_LOCATION;
-  if (location !== DEFAULT_VERTEX_LOCATION) return VERTEX_GEMINI_FALLBACK;
+  if (vertexLocationIsRegional(env)) return VERTEX_GEMINI_FALLBACK;
   try {
     const ids: string[] = [];
     const catalog = vertexClient(env).models.list({
@@ -2465,7 +2468,13 @@ async function callProvider(
   // seeded default) wins; otherwise resolve live against the provider's
   // /models list (canonical), memoized per execution via options.modelCache.
   const configured = sanitizeText(models[agent], 120);
-  let model = configured && configured !== DEFAULT_MODELS[agent] ? configured : '';
+  // Uma escolha persistida vence a resolução ao vivo — mas o catálogo do Vertex
+  // é global e anuncia previews que uma região não serve. Sem esta checagem, um
+  // `gemini-3.1-pro-preview` salvo antes contornaria o fallback regional e toda
+  // chamada seguinte voltaria 404.
+  const configuredIsUnusableHere =
+    agent === 'gemini' && vertexLocationIsRegional(env) && isGlobalOnlyModelId(configured ?? '');
+  let model = configured && configured !== DEFAULT_MODELS[agent] && !configuredIsUnusableHere ? configured : '';
   if (!model) {
     model = options?.modelCache?.get(agent) ?? '';
     if (!model) {

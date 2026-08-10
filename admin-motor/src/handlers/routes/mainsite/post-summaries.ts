@@ -6,6 +6,7 @@
  * Usa D1 direto (BIGDATA_DB) — padrão admin-app.
  */
 
+import { PROXY_REQUEST_BUDGET_MS, stageBudget } from '../../_shared/deadlines';
 import { VertexGenAI } from '../../_shared/vertex';
 import { logAiUsage } from '../_lib/ai-telemetry';
 import { toHeaders } from '../_lib/mainsite-admin';
@@ -145,9 +146,10 @@ async function generateShareSummary(
   env: SummaryEnv,
   model: string,
   db?: D1Database,
-  /** Teto opcional para esta chamada: no generate-all é o que resta do lote,
-   * de modo que nenhum post sozinho estoure o limite que evita o 524. */
-  budgetMs?: number,
+  /** Teto desta chamada: no generate-all é o que resta do lote; no post único
+   * é o orçamento do request. Em ambos os casos as tentativas dividem o mesmo
+   * relógio, senão dois retries de 80s já estouram o 524 do proxy. */
+  budgetMs: number = PROXY_REQUEST_BUDGET_MS,
 ): Promise<{ summary_og: string; summary_ld: string } | { error: string }> {
   const telStart = Date.now();
   const cleanContent = stripHtml(htmlContent);
@@ -177,10 +179,8 @@ REGRAS:
   const userPrompt = `TÍTULO: ${title}\nCONTEÚDO: ${cleanContent}`;
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-  // Sem orçamento (ação de post único) valem os tetos padrão; no lote, cada
-  // chamada recebe o que ainda resta antes do 524.
-  const remaining = () => (budgetMs === undefined ? undefined : Math.max(0, budgetMs - (Date.now() - telStart)));
-  const countTimeout = Math.min(COUNT_TOKENS_TIMEOUT_MS, remaining() ?? COUNT_TOKENS_TIMEOUT_MS);
+  const deadlineAt = telStart + budgetMs;
+  const countTimeout = stageBudget(deadlineAt, COUNT_TOKENS_TIMEOUT_MS);
   if (countTimeout <= 0) return { error: 'Tempo do lote esgotado antes de processar este post.' };
 
   // 1. Validation de Contexto API e Pre-req Token Counting
@@ -197,7 +197,7 @@ REGRAS:
   let parsedResponse: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const generateTimeout = Math.min(GENERATE_TIMEOUT_MS, remaining() ?? GENERATE_TIMEOUT_MS);
+    const generateTimeout = stageBudget(deadlineAt, GENERATE_TIMEOUT_MS);
     if (generateTimeout <= 0) {
       lastErrorMsg = 'Tempo do lote esgotado durante a geração.';
       break;

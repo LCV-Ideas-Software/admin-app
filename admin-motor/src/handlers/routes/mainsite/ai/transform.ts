@@ -5,6 +5,7 @@
  * (service account OAuth), cliente compartilhado _shared/vertex.
  */
 
+import { PROXY_REQUEST_BUDGET_MS, stageBudget } from '../../../_shared/deadlines';
 import { VertexGenAI } from '../../../_shared/vertex';
 import { logAiUsage } from '../../_lib/ai-telemetry';
 
@@ -16,6 +17,8 @@ export interface Env {
 }
 
 const DEFAULT_VERTEX_LOCATION = 'global';
+const COUNT_TOKENS_TIMEOUT_MS = 20_000;
+const GENERATE_TIMEOUT_MS = 80_000;
 
 /** Fallback usado quando BIGDATA_DB não retorna modelo configurado para 'chat'. */
 const FALLBACK_MODEL = 'gemini-2.5-pro';
@@ -78,12 +81,12 @@ async function resolveModel(db: D1Database | undefined): Promise<string> {
 /**
  * Estima contagem de tokens via SDK countTokens
  */
-async function estimateTokenCount(ai: VertexGenAI, text: string, model: string): Promise<number> {
+async function estimateTokenCount(ai: VertexGenAI, text: string, model: string, timeoutMs: number): Promise<number> {
   try {
     const resp = await ai.models.countTokens({
       model,
       contents: text,
-      config: { httpOptions: { timeout: 20_000 } },
+      config: { httpOptions: { timeout: timeoutMs } },
     });
     return resp.totalTokens ?? 0;
   } catch (error) {
@@ -117,6 +120,9 @@ const TRANSFORM_SAFETY_SETTINGS = [
 ];
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
+  // Um instante-limite para o request inteiro: a contagem de tokens e as duas
+  // tentativas de geração dividem esse relógio, senão a soma passa do 524.
+  const requestDeadlineAt = Date.now() + PROXY_REQUEST_BUDGET_MS;
   const resolvedEnv = ((context as { data?: { env?: Env } }).data?.env ?? context.env) as Env;
 
   if (!resolvedEnv.VERTEX_SA_KEY) {
@@ -179,7 +185,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const fullPrompt = `${promptInfo}\n\nTexto:\n${text}`;
 
     // Token Counting via SDK
-    const inputTokens = await estimateTokenCount(ai, fullPrompt, activeModel);
+    const inputTokens = await estimateTokenCount(
+      ai,
+      fullPrompt,
+      activeModel,
+      stageBudget(requestDeadlineAt, COUNT_TOKENS_TIMEOUT_MS),
+    );
     const validation = validateInputTokens(inputTokens);
     if (validation.shouldReject) {
       structuredLog('warn', 'Input rejected due to token count', { tokens: inputTokens });
@@ -190,6 +201,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     // Retry loop
     for (let tentativa = 0; tentativa < GEMINI_CONFIG.maxRetries; tentativa++) {
+      const generateTimeout = stageBudget(requestDeadlineAt, GENERATE_TIMEOUT_MS);
+      if (generateTimeout <= 0) {
+        throw new Error('Tempo do request esgotado antes de concluir a transformação por IA.');
+      }
       try {
         structuredLog('info', `Gemini request attempt ${tentativa + 1}`, {
           endpoint: 'transform',
@@ -205,7 +220,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             temperature: GEMINI_CONFIG.endpoints.transform.temperature,
             topP: GEMINI_CONFIG.endpoints.transform.topP,
             maxOutputTokens: GEMINI_CONFIG.endpoints.transform.maxOutputTokens,
-            httpOptions: { timeout: 80_000 },
+            httpOptions: { timeout: generateTimeout },
           },
         });
 
