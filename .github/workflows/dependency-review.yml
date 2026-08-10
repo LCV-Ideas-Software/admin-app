@@ -11,6 +11,20 @@ concurrency:
   group: dependency-review-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  workflow_boundaries:
+    permissions:
+      contents: read
+    name: Native auto-merge workflow boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test native auto-merge workflow boundaries
+        run: node --test .github/scripts/native-auto-merge-workflows.regression.mjs
+
   candidate_review:
     permissions: write-all
     name: Dependency Review candidate
@@ -21,8 +35,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Test native auto-merge workflow boundaries
-        run: node --test .github/scripts/native-auto-merge-workflows.regression.mjs
       - name: Review pull request dependencies
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
@@ -51,20 +63,35 @@ jobs:
         )
       }}
     needs:
+      - workflow_boundaries
       - candidate_review
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Reject unsuccessful dependency review candidate
-        if: ${{ needs.candidate_review.result != 'success' }}
+      - name: Reject unsuccessful dependency review prerequisite
+        if: >-
+          ${{
+            needs.workflow_boundaries.result != 'success' ||
+            needs.candidate_review.result != 'success'
+          }}
         run: exit 1
 
       - name: Preserve the required dependency review context
-        if: ${{ github.event_name != 'merge_group' && needs.candidate_review.result == 'success' }}
+        if: >-
+          ${{
+            github.event_name != 'merge_group' &&
+            needs.workflow_boundaries.result == 'success' &&
+            needs.candidate_review.result == 'success'
+          }}
         run: echo "Dependency review candidate passed."
 
       - name: Enforce merge-group feedback gate
-        if: ${{ github.event_name == 'merge_group' && needs.candidate_review.result == 'success' }}
+        if: >-
+          ${{
+            github.event_name == 'merge_group' &&
+            needs.workflow_boundaries.result == 'success' &&
+            needs.candidate_review.result == 'success'
+          }}
         uses: LCV-Ideas-Software/.github/native-auto-merge@231cd33f27c260a6b01fec26aa1d0eb606e1ee2d # native-auto-merge/v2.1.4
         with:
           operation: merge-group-feedback-gate

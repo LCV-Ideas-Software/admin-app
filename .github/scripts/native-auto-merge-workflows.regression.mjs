@@ -88,22 +88,35 @@ test('the trusted controller exposes both pinned v2.1.4 wake-up paths', () => {
 });
 
 test('the existing Dependency Review context becomes the clean merge-group gate', () => {
+  const boundaries = jobBody(dependencyReview, 'workflow_boundaries');
   const candidate = jobBody(dependencyReview, 'candidate_review');
   const required = jobBody(dependencyReview, 'dependency_review');
 
   assert.match(topLevelBody(dependencyReview, 'on'), /merge_group:[\s\S]*checks_requested/);
+  assert.match(boundaries, /permissions:[\s\S]*contents: read/);
+  assert.doesNotMatch(boundaries, /write-all/);
+  assert.match(
+    boundaries,
+    /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1[\s\S]*persist-credentials: false/,
+  );
+  assert.match(boundaries, /node --test \.github\/scripts\/native-auto-merge-workflows\.regression\.mjs/);
   assert.match(candidate, /name: Dependency Review candidate/);
   assert.match(candidate, /actions\/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294/);
-  assert.match(candidate, /node --test \.github\/scripts\/native-auto-merge-workflows\.regression\.mjs/);
+  assert.doesNotMatch(candidate, /node --test \.github\/scripts\/native-auto-merge-workflows\.regression\.mjs/);
   assert.match(required, /^ {4}name: Dependency Review$/m);
   assert.match(required, /always\(\)/);
   assert.match(
     required,
     /github\.event_name == 'merge_group'[\s\S]*github\.event\.pull_request\.head\.repo\.full_name == github\.repository/,
   );
-  assert.match(required, /needs:[\s\S]*- candidate_review/);
+  assert.match(required, /needs:[\s\S]*- workflow_boundaries[\s\S]*- candidate_review/);
   assert.match(required, /timeout-minutes: 30/);
-  assert.match(required, /needs\.candidate_review\.result != 'success'[\s\S]*run: exit 1/);
+  assert.match(
+    required,
+    /needs\.workflow_boundaries\.result != 'success'[\s\S]*needs\.candidate_review\.result != 'success'[\s\S]*run: exit 1/,
+  );
+  assert.ok((required.match(/needs\.workflow_boundaries\.result == 'success'/g) ?? []).length >= 2);
+  assert.ok((required.match(/needs\.candidate_review\.result == 'success'/g) ?? []).length >= 2);
   assert.match(required, /operation: merge-group-feedback-gate/);
   assert.match(required, /github_token: \$\{\{ github\.token \}\}/);
   for (const [input, expression] of Object.entries({
