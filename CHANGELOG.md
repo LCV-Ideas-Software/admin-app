@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [v02.15.17] - 2026-08-10
+
+### Fixed
+
+- **Catálogo de modelos voltou a responder.** `models.list` pedia
+  `pageSize=1000`, herdado do SDK do AI Studio; o endpoint de publisher models
+  do Vertex aceita no máximo 300 e devolve HTTP 400
+  (`"Page size should be non-negative and the maximum size is 300."`), o que
+  derrubava com 500 as rotas `/api/{oraculo,astrologo,mainsite,calculadora}/modelos`
+  e deixava os seletores do admin exibindo apenas o valor já persistido. O
+  cliente passa a limitar `pageSize` ao teto da API — contrato do endpoint, não
+  preferência do chamador — e a paginação por `nextPageToken` continua trazendo
+  o catálogo inteiro.
+- **`httpOptions.timeout` menor ou igual a zero** passa a significar prazo já
+  esgotado, com erro imediato. Antes era tratado como ausência de prazo, então a
+  chamada saía sem `AbortSignal` justamente quando o orçamento tinha acabado.
+- **Flag legado de credencial do Gemini.** Linhas antigas de
+  `configured_secrets_json` trazem `gemini: true` de quando a chave era gravável
+  pelo painel; honrá-lo fazia o Maestro anunciar a credencial nova como salva
+  sem `VERTEX_SA_KEY` e podia eleger o agente para uma sessão que falharia na
+  primeira chamada. Para o gemini agora vale apenas o que existe em runtime.
+
 ## [v02.15.16] - 2026-08-09
 
 ### Changed
