@@ -127,7 +127,7 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     // O catálogo precisa de prazo próprio: ele roda antes da geração e um
     // catálogo travado impediria o health check de chegar à chamada.
     expect(runtime.listRequests[0]).toEqual({
-      config: { pageSize: 1000, httpOptions: { timeout: 15_000 } },
+      config: { pageSize: 300, httpOptions: { timeout: 15_000 } },
     });
     const gen = runtime.generateRequests[0] as {
       model: string;
@@ -223,6 +223,43 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     const gemini = body.settings.agents.find((a) => a.key === 'gemini');
     expect(gemini?.secret_name).toBe('VERTEX_SA_KEY');
     expect(gemini?.runtime_ready).toBe(true);
+  });
+
+  it('settings GET: flag legado configured=true não faz o gemini parecer pronto sem VERTEX_SA_KEY', async () => {
+    // Linha antiga, de quando a chave do Gemini era gravável pelo painel.
+    const settingsRow = {
+      id: 'default',
+      protocol_text: 'p'.repeat(120),
+      max_cost_usd: 10,
+      max_runtime_minutes: null,
+      max_cycles: 2,
+      configured_secrets_json: JSON.stringify({ gemini: true, claude: true }),
+      rates_json: JSON.stringify(
+        Object.fromEntries(
+          ['claude', 'codex', 'gemini', 'deepseek', 'grok', 'perplexity'].map((k) => [
+            k,
+            { input_usd_per_million: 1, output_usd_per_million: 2 },
+          ]),
+        ),
+      ),
+      models_json: '{}',
+      updated_at: '2026-08-09T00:00:00Z',
+    };
+
+    // Sem VERTEX_SA_KEY no ambiente: a credencial NÃO está disponível.
+    const res = await handleMaestroAiSettingsGet(context({}, undefined, settingsRow));
+    const body = (await res.json()) as {
+      settings: { agents: { key: string; configured: boolean; runtime_ready: boolean }[] };
+    };
+    const gemini = body.settings.agents.find((a) => a.key === 'gemini');
+    // O flag legado se referia a um secret que ninguém mais lê; deixá-lo valer
+    // faria o painel anunciar 'salva' e o frontend eleger o gemini como agente
+    // inicial de uma sessão que falharia na primeira chamada.
+    expect(gemini?.configured).toBe(false);
+    expect(gemini?.runtime_ready).toBe(false);
+    // Os demais providers continuam honrando o flag persistido.
+    const claude = body.settings.agents.find((a) => a.key === 'claude');
+    expect(claude?.configured).toBe(true);
   });
 
   it('settings PUT: rejeita o gemini ANTES de gravar qualquer outro secret (atomicidade)', async () => {

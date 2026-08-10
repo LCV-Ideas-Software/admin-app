@@ -9,6 +9,10 @@ const DEFAULT_VERTEX_LOCATION = 'global';
  * oferecer preview/exp na UI é oferecer uma escolha que falha na geração. */
 export const isGlobalOnlyModelId = (id: string): boolean => /preview|exp/i.test(id);
 
+/** Máximo aceito pelo catálogo de publisher models: acima disso a API responde
+ * HTTP 400 e a rota inteira cai. A paginação cobre catálogos maiores. */
+export const VERTEX_CATALOG_PAGE_SIZE = 300;
+
 type Env = {
   VERTEX_SA_KEY?: string;
   VERTEX_PROJECT?: string;
@@ -50,7 +54,9 @@ export const handleOraculoModelosGet = async (context: Context) => {
     const ai = new VertexGenAI({ saKeyJson, project: env.VERTEX_PROJECT, location });
     const allModels = new Map<string, { id: string; displayName: string; api: string; vision: boolean }>();
 
-    const pager = await ai.models.list({ config: { pageSize: 1000, httpOptions: { timeout: 20_000 } } });
+    const pager = await ai.models.list({
+      config: { pageSize: VERTEX_CATALOG_PAGE_SIZE, httpOptions: { timeout: 20_000 } },
+    });
     for await (const m of pager) {
       if (!m.name) continue;
       // Vertex retorna "publishers/google/models/<id>" (AI Studio retornava "models/<id>").

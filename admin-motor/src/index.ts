@@ -6,7 +6,7 @@ import { handleAstrologoEnviarEmailPost } from './handlers/astrologoEmail';
 import { handleCfdnsZonesGet } from './handlers/cfdnsZones';
 import { handleCleanupDeploymentsGet, handleCleanupDeploymentsPost } from './handlers/cfpwCleanup';
 import { handleOraculoCronGet, handleOraculoCronPut } from './handlers/oraculoCron';
-import { handleOraculoModelosGet, isGlobalOnlyModelId } from './handlers/oraculoModelos';
+import { handleOraculoModelosGet, isGlobalOnlyModelId, VERTEX_CATALOG_PAGE_SIZE } from './handlers/oraculoModelos';
 import { resolveAdminBearerToken, validatePutAuth } from './handlers/routes/_lib/auth';
 import {
   onRequestGet as handleAdminhubConfigGet,
@@ -419,7 +419,9 @@ const fetchMainsiteGeminiModels = async (_request: Request, env: ResolvedAdminMo
 
   const allModels = new Map<string, ModelOption>();
 
-  const pager = await ai.models.list({ config: { pageSize: 1000, httpOptions: { timeout: 20_000 } } });
+  const pager = await ai.models.list({
+    config: { pageSize: VERTEX_CATALOG_PAGE_SIZE, httpOptions: { timeout: 20_000 } },
+  });
   for await (const m of pager) {
     if (!m.name) continue;
 

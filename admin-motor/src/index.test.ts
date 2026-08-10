@@ -89,7 +89,7 @@ describe('GET /api/mainsite/modelos e /api/calculadora/modelos (catálogo via Ve
     expect(body.models[0]?.api).toBe('vertex');
     expect(runtime.constructorOptions[0]?.saKeyJson).toBe('{"sa":"x"}');
     expect(runtime.listRequests[0]).toEqual({
-      config: { pageSize: 1000, httpOptions: { timeout: 20_000 } },
+      config: { pageSize: 300, httpOptions: { timeout: 20_000 } },
     });
   });
 
