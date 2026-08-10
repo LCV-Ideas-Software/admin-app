@@ -54,6 +54,6 @@ jobs:
           output: ${{ runner.temp }}/codeql-results
 
       - name: Enforce zero CodeQL findings
-        uses: LCV-Ideas-Software/.github/codeql-sarif-gate@24b0bcc09a48b47f740b8a8bd972374f7289e48e # codeql-sarif-v1.0.0
+        uses: LCV-Ideas-Software/.github/codeql-sarif-gate@24b0bcc09a48b47f740b8a8bd972374f7289e48e # codeql-sarif-gate/v1.0.0
         with:
           sarif-directory: ${{ runner.temp }}/codeql-results
