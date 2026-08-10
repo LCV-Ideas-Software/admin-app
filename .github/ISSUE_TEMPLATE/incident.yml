@@ -1,0 +1,57 @@
+name: Incident
+description: Production is broken or degraded and needs a root cause
+title: "[Incident]: "
+labels: ["bug"]
+type: Incident
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use placeholders instead of real infrastructure identifiers. This repository is public.
+        Never paste cloud project IDs, database names, tokens, or account identifiers.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is broken, for whom, and since when?
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options: [Production, Preview, Local, CI]
+    validations:
+      required: true
+  - type: textarea
+    id: timeline
+    attributes:
+      label: Timeline
+      description: What happened, in order, with timestamps in UTC.
+      value: |
+        - HH:MM —
+        - HH:MM —
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, failing check URLs, error output. Redact secrets and real identifiers.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Mitigation applied
+      description: What restored service, if anything. Write "none yet" if still broken.
+    validations:
+      required: true
+  - type: textarea
+    id: root-cause
+    attributes:
+      label: Root cause hypothesis
+      description: What you believe caused it and what evidence supports that.
+    validations:
+      required: true

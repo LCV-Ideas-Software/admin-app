@@ -3,3 +3,9 @@ contact_links:
   - name: Private security report
     url: https://github.com/LCV-Ideas-Software
     about: Report vulnerabilities privately. Do not disclose secrets or exploit details in public issues.
+  - name: Ask a question (Discussions)
+    url: https://github.com/LCV-Ideas-Software/admin-app/discussions/new?category=q-a
+    about: Technical questions about this repository. Answers are marked and become the durable record.
+  - name: Propose an idea (Discussions)
+    url: https://github.com/LCV-Ideas-Software/admin-app/discussions/new?category=ideas
+    about: New apps, features or directions. Ideas that mature become issues.

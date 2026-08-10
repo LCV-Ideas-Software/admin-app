@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Governanca de trabalho sobre GitHub Projects, Issues e Discussions: quadro dedicado do repositorio, formularios de issue para Incident, Maintenance e Spike, atalhos para Discussions no seletor de issues, workflow `add-to-project` (inerte ate a organizacao definir `LCV_PROJECTS_APP_CLIENT_ID`) e o ritual de registro G1..G4 documentado para Claude Code e ChatGPT-Codex.
+
+## [Unreleased]
+
 ## [v02.15.22] - 2026-08-10
 
 ### Fixed
