@@ -619,6 +619,21 @@ describe('models.list (catálogo de publisher models, v1beta1 global)', () => {
     expect(vistos).toHaveLength(0);
   });
 
+  it('pageSize negativo é normalizado para 0, que o endpoint aceita como "use o padrão"', async () => {
+    const sa = await makeTestSa('kid-pagesize-neg');
+    const mock = listFetch([{ publisherModels: [] }]);
+    const ai = new VertexGenAI({ saKeyJson: sa.saJson, location: 'global', fetchImpl: mock.fetchImpl });
+    const vistos: PublisherModelSummary[] = [];
+    for await (const model of ai.models.list({ config: { pageSize: -1 } })) {
+      vistos.push(model);
+    }
+    // Verificado contra a API: -1 responde 400, 0 responde 200 (padrão do
+    // servidor). O intervalo aceito é [0, 300] e o cliente preserva isso.
+    expect(mock.calls[0]).toContain('pageSize=0');
+    expect(mock.calls[0]).not.toContain('pageSize=-1');
+    expect(vistos).toHaveLength(0);
+  });
+
   it('sem timeout configurado não envia signal; com timeout, cada página vai com AbortSignal', async () => {
     const sa = await makeTestSa('kid-list-timeout');
     const semTimeout = listFetch([{ publisherModels: [] }]);
