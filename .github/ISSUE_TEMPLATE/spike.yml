@@ -1,0 +1,33 @@
+name: Spike
+description: Time-boxed investigation with no guaranteed deliverable
+title: "[Spike]: "
+type: Spike
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question to answer
+      description: A single, decidable question. Not "look into X".
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: What decision is blocked until this is answered.
+    validations:
+      required: true
+  - type: input
+    id: timebox
+    attributes:
+      label: Time box
+      placeholder: "e.g. 2 hours"
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: What artifact ends this spike — a written answer, a benchmark, a prototype?
+    validations:
+      required: true

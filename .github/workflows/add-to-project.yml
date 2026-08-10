@@ -1,0 +1,51 @@
+name: Add to project
+
+# Coloca toda issue e todo pull request nos quadros do repositorio e do portfolio.
+# Inerte enquanto a variavel LCV_PROJECTS_APP_CLIENT_ID nao estiver definida na organizacao.
+#
+# Pre-requisito (acao do operador): GitHub App da organizacao com permissao de leitura e
+# escrita em **projects de organizacao** (permissao de projects de repositorio nao basta),
+# instalado neste repositorio, com:
+#   - variavel de organizacao LCV_PROJECTS_APP_CLIENT_ID
+#   - secret de organizacao   LCV_PROJECTS_APP_PRIVATE_KEY
+# GITHUB_TOKEN nao acessa Projects v2, por isso o App e obrigatorio.
+
+on:
+  issues:
+    types: [opened, reopened, transferred]
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: add-to-project-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  add:
+    name: Add item to projects
+    if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' }}
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Mint installation token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.LCV_PROJECTS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Add to repository project
+        uses: actions/add-to-project@5afcf98fcd03f1c2f92c3c83f58ae24323cc57fd # v2.0.0
+        with:
+          project-url: https://github.com/orgs/LCV-Ideas-Software/projects/13
+          github-token: ${{ steps.token.outputs.token }}
+
+      - name: Add to portfolio project
+        uses: actions/add-to-project@5afcf98fcd03f1c2f92c3c83f58ae24323cc57fd # v2.0.0
+        with:
+          project-url: https://github.com/orgs/LCV-Ideas-Software/projects/17
+          github-token: ${{ steps.token.outputs.token }}
