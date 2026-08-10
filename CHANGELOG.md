@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [v02.15.18] - 2026-08-10
+
+### Fixed
+
+- **`pageSize` do catálogo normalizado no intervalo aceito pelo endpoint.** O
+  clamp introduzido na v02.15.17 cobria apenas o teto: um valor negativo
+  continuaria sendo serializado na URL e reproduziria o mesmo HTTP 400 que o
+  hotfix existe para evitar (achado do Copilot no PR #451). Verificado contra a
+  API — `pageSize=-1` responde 400, `0` responde 200 (padrão do servidor), `1` e
+  `300` respondem 200 —, o cliente passa a normalizar para `[0, 300]` truncando
+  frações. O zero é preservado em vez de elevado a 1, porque o endpoint o trata
+  como "use o padrão" e elevá-lo mudaria o sentido do pedido em silêncio.
+
 ## [v02.15.17] - 2026-08-10
 
 ### Fixed

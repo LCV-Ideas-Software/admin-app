@@ -100,12 +100,16 @@ interface ListModelsArgs {
 // Catálogo de publisher models: existe apenas no v1beta1 e apenas no host
 // global — o v1 e os hosts regionais respondem 404 (provado empiricamente).
 const LIST_MODELS_BASE_URL = 'https://aiplatform.googleapis.com/v1beta1/publishers/google/models';
-// Teto do endpoint, verificado contra a API em 2026-08-10: pageSize=1000 volta
-// HTTP 400 ("Page size should be non-negative and the maximum size is 300") e
-// derruba a rota de catálogo inteira; 300 responde 200. O cliente limita aqui
-// porque esse é um contrato da API, não uma preferência do caller — a
-// paginação por nextPageToken continua trazendo o catálogo completo.
+// Intervalo aceito pelo endpoint, verificado contra a API em 2026-08-10:
+// pageSize=1000 e pageSize=-1 respondem HTTP 400 ("Page size should be
+// non-negative and the maximum size is 300") e derrubam a rota de catálogo
+// inteira; 0 (padrão do servidor), 1 e 300 respondem 200. O cliente normaliza
+// aqui porque é contrato da API, não preferência do caller — a paginação por
+// nextPageToken continua trazendo o catálogo completo.
+const LIST_MODELS_MIN_PAGE_SIZE = 0;
 const LIST_MODELS_MAX_PAGE_SIZE = 300;
+const clampPageSize = (value: number): number =>
+  Math.min(Math.max(Math.trunc(value), LIST_MODELS_MIN_PAGE_SIZE), LIST_MODELS_MAX_PAGE_SIZE);
 
 /** Erro HTTP com status numérico e operação de origem preservados para o classificador de retry/fallback do caller. */
 export class VertexHttpError extends Error {
@@ -399,7 +403,7 @@ export class VertexGenAI {
     let pageToken: string | undefined;
     do {
       const params = new URLSearchParams();
-      if (pageSize !== undefined) params.set('pageSize', String(Math.min(pageSize, LIST_MODELS_MAX_PAGE_SIZE)));
+      if (pageSize !== undefined) params.set('pageSize', String(clampPageSize(pageSize)));
       if (pageToken) params.set('pageToken', pageToken);
       const qs = params.toString();
       const url = `${LIST_MODELS_BASE_URL}${qs ? `?${qs}` : ''}`;
