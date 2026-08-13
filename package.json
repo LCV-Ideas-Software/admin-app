@@ -67,7 +67,7 @@
     "dompurify": "^3.4.13",
     "hono": "^4.13.1",
     "lowlight": "^3.3.0",
-    "lucide-react": "^1.30.0",
+    "lucide-react": "^1.31.0",
     "mammoth": "^1.12.1",
     "marked": "^18.0.9",
     "prosemirror-model": "^1.25.11",
