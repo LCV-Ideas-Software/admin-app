@@ -7,6 +7,14 @@ body:
   - type: markdown
     attributes:
       value: |
+        **Stop before filling this in.** If the incident involves a suspected vulnerability,
+        a credential leak, exposure of private data, an authentication bypass, a payment-flow
+        issue, a supply-chain issue, or a deployment misconfiguration, **do not use this public
+        form** — report it privately through the channel in `SECURITY.md`. Timelines, logs and
+        reproduction steps for those cases must not be posted publicly.
+  - type: markdown
+    attributes:
+      value: |
         Use placeholders instead of real infrastructure identifiers. This repository is public.
         Never paste cloud project IDs, database names, tokens, or account identifiers.
   - type: textarea

@@ -37,7 +37,6 @@ test-results/
 .claude/
 .aiexclude
 .copilotignore
-AGENTS.md
 GEMINI.md
 .github/copilot-instructions.md
 
@@ -114,7 +113,6 @@ scripts/apply-headers.*
 # AI agent memory + tooling — broad coverage (operator directive 2026-04-26).
 # Memories MUST never reach remote. Defense-in-depth: covers tools whose
 # patterns weren't already excluded above.
-CLAUDE.md
 .claude/
 .cursor/
 .cursorrules

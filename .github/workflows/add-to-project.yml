@@ -3,22 +3,64 @@ name: Add to project
 # Coloca toda issue e todo pull request nos quadros do repositorio e do portfolio.
 # Inerte enquanto a variavel LCV_PROJECTS_APP_CLIENT_ID nao estiver definida na organizacao.
 #
-# Pre-requisito (acao do operador): GitHub App da organizacao com permissao de leitura e
-# escrita em **projects de organizacao** (permissao de projects de repositorio nao basta),
-# instalado neste repositorio, com:
+# Pre-requisito (acao do operador): GitHub App da organizacao instalado neste repositorio.
+# O passo de mint abaixo solicita tres permissoes e o token NAO e emitido se a instalacao
+# nao conceder cada uma delas:
+#   - projects de organizacao: leitura e escrita (permissao de projects de repositorio nao basta)
+#   - issues: leitura
+#   - pull requests: leitura
+# Alem do App, precisam existir:
 #   - variavel de organizacao LCV_PROJECTS_APP_CLIENT_ID
 #   - secret LCV_PROJECTS_APP_PRIVATE_KEY no environment 'projects-automation' deste repo
 # GITHUB_TOKEN nao acessa Projects v2, por isso o App e obrigatorio.
+#
+# Backfill na ativacao (uma unica vez): definir a variavel NAO reprocessa eventos
+# passados — issues/PRs abertos enquanto o workflow esteve inerte nao entram nos quadros
+# por este gatilho. Ao ativar, adicionar aos dois quadros os itens abertos que ainda nao
+# estejam neles (addProjectV2ItemById), conforme checklist da issue de rastreamento desta
+# implantacao.
+#
+# Por que pull_request_target: em PR de fork o evento pull_request roda sem os secrets do
+# repositorio e o mint da chave do App falharia; pull_request_target roda no contexto da
+# base e alcanca o secret do environment. Essa e a cobertura que este gatilho garante.
+#
+# PR do Dependabot: cobertura NAO garantida por este gatilho. A documentacao publica nao
+# resolve o caso — afirma que "Your secrets are available in Dependabot secrets rather
+# than as GitHub Actions secrets" e, em outra pagina, que pull_request_target "does not
+# have these limitations", sem dizer qual secret store vale em pull_request_target
+# disparado pelo Dependabot. Portanto NAO se promete cobertura de Dependabot aqui: na
+# ativacao, um PR de Dependabot de teste decide empiricamente; se o mint falhar, a
+# cobertura desses PRs vem de reconciliacao por evento confiavel (workflow_run ou
+# agendado, sem executar codigo do PR), e nao deste gatilho.
+#
+# Segunda lacuna conhecida do gatilho, esta documentada pelo GitHub: "branches with names
+# that match certain patterns (such as those which look similar to SHAs) may not trigger
+# workflows with the pull_request_target event". PR aberto de um branch com nome parecido
+# com SHA pode simplesmente nao disparar este workflow. Vale a mesma saida do caso
+# Dependabot: reconciliacao por evento confiavel cobre o que o gatilho nao alcanca.
+#
+# Em resumo, este gatilho garante PR de fork com nome de branch comum; Dependabot e
+# branch com cara de SHA sao lacunas conhecidas e declaradas, nao promessas quebradas.
+#
+# Este workflow usa somente metadados e NAO faz checkout nem executa codigo do PR —
+# invariante que mantem o gatilho privilegiado seguro e justifica a excecao estreita do
+# zizmor na linha do gatilho. Se algum passo futuro precisar de checkout, a excecao deixa
+# de valer e o gatilho volta a pull_request.
 
 on:
   issues:
+    # transferred cobre a issue transferida PARA este repositorio: o README da action
+    # pinada lista o evento como o caminho suportado para "Issues... transferred into
+    # your repository", e a adicao e idempotente (re-adicionar devolve o mesmo item).
     types: [opened, reopened, transferred]
-  pull_request:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] -- sem checkout e sem execucao de codigo do PR; somente metadados; secret do environment para PR de fork (cobertura de Dependabot nao garantida: decidida por sonda na ativacao)
     types: [opened, reopened, ready_for_review]
 
-# Escopo de workflow E de job, por politica da organizacao (regra TokenPermissions do
-# OpenSSF Scorecard exige um bloco permissions em escopo de workflow).
-permissions: write-all
+# Scorecard TokenPermissions exige um bloco permissions em escopo de workflow; a politica
+# enterprise revogou write-all (Discussion .github#150, 11/08/2026). Nenhum passo deste
+# workflow usa o GITHUB_TOKEN — o token do App e emitido e repassado explicitamente —,
+# entao o conjunto vazio e o privilegio minimo real.
+permissions: {}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -32,10 +74,16 @@ jobs:
     name: Add item to projects
     if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' }}
     runs-on: ubuntu-latest
-    permissions: write-all
+    timeout-minutes: 10
+    permissions: {}
     # Confina a chave privada do App a este job (zizmor secrets-outside-env).
     # Mesmo padrao ja usado pela organizacao para credenciais de automacao.
-    environment: projects-automation
+    # deployment: false — usa os secrets do environment sem criar um deployment
+    # object por evento de issue/PR (senao cada evento polui o historico de
+    # deployments e aciona integracoes de deployment).
+    environment:
+      name: projects-automation
+      deployment: false
     steps:
       - name: Mint installation token
         id: token
