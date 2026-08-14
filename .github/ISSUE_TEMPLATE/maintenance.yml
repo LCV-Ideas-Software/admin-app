@@ -4,6 +4,11 @@ title: "[Maintenance]: "
 labels: ["dependencies"]
 type: Maintenance
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Use placeholders instead of real infrastructure identifiers. This repository is public.
+        Never paste cloud project IDs, database names, tokens, or account identifiers.
   - type: textarea
     id: what
     attributes:
