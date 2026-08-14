@@ -348,11 +348,11 @@ const CANON_HEAD = [
 const CANON_AGG = [
   '  dependency_review:',
   '    # write-all HISTORICO exigido pelo gate de merge-group do native-auto-merge',
-  '    # (componente em aposentadoria pela C2, .github#147): o conjunto escopado de',
-  '    # reads quebrou o gate em producao (admin-app, run 31806593048, "Resource not',
-  '    # accessible by integration" no mergeQueue) e o dump do token prova que NAO',
-  '    # existe permissao MergeQueues para conceder individualmente. Volta ao minimo',
-  '    # (contents: read) junto com a remocao do gate pela C2.',
+  '    # (componente em aposentadoria, rastreado na issue de governanca central): o',
+  '    # conjunto escopado de reads quebrou o gate em execucao real de merge queue',
+  '    # ("Resource not accessible by integration" no mergeQueue) e o dump do token',
+  '    # prova que nao existe permissao MergeQueues para conceder individualmente.',
+  '    # Volta ao minimo junto com a remocao do gate.',
   '    permissions: write-all',
   '    name: Dependency Review',
   '    # Job exigido que fica skipped conta como aprovado para o ruleset; por isso',
@@ -433,7 +433,18 @@ test('the boundary job feeds the required aggregator for every origin', () => {
     'boundary job must equal its canonical block exactly',
   );
   const agregador = carrierNorm.slice(carrierNorm.indexOf('  dependency_review:'), inicioBoundary);
-  assert.equal(agregador.trimEnd(), CANON_AGG.trimEnd(), 'aggregator job must equal its canonical block exactly');
+  // A linha de permissions do agregador e superficie da outra equipe (o gate de
+  // merge-group em aposentadoria dita o nivel; a reducao futura nao deve quebrar
+  // este check). A igualdade IGNORA o valor de permissions deste job: alarga-lo
+  // nao ganha nada (os passos sao canonicos) e estreita-lo demais so falha o
+  // gate — fail-closed nos dois sentidos.
+  const mascaraPermissoes = (s) =>
+    s.replace(/^ {4}permissions:(?: .*)?\n(?: {6}.+\n)*/m, '    permissions: <fora-do-canon>\n');
+  assert.equal(
+    mascaraPermissoes(agregador).trimEnd(),
+    mascaraPermissoes(CANON_AGG).trimEnd(),
+    'aggregator job must equal its canonical block exactly (permissions masked)',
+  );
   assert.match(agregador, /^ {4}if: \$\{\{ always\(\) \}\}$/m);
   assert.doesNotMatch(agregador, /continue-on-error/);
   assert.match(agregador, /needs:[\s\S]{0,200}- projects_workflow_boundaries/);

@@ -56,11 +56,11 @@ jobs:
 
   dependency_review:
     # write-all HISTORICO exigido pelo gate de merge-group do native-auto-merge
-    # (componente em aposentadoria pela C2, .github#147): o conjunto escopado de
-    # reads quebrou o gate em producao (admin-app, run 31806593048, "Resource not
-    # accessible by integration" no mergeQueue) e o dump do token prova que NAO
-    # existe permissao MergeQueues para conceder individualmente. Volta ao minimo
-    # (contents: read) junto com a remocao do gate pela C2.
+    # (componente em aposentadoria, rastreado na issue de governanca central): o
+    # conjunto escopado de reads quebrou o gate em execucao real de merge queue
+    # ("Resource not accessible by integration" no mergeQueue) e o dump do token
+    # prova que nao existe permissao MergeQueues para conceder individualmente.
+    # Volta ao minimo junto com a remocao do gate.
     permissions: write-all
     name: Dependency Review
     # Job exigido que fica skipped conta como aprovado para o ruleset; por isso
