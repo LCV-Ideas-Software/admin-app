@@ -130,7 +130,9 @@ const ESPERADO = [
   'jobs:',
   '  add:',
   '    name: Add item to projects',
-  "    if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' }}",
+  '    # Dependabot fica fora da cobertura deste gatilho (declarado acima); sem esta',
+  '    # guarda, apos a ativacao cada PR dele falharia no mint e viraria ruido vermelho.',
+  "    if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' && github.actor != 'dependabot[bot]' }}",
   '    runs-on: ubuntu-latest',
   '    timeout-minutes: 10',
   '    permissions: {}',
@@ -196,7 +198,8 @@ test('the privileged projects workflow never executes PR-controlled code', () =>
 
 test('the projects workflow bans YAML mechanics that could disguise a key', () => {
   assert.doesNotMatch(workflow, /\\/);
-  assert.doesNotMatch(workflow, /&/);
+  // & isolado = ancora YAML (banida); && = operador de expressao (permitido)
+  assert.doesNotMatch(workflow, /(?<!&)&(?!&)/);
   assert.doesNotMatch(workflow, /\*/);
   assert.doesNotMatch(workflow, /\?/);
   assert.doesNotMatch(workflow, /^\s*<</m);

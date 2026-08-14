@@ -72,7 +72,9 @@ concurrency:
 jobs:
   add:
     name: Add item to projects
-    if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' }}
+    # Dependabot fica fora da cobertura deste gatilho (declarado acima); sem esta
+    # guarda, apos a ativacao cada PR dele falharia no mint e viraria ruido vermelho.
+    if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}
