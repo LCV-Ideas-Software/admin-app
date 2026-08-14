@@ -55,15 +55,13 @@ jobs:
           fail-on-scopes: runtime, development, unknown
 
   dependency_review:
-    # Somente os reads que o gate de merge_group usa (associacao do PR, estado de
-    # feedback, runs): com always() este job roda tambem para PR de fork; nenhum
-    # passo escreve e a operacao de mutacao do native-auto-merge proibe github_token.
-    permissions:
-      actions: read # associacao do merge group com runs/attempts do workflow
-      checks: read # estado dos check runs do feedback dos bots
-      contents: read # dados de repositorio e refs
-      pull-requests: read # associacao do PR e reviews dos bots
-      statuses: read # commit statuses do head do merge group
+    # write-all HISTORICO exigido pelo gate de merge-group do native-auto-merge
+    # (componente em aposentadoria pela C2, .github#147): o conjunto escopado de
+    # reads quebrou o gate em producao (admin-app, run 31806593048, "Resource not
+    # accessible by integration" no mergeQueue) e o dump do token prova que NAO
+    # existe permissao MergeQueues para conceder individualmente. Volta ao minimo
+    # (contents: read) junto com a remocao do gate pela C2.
+    permissions: write-all
     name: Dependency Review
     # Job exigido que fica skipped conta como aprovado para o ruleset; por isso
     # o agregador roda para TODA origem (sem gate proprio) e decide por resultado:

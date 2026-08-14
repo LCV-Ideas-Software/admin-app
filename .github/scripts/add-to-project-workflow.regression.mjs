@@ -97,8 +97,13 @@ const ESPERADO = [
   '# com SHA pode simplesmente nao disparar este workflow. Vale a mesma saida do caso',
   '# Dependabot: reconciliacao por evento confiavel cobre o que o gatilho nao alcanca.',
   '#',
-  '# Em resumo, este gatilho garante PR de fork com nome de branch comum; Dependabot e',
-  '# branch com cara de SHA sao lacunas conhecidas e declaradas, nao promessas quebradas.',
+  '# Terceira lacuna declarada: item ja ARQUIVADO no quadro. O fix #797 transforma a',
+  '# duplicata em skip (nao em falha), mas nao desarquiva: reabrir trabalho arquivado',
+  '# nao o traz de volta a visao ativa. Desarquivar exigiria passo de execucao aqui',
+  '# (proibido pelo invariante metadata-only) — cabe a reconciliacao/backfill.',
+  '#',
+  '# Em resumo, este gatilho garante PR de fork com nome de branch comum; Dependabot,',
+  '# branch com cara de SHA e item arquivado sao lacunas conhecidas e declaradas.',
   '#',
   '# Este workflow usa somente metadados e NAO faz checkout nem executa codigo do PR —',
   '# invariante que mantem o gatilho privilegiado seguro e justifica a excecao estreita do',
@@ -135,7 +140,9 @@ const ESPERADO = [
   '    name: Add item to projects',
   '    # Dependabot fica fora da cobertura deste gatilho (declarado acima); sem esta',
   '    # guarda, apos a ativacao cada PR dele falharia no mint e viraria ruido vermelho.',
-  "    if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' && github.actor != 'dependabot[bot]' }}",
+  '    # A guarda olha o AUTOR do PR (nao o ator): reopen por mantenedor mantem o autor',
+  '    # dependabot[bot]. Em evento de issue o campo e nulo e a guarda nao interfere.',
+  "    if: ${{ vars.LCV_PROJECTS_APP_CLIENT_ID != '' && github.event.pull_request.user.login != 'dependabot[bot]' }}",
   '    runs-on: ubuntu-latest',
   '    timeout-minutes: 10',
   '    permissions: {}',
@@ -340,15 +347,13 @@ const CANON_HEAD = [
 // ou qualquer contrabando dentro do job reprovam por construcao.
 const CANON_AGG = [
   '  dependency_review:',
-  '    # Somente os reads que o gate de merge_group usa (associacao do PR, estado de',
-  '    # feedback, runs): com always() este job roda tambem para PR de fork; nenhum',
-  '    # passo escreve e a operacao de mutacao do native-auto-merge proibe github_token.',
-  '    permissions:',
-  '      actions: read # associacao do merge group com runs/attempts do workflow',
-  '      checks: read # estado dos check runs do feedback dos bots',
-  '      contents: read # dados de repositorio e refs',
-  '      pull-requests: read # associacao do PR e reviews dos bots',
-  '      statuses: read # commit statuses do head do merge group',
+  '    # write-all HISTORICO exigido pelo gate de merge-group do native-auto-merge',
+  '    # (componente em aposentadoria pela C2, .github#147): o conjunto escopado de',
+  '    # reads quebrou o gate em producao (admin-app, run 31806593048, "Resource not',
+  '    # accessible by integration" no mergeQueue) e o dump do token prova que NAO',
+  '    # existe permissao MergeQueues para conceder individualmente. Volta ao minimo',
+  '    # (contents: read) junto com a remocao do gate pela C2.',
+  '    permissions: write-all',
   '    name: Dependency Review',
   '    # Job exigido que fica skipped conta como aprovado para o ruleset; por isso',
   '    # o agregador roda para TODA origem (sem gate proprio) e decide por resultado:',
@@ -415,15 +420,6 @@ const CANON_AGG = [
   '',
 ].join('\n');
 
-const PERMISSOES_AGREGADOR = [
-  '    permissions:',
-  '      actions: read # associacao do merge group com runs/attempts do workflow',
-  '      checks: read # estado dos check runs do feedback dos bots',
-  '      contents: read # dados de repositorio e refs',
-  '      pull-requests: read # associacao do PR e reviews dos bots',
-  '      statuses: read # commit statuses do head do merge group',
-].join('\n');
-
 test('the boundary job feeds the required aggregator for every origin', () => {
   assert.ok(
     carrierNorm.startsWith(CANON_HEAD),
@@ -439,8 +435,6 @@ test('the boundary job feeds the required aggregator for every origin', () => {
   const agregador = carrierNorm.slice(carrierNorm.indexOf('  dependency_review:'), inicioBoundary);
   assert.equal(agregador.trimEnd(), CANON_AGG.trimEnd(), 'aggregator job must equal its canonical block exactly');
   assert.match(agregador, /^ {4}if: \$\{\{ always\(\) \}\}$/m);
-  assert.ok(agregador.includes(PERMISSOES_AGREGADOR), 'aggregator permissions must be the scoped read block');
-  assert.doesNotMatch(agregador, /read-all|write-all/);
   assert.doesNotMatch(agregador, /continue-on-error/);
   assert.match(agregador, /needs:[\s\S]{0,200}- projects_workflow_boundaries/);
   const passos = agregador.split(/^ {6}- name: /m).slice(1);
