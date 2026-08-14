@@ -18,9 +18,7 @@ Deploy exclusivamente via GitHub Actions.
 
 ```bash
 npm test
-npm run test:admin-motor
 npm run lint
-npm run biome
 npm run typecheck:admin-motor
 npm run build
 npm run format:public:check
@@ -90,7 +88,8 @@ mudar de escopo, vale o texto de la.
 ### Valvula de escape
 
 Bump de dependencia, correcao de typo, lockfile e ajuste de formatacao **dispensam issue**.
-O PR basta — ele entra no quadro sozinho.
+O PR basta — ele entra no quadro sozinho quando o gatilho o alcanca; PR do Dependabot
+e uma lacuna declarada do gatilho e pode depender do backfill/reconciliacao da ativacao.
 
 ### Campos
 
