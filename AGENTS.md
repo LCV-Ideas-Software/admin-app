@@ -18,7 +18,9 @@ Deploy exclusivamente via GitHub Actions.
 
 ```bash
 npm test
+npm run test:admin-motor
 npm run lint
+npm run biome
 npm run typecheck:admin-motor
 npm run build
 npm run format:public:check
