@@ -1,0 +1,45 @@
+name: Maintenance
+description: Dependency bumps, lockfiles, version bumps and routine upkeep
+title: "[Maintenance]: "
+labels: ["dependencies"]
+type: Maintenance
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Stop before filling this in.** If this work is prompted by a suspected vulnerability,
+        a credential leak, exposure of private data, an authentication bypass, a payment-flow
+        issue, a supply-chain issue, or a deployment misconfiguration, **do not use this
+        public form** — report it privately through the channel in `SECURITY.md`.
+  - type: markdown
+    attributes:
+      value: |
+        Use placeholders instead of real infrastructure identifiers. This repository is public.
+        Never paste cloud project IDs, database names, tokens, or account identifiers.
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs upkeep
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now
+      description: Advisory, deprecation, drift, or scheduled upkeep.
+    validations:
+      required: true
+  - type: textarea
+    id: surfaces
+    attributes:
+      label: Surfaces touched
+      description: Every file or configuration that must change together.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: How it will be verified
+      description: Which gates must pass before this is considered done.
+    validations:
+      required: true

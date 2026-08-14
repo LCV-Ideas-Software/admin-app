@@ -1,0 +1,45 @@
+name: Spike
+description: Time-boxed investigation with no guaranteed deliverable
+title: "[Spike]: "
+type: Spike
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Stop before filling this in.** If this work is prompted by a suspected vulnerability,
+        a credential leak, exposure of private data, an authentication bypass, a payment-flow
+        issue, a supply-chain issue, or a deployment misconfiguration, **do not use this
+        public form** — report it privately through the channel in `SECURITY.md`.
+  - type: markdown
+    attributes:
+      value: |
+        Use placeholders instead of real infrastructure identifiers. This repository is public.
+        Never paste cloud project IDs, database names, tokens, or account identifiers.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question to answer
+      description: A single, decidable question. Not "look into X".
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: What decision is blocked until this is answered.
+    validations:
+      required: true
+  - type: input
+    id: timebox
+    attributes:
+      label: Time box
+      placeholder: "e.g. 2 hours"
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: What artifact ends this spike — a written answer, a benchmark, a prototype?
+    validations:
+      required: true

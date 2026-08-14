@@ -4,6 +4,7 @@
   "version": "2.15.22",
   "type": "module",
   "scripts": {
+    "projects:boundaries": "node --test .github/scripts/add-to-project-workflow.regression.mjs",
     "dev": "vite",
     "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -b && vite build",
