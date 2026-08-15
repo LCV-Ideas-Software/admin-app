@@ -24,7 +24,6 @@ npm run biome
 npm run typecheck:admin-motor
 npm run build
 npm run format:public:check
-npm run projects:boundaries
 ```
 
 ## Workspace Policy
@@ -112,9 +111,11 @@ com desvios `Bloqueado` e `Descartado`.
 > proprios em cada quadro. Atualize os DOIS quadros — o deste repositorio e o portfolio
 > #17 — a cada transicao; ID de opcao de um quadro nunca vale no outro (Discussion org#176).
 
-### Nada de identificador real em repositorio publico
+### Identificadores em superficie publica
 
 Issues, PRs e Discussions deste repositorio sao publicos e permanentes. Use placeholders
-(`proj-x`, `exemplo-projeto-000`, `exemplo.com`) no lugar de IDs de projeto de nuvem, nomes
-de banco, dominios e contas. Detalhe operacional sensivel vai para o quadro privado ou para
-`.github-private`.
+(`proj-x`, `exemplo-projeto-000`, `exemplo.com`) para detalhes operacionais que nao precisam
+ser publicos. Excecao: identificadores nao secretos exigidos pela configuracao Cloudflare
+versionada, como `database_id` de D1 em `wrangler.json`, podem ser commitados conforme a
+politica do workspace. Credenciais, tokens, IDs de conta e detalhes operacionais sensiveis
+continuam restritos ao quadro privado ou a `.github-private`.

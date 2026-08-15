@@ -5,7 +5,6 @@
 # admin-app
 
 [![status: stable](https://img.shields.io/badge/status-stable-brightgreen.svg)](#status)
-[![release](https://img.shields.io/github/v/release/LCV-Ideas-Software/admin-app?sort=semver)](https://github.com/LCV-Ideas-Software/admin-app/releases)
 [![Deploy](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/deploy.yml/badge.svg)](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/deploy.yml)
 [![Pages](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/pages.yml/badge.svg)](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/pages.yml)
 [![CodeQL](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/codeql.yml/badge.svg)](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/codeql.yml)
@@ -16,12 +15,16 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current release target: **v02.15.22**. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+**Status.** Stable. Current internal source version: **APP v02.15.23**. The last
+historical tagged release is `v02.15.22`; web deployments after that point keep
+their visible version and changelog without creating package, tag, or GitHub
+Release artifacts. See [CHANGELOG.md](./CHANGELOG.md) for the full history.
 
 The version history at a glance:
 
 | Release         | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`APP v02.15.23`** | **Automação e deploy official-only.** Substitui controladores e validadores próprios por recursos nativos do GitHub e Actions oficiais, reduz permissões, preserva a fila nativa com checks reais e passa os três deploys Cloudflare para a Wrangler Action oficial. É uma versão interna de fonte, sem tag ou GitHub Release. |
 | **`v02.15.22`** | **Corrige a atribuição da baseline de segurança no `SECURITY.md`.** O parágrafo de _Supported status_ acompanhava o número da release corrente e passava a atribuir a ela as correções de Hono, `brace-expansion`, Undici e PostCSS entregues na v02.15.15. |
 | **`v02.15.21`** | **Descomissiona os bindings legados do AI Studio.** Saem `GEMINI_API_KEY` e `MAESTRO_GEMINI_API_KEY` do `admin-motor/wrangler.json`, os tipos e a resolução em `index.ts` e o alias no resolver de secrets das Pages Functions. Nenhum código lia essas chaves desde a migração para o Vertex AI. |
 | **`v02.15.20`** | **`pageSize: Infinity` volta a saturar no teto.** O guard de não finitos da v02.15.19 mandava `Infinity` para 0 (padrão do servidor), reduzindo a página e multiplicando as requisições de catálogo; agora só o `NaN` é tratado à parte. |
@@ -175,7 +178,8 @@ npx wrangler r2 bucket create mainsite-media
 
 ### 3. Wire `database_id` into all three `wrangler.json`
 
-Replace `00000000-0000-0000-0000-000000000000` in:
+Replace the repository's production `database_id` with the identifier returned
+for your own database in:
 
 - `wrangler.json` (root, Pages app)
 - `admin-motor/wrangler.json`
@@ -195,23 +199,32 @@ Replace `00000000-0000-0000-0000-000000000000` in:
 
 ### 4. Apply schema
 
-Apply migrations 001 through 014 once, run the versioned Astrólogo preflight,
-then apply migrations 015 and 016. Run the preflight again after those explicit
-migrations. The first pass adds legacy `astrologo_mapas.email` only when absent;
-the final pass materializes and verifies the idempotent contracts from migrations
-017 and 018, including durable AI-analysis jobs and steps.
+For a new, empty database, apply the versioned SQL files exactly once in lexical
+order. This includes migration `014a`, which materializes
+`astrologo_mapas.email` before migration 015, and migrations 017/018, which add
+saved-map ownership and durable AI-analysis jobs.
 
 ```bash
 for f in $(git ls-files 'db/migrations/*.sql' | sort); do
-  [[ "$f" == *"/015_"* ]] && break
   npx wrangler d1 execute example_db --remote --file "$f"
 done
-
-node scripts/reconcile-astrologo-schema.mjs --remote --database example_db
-npx wrangler d1 execute example_db --remote --file db/migrations/015_bigdata_astrologo_schema_regularization.sql
-npx wrangler d1 execute example_db --remote --file db/migrations/016_bigdata_astrologo_advanced_charts.sql
-node scripts/reconcile-astrologo-schema.mjs --remote --database example_db
 ```
+
+Do not replay this historical series against an existing database. Verify the
+live schema with the read-only queries in the schema document. Production
+changes live separately in `db/admin-app-migrations` and are tracked by the
+`admin_app_migrations` table, so Wrangler never mistakes the bootstrap history
+for pending production work.
+
+After the bootstrap series on a fresh database—or directly on an existing
+compatible database—apply the pending production migrations through Wrangler:
+
+```bash
+npx wrangler d1 migrations apply BIGDATA_DB --remote --config wrangler.json
+```
+
+Each new production change must be a backward-compatible, data-preserving
+migration because the previous Worker revision remains live until deploy.
 
 The canonical Astrólogo schema, rollout order, verification queries, and the
 `astrologo-config/modeloSintese` contract are documented in
@@ -252,13 +265,19 @@ The Pages app, `admin-motor`, and `tlsrpt-motor` are deployed independently but 
 
 ## CI deploy (this repo)
 
-This repo's [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push to `main`:
+This repo's [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on
+every push to `main`. One least-privilege job validates both Node workspaces and
+then serially deploys `tlsrpt-motor`, `admin-motor`, and the Pages application
+with the SHA-pinned official Cloudflare Wrangler Action and a fixed Wrangler
+version. The D1 binding uses the versioned, non-secret database identifier from
+each `wrangler.json`. Before deploying any Worker, the workflow applies only
+pending files from `db/admin-app-migrations` with Wrangler's native migration
+command; a migration failure blocks every deploy. It never mutates configuration
+or replays the historical `db/migrations` bootstrap series.
 
-1. **detect_tlsrpt** — detects whether `tlsrpt-motor/**` changed.
-2. **deploy_tlsrpt** (conditional) — runs `npm audit` + injects `D1_DATABASE_ID` into `tlsrpt-motor/wrangler.json` via `jq` from a GitHub secret + deploys the worker.
-3. **deploy_admin** (conditional, after `deploy_tlsrpt`) — runs `lint` + `test` (admin-app UI) + `test:admin-motor` + injects D1 ID into root `wrangler.json` and `admin-motor/wrangler.json` + deploys admin-motor + builds the Pages app + deploys it.
-
-The real D1 ID is kept out of git; it lives only as a GitHub Actions secret.
+The separate GitHub Pages documentation site expects Pages to be enabled once
+under **Settings → Pages → GitHub Actions** in a fresh fork. The workflow does
+not request an administrative PAT or GitHub App credential to self-enable it.
 
 ## Repository conventions
 

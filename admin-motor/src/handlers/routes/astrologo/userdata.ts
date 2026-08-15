@@ -141,7 +141,7 @@ export const onRequestDelete = async (context: HandlerContext) => {
     const tokenResult = await db.prepare('DELETE FROM astrologo_auth_tokens WHERE email = ?').bind(email).run();
     deletedCounts.tokens = getChanges(tokenResult);
 
-    // 6. Safety net por e-mail; a coluna é garantida pelo preflight versionado.
+    // 6. Safety net por e-mail; a coluna é garantida pela migration versionada.
     await db.prepare('DELETE FROM astrologo_mapas WHERE email = ?').bind(email).run();
 
     // 7. Deletar o registro principal de astrologo_user_data

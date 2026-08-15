@@ -21,37 +21,41 @@ salva pelo operador nunca é sobrescrita.
 
 ## Ordem obrigatória
 
-1. Aplicar as migrations 001 a 014.
-2. Em banco legado, confirmar que `astrologo_mapas.email` existe antes da
-   migration 015. Essa foi a função do preflight v1; instalações novas devem
-   materializar a coluna com `TEXT DEFAULT ''` quando ela estiver ausente.
+1. Em um banco novo e vazio, aplicar as migrations 001 a 014 uma única vez.
+2. Aplicar `014a_bigdata_astrologo_email.sql` uma única vez para materializar
+   `astrologo_mapas.email` com `TEXT DEFAULT ''`.
 3. Aplicar `015_bigdata_astrologo_schema_regularization.sql` uma única vez.
 4. Aplicar `016_bigdata_astrologo_advanced_charts.sql` uma única vez.
 5. Aplicar `017_astrologo_saved_map_claims.sql` e
-   `018_astrologo_reentrant_ai_analysis.sql` uma única vez **ou** executar o
-   reconciliador v3 do deploy, que materializa os mesmos contratos sem repetir
-   o `ALTER TABLE` quando a coluna já existe nem substituir tabelas ou policies
-   já canônicas:
-
-   ```bash
-   node scripts/reconcile-astrologo-schema.mjs --remote --database bigdata_db
-   ```
-
-6. Publicar o `admin-app` e confirmar o preflight. Somente depois publicar o
+   `018_astrologo_reentrant_ai_analysis.sql` uma única vez.
+6. Aplicar as migrations de produção pendentes em `db/admin-app-migrations`
+   com `wrangler d1 migrations apply BIGDATA_DB --remote --config wrangler.json`.
+7. Executar as consultas read-only da seção **Verificação**. Somente depois
+   publicar o `admin-app` e o
    `astrologo-app` que escreve ou exige `save_claim_hash` e os jobs reentrantes.
 
-O reconciliador v1.0.0 consulta `PRAGMA table_info(astrologo_mapas)`. Ele adiciona a
-coluna `email` somente quando ausente, confirma o resultado e falha fechado se a
-tabela base não existir. A migration 015 adiciona `data_analise`, que estava
-ausente no schema remoto verificado antes desta mudança.
+O workflow de deploy não reaplica migrations históricas. Antes de publicar os
+Workers, ele executa somente `db/admin-app-migrations` por meio do comando
+oficial do Wrangler e da tabela de tracking `admin_app_migrations`; qualquer
+falha interrompe o deploy. Ambientes existentes devem ser inspecionados pelas
+consultas abaixo, e qualquer divergência futura exige uma migration nova,
+retrocompatível e preservadora de dados. A migration 015 adiciona
+`data_analise`, que estava ausente no schema remoto verificado antes dessa
+mudança histórica.
 
-O workflow de deploy executa o reconciliador v3 antes do Admin Motor. Ele não
-reaplica cegamente as migrations 017 e 018: inspeciona o DDL, adiciona somente
-colunas ausentes, executa o backfill idempotente, cria tabelas e índices apenas
-quando ausentes, semeia policies com `INSERT OR IGNORE` e verifica novamente
-todas as garantias. Coluna, tabela ou índice homônimo com definição incompatível
-faz o deploy falhar fechado. As migrations 015 e 016 continuam sendo operações
-explícitas e únicas.
+## Migration oficial 0001
+
+`0001_regularize_astrologo_runtime_tables.sql` torna o schema existente de
+`astrologo_user_data`, `astrologo_auth_tokens`, `admin_module_configs` e
+`ai_usage_logs` idêntico às declarações canônicas da migration 015. Ela também
+reconstrói `astrologo_user_saved_items`, porque derrubar sua tabela pai enquanto
+a FK `ON DELETE CASCADE` ainda existe apagaria itens salvos. O arquivo preserva
+todos os registros, os 13 índices envolvidos e o watermark AUTOINCREMENT de
+`ai_usage_logs`; dados incompatíveis fazem a migration inteira falhar e voltar
+ao estado anterior.
+
+Rotas de aplicação não criam mais `ai_usage_logs` em tempo de requisição. A
+migration deve estar concluída antes que qualquer uma delas seja publicada.
 
 ## Migration 015
 
@@ -132,9 +136,10 @@ O backfill lê apenas associações já registradas em
 `lower(trim(email))` e preenche `astrologo_mapas.email` somente quando o mesmo
 mapa possui exatamente um proprietário distinto. Ele preserva qualquer e-mail
 já gravado, deixa conflitos sem proprietário e ignora JSON malformado, listas de
-formato inesperado e itens sem um `id` textual. Por isso o reconciliador pode
-repeti-lo sem transferir propriedade nem depender de IDs recém-enviados pelo
-navegador.
+formato inesperado e itens sem um `id` textual. Esse backfill pertence à
+migration histórica 017 e não é reaplicado pelo deploy; seus predicados também
+evitam transferir propriedade ou depender de IDs recém-enviados pelo navegador
+se uma tentativa atômica precisar ser repetida após rollback.
 
 O seed de `astrologo/auth-read` usa `INSERT OR IGNORE`: 60/15 é o padrão de uma
 instalação sem policy, enquanto limites já configurados pelo operador permanecem
@@ -199,11 +204,11 @@ etapas. O código de erro é limitado a um identificador curto; a presença de
 detalhes técnicos gera somente uma mensagem fixa, sem devolver o texto bruto.
 Campos sensíveis nunca integram a resposta administrativa nem o HTML.
 
-O preflight v3 compara também todas as colunas consumidas pelo repositório. Nos
-jobs isso inclui erros e conclusão; nas etapas inclui ordem com `CHECK >= 0`,
-erros, início e conclusão, além de estado, tentativas, leases, JSONs e tokens. Um
-objeto homônimo incompleto não é aceito como canônico. O índice parcial ativo é
-verificado por nome, unicidade, coluna e predicado exato.
+As consultas da seção **Verificação** cobrem as colunas consumidas pelo
+repositório. Nos jobs isso inclui erros e conclusão; nas etapas inclui ordem com
+`CHECK >= 0`, erros, início e conclusão, além de estado, tentativas, leases,
+JSONs e tokens. O índice parcial ativo deve ser verificado por nome, unicidade,
+coluna e predicado exato antes de qualquer rollout de schema.
 
 ## Consumo administrativo dos contratos v1
 

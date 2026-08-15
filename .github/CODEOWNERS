@@ -20,6 +20,7 @@
 /functions/ @lcv-leo
 /admin-motor/ @lcv-leo
 /tlsrpt-motor/src/ @lcv-leo
+/db/ @lcv-leo
 /wrangler.json @lcv-leo
 /**/wrangler.json @lcv-leo
 /wrangler.toml @lcv-leo

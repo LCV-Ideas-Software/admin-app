@@ -11,8 +11,9 @@ ALTER TABLE astrologo_mapas ADD COLUMN save_claim_hash TEXT CHECK (
 
 -- Associações históricas já persistidas no servidor são migradas somente
 -- quando há exatamente um e-mail proprietário normalizado para o mapa. O
--- reconciliador do deploy pode repetir este bloco com segurança: ele nunca
--- substitui um proprietário já gravado e ignora JSON legado malformado.
+-- backfill pertence a esta migration histórica de aplicação única; os
+-- predicados nunca substituem um proprietário já gravado e ignoram JSON legado
+-- malformado.
 WITH historical_ownership AS (
     SELECT
         json_extract(saved.value, '$.id') AS mapa_id,

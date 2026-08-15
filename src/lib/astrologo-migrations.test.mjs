@@ -1,16 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import {
-  ASTROLOGO_ANALYSIS_INDEXES,
-  ASTROLOGO_ANALYZE_STEP_POLICY_SQL,
-  ASTROLOGO_AUTH_READ_POLICY_SQL,
-  ASTROLOGO_SAVE_CLAIM_INDEX_SQL,
-  ASTROLOGO_SAVED_MAPS_BACKFILL_SQL,
-} from '../../scripts/lib/astrologo-schema-reconciler.mjs';
 
 const root = process.cwd();
 const migration = (name) => readFileSync(`${root}/db/migrations/${name}`, 'utf8');
+const adminMigration = (name) => readFileSync(`${root}/db/admin-app-migrations/${name}`, 'utf8');
 const tableColumns = (db, table) =>
   db
     .prepare(`PRAGMA table_info(${table})`)
@@ -23,15 +17,51 @@ const tableIndexes = (db, table) =>
     .map((row) => row.name);
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
-const normalizeSql = (value) => value.replaceAll(/\s+/g, '').replaceAll(';', '').toLowerCase();
-
 const prepareVersionedBaseline = () => {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(migration('001_bigdata_astrologo_prefixacao.sql'));
   db.exec(migration('014_bigdata_astrologo_positional_v2.sql'));
-  db.exec("ALTER TABLE astrologo_mapas ADD COLUMN email TEXT DEFAULT ''");
+  db.exec(migration('014a_bigdata_astrologo_email.sql'));
   return db;
+};
+const prepareRuntimeDriftBaseline = () => {
+  const db = prepareVersionedBaseline();
+  db.exec(`
+    CREATE TABLE admin_module_configs (
+      module_key TEXT PRIMARY KEY,
+      config_json TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE astrologo_user_data (
+      id TEXT PRIMARY KEY, email TEXT NOT NULL, dados_json TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE astrologo_auth_tokens (
+      id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT NOT NULL, action TEXT NOT NULL,
+      dados_json TEXT, expires_at TEXT NOT NULL, used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE ai_usage_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+      module TEXT NOT NULL, model TEXT NOT NULL, input_tokens INTEGER DEFAULT 0,
+      output_tokens INTEGER DEFAULT 0, latency_ms INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'ok', error_detail TEXT
+    );
+  `);
+  db.exec(migration('015_bigdata_astrologo_schema_regularization.sql'));
+  db.exec(migration('016_bigdata_astrologo_advanced_charts.sql'));
+  return db;
+};
+const applyAdminMigration = (db, name) => {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(adminMigration(name));
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 };
 
 describe('canonical Astrologo BIGDATA_DB migrations', () => {
@@ -41,7 +71,6 @@ describe('canonical Astrologo BIGDATA_DB migrations', () => {
     db.exec(migration('016_bigdata_astrologo_advanced_charts.sql'));
     db.exec(migration('017_astrologo_saved_map_claims.sql'));
     const migration018 = migration('018_astrologo_reentrant_ai_analysis.sql');
-    expect(normalizeSql(migration018)).toContain(normalizeSql(ASTROLOGO_ANALYZE_STEP_POLICY_SQL));
     db.exec(migration018);
     expect(() => db.exec(migration018)).not.toThrow();
 
@@ -105,7 +134,19 @@ describe('canonical Astrologo BIGDATA_DB migrations', () => {
         'idx_astrologo_ai_analysis_steps_job_status_ordinal',
       ]),
     );
-    expect(Object.keys(ASTROLOGO_ANALYSIS_INDEXES)).toHaveLength(6);
+    expect([
+      ...tableIndexes(db, 'astrologo_ai_analysis_jobs'),
+      ...tableIndexes(db, 'astrologo_ai_analysis_steps'),
+    ]).toEqual(
+      expect.arrayContaining([
+        'idx_astrologo_ai_analysis_jobs_capability_hash',
+        'idx_astrologo_ai_analysis_jobs_active_mapa',
+        'idx_astrologo_ai_analysis_jobs_mapa_status',
+        'idx_astrologo_ai_analysis_jobs_expires_at',
+        'idx_astrologo_ai_analysis_steps_job_ordinal',
+        'idx_astrologo_ai_analysis_steps_job_status_ordinal',
+      ]),
+    );
     expect(
       db
         .prepare('SELECT max_requests, window_minutes FROM astrologo_rate_limit_policies WHERE route = ?')
@@ -159,10 +200,6 @@ describe('canonical Astrologo BIGDATA_DB migrations', () => {
     );
 
     const migration017 = migration('017_astrologo_saved_map_claims.sql');
-    const normalizedMigration = normalizeSql(migration017);
-    expect(normalizedMigration).toContain(normalizeSql(ASTROLOGO_SAVED_MAPS_BACKFILL_SQL));
-    expect(normalizedMigration).toContain(normalizeSql(ASTROLOGO_AUTH_READ_POLICY_SQL));
-    expect(normalizedMigration).toContain(normalizeSql(ASTROLOGO_SAVE_CLAIM_INDEX_SQL));
     db.exec(migration017);
 
     expect(tableColumns(db, 'astrologo_mapas')).toContain('save_claim_hash');
@@ -248,6 +285,120 @@ describe('canonical Astrologo BIGDATA_DB migrations', () => {
       .get();
     expect(JSON.parse(config.config_json)).toEqual({ modeloSintese: 'gemini-selected' });
     expect(tableColumns(db, 'astrologo_mapas')).toContain('data_analise');
+  });
+
+  it('atomically regularizes live tables while preserving saved children, indexes, and sequence', () => {
+    const db = prepareRuntimeDriftBaseline();
+    db.prepare('INSERT INTO astrologo_mapas (id, nome) VALUES (?, ?)').run('map-migrated', 'Pessoa');
+    db.prepare('INSERT INTO astrologo_user_data (id, email, dados_json) VALUES (?, ?, ?)').run(
+      'user-migrated',
+      'owner@example.com',
+      JSON.stringify({ mapasSalvos: [{ id: 'map-migrated' }] }),
+    );
+    db.prepare(
+      `INSERT INTO astrologo_auth_tokens
+       (id, email, token, action, dados_json, expires_at, used)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'token-migrated',
+      'owner@example.com',
+      'token-value',
+      'read',
+      JSON.stringify({ mapaId: 'map-migrated' }),
+      '2026-08-16T00:00:00Z',
+      0,
+    );
+    db.prepare('UPDATE admin_module_configs SET config_json = ? WHERE module_key = ?').run(
+      JSON.stringify({ modeloSintese: 'gemini-selected' }),
+      'astrologo-config',
+    );
+    db.prepare(
+      `INSERT INTO ai_usage_logs
+       (id, module, model, input_tokens, output_tokens, latency_ms, status)
+       VALUES (420, 'astrologo', 'gemini-selected', 10, 20, 30, 'ok')`,
+    ).run();
+    db.prepare("UPDATE sqlite_sequence SET seq = 999 WHERE name = 'ai_usage_logs'").run();
+    db.prepare(
+      `INSERT INTO astrologo_user_saved_items
+       (id, user_data_id, mapa_id, label)
+       VALUES (?, ?, ?, ?)`,
+    ).run('saved-item-1', 'user-migrated', 'map-migrated', 'Mapa preservado');
+
+    applyAdminMigration(db, '0001_regularize_astrologo_runtime_tables.sql');
+
+    expect(db.prepare('SELECT COUNT(*) AS total FROM astrologo_user_data').get()).toEqual({ total: 1 });
+    expect(db.prepare('SELECT COUNT(*) AS total FROM astrologo_auth_tokens').get()).toEqual({ total: 1 });
+    expect(db.prepare('SELECT COUNT(*) AS total FROM astrologo_user_saved_items').get()).toEqual({ total: 1 });
+    expect(db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'ai_usage_logs'").get()).toEqual({ seq: 999 });
+    expect(
+      [
+        ...tableIndexes(db, 'astrologo_user_data'),
+        ...tableIndexes(db, 'astrologo_auth_tokens'),
+        ...tableIndexes(db, 'admin_module_configs'),
+        ...tableIndexes(db, 'ai_usage_logs'),
+        ...tableIndexes(db, 'astrologo_user_saved_items'),
+      ].filter((name) => !name.startsWith('sqlite_autoindex_')),
+    ).toHaveLength(13);
+    expect(() =>
+      db
+        .prepare('INSERT INTO astrologo_user_data (id, email, dados_json) VALUES (?, ?, ?)')
+        .run('user-invalid', 'invalid@example.com', 'not-json'),
+    ).toThrow();
+    expect(() =>
+      db
+        .prepare('INSERT INTO astrologo_user_data (id, email, dados_json) VALUES (?, ?, ?)')
+        .run('user-duplicate', ' OWNER@example.com ', '{}'),
+    ).toThrow();
+    expect(() =>
+      db
+        .prepare(
+          'INSERT INTO astrologo_auth_tokens (id, email, token, action, expires_at, used) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run('token-invalid', 'invalid@example.com', 'token', 'read', '2026-08-16T00:00:00Z', 2),
+    ).toThrow();
+    expect(() =>
+      db
+        .prepare('INSERT INTO admin_module_configs (module_key, config_json) VALUES (?, ?)')
+        .run('invalid-config', 'not-json'),
+    ).toThrow();
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO ai_usage_logs
+           (module, model, input_tokens, output_tokens, latency_ms, status)
+           VALUES ('astrologo', 'gemini', -1, 0, 0, 'error')`,
+        )
+        .run(),
+    ).toThrow();
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+  });
+
+  it('rolls back the official migration when legacy data violates the canonical constraints', () => {
+    const db = prepareRuntimeDriftBaseline();
+    db.prepare('INSERT INTO astrologo_mapas (id, nome) VALUES (?, ?)').run('map-rollback', 'Pessoa');
+    db.prepare('INSERT INTO astrologo_user_data (id, email, dados_json) VALUES (?, ?, ?)').run(
+      'user-rollback',
+      'rollback@example.com',
+      'not-json',
+    );
+    db.prepare('INSERT INTO astrologo_user_saved_items (id, user_data_id, mapa_id) VALUES (?, ?, ?)').run(
+      'saved-rollback',
+      'user-rollback',
+      'map-rollback',
+    );
+
+    expect(() => applyAdminMigration(db, '0001_regularize_astrologo_runtime_tables.sql')).toThrow();
+
+    expect(db.prepare('SELECT dados_json FROM astrologo_user_data WHERE id = ?').get('user-rollback')).toEqual({
+      dados_json: 'not-json',
+    });
+    expect(db.prepare('SELECT id FROM astrologo_user_saved_items WHERE id = ?').get('saved-rollback')).toEqual({
+      id: 'saved-rollback',
+    });
+    expect(
+      db.prepare("SELECT COUNT(*) AS total FROM sqlite_master WHERE name LIKE '__admin_app_0001_%'").get(),
+    ).toEqual({ total: 0 });
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   });
 
   it('creates the seven advanced entities with enforced foreign keys', () => {
