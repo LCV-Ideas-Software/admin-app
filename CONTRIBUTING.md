@@ -57,7 +57,13 @@ This repo enforces SHA-pinned GitHub Actions. Don't downgrade to floating tags. 
 
 ### D1 schema changes
 
-Migrations live in `db/migrations/*.sql`. Add a new numbered file; do NOT mutate historical migrations. ALTER TABLE / column adds need to be coordinated with all consumers (admin-motor handlers + any cross-app reader/writer).
+`db/migrations/*.sql` is the immutable bootstrap history for a new, empty
+database; do not mutate or replay it against production. Forward production
+changes live in `db/admin-app-migrations/*.sql` and are applied through the
+`BIGDATA_DB` binding with `wrangler d1 migrations apply`. Add the next numbered,
+backward-compatible, data-preserving file there. ALTER TABLE / column changes
+must be coordinated with all consumers (admin-motor handlers and every
+cross-app reader/writer).
 
 ---
 

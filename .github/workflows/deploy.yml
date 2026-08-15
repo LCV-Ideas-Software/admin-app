@@ -8,8 +8,8 @@ on:
 permissions: {}
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  NODE_OPTIONS: "--no-deprecation"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NODE_OPTIONS: '--no-deprecation'
 
 concurrency:
   group: deploy-main
@@ -18,9 +18,11 @@ concurrency:
 jobs:
   deploy:
     name: Validate and deploy application
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    environment: cloudflare-production
+    environment:
+      name: cloudflare-production
     permissions:
       contents: read # Deploy the exact source revision from the protected branch.
     steps:

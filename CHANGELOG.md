@@ -16,7 +16,9 @@
   pinada em SHA, com Wrangler `4.123.0`. Os três `wrangler.json` versionam o
   identificador D1 não secreto; o workflow não instala `wrangler@latest`, não
   injeta configuração nem executa reconciliador imperativo: aplica somente as
-  migrations oficiais pendentes antes dos deploys.
+  migrations oficiais pendentes antes dos deploys. Tanto pushes quanto
+  despachos manuais são recusados fora de `refs/heads/main`, antes de acessar o
+  environment de produção.
 - **Versão interna sem release.** O painel passa a exibir `APP v02.15.23` e o
   changelog continua sendo a fonte histórica, mas este web app deixa de criar
   novas tags, pacotes ou GitHub Releases. `v02.15.22` permanece como a última
