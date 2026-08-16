@@ -1,10 +1,11 @@
 name: CodeQL
+
 on:
   workflow_dispatch:
   push:
-    branches: ['main']
+    branches: [main]
   pull_request:
-    branches: ['main']
+    branches: [main]
     types:
       - opened
       - reopened
@@ -14,18 +15,23 @@ on:
     types:
       - checks_requested
   schedule:
-    - cron: '11 6 * * 2'
-permissions: write-all
+    - cron: "11 6 * * 2"
+
+permissions: {}
+
 concurrency:
-  group: codeql-${{ github.ref }}
-  queue: max
-  cancel-in-progress: false
+  group: codeql-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   analyze:
-    permissions: write-all
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      actions: read # Resolve workflow metadata during analysis.
+      contents: read # Analyze the checked-out repository contents.
+      security-events: write # Upload CodeQL results to code scanning.
     strategy:
       fail-fast: false
       matrix:
@@ -35,25 +41,20 @@ jobs:
           - language: javascript-typescript
             build-mode: none
     steps:
-      - name: Checkout
+      - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
           dependency-caching: true
-      - name: Perform CodeQL analysis
-        id: analyze
-        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
-        with:
-          category: '/language:${{ matrix.language }}'
-          output: ${{ runner.temp }}/codeql-results
 
-      - name: Enforce zero CodeQL findings
-        uses: LCV-Ideas-Software/.github/codeql-sarif-gate@24b0bcc09a48b47f740b8a8bd972374f7289e48e # codeql-sarif-gate/v1.0.0
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
-          sarif-directory: ${{ runner.temp }}/codeql-results
+          category: "/language:${{ matrix.language }}"

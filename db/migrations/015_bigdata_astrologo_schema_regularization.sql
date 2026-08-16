@@ -3,8 +3,7 @@
 --
 -- Pré-condições:
 --   1. migrations 001 e 014 aplicadas;
---   2. scripts/reconcile-astrologo-schema.mjs executado para adicionar
---      astrologo_mapas.email somente quando a coluna estiver ausente.
+--   2. migration 014a aplicada para materializar astrologo_mapas.email.
 --
 -- Esta migration deve ser aplicada uma única vez. Ela substitui CREATE/ALTER
 -- executados durante requisições por um contrato versionado e auditável.

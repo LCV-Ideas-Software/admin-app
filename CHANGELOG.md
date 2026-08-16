@@ -2,9 +2,50 @@
 
 ## [Unreleased]
 
-### Added
+## [APP v02.15.23] — 15/08/2026
 
-- Governanca de trabalho sobre GitHub Projects, Issues e Discussions: quadro dedicado do repositorio, formularios de issue para Incident, Maintenance e Spike, atalhos para Discussions no seletor de issues, workflow `add-to-project` (inerte ate a organizacao definir `LCV_PROJECTS_APP_CLIENT_ID`; gatilho `pull_request_target` sem checkout nem execucao de codigo do PR, para alcancar PRs de fork com o secret do environment — cobertura de PRs do Dependabot e de branches com nome tipo SHA nao e garantida por este gatilho e fica declarada no proprio arquivo — com excecao estreita e documentada do zizmor), regressao propria do invariante privilegiado fiada no agregador exigido, e o ritual de registro G1..G4 versionado em `AGENTS.md` e `CLAUDE.md` para Claude Code e ChatGPT-Codex.
+### Alterado
+
+- **Automação official-only e permissões mínimas.** CodeQL foi absorvido em
+  `v4.37.7`; Zizmor usa a Action oficial `v0.6.2`; Dependency Review ficou
+  somente com a Action oficial; Scorecard, Pages e os checks de aplicação
+  declaram apenas os grants necessários. Os grupos de concorrência de push e
+  merge queue preservam a prova por SHA exato.
+- **Deploy Cloudflare pela Wrangler Action oficial.** `tlsrpt-motor`,
+  `admin-motor` e Pages são validados e publicados em série pela Action oficial
+  pinada em SHA, com Wrangler `4.123.0`. Os três `wrangler.json` versionam o
+  identificador D1 não secreto; o workflow não instala `wrangler@latest`, não
+  injeta configuração nem executa reconciliador imperativo: aplica somente as
+  migrations oficiais pendentes antes dos deploys. Tanto pushes quanto
+  despachos manuais são recusados fora de `refs/heads/main`, antes de acessar o
+  environment de produção.
+- **Versão interna sem release.** O painel passa a exibir `APP v02.15.23` e o
+  changelog continua sendo a fonte histórica, mas este web app deixa de criar
+  novas tags, pacotes ou GitHub Releases. `v02.15.22` permanece como a última
+  release histórica.
+- **Bootstrap de schema explícito.** A migration `014a` materializa o e-mail do
+  mapa antes da 015 em bancos novos. A migration oficial 0001, isolada da série
+  histórica e rastreada por `admin_app_migrations`, regulariza cinco tabelas sem
+  perder filhos, índices ou sequência; o deploy aplica migrations pendentes
+  antes de publicar qualquer Worker e falha fechado em dado incompatível.
+
+### Removido
+
+- Os workflows próprios de Native Auto-merge, Add-to-project e Auto-release,
+  seus validadores, o gate SARIF próprio, o reusable central do Zizmor e o
+  reconciliador imperativo do schema. Projects e merge queue passam a depender
+  dos recursos nativos do GitHub; a criação de `ai_usage_logs` em request foi
+  removida e alterações futuras desse contrato exigem migration oficial nova e
+  retrocompatível.
+
+### Corrigido
+
+- O carrier absorve o bump CodeQL do Dependabot #493 e supersede o bump do
+  reusable Zizmor #494 pela Action oficial, removendo a família que mantinha os
+  dois PRs bloqueados.
+- Forks habilitam o site documental uma vez em **Settings → Pages → GitHub
+  Actions**; o workflow não tenta autoativá-lo com `GITHUB_TOKEN`, credencial que
+  o `actions/configure-pages` oficial não aceita para essa operação.
 
 ## [v02.15.22] - 2026-08-10
 

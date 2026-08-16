@@ -1,286 +1,103 @@
 name: Deploy
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      deploy_tlsrpt:
-        description: Deploy TLS-RPT Motor
-        required: true
-        default: true
-        type: boolean
+
+permissions: {}
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   NODE_OPTIONS: '--no-deprecation'
+
 concurrency:
   group: deploy-main
   cancel-in-progress: false
-permissions: write-all
+
 jobs:
-  detect_tlsrpt:
-    name: Detect TLS-RPT changes
+  deploy:
+    name: Validate and deploy application
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions: write-all
-    outputs:
-      deploy_tlsrpt: ${{ steps.detect.outputs.deploy_tlsrpt }}
-      reason: ${{ steps.detect.outputs.reason }}
+    timeout-minutes: 40
+    environment:
+      name: cloudflare-production
+    permissions:
+      contents: read # Deploy the exact source revision from the protected branch.
     steps:
-      - name: Detect TLS-RPT Motor Changes
-        id: detect
-        env:
-          DEPLOY_TLSRPT_INPUT: ${{ inputs.deploy_tlsrpt }}
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-
-          const eventName = process.env.GITHUB_EVENT_NAME;
-          const eventPath = process.env.GITHUB_EVENT_PATH;
-          const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
-          const isTlsrptPath = (filePath) =>
-            filePath === 'tlsrpt-motor' || filePath.startsWith('tlsrpt-motor/');
-
-          let deployTlsrpt = false;
-          let reason = 'TLS-RPT Motor unchanged';
-
-          if (eventName === 'workflow_dispatch') {
-            deployTlsrpt = process.env.DEPLOY_TLSRPT_INPUT !== 'false';
-            reason = deployTlsrpt
-              ? 'manual workflow_dispatch requested TLS-RPT Motor deploy'
-              : 'manual workflow_dispatch skipped TLS-RPT Motor deploy';
-          } else if (eventName === 'push') {
-            const commits = Array.isArray(payload.commits) ? payload.commits : [];
-
-            if (commits.length === 0) {
-              deployTlsrpt = true;
-              reason = 'push payload had no commit list; deploying TLS-RPT Motor defensively';
-            } else {
-              deployTlsrpt = commits.some((commit) =>
-                ['added', 'modified', 'removed'].some((key) =>
-                  Array.isArray(commit[key]) && commit[key].some(isTlsrptPath),
-                ),
-              );
-
-              reason = deployTlsrpt
-                ? 'push changed files under tlsrpt-motor/'
-                : 'push did not change tlsrpt-motor/';
-            }
-          }
-
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy_tlsrpt=${deployTlsrpt}\n`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason=${reason}\n`);
-          console.log(reason);
-          NODE
-    timeout-minutes: 30
-  deploy_tlsrpt:
-    name: Deploy TLS-RPT Worker
-    needs: detect_tlsrpt
-    if: needs.detect_tlsrpt.outputs.deploy_tlsrpt == 'true'
-    runs-on: ubuntu-latest
-    permissions: write-all
-    environment: cloudflare-production
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           check-latest: true
-          cache: npm
-          cache-dependency-path: ./tlsrpt-motor/package-lock.json
-      - name: Install and verify latest Wrangler
-        id: wrangler
+          package-manager-cache: false
+
+      - name: Verify npm registry
         shell: bash
-        run: | # zizmor: ignore[adhoc-packages] Wrangler latest is an explicit organization policy; signatures are verified below.
-          set -euo pipefail
-          wrangler_prefix="$RUNNER_TEMP/wrangler-latest"
-          effective_registry="$(npm config get registry --prefix "$wrangler_prefix")"
-          if [ "$effective_registry" != "https://registry.npmjs.org/" ]; then
-            echo "::error::Unexpected npm registry for the isolated Wrangler prefix: $effective_registry" >&2
-            exit 1
-          fi
-          npm install --prefix "$wrangler_prefix" --save-exact --ignore-scripts --no-audit --no-fund wrangler@latest
+        run: test "$(npm config get registry)" = "https://registry.npmjs.org/"
 
-          undici_package="$wrangler_prefix/node_modules/undici/package.json"
-          if [ -f "$undici_package" ]; then
-            installed_undici="$(node -p "require(process.argv[1]).version" "$undici_package")"
-            if [ "$installed_undici" = "7.28.0" ]; then
-              npm pkg set --prefix "$wrangler_prefix" overrides.undici=7.29.0
-              npm install --prefix "$wrangler_prefix" --ignore-scripts --no-audit --no-fund
-            fi
-          fi
-          npm audit signatures --prefix "$wrangler_prefix"
-          npm audit --prefix "$wrangler_prefix" --audit-level=low
-
-          WRANGLER_BIN="$wrangler_prefix/node_modules/.bin/wrangler"
-          if [ ! -x "$WRANGLER_BIN" ]; then
-            echo "::error::The isolated Wrangler executable was not created." >&2
-            exit 1
-          fi
-          WRANGLER_VERSION="$("$WRANGLER_BIN" --version)"
-          if ! [[ "$WRANGLER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Unexpected Wrangler version: $WRANGLER_VERSION" >&2
-            exit 1
-          fi
-
-          printf 'Resolved Wrangler version: %s\n' "$WRANGLER_VERSION"
-          printf 'bin=%s\nversion=%s\n' "$WRANGLER_BIN" "$WRANGLER_VERSION" >> "$GITHUB_OUTPUT"
-      - name: Install TLS-RPT Motor
-        working-directory: ./tlsrpt-motor
-        run: npm ci --ignore-scripts
-      - name: Audit TLS-RPT Motor
-        working-directory: ./tlsrpt-motor
-        run: npm audit --audit-level=high
-      - name: Lint TLS-RPT Motor
-        working-directory: ./tlsrpt-motor
-        run: npm run lint
-      - name: Test TLS-RPT Motor
-        working-directory: ./tlsrpt-motor
-        run: npm test
-      - name: Inject D1 database_id from secret (tlsrpt-motor)
+      - name: Install dependencies
         run: |
-          if [ -z "${D1_DATABASE_ID:-}" ]; then
-            echo "::error::D1_DATABASE_ID secret is not set" >&2
-            exit 1
-          fi
-          CFG=tlsrpt-motor/wrangler.json
-          jq --arg id "$D1_DATABASE_ID" '.d1_databases[0].database_id = $id' "$CFG" > "$CFG.tmp"
-          mv "$CFG.tmp" "$CFG"
-          grep -q "$D1_DATABASE_ID" "$CFG" || { echo "::error::Substitution failed in $CFG" >&2; exit 1; }
-          if grep -q "00000000-0000-0000-0000-000000000000" "$CFG"; then
-            echo "::error::Placeholder still present in $CFG" >&2
-            exit 1
-          fi
-        env:
-          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-      - name: Deploy TLS-RPT Motor
-        working-directory: ./tlsrpt-motor
-        run: |
-          "$WRANGLER_BIN" deploy --strict
-        env:
-          WRANGLER_BIN: ${{ steps.wrangler.outputs.bin }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
-    timeout-minutes: 30
-  deploy_admin:
-    name: Deploy admin application
-    needs: [detect_tlsrpt, deploy_tlsrpt]
-    if: >
-      always() && github.event_name == 'push' && needs.detect_tlsrpt.result == 'success' && (needs.detect_tlsrpt.outputs.deploy_tlsrpt != 'true' || needs.deploy_tlsrpt.result == 'success')
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --prefix tlsrpt-motor --ignore-scripts --no-audit --no-fund
 
-    runs-on: ubuntu-latest
-    permissions: write-all
-    environment: cloudflare-production
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate admin application
+        run: |
+          npm audit --audit-level=high
+          npm run lint
+          npm run biome
+          npm test
+          npm run test:admin-motor
+          npm run typecheck:admin-motor
+          npm run build
+          npm run format:public:check
+
+      - name: Validate TLS-RPT Motor
+        working-directory: tlsrpt-motor
+        run: |
+          npm audit --audit-level=high
+          npm run lint
+          npm test
+
+      - name: Apply D1 migrations with Wrangler
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: 4.123.0
+          command: d1 migrations apply BIGDATA_DB --remote --config wrangler.json
+
+      - name: Deploy TLS-RPT Motor with Wrangler
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
-          node-version: 24
-          check-latest: true
-          cache: npm
-          cache-dependency-path: ./package-lock.json
-      - name: Install and verify latest Wrangler
-        id: wrangler
-        shell: bash
-        run: | # zizmor: ignore[adhoc-packages] Wrangler latest is an explicit organization policy; signatures are verified below.
-          set -euo pipefail
-          wrangler_prefix="$RUNNER_TEMP/wrangler-latest"
-          effective_registry="$(npm config get registry --prefix "$wrangler_prefix")"
-          if [ "$effective_registry" != "https://registry.npmjs.org/" ]; then
-            echo "::error::Unexpected npm registry for the isolated Wrangler prefix: $effective_registry" >&2
-            exit 1
-          fi
-          npm install --prefix "$wrangler_prefix" --save-exact --ignore-scripts --no-audit --no-fund wrangler@latest
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: 4.123.0
+          workingDirectory: tlsrpt-motor
+          command: deploy --strict
 
-          undici_package="$wrangler_prefix/node_modules/undici/package.json"
-          if [ -f "$undici_package" ]; then
-            installed_undici="$(node -p "require(process.argv[1]).version" "$undici_package")"
-            if [ "$installed_undici" = "7.28.0" ]; then
-              npm pkg set --prefix "$wrangler_prefix" overrides.undici=7.29.0
-              npm install --prefix "$wrangler_prefix" --ignore-scripts --no-audit --no-fund
-            fi
-          fi
-          npm audit signatures --prefix "$wrangler_prefix"
-          npm audit --prefix "$wrangler_prefix" --audit-level=low
+      - name: Deploy Admin Motor with Wrangler
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: 4.123.0
+          command: deploy --strict --config admin-motor/wrangler.json
 
-          WRANGLER_BIN="$wrangler_prefix/node_modules/.bin/wrangler"
-          if [ ! -x "$WRANGLER_BIN" ]; then
-            echo "::error::The isolated Wrangler executable was not created." >&2
-            exit 1
-          fi
-          WRANGLER_VERSION="$("$WRANGLER_BIN" --version)"
-          if ! [[ "$WRANGLER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Unexpected Wrangler version: $WRANGLER_VERSION" >&2
-            exit 1
-          fi
-
-          printf 'Resolved Wrangler version: %s\n' "$WRANGLER_VERSION"
-          printf 'bin=%s\nversion=%s\n' "$WRANGLER_BIN" "$WRANGLER_VERSION" >> "$GITHUB_OUTPUT"
-      - name: Install Admin App
-        run: npm ci --ignore-scripts
-        working-directory: ./
-      - name: Security Audit — Admin App
-        run: npm audit --audit-level=high
-        working-directory: ./
-      - name: Lint Admin App
-        run: npm run lint
-        working-directory: ./
-      - name: Biome (lint + format) Admin App
-        run: npm run biome
-        working-directory: ./
-      - name: Test Admin App UI
-        run: npm test
-        working-directory: ./
-      - name: Test Admin Motor
-        run: npm run test:admin-motor
-        working-directory: ./
-      - name: Typecheck Admin Motor
-        run: npm run typecheck:admin-motor
-        working-directory: ./
-      - name: Build Admin App
-        run: npm run build
-        working-directory: ./
-      - name: Inject D1 database_id from secret (root + admin-motor)
-        run: |
-          if [ -z "${D1_DATABASE_ID:-}" ]; then
-            echo "::error::D1_DATABASE_ID secret is not set" >&2
-            exit 1
-          fi
-          for CFG in wrangler.json admin-motor/wrangler.json; do
-            jq --arg id "$D1_DATABASE_ID" '.d1_databases[0].database_id = $id' "$CFG" > "$CFG.tmp"
-            mv "$CFG.tmp" "$CFG"
-            grep -q "$D1_DATABASE_ID" "$CFG" || { echo "::error::Substitution failed in $CFG" >&2; exit 1; }
-            if grep -q "00000000-0000-0000-0000-000000000000" "$CFG"; then
-              echo "::error::Placeholder still present in $CFG" >&2
-              exit 1
-            fi
-          done
-        env:
-          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-      - name: Reconcile Astrologo schema and saved-map ownership
-        run: node scripts/reconcile-astrologo-schema.mjs --remote --config wrangler.json
-        working-directory: ./
-        env:
-          WRANGLER_BIN: ${{ steps.wrangler.outputs.bin }}
-          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
-      - name: Deploy Admin Motor
-        run: |
-          "$WRANGLER_BIN" deploy --strict --config admin-motor/wrangler.json
-        working-directory: ./
-        env:
-          WRANGLER_BIN: ${{ steps.wrangler.outputs.bin }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
-      - name: Deploy Admin App
-        run: |
-          "$WRANGLER_BIN" pages deploy dist --project-name=admin-app --branch=main --commit-dirty=true
-        working-directory: ./
-        env:
-          WRANGLER_BIN: ${{ steps.wrangler.outputs.bin }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets['CLOUDFLARE_API_TOKEN'] }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets['CLOUDFLARE_ACCOUNT_ID'] }}
-    timeout-minutes: 30
+      - name: Deploy Admin Pages with Wrangler
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: 4.123.0
+          command: pages deploy dist --project-name=admin-app --branch=main

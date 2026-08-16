@@ -2,8 +2,10 @@
 
 ## Supported status
 
-Latest supported source/release target: v02.15.22. The current `main` branch is
-also supported for security fixes. The current dependency security baseline was
+Latest supported source target: APP v02.15.23 on the current `main` branch. The
+last historical tagged release is v02.15.22; this web application no longer
+creates package, tag, or GitHub Release artifacts for source-only revisions.
+The current dependency security baseline was
 established in v02.15.15, which resolved the Hono, `brace-expansion`, Undici and
 PostCSS findings in the root and TLS reporting toolchains while preserving
 scoped overrides for incompatible dependency families. Hono 4.12.34 resolves

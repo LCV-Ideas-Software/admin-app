@@ -1,43 +1,31 @@
 name: Dependency Review
+
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
   merge_group:
     types:
       - checks_requested
-# Politica enterprise (.github#150): sem write-all. Conjunto vazio no escopo do
-# workflow e grant minimo declarado em cada job.
-permissions: {}
-concurrency:
-  group: dependency-review-${{ github.ref }}
-  cancel-in-progress: true
-jobs:
-  workflow_boundaries:
-    permissions:
-      contents: read
-    name: Native auto-merge workflow boundaries
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: ${{ github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Test native auto-merge workflow boundaries
-        run: node --test .github/scripts/native-auto-merge-workflows.regression.mjs
 
-  candidate_review:
-    permissions:
-      contents: read # a dependency-review-action apenas le diff e manifests
-    name: Dependency Review candidate
+permissions: {}
+
+concurrency:
+  group: dependency-review-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency Review
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read # Read the dependency graph and checked-out manifests.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
       - name: Review pull request dependencies
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
@@ -53,117 +41,3 @@ jobs:
           head-ref: ${{ github.event.merge_group.head_sha }}
           fail-on-severity: low
           fail-on-scopes: runtime, development, unknown
-
-  dependency_review:
-    # write-all HISTORICO exigido pelo gate de merge-group do native-auto-merge
-    # (componente em aposentadoria, rastreado na issue de governanca central): o
-    # conjunto escopado de reads quebrou o gate em execucao real de merge queue
-    # ("Resource not accessible by integration" no mergeQueue) e o dump do token
-    # prova que nao existe permissao MergeQueues para conceder individualmente.
-    # Volta ao minimo junto com a remocao do gate.
-    permissions: write-all
-    name: Dependency Review
-    # Job exigido que fica skipped conta como aprovado para o ruleset; por isso
-    # o agregador roda para TODA origem (sem gate proprio) e decide por resultado:
-    # o invariante projects_workflow_boundaries e exigido incondicionalmente e os
-    # jobs com gate de origem so sao exigidos quando a origem os executa.
-    if: ${{ always() }}
-    needs:
-      - workflow_boundaries
-      - candidate_review
-      - projects_workflow_boundaries
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Reject unsuccessful dependency review prerequisite
-        if: >-
-          ${{
-            needs.projects_workflow_boundaries.result != 'success' ||
-            (
-              (
-                github.event_name == 'merge_group' ||
-                github.event.pull_request.head.repo.full_name == github.repository
-              ) &&
-              (
-                needs.workflow_boundaries.result != 'success' ||
-                needs.candidate_review.result != 'success'
-              )
-            )
-          }}
-        run: exit 1
-
-      - name: Preserve the required dependency review context
-        if: >-
-          ${{
-            github.event_name != 'merge_group' &&
-            needs.projects_workflow_boundaries.result == 'success' &&
-            (
-              github.event.pull_request.head.repo.full_name != github.repository ||
-              (
-                needs.workflow_boundaries.result == 'success' &&
-                needs.candidate_review.result == 'success'
-              )
-            )
-          }}
-        run: echo "Dependency review candidate passed."
-
-      - name: Enforce merge-group feedback gate
-        if: >-
-          ${{
-            github.event_name == 'merge_group' &&
-            needs.workflow_boundaries.result == 'success' &&
-            needs.candidate_review.result == 'success' &&
-            needs.projects_workflow_boundaries.result == 'success'
-          }}
-        uses: LCV-Ideas-Software/.github/native-auto-merge@231cd33f27c260a6b01fec26aa1d0eb606e1ee2d # native-auto-merge/v2.1.4
-        with:
-          operation: merge-group-feedback-gate
-          github_token: ${{ github.token }}
-          event_repository: ${{ github.event.repository.full_name }}
-          event_action: ${{ github.event.action }}
-          merge_group_head_sha: ${{ github.event.merge_group.head_sha }}
-          merge_group_base_sha: ${{ github.event.merge_group.base_sha }}
-          merge_group_base_ref: ${{ github.event.merge_group.base_ref }}
-          merge_group_head_ref: ${{ github.event.merge_group.head_ref }}
-
-  projects_workflow_boundaries:
-    name: Projects workflow boundaries
-    # Sem gate de origem: a assercao do invariante privilegiado roda para TODO PR,
-    # inclusive de fork (evento sem secrets), e tambem no merge_group.
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # O verificador NAO pode vir apenas da arvore do candidato: um PR que altere
-      # o workflow privilegiado E o proprio verificador se auto-aprovaria. A copia
-      # confiavel vem do ref base protegido (main). Bootstrap: enquanto main ainda
-      # nao contiver o verificador (este PR o introduz), usa-se a copia do
-      # candidato — desvio que morre no primeiro merge.
-      # Destinacao limpa e nao-symlinkada: um .trusted-boundary pre-colocado pelo
-      # candidato como symlink faria o checkout de main seguir o link e sobrescrever
-      # a arvore do candidato. rm -rf sobre um symlink desfaz o link, nao o alvo.
-      - name: Ensure a clean, non-symlinked trusted destination
-        run: rm -rf .trusted-boundary
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: main
-          path: .trusted-boundary
-      - name: Test projects automation workflow boundaries
-        run: |
-          if [ -L .trusted-boundary ]; then
-            echo "::error::.trusted-boundary must be a real directory, not a symlink"
-            exit 1
-          fi
-          verificador=".github/scripts/add-to-project-workflow.regression.mjs"
-          confiavel=".trusted-boundary/${verificador}"
-          if [ -f "${confiavel}" ]; then
-            node --test "${confiavel}"
-          else
-            echo "Bootstrap: verificador ausente em main; usando a copia do candidato."
-            node --test "${verificador}"
-          fi

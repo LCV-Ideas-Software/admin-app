@@ -1,4 +1,5 @@
 name: Public Format
+
 on:
   push:
     branches: [main]
@@ -7,42 +8,42 @@ on:
   merge_group:
     types:
       - checks_requested
-permissions: write-all
+
+permissions: {}
+
+concurrency:
+  group: public-format-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   prettier-public:
-    permissions: write-all
     name: Check index.html formatting
-    environment: ci-automation
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # Read the exact candidate tree.
     steps:
-      - name: Checkout
+      - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Setup Node.js 24
+
+      - name: Set up Node.js 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           check-latest: true
           cache: npm
+
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Check public page formatting
-        run: npm run format:public:check
-      - name: Lint application
-        run: npm run lint
-      - name: Check Biome policy
-        run: npm run biome
-      - name: Run frontend tests
-        run: npm test
-      - name: Run admin-motor tests
-        run: npm run test:admin-motor
-      - name: Typecheck admin-motor
-        run: npm run typecheck:admin-motor
-      - name: Build production application
-        run: npm run build
-    timeout-minutes: 30
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  queue: max
-  cancel-in-progress: false
+
+      - name: Validate application
+        run: |
+          npm run format:public:check
+          npm run lint
+          npm run biome
+          npm test
+          npm run test:admin-motor
+          npm run typecheck:admin-motor
+          npm run build
