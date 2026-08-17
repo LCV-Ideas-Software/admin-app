@@ -36,7 +36,15 @@ jobs:
       # de digest. Contenção: a chave exposta só cria releases numa única pipeline
       # do Linear e vive em environment dedicado; blast radius mínimo. Rastreio na
       # issue vinculada ao PR que introduziu este workflow.
+      #
+      # Best-effort por desenho: esta sincronização é um espelho opcional e sua
+      # falha (segredo expirado, indisponibilidade do Linear) NUNCA pode bloquear
+      # portões que varrem todos os runs do SHA (ex.: auto-tag/publicação). Por
+      # isso continue-on-error: o run conclui verde e a falha fica visível na
+      # anotação do passo; commits não sincronizados embarcam na release seguinte.
       - name: Create Linear release
+        id: linear_release
+        continue-on-error: true
         uses: linear/linear-release-action@17b8c24f8ceb2b98cabaf1965ff83c55dd596fac # v0.15.1
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
