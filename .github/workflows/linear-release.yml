@@ -3,9 +3,14 @@ on:
   push:
     branches:
       - main
-# Politica enterprise (Discussion #150): sem write-all. Conjunto vazio no escopo do
-# workflow e grant minimo declarado no job.
+# Política enterprise (Discussion #150): sem write-all. Conjunto vazio no escopo do
+# workflow e grant mínimo declarado no job.
 permissions: {}
+# Agrupamento intencional: a linear-release-action varre todos os commits desde a
+# última release (fetch-depth: 0). Se um run pendente for substituído por um push
+# mais novo, os commits dele embarcam na release do run seguinte — nada se perde;
+# releases agrupam pushes em rajada por desenho, e o grupo evita corrida entre
+# duas criações de release simultâneas.
 concurrency:
   group: linear-release-${{ github.ref }}
   cancel-in-progress: false
@@ -14,17 +19,23 @@ jobs:
     name: Linear Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Politica zizmor da casa: secret so e lido dentro de environment dedicado.
-    # LINEAR_ACCESS_KEY vive como environment secret de linear-release, nao no repo.
+    # Política zizmor da casa: secret só é lido dentro de environment dedicado.
+    # LINEAR_ACCESS_KEY vive como environment secret de linear-release — escopo
+    # restrito a criar releases na pipeline deste repositório, nada além.
     environment: linear-release
     permissions:
-      contents: read # a action le o historico de commits para associar issues a release
+      contents: read # a action lê o histórico de commits para associar issues à release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # historico completo: a action varre commits desde a ultima release
+          fetch-depth: 0 # histórico completo: a action varre commits desde a última release
           persist-credentials: false
 
+      # Risco de cadeia de suprimento aceito e registrado: nesta revisão a action
+      # baixa o binário da própria release upstream (asset mutável) sem verificação
+      # de digest. Contenção: a chave exposta só cria releases numa única pipeline
+      # do Linear e vive em environment dedicado; blast radius mínimo. Rastreio na
+      # issue vinculada ao PR que introduziu este workflow.
       - name: Create Linear release
         uses: linear/linear-release-action@17b8c24f8ceb2b98cabaf1965ff83c55dd596fac # v0.15.1
         with:
