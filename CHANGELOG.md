@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [APP v02.15.24] — 17/08/2026
+
+### Removido
+
+- **Modelo Anthropic datado aposentado da sondagem do Maestro AI.** Sai
+  `claude-opus-4-1-20250805` da lista de candidatos Claude em
+  `admin-motor/src/handlers/routes/maestro-ai/sessions.ts` — o próprio
+  comentário do código agendava a remoção para a aposentadoria upstream de
+  05/08/2026. Efeito prático: a seleção por sonda deixa de gastar uma tentativa
+  num id morto; o fallback (`claude-fable-5`) e os demais candidatos ficam
+  inalterados. Fecha a issue #472.
+
 ## [APP v02.15.23] — 15/08/2026
 
 ### Alterado
