@@ -2352,13 +2352,7 @@ const MODEL_RESOLUTION: Partial<
   claude: {
     endpoint: 'https://api.anthropic.com/v1/models',
     auth: 'x-api-key',
-    candidates: [
-      'claude-fable-5',
-      'claude-opus-5',
-      'claude-opus-4-8',
-      'claude-opus-4-7',
-      'claude-sonnet-5',
-    ],
+    candidates: ['claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-sonnet-5'],
     fallback: 'claude-fable-5',
   },
   deepseek: {
