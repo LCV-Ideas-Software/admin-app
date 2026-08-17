@@ -14,6 +14,9 @@ jobs:
     name: Linear Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Politica zizmor da casa: secret so e lido dentro de environment dedicado.
+    # LINEAR_ACCESS_KEY vive como environment secret de linear-release, nao no repo.
+    environment: linear-release
     permissions:
       contents: read # a action le o historico de commits para associar issues a release
     steps:
