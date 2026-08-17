@@ -1,0 +1,28 @@
+name: Linear Release
+on:
+  push:
+    branches:
+      - main
+# Politica enterprise (Discussion #150): sem write-all. Conjunto vazio no escopo do
+# workflow e grant minimo declarado no job.
+permissions: {}
+concurrency:
+  group: linear-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  linear_release:
+    name: Linear Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # a action le o historico de commits para associar issues a release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # historico completo: a action varre commits desde a ultima release
+          persist-credentials: false
+
+      - name: Create Linear release
+        uses: linear/linear-release-action@17b8c24f8ceb2b98cabaf1965ff83c55dd596fac # v0.15.1
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
