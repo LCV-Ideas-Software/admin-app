@@ -2358,8 +2358,6 @@ const MODEL_RESOLUTION: Partial<
       'claude-opus-4-8',
       'claude-opus-4-7',
       'claude-sonnet-5',
-      // Retires 2026-08-05; scheduled for removal with the retirement.
-      'claude-opus-4-1-20250805',
     ],
     fallback: 'claude-fable-5',
   },
