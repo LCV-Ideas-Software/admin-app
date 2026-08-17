@@ -1,22 +1,41 @@
 name: Linear Release
+# Fase 2: a release no Linear só é criada quando o Deploy CONCLUIU COM SUCESSO —
+# release descreve mudança em produção, não merge. O gatilho workflow_run é
+# marcado pela persona auditor do zizmor como perigoso por poder executar código
+# de PR em contexto privilegiado; aqui não há essa superfície: o job exige
+# conclusão success do Deploy em main, faz checkout do SHA daquele run (código já
+# mergeado e confiável), roda com contents: read e nenhum dado controlado por
+# terceiros toca shell. Ignore pontual e justificado abaixo.
 on:
-  push:
-    branches:
-      - main
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows:
+      - Deploy
+    types:
+      - completed
 # Política enterprise (Discussion #150): sem write-all. Conjunto vazio no escopo do
 # workflow e grant mínimo declarado no job.
 permissions: {}
 # Agrupamento intencional: o CLI varre todos os commits desde a última release
-# (fetch-depth: 0). Se um run pendente for substituído por um push mais novo, os
+# (fetch-depth: 0). Se um run pendente for substituído por um mais novo, os
 # commits dele embarcam na release do run seguinte — nada se perde; releases
-# agrupam pushes em rajada por desenho, e o grupo evita corrida entre duas
+# agrupam deploys em rajada por desenho, e o grupo evita corrida entre duas
 # criações de release simultâneas.
+# O grupo inclui a CONCLUSAO do Deploy: o filtro do job (if) so age depois do
+# enfileiramento, entao um run de Deploy falhado entraria no mesmo grupo e
+# poderia substituir na fila um run de sucesso pendente — deixando o SHA
+# publicado sem release ate o proximo deploy. Com a conclusao na chave, runs de
+# falha (que o if pula) nunca deslocam runs de sucesso.
 concurrency:
-  group: linear-release-${{ github.ref }}
+  group: linear-release-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.conclusion }}
   cancel-in-progress: false
 jobs:
   linear_release:
     name: Linear Release
+    # Só após Deploy bem-sucedido de main; deploy falhado ou de outra ref não
+    # gera release — a pipeline do Linear descreve somente o que chegou em produção.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Política zizmor da casa: secret só é lido dentro de environment dedicado.
@@ -28,6 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.workflow_run.head_sha }} # o SHA que o Deploy publicou
           fetch-depth: 0 # histórico completo: o CLI varre commits desde a última release
           persist-credentials: false
 
@@ -40,9 +60,9 @@ jobs:
       #
       # Best-effort por desenho: esta sincronização é um espelho opcional e sua
       # falha (digest divergente, indisponibilidade, segredo expirado) NUNCA pode
-      # bloquear portões que varrem todos os runs do SHA (ex.: auto-tag/publicação).
-      # O run conclui verde e a falha fica visível na anotação do passo; commits
-      # não sincronizados embarcam na release seguinte.
+      # bloquear portões que varrem todos os runs do SHA. O run conclui verde e a
+      # falha fica visível na anotação do passo; commits não sincronizados embarcam
+      # na release seguinte.
       - name: Create Linear release (CLI verificado por digest)
         id: linear_release
         continue-on-error: true
