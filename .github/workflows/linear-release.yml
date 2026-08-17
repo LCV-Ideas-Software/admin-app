@@ -20,10 +20,10 @@ permissions: {}
 # commits dele embarcam na release do run seguinte — nada se perde; releases
 # agrupam deploys em rajada por desenho, e o grupo evita corrida entre duas
 # criações de release simultâneas.
-# O grupo inclui a CONCLUSAO do Deploy: o filtro do job (if) so age depois do
-# enfileiramento, entao um run de Deploy falhado entraria no mesmo grupo e
+# O grupo inclui a CONCLUSÃO do Deploy: o filtro do job (if) só age depois do
+# enfileiramento, então um run de Deploy falhado entraria no mesmo grupo e
 # poderia substituir na fila um run de sucesso pendente — deixando o SHA
-# publicado sem release ate o proximo deploy. Com a conclusao na chave, runs de
+# publicado sem release até o próximo deploy. Com a conclusão na chave, runs de
 # falha (que o if pula) nunca deslocam runs de sucesso.
 concurrency:
   group: linear-release-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.conclusion }}
