@@ -56,7 +56,12 @@
     {
       "binding": "CLOUDFLARE_PW",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
-      "secret_name": "cloudflare-pw"
+      "secret_name": "admin-cloudflare-api-token"
+    },
+    {
+      "binding": "ADMIN_BEARER_TOKEN",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "admin-motor-bearer-token"
     },
     {
       "binding": "CLOUDFLARE_DNS",
