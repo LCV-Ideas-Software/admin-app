@@ -110,7 +110,7 @@
     "globals": "^17.9.0",
     "happy-dom": "^20.11.2",
     "husky": "^9.0.0",
-    "knip": "^6.32.1",
+    "knip": "^6.32.2",
     "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
     "rollup-plugin-visualizer": "^7.0.1",
@@ -128,6 +128,7 @@
   },
   "overrides": {
     "picomatch": "4.0.4",
+    "unbash": "4.0.9",
     "miniflare": {
       "undici": "7.29.0"
     },
