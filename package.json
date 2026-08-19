@@ -128,6 +128,7 @@
   },
   "overrides": {
     "picomatch": "4.0.4",
+    "unbash": "4.0.9",
     "miniflare": {
       "undici": "7.29.0"
     },
