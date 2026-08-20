@@ -2,7 +2,7 @@
 
 ## Supported status
 
-Latest supported source target: APP v02.15.24 on the current `main` branch. The
+Latest supported source target: APP v02.15.25 on the current `main` branch. The
 last historical tagged release is v02.15.22; this web application no longer
 creates package, tag, or GitHub Release artifacts for source-only revisions.
 The current dependency security baseline was

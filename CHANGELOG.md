@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [APP v02.15.25] — 20/08/2026
+
+### Segurança
+
+- **Ponto-raiz de FQDN não escapa mais do guard SSRF da auditoria de links.**
+  `isBlockedAuditHost` em
+  `admin-motor/src/handlers/routes/maestro-ai/sessions.ts` agora remove o
+  ponto-raiz terminal do hostname antes dos predicados de bloqueio; antes,
+  `http://localhost./` ou `http://metadata.google.internal./` preservavam o
+  ponto em `URL.hostname`, não casavam os checks de `localhost`/`.internal`/
+  faixas IPv4 e eram buscados como alvos internos. Origem: thread de review no
+  PR #219.
+- **Links com esquema em maiúsculas entram no pipeline de auditoria.** A regex
+  canônica de extração (`LINK_AUDIT_URL_REGEX`) ganha a flag `i`; antes,
+  `HTTPS://…`/`HTTP://…` em maiúsculas escapavam dos gates de capacidade,
+  HTTP e blocked-host e a sessão finalizava sem auditar o link. Origem: thread
+  de review no PR #302. Ambas as mudanças são desvios documentados de web
+  hardening sobre a lista desktop, no mesmo padrão dos desvios já registrados
+  no arquivo.
+
 ## [APP v02.15.24] — 17/08/2026
 
 ### Removido
