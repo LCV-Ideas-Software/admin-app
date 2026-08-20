@@ -47,6 +47,18 @@ describe('sanitizeForEmail', () => {
     expect(out).toContain('ola');
   });
 
+  it('never emits a raw tag opener from the DOMParser-less fallback (entity-order/unclosed-tag invariant)', () => {
+    vi.stubGlobal('DOMParser', undefined);
+    // Encoded markup must stay inert text, never become a live tag.
+    const encoded = sanitizeForEmail('&lt;img src=x onerror=alert(1)&gt; e &amp;lt;script&amp;gt;');
+    expect(encoded).not.toMatch(/<[a-zA-Z!/]/);
+    // An UNCLOSED tag does not match the <[^>]*> strip; the raw `<` must not
+    // reach the HTML e-mail context where a later `>` could complete it.
+    const unclosed = sanitizeForEmail('inicio <img src=x onerror=alert(1) fim');
+    expect(unclosed).not.toMatch(/<[a-zA-Z!/]/);
+    expect(unclosed).toContain('inicio');
+  });
+
   it('removes attributes whose scheme hides behind embedded control characters', () => {
     // DOMParser decodes &#x0d; into a raw CR inside the attribute value, so a
     // plain startsWith('javascript:') check would miss it.

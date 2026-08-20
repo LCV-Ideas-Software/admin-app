@@ -12,8 +12,12 @@
   ele nesse runtime) — agora remove tags até estabilizar antes da
   decodificação. A sonda de esquema de atributos ignora caracteres de
   controle/espaço (≤ 0x20), fechando o desvio `java&#x0d;script:` que o
-  `DOMParser` decodifica dentro do valor. Origem: threads de review nos PRs
-  #2 e #3.
+  `DOMParser` decodifica dentro do valor. Além disso, o fallback de
+  `sanitizeForEmail` passa a escapar o texto plano com `escapeHtml` antes de
+  devolvê-lo ao contexto HTML — uma tag NÃO fechada (`<img src=x onerror=…`
+  sem `>`) não casa o strip `<[^>]*>` e o `<` cru poderia ser completado por
+  um `>` do template (invariante apontada no cross-review pelo peer codex).
+  Origem: threads de review nos PRs #2 e #3.
 
 ### Corrigido
 

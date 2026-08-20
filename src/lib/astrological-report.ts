@@ -159,7 +159,10 @@ const htmlToPlainText = (html: string): string => {
 const sanitizeForEmail = (html: string): string => {
   const safeHtml = stripInternalAnalysisMarkers(html);
   if (typeof DOMParser === 'undefined') {
-    return htmlToPlainText(safeHtml);
+    // O resultado vai para um contexto HTML: escapar o texto plano garante
+    // que nada remanescente (ex.: `<` de tag não fechada, que o strip por
+    // `<[^>]*>` não casa) possa virar markup completado pelo template.
+    return escapeHtml(htmlToPlainText(safeHtml));
   }
 
   const blockedTags = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'meta', 'link', 'base']);
