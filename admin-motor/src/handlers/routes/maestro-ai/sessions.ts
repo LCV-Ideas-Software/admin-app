@@ -1662,10 +1662,14 @@ function embeddedIpv4FromIpv6(host: string): string | null {
 }
 
 function isBlockedAuditHost(hostname: string): boolean {
+  // Web hardening beyond the desktop list (documented deviation): strip the
+  // FQDN root dot (`localhost.`, `metadata.google.internal.`) so it cannot
+  // dodge the string/range predicates below while resolving to the same host.
   const host = hostname
     .trim()
     .toLowerCase()
-    .replace(/^\[|\]$/g, '');
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.+$/, '');
   if (!host) return true;
   if (host === 'localhost' || host === 'localhost.localdomain' || host.endsWith('.localhost')) return true;
   // Web hardening beyond the desktop list (documented deviation): `.internal`
@@ -1707,7 +1711,9 @@ const LINK_AUDIT_MAX_MATCHES = 80;
 const LINK_AUDIT_TIMEOUT_MS = 15_000;
 const LINK_AUDIT_MAX_REDIRECT_HOPS = 5;
 // Canonical extraction regex: stop-set is whitespace and < > " ' ) ] — no `}`.
-const LINK_AUDIT_URL_REGEX = /https?:\/\/[^\s<>"')\]]+/g;
+// Case-insensitive (web hardening deviation): `HTTPS://…` must enter the audit
+// pipeline instead of silently bypassing the capability/blocked-host gates.
+const LINK_AUDIT_URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
 
 type LinkCandidate = { url: string; rejection: string | null };
 

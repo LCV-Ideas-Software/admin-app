@@ -1015,6 +1015,30 @@ describe('Maestro AI release link audit (Plan D)', () => {
     }
   });
 
+  it('isBlockedAuditHost strips trailing root dots before matching (web hardening deviation)', () => {
+    const { isBlockedAuditHost } = maestroAiTestHooks;
+    // A trailing root dot is a valid FQDN spelling: `localhost.` and
+    // `metadata.google.internal.` resolve to the same internal targets but
+    // would dodge the string predicates without normalization.
+    for (const host of ['localhost.', 'metadata.google.internal.', 'corp.local.', '10.0.0.5.', '169.254.169.254.']) {
+      expect(isBlockedAuditHost(host), host).toBe(true);
+    }
+    // A trailing root dot on a public FQDN stays auditable.
+    expect(isBlockedAuditHost('example.com.')).toBe(false);
+  });
+
+  it('extractUrlCandidates matches uppercase schemes so they cannot bypass the audit gates', () => {
+    const { extractUrlCandidates } = maestroAiTestHooks;
+    const candidates = extractUrlCandidates('veja HTTPS://Alpha.Example/x e HTTP://169.254.169.254/y fim');
+    expect(candidates.map((c: { url: string }) => c.url)).toEqual([
+      'HTTP://169.254.169.254/y',
+      'HTTPS://Alpha.Example/x',
+    ]);
+    // The uppercase link-local candidate still surfaces as a blocked row.
+    expect(candidates[0]?.rejection).toMatch(/bloqueado/i);
+    expect(candidates[1]?.rejection).toBeNull();
+  });
+
   it('hostResolvesToBlockedIp uses DoH and fails open on resolver errors', async () => {
     const { hostResolvesToBlockedIp } = maestroAiTestHooks;
     const dohCalls: string[] = [];

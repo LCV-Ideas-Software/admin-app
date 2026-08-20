@@ -1,7 +1,7 @@
 {
   "name": "admin-app",
   "private": true,
-  "version": "2.15.24",
+  "version": "2.15.25",
   "type": "module",
   "scripts": {
     "dev": "vite",
