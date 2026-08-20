@@ -92,7 +92,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.0.0",
-    "@testing-library/user-event": "^14.6.3",
+    "@testing-library/user-event": "^14.6.4",
     "@types/d3-geo": "3.1.1",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
@@ -107,10 +107,10 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",
-    "globals": "^17.9.0",
+    "globals": "^17.11.0",
     "happy-dom": "^20.11.2",
     "husky": "^9.0.0",
-    "knip": "^6.32.1",
+    "knip": "^6.32.2",
     "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
     "rollup-plugin-visualizer": "^7.0.1",
@@ -128,6 +128,7 @@
   },
   "overrides": {
     "picomatch": "4.0.4",
+    "unbash": "4.0.9",
     "miniflare": {
       "undici": "7.29.0"
     },
