@@ -120,11 +120,26 @@ const formatPosicaoLabel = (pos: string): string => {
   return p;
 };
 
-/** Sanitiza HTML para uso em e-mail (tags seguras apenas) */
+/** Troca tags estruturais por quebras de linha antes da extração de texto,
+ *  para que `<br>`, `<p>`, `<li>` etc. não achatem o relatório texto. */
+const structuralTagsToLineBreaks = (html: string): string =>
+  html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(?:p|div|li|h[1-6]|tr|blockquote)>/gi, '\n');
+
+/** Converte HTML em texto puro (sem tags), preservando quebras de linha
+ *  estruturais; adequado para e-mail texto e canais apenas-texto. */
 const htmlToPlainText = (html: string): string => {
-  const safeHtml = stripInternalAnalysisMarkers(html);
+  const safeHtml = structuralTagsToLineBreaks(stripInternalAnalysisMarkers(html));
   if (typeof DOMParser === 'undefined') {
-    return safeHtml
+    // Fallback sem DOM: remove tags até estabilizar (uma passada única
+    // deixaria `<scr<script>ipt>` recompor uma tag) e decodifica as
+    // entidades básicas já tratadas antes.
+    let text = safeHtml;
+    let previous: string;
+    do {
+      previous = text;
+      text = text.replace(/<[^>]*>/g, '');
+    } while (text !== previous);
+    return text
       .split('&nbsp;')
       .join(' ')
       .split('&amp;')
@@ -140,10 +155,14 @@ const htmlToPlainText = (html: string): string => {
   return stripInternalAnalysisMarkers(parsed.body.textContent || '').trim();
 };
 
+/** Sanitiza HTML para uso em e-mail (tags seguras apenas). */
 const sanitizeForEmail = (html: string): string => {
   const safeHtml = stripInternalAnalysisMarkers(html);
   if (typeof DOMParser === 'undefined') {
-    return htmlToPlainText(safeHtml);
+    // O resultado vai para um contexto HTML: escapar o texto plano garante
+    // que nada remanescente (ex.: `<` de tag não fechada, que o strip por
+    // `<[^>]*>` não casa) possa virar markup completado pelo template.
+    return escapeHtml(htmlToPlainText(safeHtml));
   }
 
   const blockedTags = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'meta', 'link', 'base']);
@@ -161,13 +180,18 @@ const sanitizeForEmail = (html: string): string => {
     Array.from(node.attributes).forEach((attr) => {
       const name = attr.name.toLowerCase();
       const rawValue = attr.value.trim();
-      const lowerValue = rawValue.toLowerCase();
+      // Controles/espaços embutidos não podem esconder o esquema: o DOMParser
+      // decodifica `java&#x0d;script:` para um CR literal dentro do valor, que
+      // um startsWith direto deixaria passar.
+      const schemeProbe = Array.from(rawValue.toLowerCase())
+        .filter((ch) => ch.charCodeAt(0) > 0x20)
+        .join('');
 
       if (
         name.startsWith('on') ||
-        lowerValue.startsWith('javascript:') ||
-        lowerValue.startsWith('data:') ||
-        lowerValue.startsWith('vbscript:')
+        schemeProbe.startsWith('javascript:') ||
+        schemeProbe.startsWith('data:') ||
+        schemeProbe.startsWith('vbscript:')
       ) {
         node.removeAttribute(attr.name);
         return;
@@ -838,3 +862,8 @@ export function generateAstrologicalReport(mapa: MapaDetalhado): GeneratedReport
 
   return { html: htmlContent, text: textContent, summary };
 }
+
+export const astrologicalReportTestHooks = {
+  htmlToPlainText,
+  sanitizeForEmail,
+};

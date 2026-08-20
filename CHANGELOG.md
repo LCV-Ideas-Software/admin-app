@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [APP v02.15.26] — 20/08/2026
+
+### Segurança
+
+- **Sanitizador de e-mail endurecido em `src/lib/astrological-report.ts`.**
+  O fallback sem `DOMParser` de `htmlToPlainText` removia apenas entidades e
+  vazava tags cruas para o corpo do e-mail (e `sanitizeForEmail` delega para
+  ele nesse runtime) — agora remove tags até estabilizar antes da
+  decodificação. A sonda de esquema de atributos ignora caracteres de
+  controle/espaço (≤ 0x20), fechando o desvio `java&#x0d;script:` que o
+  `DOMParser` decodifica dentro do valor. Além disso, o fallback de
+  `sanitizeForEmail` passa a escapar o texto plano com `escapeHtml` antes de
+  devolvê-lo ao contexto HTML — uma tag NÃO fechada (`<img src=x onerror=…`
+  sem `>`) não casa o strip `<[^>]*>` e o `<` cru poderia ser completado por
+  um `>` do template (invariante apontada no cross-review pelo peer codex).
+  Origem: threads de review nos PRs #2 e #3.
+
+### Corrigido
+
+- **Relatório texto preserva quebras de linha estruturais.** `<br>`, `</p>`,
+  `</li>` e demais fechamentos de bloco viram `\n` antes da extração de texto
+  (novo helper `structuralTagsToLineBreaks`), em vez de achatar a saída; o
+  docstring deslocado sobre `htmlToPlainText` foi corrigido. Origem: threads
+  de review no PR #3.
+
 ## [APP v02.15.25] — 20/08/2026
 
 ### Segurança
