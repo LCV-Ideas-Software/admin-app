@@ -1,3 +1,5 @@
+# This workflow is managed by gh actions-lock.
+
 name: Linear Release
 # Fase 2: a release no Linear só é criada quando o Deploy CONCLUIU COM SUCESSO —
 # release descreve mudança em produção, não merge. O gatilho workflow_run é
