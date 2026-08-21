@@ -247,7 +247,9 @@ npx wrangler secret put ENFORCE_JWT_VALIDATION --config admin-motor/wrangler.jso
 
 ### 6. Configure additional secrets
 
-Per `admin-motor/wrangler.json`'s `secrets_store_secrets` list, set values for the keys you intend to use (Vertex AI, Resend, JINA, Cloudflare DNS/Cache/Account-ID tokens, etc.). `VERTEX_SA_KEY` (Secret Store `vertex-sa-key`, the same Service Account the other LCV apps use) is required by every AI endpoint: `/api/{oraculo,astrologo,mainsite,calculadora}/modelos`, the MainSite editor transform, Gemini share import, post summaries, the optional news-discovery layer and the Maestro AI Gemini provider. Optional companions: `VERTEX_PROJECT` (defaults to the `project_id` inside the Service Account JSON) and `VERTEX_LOCATION` (defaults to `global`).
+Per `admin-motor/wrangler.json`'s `secrets_store_secrets` list, set values for the keys you intend to use (Vertex AI, Resend, JINA, Cloudflare DNS/Cache/Account-ID tokens, etc.). Resend is the canonical e-mail provider for the Astrólogo flow; configure `RESEND_API_KEY` when e-mail dispatch is enabled. There is no planned Cloudflare Email Service binding for this flow. `VERTEX_SA_KEY` (Secret Store `vertex-sa-key`, the same Service Account the other LCV apps use) is required by every AI endpoint: `/api/{oraculo,astrologo,mainsite,calculadora}/modelos`, the MainSite editor transform, Gemini share import, post summaries, the optional news-discovery layer and the Maestro AI Gemini provider. Optional companions: `VERTEX_PROJECT` (defaults to the `project_id` inside the Service Account JSON) and `VERTEX_LOCATION` (defaults to `global`).
+
+The storage routes use the least-privilege Secrets Store binding `CLOUDFLARE_STORAGE`, backed by the active Workers-scoped secret `cloudflare-storage`, and retain `CLOUDFLARE_PW` only as a degraded compatibility fallback.
 
 `GCP_SA_KEY` (Cloud Monitoring Service Account) is provisioned as a native Worker secret instead:
 

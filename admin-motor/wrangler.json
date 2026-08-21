@@ -59,6 +59,11 @@
       "secret_name": "admin-cloudflare-api-token"
     },
     {
+      "binding": "CLOUDFLARE_STORAGE",
+      "store_id": "df90c0935ba1460899c3c2c457548a90",
+      "secret_name": "cloudflare-storage"
+    },
+    {
       "binding": "ADMIN_BEARER_TOKEN",
       "store_id": "df90c0935ba1460899c3c2c457548a90",
       "secret_name": "admin-motor-bearer-token"

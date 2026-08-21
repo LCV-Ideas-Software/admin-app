@@ -265,7 +265,7 @@ type AdminMotorEnv = {
   RESEND_API_KEY?: unknown;
   CLOUDFLARE_DNS?: unknown;
   CLOUDFLARE_CACHE?: unknown;
-  CLOUDFLARE_STORAGE?: unknown;
+  CLOUDFLARE_STORAGE: SecretsStoreSecret;
   GCP_SA_KEY?: unknown;
   GCP_PROJECT_ID?: unknown;
   JINA_API_KEY?: unknown;
@@ -371,6 +371,20 @@ const readSecretString = async (value: unknown): Promise<string> => {
   return '';
 };
 
+/**
+ * A API oficial do Secrets Store faz `get()` rejeitar em falhas de leitura.
+ * Nesse caso deixamos o valor vazio para que o núcleo de API use o fallback
+ * explícito CLOUDFLARE_PW, sem registrar valor nem erro bruto.
+ */
+const readStorageSecretString = async (value: SecretsStoreSecret, binding: string): Promise<string> => {
+  try {
+    return await readSecretString(value);
+  } catch {
+    console.warn('[admin-motor] secret:read-failed', { binding });
+    return '';
+  }
+};
+
 const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotorEnv> => ({
   ...(env.BIGDATA_DB !== undefined ? { BIGDATA_DB: env.BIGDATA_DB } : {}),
   MEDIA_BUCKET: env.MEDIA_BUCKET,
@@ -389,7 +403,7 @@ const resolveRuntimeEnv = async (env: AdminMotorEnv): Promise<ResolvedAdminMotor
   RESEND_API_KEY: await readSecretString(env.RESEND_API_KEY),
   CLOUDFLARE_DNS: await readSecretString(env.CLOUDFLARE_DNS),
   CLOUDFLARE_CACHE: await readSecretString(env.CLOUDFLARE_CACHE),
-  CLOUDFLARE_STORAGE: await readSecretString(env.CLOUDFLARE_STORAGE),
+  CLOUDFLARE_STORAGE: await readStorageSecretString(env.CLOUDFLARE_STORAGE, 'CLOUDFLARE_STORAGE'),
   GCP_SA_KEY: await readSecretString(env.GCP_SA_KEY),
   GCP_PROJECT_ID: await readSecretString(env.GCP_PROJECT_ID),
   JINA_API_KEY: await readSecretString(env.JINA_API_KEY),

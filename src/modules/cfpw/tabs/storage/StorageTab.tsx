@@ -31,24 +31,24 @@ type StorageSubTab = 'kv' | 'd1' | 'r2';
 
 const KV_DISABLED_INSTRUCTIONS: Record<'sem-permissao' | 'indisponivel' | 'erro', string> = {
   'sem-permissao':
-    'Sem permissão para Workers KV: crie o token cloudflare-storage (Workers KV Storage Edit + D1 Edit + R2 Edit) ' +
-    'no Secrets Store ou amplie as permissões do token CLOUDFLARE_PW.',
+    'Sem permissão para Workers KV: verifique o token cloudflare-storage (Workers KV Storage Edit + D1 Edit + R2 Edit) ' +
+    'e o binding CLOUDFLARE_STORAGE, ou amplie as permissões do token CLOUDFLARE_PW.',
   indisponivel: 'Workers KV indisponível nesta conta Cloudflare — verifique se o produto está ativo no dashboard.',
   erro: 'Falha ao sondar o Workers KV na API Cloudflare — tente atualizar; se persistir, verifique o motor.',
 };
 
 const D1_DISABLED_INSTRUCTIONS: Record<'sem-permissao' | 'indisponivel' | 'erro', string> = {
   'sem-permissao':
-    'Sem permissão para D1: crie o token cloudflare-storage (Workers KV Storage Edit + D1 Edit + R2 Edit) ' +
-    'no Secrets Store ou amplie as permissões do token CLOUDFLARE_PW.',
+    'Sem permissão para D1: verifique o token cloudflare-storage (Workers KV Storage Edit + D1 Edit + R2 Edit) ' +
+    'e o binding CLOUDFLARE_STORAGE, ou amplie as permissões do token CLOUDFLARE_PW.',
   indisponivel: 'D1 indisponível nesta conta Cloudflare — verifique se o produto está ativo no dashboard.',
   erro: 'Falha ao sondar o D1 na API Cloudflare — tente atualizar; se persistir, verifique o motor.',
 };
 
 const R2_DISABLED_INSTRUCTIONS: Record<'sem-permissao' | 'indisponivel' | 'erro', string> = {
   'sem-permissao':
-    'Sem permissão para R2: crie o token cloudflare-storage (Workers KV Storage Edit + D1 Edit + R2 Edit) ' +
-    'no Secrets Store ou amplie as permissões do token CLOUDFLARE_PW.',
+    'Sem permissão para R2: verifique o token cloudflare-storage (Workers KV Storage Edit + D1 Edit + R2 Edit) ' +
+    'e o binding CLOUDFLARE_STORAGE, ou amplie as permissões do token CLOUDFLARE_PW.',
   indisponivel: 'R2 indisponível nesta conta Cloudflare — verifique se o produto está ativo no dashboard.',
   erro: 'Falha ao sondar o R2 na API Cloudflare — tente atualizar; se persistir, verifique o motor.',
 };
