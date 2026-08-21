@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Corrigido
+
+- **Fallback do token dedicado de armazenamento.** O ambiente bruto do
+  `admin-motor` tipa `CLOUDFLARE_STORAGE` como `SecretsStoreSecret`, lê o valor
+  pela chamada assíncrona `get()` e, se a leitura do binding opcional falhar,
+  preserva o fallback explícito para `CLOUDFLARE_PW` sem registrar valor ou
+  erro bruto. O binding versionado aponta para o secret ativo
+  `cloudflare-storage`, de escopo Workers, e mantém o token amplo apenas como
+  compatibilidade degradada. A credencial do environment de produção foi
+  verificada com `Secrets Store Write`, `D1 Write`, `Pages Write` e
+  `Workers Scripts Write`, cobrindo a validação do binding no deploy por CI.
+
+### Decidido
+
+- **Resend permanece como provedor do Astrólogo.** Os planos documentais de
+  migração para o Cloudflare Email Service foram revogados; o handler e o
+  binding `RESEND_API_KEY` continuam sendo o contrato vigente.
+
 ## [APP v02.15.26] — 20/08/2026
 
 ### Segurança

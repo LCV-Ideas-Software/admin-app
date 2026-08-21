@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import adminMotorConfig from '../wrangler.json';
 
 const runtime = vi.hoisted(() => {
   class MockVertexHttpError extends Error {
@@ -62,6 +64,11 @@ beforeEach(() => {
   runtime.listError = null;
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 describe('GET /api/mainsite/modelos e /api/calculadora/modelos (catálogo via Vertex)', () => {
   it('retorna 500 quando VERTEX_SA_KEY está ausente', async () => {
     const res = await dispatch('/api/mainsite/modelos', { ADMIN_BEARER_TOKEN: TOKEN });
@@ -117,5 +124,71 @@ describe('GET /api/mainsite/modelos e /api/calculadora/modelos (catálogo via Ve
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; models: ModelPayload[] };
     expect(body.models.map((m) => m.id)).toEqual(['gemini-2.5-flash']);
+  });
+});
+
+describe('Secrets Store de armazenamento no limite do Worker', () => {
+  const stubKvNamespaces = () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json({
+        success: true,
+        errors: [],
+        messages: [],
+        result: [],
+        result_info: { page: 1, per_page: 20, total_count: 0, total_pages: 1 },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  it('declara o binding dedicado para o secret ativo cloudflare-storage', () => {
+    expect(adminMotorConfig.secrets_store_secrets).toContainEqual({
+      binding: 'CLOUDFLARE_STORAGE',
+      store_id: 'df90c0935ba1460899c3c2c457548a90',
+      secret_name: 'cloudflare-storage',
+    });
+  });
+
+  it('lê o binding assíncrono e faz o token dedicado prevalecer sobre CLOUDFLARE_PW', async () => {
+    const fetchMock = stubKvNamespaces();
+    const storageGet = vi.fn().mockResolvedValue(' storage-token ');
+    const fallbackGet = vi.fn().mockResolvedValue(' pw-token ');
+
+    const res = await dispatch('/api/cfpw/storage/kv/namespaces', {
+      ADMIN_BEARER_TOKEN: TOKEN,
+      CF_ACCOUNT_ID: 'acct-1',
+      CLOUDFLARE_STORAGE: { get: storageGet },
+      CLOUDFLARE_PW: { get: fallbackGet },
+    });
+
+    expect(res.status).toBe(200);
+    expect(storageGet).toHaveBeenCalledTimes(1);
+    expect(fallbackGet).toHaveBeenCalledTimes(1);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer storage-token');
+  });
+
+  it('usa CLOUDFLARE_PW quando get() do binding opcional de armazenamento rejeita', async () => {
+    const fetchMock = stubKvNamespaces();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const storageGet = vi.fn().mockRejectedValue(new Error('binding indisponível'));
+    const fallbackGet = vi.fn().mockResolvedValue('pw-token');
+
+    const res = await dispatch('/api/cfpw/storage/kv/namespaces', {
+      ADMIN_BEARER_TOKEN: TOKEN,
+      CF_ACCOUNT_ID: 'acct-1',
+      CLOUDFLARE_STORAGE: { get: storageGet },
+      CLOUDFLARE_PW: { get: fallbackGet },
+    });
+
+    expect(res.status).toBe(200);
+    expect(storageGet).toHaveBeenCalledTimes(1);
+    expect(fallbackGet).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('[admin-motor] secret:read-failed', {
+      binding: 'CLOUDFLARE_STORAGE',
+    });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer pw-token');
   });
 });
