@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS calc_parametros_auditoria (
 -- ============================================================================
 -- TABELAS LEGADO (prefixo obrigatório: calc_)
 -- Existentes em calculadora-calc-db mas sem uso no código atual.
--- Mantidas para preservar histórico de dados antes do cutover.
+-- Preservadas nesta etapa histórica; a migration 019 só as remove se vazias.
 -- ============================================================================
 
 -- Legacy: rate-limit de e-mail gerenciado inline (antes do módulo rate-limit.mjs)
@@ -64,5 +64,5 @@ CREATE INDEX IF NOT EXISTS idx_calc_email_rate_limit_ip_timestamp
 -- As tabelas ativas (parametros_customizados e parametros_auditoria) são criadas
 -- inline no código via "CREATE TABLE IF NOT EXISTS" — esta migration garante que
 -- existam na bigdata_db antes do primeiro acesso.
--- As tabelas legado (email_rate_limit, parametros_calculo) devem ser populadas
--- via sync manual antes do cutover definitivo do calculadora-calc-db.
+-- As tabelas legado (email_rate_limit, parametros_calculo) não devem receber
+-- novos dados. A migration 019 encerra o contrato após um guard fail-closed.

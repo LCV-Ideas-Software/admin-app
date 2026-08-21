@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Removido
+
+- **Duas tabelas D1 legadas da Calculadora.** A migração nativa `0002` e a
+  etapa de bootstrap `019` aposentam `calc_email_rate_limit` e
+  `calc_parametros_calculo`, ambas sem consumidor runtime e vazias no inventário
+  pré-operação. Um guard transacional recusa a remoção caso qualquer tabela
+  ganhe linhas ou se `calc_parametros_auditoria` — ainda usada pelo
+  `admin-motor` — estiver ausente. Testes cobrem sucesso, repetição idempotente e
+  rollback dos três desvios.
+
 ### Corrigido
 
 - **Fallback do token dedicado de armazenamento.** O ambiente bruto do
