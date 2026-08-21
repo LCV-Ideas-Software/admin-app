@@ -205,7 +205,9 @@ for your own database in:
 For a new, empty database, apply the versioned SQL files exactly once in lexical
 order. This includes migration `014a`, which materializes
 `astrologo_mapas.email` before migration 015, and migrations 017/018, which add
-saved-map ownership and durable AI-analysis jobs.
+saved-map ownership and durable AI-analysis jobs. Migration 019 retires the
+empty Calculadora legacy tables `calc_email_rate_limit` and
+`calc_parametros_calculo` while preserving `calc_parametros_auditoria`.
 
 ```bash
 for f in $(git ls-files 'db/migrations/*.sql' | sort); do
@@ -226,8 +228,10 @@ compatible database—apply the pending production migrations through Wrangler:
 npx wrangler d1 migrations apply BIGDATA_DB --remote --config wrangler.json
 ```
 
-Each new production change must be a backward-compatible, data-preserving
-migration because the previous Worker revision remains live until deploy.
+Each new production change must remain compatible with the previous Worker
+revision while it is live. A deliberate legacy-table retirement must be
+fail-closed on non-empty data, have a pre-apply export and Time Travel bookmark,
+and preserve every table still consumed by a deployed Worker.
 
 The canonical Astrólogo schema, rollout order, verification queries, and the
 `astrologo-config/modeloSintese` contract are documented in
