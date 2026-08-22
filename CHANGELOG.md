@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Infraestrutura
+
+- **Linear Release usa a action oficial da Linear.** O workflow pós-Deploy
+  substitui o download manual pelo `linear/linear-release-action` v0.16.0,
+  fixado por SHA completo e com a versão do CLI explícita. Permanecem o
+  checkout do SHA efetivamente implantado, o histórico completo, o environment
+  dedicado, as permissões mínimas, a concorrência e o comportamento
+  best-effort. O instalador upstream ainda não valida o digest do binário; o
+  risco residual está registrado em ADMIAPP-12 e em
+  `linear/linear-release-action#59`.
+
 ### Removido
 
 - **Duas tabelas D1 legadas da Calculadora.** A migração nativa `0002` e a

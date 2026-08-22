@@ -53,28 +53,21 @@ jobs:
           fetch-depth: 0 # histórico completo: o CLI varre commits desde a última release
           persist-credentials: false
 
-      # Download verificado por digest — sem wrapper de terceiro: o binário oficial
-      # do CLI só executa se o SHA-256 conferir com o valor gravado abaixo
-      # (recomputado localmente e conferido contra o digest declarado pela API do
-      # GitHub em 17/08/2026). Troca de versão exige atualizar URL e digest juntos,
-      # por desenho. Inventário e fronteira de confiança em THIRDPARTY.md do
-      # repositório de governança.
+      # Integração oficial da Linear, pinada no commit da release v0.16.0 e com a
+      # versão do CLI também explícita. O pin protege o código da action contra
+      # deslocamento de tag; o instalador upstream ainda não verifica o digest do
+      # asset do CLI, risco residual registrado em ADMIAPP-12 e
+      # linear/linear-release-action#59.
       #
       # Best-effort por desenho: esta sincronização é um espelho opcional e sua
-      # falha (digest divergente, indisponibilidade, segredo expirado) NUNCA pode
+      # falha (indisponibilidade, segredo expirado ou erro upstream) NUNCA pode
       # bloquear portões que varrem todos os runs do SHA. O run conclui verde e a
       # falha fica visível na anotação do passo; commits não sincronizados embarcam
       # na release seguinte.
-      - name: Create Linear release (CLI verificado por digest)
+      - name: Create Linear release (action oficial)
         id: linear_release
         continue-on-error: true
-        env:
-          LINEAR_ACCESS_KEY: ${{ secrets.LINEAR_ACCESS_KEY }}
-          CLI_URL: https://github.com/linear/linear-release/releases/download/v0.15.0/linear-release-linux-x64
-          CLI_SHA256: 06eddce3f0d306fcdfed634105a57b02695b5c4fb40c42eb56d13feced729c99
-        run: |
-          bin="$RUNNER_TEMP/linear-release"
-          curl -fsSL "$CLI_URL" -o "$bin"
-          echo "$CLI_SHA256  $bin" | sha256sum -c -
-          chmod +x "$bin"
-          "$bin" sync
+        uses: linear/linear-release-action@0a25abab892a91062ebf42260dbb2ce6277aa205 # v0.16.0
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          cli_version: v0.16.0
