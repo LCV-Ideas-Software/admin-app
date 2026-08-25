@@ -75,7 +75,7 @@ By contributing, you agree your contribution is licensed under [AGPL-3.0-or-late
 
 ## Code of Conduct
 
-By participating, you agree to follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) (Contributor Covenant 3.0). Violations to `chamados@lcv.dev`.
+By participating, you agree to follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) (Contributor Covenant 3.0). General support: `chamados@lcv.dev`. Code of Conduct violations: `conductcode@lcv.dev`.
 
 ---
 
