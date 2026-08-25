@@ -17,7 +17,7 @@ Please do not open a public issue for suspected vulnerabilities, credential leak
 
 Report privately by email:
 
-- lcv@lcv.dev
+- security@lcv.dev
 
 If GitHub private vulnerability reporting is enabled for this repository, that channel is also acceptable.
 
