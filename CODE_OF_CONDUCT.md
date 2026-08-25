@@ -22,7 +22,7 @@ This applies to:
 
 Reports of violations can be sent privately to:
 
-**lcv@lcv.dev**
+**conductcode@lcv.dev**
 
 This is the same private channel used for security reports (see [SECURITY.md](./SECURITY.md)). Reports will be acknowledged within 48 hours and handled per the Contributor Covenant 3.0 enforcement ladder.
 
