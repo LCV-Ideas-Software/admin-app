@@ -13,7 +13,7 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.8",
+		"@biomejs/biome": "^2.5.9",
 		"@cloudflare/vitest-pool-workers": "^0.21.3",
 		"vitest": "^4.1.10",
 		"wrangler": "^4.123.0"
