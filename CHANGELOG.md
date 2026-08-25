@@ -1065,7 +1065,7 @@
 ### Adicionado — Phase 3 sweep (flip readiness foundation, puramente aditivo)
 
 - **`CONTRIBUTING.md`**: guia para issues + PRs cobrindo gates locais (`lint`, `test`, `test:admin-motor`, `build`), wrangler dry-run, action pinning, versioning, D1 schema discipline.
-- **`CODE_OF_CONDUCT.md`**: Contributor Covenant 3.0 com canal `lcv@lcv.dev` + ladder de enforcement.
+- **`CODE_OF_CONDUCT.md`**: Contributor Covenant 3.0 com canal `***@lcv.dev` + ladder de enforcement.
 - **`.github/CODEOWNERS`**: `* @example-beneficiary` como owner default.
 - **`src/lib/apiClient.ts` (novo, opt-in)**: foundation com `safeJson<T>()` + `apiFetch()` + `apiFetchJson<T>()`. Helpers defensivos para o padrão da v01.10.00 do oraculo-financeiro (Content-Type check antes de `res.json()`) e timeout per-call via AbortController. Sites de fetch existentes NÃO foram migrados — adoção é opt-in incremental.
 
