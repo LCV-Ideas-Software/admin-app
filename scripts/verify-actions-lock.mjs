@@ -1,6 +1,6 @@
-#!/usr/bin/env node
+// biome-ignore-all format: Canonical security validator is Prettier-formatted across the fleet.
 
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -20,7 +20,9 @@ function parseScalar(raw, file, line, diagnostics) {
   if (value.startsWith("'")) {
     const match = value.match(/^'((?:[^']|'')*)'\s*(?:#.*)?$/);
     if (!match) {
-      diagnostics.push(diagnostic(file, line, "invalid single-quoted YAML scalar"));
+      diagnostics.push(
+        diagnostic(file, line, "invalid single-quoted YAML scalar"),
+      );
       return null;
     }
     return match[1].replaceAll("''", "'");
@@ -29,20 +31,26 @@ function parseScalar(raw, file, line, diagnostics) {
   if (value.startsWith('"')) {
     const match = value.match(/^("(?:[^"\\]|\\.)*")\s*(?:#.*)?$/);
     if (!match) {
-      diagnostics.push(diagnostic(file, line, "invalid double-quoted YAML scalar"));
+      diagnostics.push(
+        diagnostic(file, line, "invalid double-quoted YAML scalar"),
+      );
       return null;
     }
     try {
       return JSON.parse(match[1]);
     } catch {
-      diagnostics.push(diagnostic(file, line, "invalid escape in double-quoted YAML scalar"));
+      diagnostics.push(
+        diagnostic(file, line, "invalid escape in double-quoted YAML scalar"),
+      );
       return null;
     }
   }
 
   const unquoted = value.replace(/\s+#.*$/, "").trim();
-  if (!unquoted || /[\[\]{},&*!|>%`]/.test(unquoted)) {
-    diagnostics.push(diagnostic(file, line, "ambiguous or unsupported unquoted YAML scalar"));
+  if (!unquoted || /[[\]{},&*!|>%`]/.test(unquoted)) {
+    diagnostics.push(
+      diagnostic(file, line, "ambiguous or unsupported unquoted YAML scalar"),
+    );
     return null;
   }
   return unquoted;
@@ -58,12 +66,16 @@ function parsePin(raw, file, line, diagnostics) {
     components.length >= 2 &&
     ACTION_REPOSITORY_COMPONENT.test(components[0]) &&
     ACTION_REPOSITORY_COMPONENT.test(components[1]) &&
-    components.slice(2).every((component) => ACTION_SUBPATH_COMPONENT.test(component)) &&
+    components
+      .slice(2)
+      .every((component) => ACTION_SUBPATH_COMPONENT.test(component)) &&
     reference.length > 0 &&
     !/\s/.test(reference);
 
   if (!validPath) {
-    diagnostics.push(diagnostic(file, line, `invalid action pin ${JSON.stringify(raw)}`));
+    diagnostics.push(
+      diagnostic(file, line, `invalid action pin ${JSON.stringify(raw)}`),
+    );
     return null;
   }
 
@@ -115,7 +127,9 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
     const lineNumber = index + 1;
     const raw = lines[index];
     if (raw.includes("\t")) {
-      diagnostics.push(diagnostic(file, lineNumber, "tabs are not allowed in actions.lock"));
+      diagnostics.push(
+        diagnostic(file, lineNumber, "tabs are not allowed in actions.lock"),
+      );
       continue;
     }
     if (!raw.trim() || raw.trimStart().startsWith("#")) continue;
@@ -130,23 +144,40 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
 
       if (trimmed.startsWith("version:")) {
         if (version !== null) {
-          diagnostics.push(diagnostic(file, lineNumber, "duplicate lockfile version"));
+          diagnostics.push(
+            diagnostic(file, lineNumber, "duplicate lockfile version"),
+          );
           continue;
         }
-        version = parseScalar(trimmed.slice("version:".length), file, lineNumber, diagnostics);
+        version = parseScalar(
+          trimmed.slice("version:".length),
+          file,
+          lineNumber,
+          diagnostics,
+        );
         section = null;
       } else if (trimmed === "workflows:") {
         if (workflows.size > 0 || section === "workflows") {
-          diagnostics.push(diagnostic(file, lineNumber, "duplicate workflows section"));
+          diagnostics.push(
+            diagnostic(file, lineNumber, "duplicate workflows section"),
+          );
         }
         section = "workflows";
       } else if (trimmed === "dependencies:") {
         if (dependencies.size > 0 || section === "dependencies") {
-          diagnostics.push(diagnostic(file, lineNumber, "duplicate dependencies section"));
+          diagnostics.push(
+            diagnostic(file, lineNumber, "duplicate dependencies section"),
+          );
         }
         section = "dependencies";
       } else {
-        diagnostics.push(diagnostic(file, lineNumber, `unsupported top-level entry ${JSON.stringify(trimmed)}`));
+        diagnostics.push(
+          diagnostic(
+            file,
+            lineNumber,
+            `unsupported top-level entry ${JSON.stringify(trimmed)}`,
+          ),
+        );
         section = null;
       }
       continue;
@@ -158,22 +189,52 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
         currentWorkflow = workflow;
         if (workflow !== null) {
           if (!/^\.github\/workflows\/[^/]+\.ya?ml$/.test(workflow)) {
-            diagnostics.push(diagnostic(file, lineNumber, `invalid workflow path ${JSON.stringify(workflow)}`));
+            diagnostics.push(
+              diagnostic(
+                file,
+                lineNumber,
+                `invalid workflow path ${JSON.stringify(workflow)}`,
+              ),
+            );
           }
           if (workflows.has(workflow)) {
-            diagnostics.push(diagnostic(file, lineNumber, `duplicate workflow entry ${JSON.stringify(workflow)}`));
+            diagnostics.push(
+              diagnostic(
+                file,
+                lineNumber,
+                `duplicate workflow entry ${JSON.stringify(workflow)}`,
+              ),
+            );
           } else {
             workflows.set(workflow, []);
           }
         }
-      } else if (indent === 8 && trimmed.startsWith("- ") && currentWorkflow !== null) {
-        const rawPin = parseScalar(trimmed.slice(2), file, lineNumber, diagnostics);
+      } else if (
+        indent === 8 &&
+        trimmed.startsWith("- ") &&
+        currentWorkflow !== null
+      ) {
+        const rawPin = parseScalar(
+          trimmed.slice(2),
+          file,
+          lineNumber,
+          diagnostics,
+        );
         if (rawPin !== null) {
           const pin = parsePin(rawPin, file, lineNumber, diagnostics);
-          if (pin) workflows.get(currentWorkflow)?.push({ ...pin, line: lineNumber, raw: rawPin });
+          if (pin)
+            workflows
+              .get(currentWorkflow)
+              ?.push({ ...pin, line: lineNumber, raw: rawPin });
         }
       } else {
-        diagnostics.push(diagnostic(file, lineNumber, "invalid indentation or entry in workflows section"));
+        diagnostics.push(
+          diagnostic(
+            file,
+            lineNumber,
+            "invalid indentation or entry in workflows section",
+          ),
+        );
       }
       continue;
     }
@@ -187,7 +248,13 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
           const pin = parsePin(rawPin, file, lineNumber, diagnostics);
           if (pin) {
             if (dependencies.has(pin.canonical)) {
-              diagnostics.push(diagnostic(file, lineNumber, `duplicate dependency ${JSON.stringify(rawPin)}`));
+              diagnostics.push(
+                diagnostic(
+                  file,
+                  lineNumber,
+                  `duplicate dependency ${JSON.stringify(rawPin)}`,
+                ),
+              );
             } else {
               dependencies.set(pin.canonical, {
                 ...pin,
@@ -201,24 +268,45 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
           }
         }
       } else if (indent === 8 && currentDependency !== null) {
-        const parsedDependency = parsePin(currentDependency, file, lineNumber, []);
-        const dependency = parsedDependency ? dependencies.get(parsedDependency.canonical) : null;
+        const parsedDependency = parsePin(
+          currentDependency,
+          file,
+          lineNumber,
+          [],
+        );
+        const dependency = parsedDependency
+          ? dependencies.get(parsedDependency.canonical)
+          : null;
         if (trimmed === "uses:") {
           inDependencyUses = true;
         } else {
           inDependencyUses = false;
           const field = trimmed.match(/^([a-z_]+):\s*(.+)$/);
           if (!field) {
-            diagnostics.push(diagnostic(file, lineNumber, "invalid dependency metadata entry"));
+            diagnostics.push(
+              diagnostic(file, lineNumber, "invalid dependency metadata entry"),
+            );
             continue;
           }
           if (!["ref", "commit", "owner_id", "repo_id"].includes(field[1])) {
-            diagnostics.push(diagnostic(file, lineNumber, `unsupported dependency field ${JSON.stringify(field[1])}`));
+            diagnostics.push(
+              diagnostic(
+                file,
+                lineNumber,
+                `unsupported dependency field ${JSON.stringify(field[1])}`,
+              ),
+            );
             continue;
           }
           const value = parseScalar(field[2], file, lineNumber, diagnostics);
           if (dependency?.fields.has(field[1])) {
-            diagnostics.push(diagnostic(file, lineNumber, `duplicate dependency field ${JSON.stringify(field[1])}`));
+            diagnostics.push(
+              diagnostic(
+                file,
+                lineNumber,
+                `duplicate dependency field ${JSON.stringify(field[1])}`,
+              ),
+            );
           } else if (dependency && value !== null) {
             dependency.fields.set(field[1], { value, line: lineNumber });
           }
@@ -232,20 +320,45 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
         currentDependency !== null &&
         inDependencyUses
       ) {
-        const parsedDependency = parsePin(currentDependency, file, lineNumber, []);
-        const dependency = parsedDependency ? dependencies.get(parsedDependency.canonical) : null;
-        const rawPin = parseScalar(trimmed.slice(2), file, lineNumber, diagnostics);
+        const parsedDependency = parsePin(
+          currentDependency,
+          file,
+          lineNumber,
+          [],
+        );
+        const dependency = parsedDependency
+          ? dependencies.get(parsedDependency.canonical)
+          : null;
+        const rawPin = parseScalar(
+          trimmed.slice(2),
+          file,
+          lineNumber,
+          diagnostics,
+        );
         if (rawPin !== null) {
           const pin = parsePin(rawPin, file, lineNumber, diagnostics);
-          if (pin && dependency) dependency.uses.push({ ...pin, line: lineNumber, raw: rawPin });
+          if (pin && dependency)
+            dependency.uses.push({ ...pin, line: lineNumber, raw: rawPin });
         }
       } else {
-        diagnostics.push(diagnostic(file, lineNumber, "invalid indentation or entry in dependencies section"));
+        diagnostics.push(
+          diagnostic(
+            file,
+            lineNumber,
+            "invalid indentation or entry in dependencies section",
+          ),
+        );
       }
       continue;
     }
 
-    diagnostics.push(diagnostic(file, lineNumber, "entry appears outside a supported lockfile section"));
+    diagnostics.push(
+      diagnostic(
+        file,
+        lineNumber,
+        "entry appears outside a supported lockfile section",
+      ),
+    );
   }
 
   if (version !== SUPPORTED_LOCKFILE_VERSION) {
@@ -257,14 +370,24 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
       ),
     );
   }
-  if (workflows.size === 0) diagnostics.push(diagnostic(file, 1, "workflows section is missing or empty"));
-  if (dependencies.size === 0) diagnostics.push(diagnostic(file, 1, "dependencies section is missing or empty"));
+  if (workflows.size === 0)
+    diagnostics.push(
+      diagnostic(file, 1, "workflows section is missing or empty"),
+    );
+  if (dependencies.size === 0)
+    diagnostics.push(
+      diagnostic(file, 1, "dependencies section is missing or empty"),
+    );
 
   for (const [canonical, dependency] of dependencies) {
     for (const requiredField of ["ref", "commit", "owner_id", "repo_id"]) {
       if (!dependency.fields.has(requiredField)) {
         diagnostics.push(
-          diagnostic(file, dependency.line, `dependency ${JSON.stringify(dependency.raw)} has no ${requiredField}`),
+          diagnostic(
+            file,
+            dependency.line,
+            `dependency ${JSON.stringify(dependency.raw)} has no ${requiredField}`,
+          ),
         );
       }
     }
@@ -272,7 +395,11 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
       const metadata = dependency.fields.get(idField);
       if (metadata && !/^[1-9][0-9]*$/.test(metadata.value)) {
         diagnostics.push(
-          diagnostic(file, metadata.line, `dependency ${idField} must be a positive decimal integer`),
+          diagnostic(
+            file,
+            metadata.line,
+            `dependency ${idField} must be a positive decimal integer`,
+          ),
         );
       }
     }
@@ -302,7 +429,13 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
       }
     }
     if (canonical !== dependency.canonical) {
-      diagnostics.push(diagnostic(file, dependency.line, "internal dependency normalization mismatch"));
+      diagnostics.push(
+        diagnostic(
+          file,
+          dependency.line,
+          "internal dependency normalization mismatch",
+        ),
+      );
     }
   }
 
@@ -310,7 +443,11 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
     for (const pin of pins) {
       if (!dependencies.has(pin.canonical)) {
         diagnostics.push(
-          diagnostic(file, pin.line, `workflow dependency ${JSON.stringify(pin.raw)} has no dependencies entry`),
+          diagnostic(
+            file,
+            pin.line,
+            `workflow dependency ${JSON.stringify(pin.raw)} has no dependencies entry`,
+          ),
         );
       }
     }
@@ -320,13 +457,19 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
   const visit = (canonical) => {
     if (reachable.has(canonical)) return;
     reachable.add(canonical);
-    for (const child of dependencies.get(canonical)?.uses ?? []) visit(child.canonical);
+    for (const child of dependencies.get(canonical)?.uses ?? [])
+      visit(child.canonical);
   };
-  for (const pins of workflows.values()) for (const pin of pins) visit(pin.canonical);
+  for (const pins of workflows.values())
+    for (const pin of pins) visit(pin.canonical);
   for (const dependency of dependencies.values()) {
     if (!reachable.has(dependency.canonical)) {
       diagnostics.push(
-        diagnostic(file, dependency.line, `orphan dependency ${JSON.stringify(dependency.raw)} is not reachable`),
+        diagnostic(
+          file,
+          dependency.line,
+          `orphan dependency ${JSON.stringify(dependency.raw)} is not reachable`,
+        ),
       );
     }
   }
@@ -334,8 +477,16 @@ export function validateLockfileText(text, file = LOCKFILE_PATH) {
   return { diagnostics, workflows, dependencies, version };
 }
 
-function extractUsesScalar(raw, file, line, diagnostics, { sequenceItem = false } = {}) {
-  const match = raw.match(sequenceItem ? /^\s*-\s*uses\s*:\s*(.+)$/ : /^\s*uses\s*:\s*(.+)$/);
+function extractUsesScalar(
+  raw,
+  file,
+  line,
+  diagnostics,
+  { sequenceItem = false } = {},
+) {
+  const match = raw.match(
+    sequenceItem ? /^\s*-\s*uses\s*:\s*(.+)$/ : /^\s*uses\s*:\s*(.+)$/,
+  );
   if (!match) return null;
   return parseScalar(match[1], file, line, diagnostics);
 }
@@ -360,7 +511,9 @@ function collectWorkflowUses(text, file, diagnostics) {
   };
 
   const record = (raw, lineNumber, sequenceItem = false) => {
-    const value = extractUsesScalar(raw, file, lineNumber, diagnostics, { sequenceItem });
+    const value = extractUsesScalar(raw, file, lineNumber, diagnostics, {
+      sequenceItem,
+    });
     if (value !== null) uses.push({ line: lineNumber, value });
   };
 
@@ -404,7 +557,9 @@ function collectWorkflowUses(text, file, diagnostics) {
     }
 
     if (stepsIndent !== null) {
-      const leavesSteps = indent < stepsIndent || (indent === stepsIndent && !trimmed.startsWith("-"));
+      const leavesSteps =
+        indent < stepsIndent ||
+        (indent === stepsIndent && !trimmed.startsWith("-"));
       if (leavesSteps) {
         stepsIndent = null;
         currentStepIndent = null;
@@ -424,7 +579,8 @@ function collectWorkflowUses(text, file, diagnostics) {
       }
     }
 
-    if (jobPropertyIndent === null && !trimmed.startsWith("-")) jobPropertyIndent = indent;
+    if (jobPropertyIndent === null && !trimmed.startsWith("-"))
+      jobPropertyIndent = indent;
     if (indent === jobPropertyIndent) {
       currentStepIndent = null;
       stepPropertyIndent = null;
@@ -433,9 +589,7 @@ function collectWorkflowUses(text, file, diagnostics) {
         continue;
       }
       record(raw, lineNumber);
-      continue;
     }
-
   }
 
   return uses;
@@ -444,13 +598,22 @@ function collectWorkflowUses(text, file, diagnostics) {
 export function validateWorkflowText(text, file) {
   const diagnostics = [];
   const remotePins = [];
-  for (const { line: lineNumber, value } of collectWorkflowUses(text, file, diagnostics)) {
-
+  for (const { line: lineNumber, value } of collectWorkflowUses(
+    text,
+    file,
+    diagnostics,
+  )) {
     if (value.startsWith("docker://")) continue;
     if (value.startsWith("./")) continue;
     if (value.startsWith("$/")) {
       if (value.includes("@")) {
-        diagnostics.push(diagnostic(file, lineNumber, "self-repository $/ references must not contain @ref"));
+        diagnostics.push(
+          diagnostic(
+            file,
+            lineNumber,
+            "self-repository $/ references must not contain @ref",
+          ),
+        );
       }
       continue;
     }
@@ -480,7 +643,9 @@ export async function validateRepository(repositoryRoot = process.cwd()) {
   const observedWorkflows = new Set();
 
   for (const absoluteFile of await workflowFiles(root)) {
-    const relativeFile = path.relative(root, absoluteFile).replaceAll(path.sep, "/");
+    const relativeFile = path
+      .relative(root, absoluteFile)
+      .replaceAll(path.sep, "/");
     const text = await readFile(absoluteFile, "utf8");
     const result = validateWorkflowText(text, relativeFile);
     diagnostics.push(...result.diagnostics);
@@ -494,14 +659,22 @@ export async function validateRepository(repositoryRoot = process.cwd()) {
     for (const pin of result.remotePins) {
       if (!lockedSet.has(pin.canonical)) {
         diagnostics.push(
-          diagnostic(relativeFile, pin.line, `remote use ${JSON.stringify(pin.raw)} is absent from actions.lock`),
+          diagnostic(
+            relativeFile,
+            pin.line,
+            `remote use ${JSON.stringify(pin.raw)} is absent from actions.lock`,
+          ),
         );
       }
     }
     for (const pin of locked) {
       if (!observedSet.has(pin.canonical)) {
         diagnostics.push(
-          diagnostic(LOCKFILE_PATH, pin.line, `stale workflow dependency ${JSON.stringify(pin.raw)} for ${relativeFile}`),
+          diagnostic(
+            LOCKFILE_PATH,
+            pin.line,
+            `stale workflow dependency ${JSON.stringify(pin.raw)} for ${relativeFile}`,
+          ),
         );
       }
     }
@@ -510,7 +683,11 @@ export async function validateRepository(repositoryRoot = process.cwd()) {
   for (const [workflow, pins] of lockResult.workflows) {
     if (pins.length > 0 && !observedWorkflows.has(workflow)) {
       diagnostics.push(
-        diagnostic(LOCKFILE_PATH, pins[0].line, `lockfile records missing or action-free workflow ${workflow}`),
+        diagnostic(
+          LOCKFILE_PATH,
+          pins[0].line,
+          `lockfile records missing or action-free workflow ${workflow}`,
+        ),
       );
     }
   }
@@ -528,7 +705,10 @@ function escapeWorkflowCommandProperty(value) {
 }
 
 function escapeWorkflowCommandData(value) {
-  return String(value).replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+  return String(value)
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
 }
 
 export function formatDiagnosticCommand(item) {
@@ -539,7 +719,8 @@ export function formatDiagnosticCommand(item) {
 }
 
 function printDiagnostics(diagnostics) {
-  for (const item of diagnostics) process.stderr.write(`${formatDiagnosticCommand(item)}\n`);
+  for (const item of diagnostics)
+    process.stderr.write(`${formatDiagnosticCommand(item)}\n`);
 }
 
 async function main() {
@@ -548,7 +729,9 @@ async function main() {
     const result = await validateRepository(repositoryRoot);
     if (result.diagnostics.length > 0) {
       printDiagnostics(result.diagnostics);
-      process.stderr.write(`actions.lock structural validation failed with ${result.diagnostics.length} error(s).\n`);
+      process.stderr.write(
+        `actions.lock structural validation failed with ${result.diagnostics.length} error(s).\n`,
+      );
       process.exitCode = 1;
       return;
     }
@@ -561,5 +744,7 @@ async function main() {
   }
 }
 
-const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : null;
+const invokedPath = process.argv[1]
+  ? pathToFileURL(path.resolve(process.argv[1])).href
+  : null;
 if (invokedPath === import.meta.url) await main();
