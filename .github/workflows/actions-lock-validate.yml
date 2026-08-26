@@ -1,0 +1,199 @@
+# This workflow intentionally uses no actions. It treats the pull-request or
+# merge-group snapshot strictly as untrusted data and executes only code read
+# from the trusted default-branch commit that triggered this workflow.
+#
+# Threat boundary: this prevents untrusted pull-request content and accidental
+# invalid lockfiles from approving themselves. It does not defend against an
+# actor already authorized to modify trusted default-branch workflows, because
+# every such workflow can publish statuses as the GitHub Actions App.
+
+name: Actions lock trusted validator
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows:
+      - Actions lock validation trigger
+    types:
+      - completed
+
+permissions: {}
+
+concurrency:
+  group: actions-lock-trusted-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Publish trusted actions.lock status
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # Read the trusted validator and resolve the exact target head.
+      statuses: write # Publish the required status on that exact head SHA.
+    steps:
+      - name: Validate untrusted snapshot and publish status
+        shell: bash
+        env:
+          BASE_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          STATUS_CONTEXT: Validate actions.lock
+          STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          TRUSTED_BASE_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+
+          readonly lock_version='v0.1.6'
+          readonly lock_asset_url='https://github.com/github/gh-actions-lock/releases/download/v0.1.6/linux-amd64'
+          readonly lock_asset_sha256='4181ec1da5408b34b9a542a7ee5c6ce3a4d6ac815c7d0206a00ceca8a817f4e3'
+          readonly validator_path='scripts/verify-actions-lock.mjs'
+
+          status_started='false'
+
+          post_status() {
+            local state="$1"
+            local description="$2"
+
+            gh api \
+              --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${BASE_REPOSITORY}/statuses/${HEAD_SHA}" \
+              -f "state=${state}" \
+              -f "context=${STATUS_CONTEXT}" \
+              -f "description=${description}" \
+              -f "target_url=${STATUS_TARGET_URL}" \
+              >/dev/null
+          }
+
+          finalize_status() {
+            local exit_code="$?"
+            trap - EXIT
+
+            if [[ "${status_started}" == 'true' ]]; then
+              if (( exit_code == 0 )); then
+                if ! post_status 'success' 'actions.lock is valid and complete'; then
+                  printf '%s\n' '::error::Validation passed, but the final success status could not be published.'
+                  exit_code=1
+                fi
+              elif ! post_status 'failure' 'actions.lock validation failed'; then
+                printf '%s\n' '::error::Validation failed and the final failure status could not be published.'
+              fi
+            fi
+
+            exit "${exit_code}"
+          }
+
+          trap finalize_status EXIT
+
+          if [[ ! "${TRIGGER_EVENT}" =~ ^(pull_request|merge_group)$ ]]; then
+            printf '%s\n' "::error::Unexpected triggering event: ${TRIGGER_EVENT:-<empty>}"
+            exit 1
+          fi
+
+          if [[ ! "${HEAD_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            printf '%s\n' '::error::The triggering workflow did not provide a valid full head SHA.'
+            exit 1
+          fi
+
+          if [[ ! "${TRUSTED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            printf '%s\n' '::error::The workflow_run context did not provide a valid trusted default-branch SHA.'
+            exit 1
+          fi
+
+          if [[ ! "${HEAD_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            printf '%s\n' '::error::The triggering workflow did not provide a valid head repository name.'
+            exit 1
+          fi
+
+          resolved_head_sha="$({
+            gh api \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${HEAD_REPOSITORY}/commits/${HEAD_SHA}" \
+              --jq '.sha'
+          } 2>/dev/null)" || {
+            printf '%s\n' '::error::The target head commit does not resolve in its declared repository; no status was attempted.'
+            exit 1
+          }
+
+          if [[ "${resolved_head_sha}" != "${HEAD_SHA}" ]]; then
+            printf '%s\n' '::error::The API did not resolve the exact target head SHA; no status was attempted.'
+            exit 1
+          fi
+
+          post_status 'pending' 'Validating actions.lock from trusted code'
+          status_started='true'
+
+          readonly work_root="${RUNNER_TEMP}/actions-lock-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          readonly archive_path="${work_root}/head.tar.gz"
+          readonly snapshot_parent="${work_root}/snapshot"
+          readonly trusted_validator="${work_root}/verify-actions-lock.mjs"
+          readonly lock_binary="${work_root}/gh-actions-lock"
+
+          mkdir -p "${snapshot_parent}"
+
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${HEAD_REPOSITORY}/tarball/${HEAD_SHA}" \
+            >"${archive_path}"
+
+          tar \
+            --extract \
+            --gzip \
+            --file "${archive_path}" \
+            --directory "${snapshot_parent}" \
+            --no-same-owner \
+            --no-same-permissions
+
+          mapfile -t snapshot_entries < <(
+            find "${snapshot_parent}" -mindepth 1 -maxdepth 1 -print
+          )
+          if (( ${#snapshot_entries[@]} != 1 )) || [[ ! -d "${snapshot_entries[0]}" ]]; then
+            printf '%s\n' '::error::The GitHub-generated source archive did not contain exactly one repository root.'
+            exit 1
+          fi
+          readonly snapshot_root="${snapshot_entries[0]}"
+
+          snapshot_symlink="$(
+            find -P "${snapshot_root}" -type l -print -quit
+          )"
+          if [[ -n "${snapshot_symlink}" ]]; then
+            printf '%s\n' '::error::Symbolic links are not allowed in the untrusted repository snapshot.'
+            exit 1
+          fi
+
+          gh api \
+            -H 'Accept: application/vnd.github.raw+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${BASE_REPOSITORY}/contents/${validator_path}?ref=${TRUSTED_BASE_SHA}" \
+            >"${trusted_validator}"
+          test -s "${trusted_validator}"
+
+          curl \
+            --fail \
+            --location \
+            --proto '=https' \
+            --show-error \
+            --silent \
+            --tlsv1.2 \
+            "${lock_asset_url}" \
+            --output "${lock_binary}"
+
+          printf '%s  %s\n' "${lock_asset_sha256}" "${lock_binary}" | sha256sum --check --strict
+          chmod 0500 "${lock_binary}"
+
+          printf 'Running github/gh-actions-lock %s against %s.\n' "${lock_version}" "${HEAD_SHA}"
+          (
+            cd "${snapshot_root}"
+            "${lock_binary}" \
+              --verify-local \
+              --no-fix \
+              --no-migrate-local-actions \
+              --json=valid,findings
+          )
+
+          node "${trusted_validator}" "${snapshot_root}"

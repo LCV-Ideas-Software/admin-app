@@ -1,0 +1,25 @@
+# This workflow intentionally uses no actions and has no token permissions.
+
+name: Actions lock validation trigger
+
+on:
+  pull_request:
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: actions-lock-trigger-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  trigger:
+    name: Request trusted actions.lock validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Complete unprivileged trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' 'Trusted actions.lock validation requested.'
