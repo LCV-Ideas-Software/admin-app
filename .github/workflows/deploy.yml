@@ -52,6 +52,7 @@ jobs:
       - name: Validate admin application
         run: |
           npm audit --audit-level=high
+          npm run verify:thirdparty
           npm run lint
           npm run biome
           npm test
