@@ -1,0 +1,49 @@
+# This workflow is managed by gh actions-lock.
+
+name: Dependabot Auto-merge
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+
+# The event token only reads the pull request; the short-lived App token performs the native merge action.
+permissions:
+  pull-requests: read # Read the triggering PR; native merge is performed with the scoped App token below.
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  enable: # zizmor: ignore[secrets-outside-env] Dependabot secrets cannot be environment-scoped; no PR code executes.
+    name: Enable native auto-merge
+    if: >-
+      github.event.pull_request.user.id == 49699333 &&
+      github.repository == github.event.pull_request.head.repo.full_name &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Create the repository-scoped GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-merge-queues: write
+
+      - name: Enable GitHub native auto-merge
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --match-head-commit "$HEAD_SHA" "$PR_URL"
