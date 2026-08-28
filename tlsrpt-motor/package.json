@@ -16,7 +16,7 @@
 		"@biomejs/biome": "^2.5.9",
 		"@cloudflare/vitest-pool-workers": "^0.22.0",
 		"vitest": "^4.1.11",
-		"wrangler": "^4.123.0"
+		"wrangler": "^4.125.0"
 	},
 	"dependencies": {
 		"postal-mime": "^3.0.0"
