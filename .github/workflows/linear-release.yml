@@ -46,7 +46,7 @@ jobs:
           fetch-depth: 0 # histórico completo: o CLI varre commits desde a última release
           persist-credentials: false
 
-      # Integração oficial da Linear, pinada no commit da release v0.16.0 e com a
+      # Integração oficial da Linear, pinada no commit da release v0.17.1 e com a
       # versão do CLI também explícita. O pin protege o código da action contra
       # deslocamento de tag; o instalador upstream ainda não verifica o digest do
       # asset do CLI, risco residual registrado em ADMIAPP-12 e
@@ -57,7 +57,7 @@ jobs:
       # silenciosamente a release do SHA publicado.
       - name: Create Linear release (action oficial)
         id: linear_release
-        uses: linear/linear-release-action@0a25abab892a91062ebf42260dbb2ce6277aa205 # v0.16.0
+        uses: linear/linear-release-action@3f31fcf14c110cc53579fcc3575a26d469c413b4 # v0.17.1
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
-          cli_version: v0.16.0
+          cli_version: v0.17.1
