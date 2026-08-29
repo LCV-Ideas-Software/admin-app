@@ -3,7 +3,7 @@
 | Componente                                | Versão        | Licença Original              | Modificado? | Link de Origem                                                                                              |
 | ----------------------------------------- | ------------- | ----------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
 | @cloudflare/vitest-pool-workers           | ^0.14.0       | MIT                           | Não         | https://registry.npmjs.org/@cloudflare/vitest-pool-workers/-/vitest-pool-workers-0.14.0.tgz                 |
-| @cloudflare/workers-types                 | ^5.20260820.1 | MIT OR Apache-2.0             | Não         | https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-5.20260820.1.tgz                       |
+| @cloudflare/workers-types                 | ^5.20260822.1 | MIT OR Apache-2.0             | Não         | https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-5.20260822.1.tgz                       |
 | @eslint/js                                | ^9.39.4       | MIT                           | Não         | https://registry.npmjs.org/@eslint/js/-/js-9.39.4.tgz                                                       |
 | @tiptap/extension-bubble-menu             | ^3.21.0       | MIT                           | Não         | https://registry.npmjs.org/@tiptap/extension-bubble-menu/-/extension-bubble-menu-3.21.0.tgz                 |
 | @tiptap/extension-character-count         | ^3.21.0       | MIT                           | Não         | https://registry.npmjs.org/@tiptap/extension-character-count/-/extension-character-count-3.21.0.tgz         |
