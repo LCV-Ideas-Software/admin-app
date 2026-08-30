@@ -59,6 +59,7 @@ jobs:
           npm run test:admin-motor
           npm run typecheck:admin-motor
           npm run build
+          npm run verify:thirdparty:artifact
           npm run format:public:check
 
       - name: Validate TLS-RPT Motor
@@ -68,13 +69,19 @@ jobs:
           npm run lint
           npm test
 
+      - name: Validate Worker deployment artifacts
+        run: |
+          npm exec -- wrangler deploy --dry-run --strict --cwd tlsrpt-motor --outdir dist/legal-audit --metafile
+          npm exec -- wrangler deploy --dry-run --strict --cwd admin-motor --outdir dist/legal-audit --metafile
+          npm run verify:thirdparty:worker-artifacts
+
       - name: Apply D1 migrations with Wrangler
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.123.0
+          wranglerVersion: 4.125.0
           command: d1 migrations apply BIGDATA_DB --remote --config wrangler.json
 
       - name: Deploy TLS-RPT Motor with Wrangler
@@ -83,7 +90,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.123.0
+          wranglerVersion: 4.125.0
           workingDirectory: tlsrpt-motor
           command: deploy --strict
 
@@ -93,7 +100,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.123.0
+          wranglerVersion: 4.125.0
           command: deploy --strict --config admin-motor/wrangler.json
 
       - name: Deploy Admin Pages with Wrangler
@@ -102,5 +109,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.123.0
+          wranglerVersion: 4.125.0
           command: pages deploy dist --project-name=admin-app --branch=main

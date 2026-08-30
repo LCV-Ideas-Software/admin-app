@@ -3,7 +3,7 @@
   "files": {
     "includes": [
       "**",
-      "!dist",
+      "!**/dist",
       "!_cf_functions_build",
       "!out",
       "!functions",
