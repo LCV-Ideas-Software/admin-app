@@ -4,6 +4,20 @@
 
 ### Infraestrutura
 
+- **Inventário jurídico derivado dos dois manifestos e do bundle real.** O
+  gate cobre todas as dependências diretas da raiz e de `tlsrpt-motor`, com
+  versões declarada e resolvida, expressão SPDX, eleição `OR`, SRI e tarball
+  imutável. O build público passa a usar `build.license`, recurso nativo do
+  Vite 8, para publicar em `legal/BUNDLED-LICENSES.md` o inventário nativo e os
+  textos disponibilizados por todo componente efetivamente empacotado,
+  inclusive transitivos; `THIRDPARTY.md` complementa as lacunas upstream
+  documentadas. O gate pós-build exige as duas saídas e a paridade das cópias
+  públicas. A fonte Inter deixa a API remota mutável do Google Fonts e passa a
+  ser auto-hospedada pelo pacote oficial Fontsource, fixado no lockfile. O ativo
+  `icons.svg`, originado do scaffold Vite mas sem consumidor, foi removido; os
+  demais assets fonte do scaffold foram documentados. O bundle do Worker
+  TLS-RPT passa a preservar o aviso MIT incorporado por `postal-mime`.
+
 - **Linear Release usa a action oficial da Linear.** O workflow pós-Deploy
   substitui o download manual pelo `linear/linear-release-action` v0.16.0,
   fixado por SHA completo e com a versão do CLI explícita. Permanecem o

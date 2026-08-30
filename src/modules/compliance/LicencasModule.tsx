@@ -10,6 +10,7 @@ const LEGAL_FILES = {
   LICENSE: `${LEGAL_PUBLIC_BASE}LICENSE.txt`,
   NOTICE: `${LEGAL_PUBLIC_BASE}NOTICE.txt`,
   THIRDPARTY: `${LEGAL_PUBLIC_BASE}THIRDPARTY.md`,
+  BUNDLED_LICENSES: `${LEGAL_PUBLIC_BASE}BUNDLED-LICENSES.md`,
 } as const;
 
 type DocsState = {
@@ -114,8 +115,9 @@ export function LicencasModule() {
         Conformidade e Licenças (Open Source Compliance)
       </h1>
       <p style={{ color: '#5f6368', marginBottom: '32px' }}>
-        Este sistema opera sob a GNU Affero General Public License v3 (AGPLv3), com avisos e componentes de terceiros
-        sob Apache License 2.0 devidamente documentados em NOTICE e THIRDPARTY.md.
+        Este sistema opera sob a GNU Affero General Public License v3 (AGPLv3). Os componentes de terceiros usam
+        licenças compatíveis distintas, documentadas em NOTICE, THIRDPARTY.md e no inventário de licenças gerado pelo
+        build. <a href={LEGAL_FILES.BUNDLED_LICENSES}>Abrir o inventário nativo de licenças do bundle.</a>
       </p>
 
       <section style={sectionStyle}>
@@ -127,7 +129,7 @@ export function LicencasModule() {
 
       <section style={sectionStyle}>
         <h2 style={{ color: '#1a73e8', borderBottom: '2px solid #e8eaed', paddingBottom: '8px', marginBottom: '16px' }}>
-          Avisos de Autoria e Patentes (NOTICE / Apache 2.0)
+          Avisos de Autoria e Licenciamento (NOTICE)
         </h2>
         {renderJustifiedParagraphs(content.NOTICE)}
       </section>

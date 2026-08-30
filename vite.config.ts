@@ -15,10 +15,12 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    license: { fileName: 'legal/BUNDLED-LICENSES.md' },
     cssCodeSplit: false,
     chunkSizeWarningLimit: 900,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
+        postBanner: '/* Third-party licenses: /legal/BUNDLED-LICENSES.md */',
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
 
