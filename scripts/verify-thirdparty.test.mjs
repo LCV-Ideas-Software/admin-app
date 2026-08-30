@@ -84,8 +84,12 @@ function verify(overrides = {}) {
     artifactNotice: overrides.artifactNotice,
     artifactBundledLicenses: overrides.artifactBundledLicenses,
     artifactJavaScript: overrides.artifactJavaScript,
+    artifactHtml: overrides.artifactHtml,
+    artifactCss: overrides.artifactCss,
     workerArtifact: overrides.workerArtifact,
+    workerArtifacts: overrides.workerArtifacts,
     requiredStaticNoticeMarkers: overrides.requiredStaticNoticeMarkers,
+    requiredStaticNoticeSections: overrides.requiredStaticNoticeSections,
     requiredBundledLicenseMarkers: overrides.requiredBundledLicenseMarkers,
     bundledLicenseSupplementHeadings: overrides.bundledLicenseSupplementHeadings,
     requiredWorkerNoticeMarkers: overrides.requiredWorkerNoticeMarkers,
@@ -153,6 +157,61 @@ test('fails closed on malformed remote resource URLs', () => {
   expect(() => verifyNoRemoteGoogleFonts('<link rel="stylesheet" href="https://[">')).toThrow(
     /valid remote URL/u,
   );
+});
+
+test('rejects a mutable Google Fonts dependency in emitted HTML', () => {
+  expect(() =>
+    verify({
+      artifactHtml: [
+        {
+          path: 'dist/index.html',
+          content: '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter">',
+        },
+      ],
+    }),
+  ).toThrow(/outside the locked dependency graph/u);
+});
+
+test('rejects a mutable Google Fonts dependency in emitted CSS', () => {
+  expect(() =>
+    verify({
+      artifactCss: [
+        {
+          path: 'dist/assets/app.css',
+          content: '@font-face { src: url("https://fonts.gstatic.com/inter.woff2") format("woff2"); }',
+        },
+      ],
+    }),
+  ).toThrow(/outside the locked dependency graph/u);
+});
+
+test('rejects a truncated legal notice inside its configured section', () => {
+  const rootInventory = `${inventory()}\n### Pako 1.0.5 — MIT e Zlib\n\ncomplete MIT notice only\n`;
+  expect(() =>
+    verify({
+      rootInventory,
+      requiredStaticNoticeSections: [
+        {
+          heading: '### Pako 1.0.5 — MIT e Zlib',
+          notices: ['complete MIT notice', 'complete Zlib notice'],
+        },
+      ],
+    }),
+  ).toThrow(/complete required legal notice/u);
+});
+
+test('rejects a deployed Worker whose configured complete notice is absent', () => {
+  expect(() =>
+    verify({
+      workerArtifacts: [
+        {
+          path: 'admin-motor/dist/legal-audit/index.js',
+          content: 'export default {};',
+          requiredNotices: ['complete Hono MIT notice'],
+        },
+      ],
+    }),
+  ).toThrow(/complete required legal notice/u);
 });
 
 test('rejects a missing configured supplemental notice', () => {

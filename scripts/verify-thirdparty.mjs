@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { Window } from 'happy-dom';
+import { transform } from 'lightningcss';
 
 const ROOT_INVENTORY = 'THIRDPARTY.md';
 const ROOT_NOTICE = 'NOTICE';
@@ -13,7 +14,11 @@ const PUBLIC_NOTICE = 'public/legal/NOTICE.txt';
 const ARTIFACT_INVENTORY = 'dist/legal/THIRDPARTY.md';
 const ARTIFACT_NOTICE = 'dist/legal/NOTICE.txt';
 const ARTIFACT_BUNDLED_LICENSES = 'dist/legal/BUNDLED-LICENSES.md';
-const WORKER_ARTIFACT = 'tlsrpt-motor/dist/legal-audit/index.js';
+const TLSRPT_WORKER_ARTIFACT = 'tlsrpt-motor/dist/legal-audit/index.js';
+const ADMIN_WORKER_OUTDIR = 'admin-motor/dist/legal-audit';
+const ADMIN_WORKER_METAFILE = `${ADMIN_WORKER_OUTDIR}/bundle-meta.json`;
+const ADMIN_WORKER_NOTICE_SOURCE = 'admin-motor/src/legal/THIRDPARTY.md';
+const ADMIN_WORKER_NOTICE_ARTIFACT = `${ADMIN_WORKER_OUTDIR}/legal/THIRDPARTY.md`;
 const ROOT_HTML = 'index.html';
 const JSZIP_BROWSER_DISTRIBUTION = 'node_modules/jszip/dist/jszip.min.js';
 const JSZIP_BROWSER_DISTRIBUTION_SHA256 = 'ACC7E41455A80765B5FD9C7EE1B8078A6D160BBBCA455AEAE854DE65C947D59E';
@@ -71,6 +76,85 @@ export const VITE_SCAFFOLD_MIT_NOTICE = `MIT License
 Copyright (c) 2019-present, VoidZero Inc. and Vite contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+
+export const PAKO_MIT_NOTICE = `(The MIT License)
+
+Copyright (C) 2014-2017 by Vitaly Puzrin and Andrei Tuputcyn
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.`;
+
+export const PAKO_ZLIB_NOTICE = `Copyright (C) 1995-2013 Jean-loup Gailly and Mark Adler
+Copyright (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+
+This software is provided 'as-is', without any express or implied warranty.
+In no event will the authors be held liable for any damages arising from the
+use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not claim
+   that you wrote the original software. If you use this software in a
+   product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.`;
+
+export const SPARK_MD5_MIT_NOTICE = `Copyright (c) 2015 André Cruz <amdfcruz@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the 'Software'), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+
+const LAUNDER_MIT_TERMS = `Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
@@ -151,6 +235,17 @@ export const REQUIRED_STATIC_NOTICE_MARKERS = Object.freeze([
   VITE_SCAFFOLD_MIT_NOTICE,
 ]);
 
+export const REQUIRED_STATIC_NOTICE_SECTIONS = Object.freeze([
+  Object.freeze({
+    heading: '### Pako 1.0.5 — MIT e Zlib',
+    notices: Object.freeze([PAKO_MIT_NOTICE, PAKO_ZLIB_NOTICE]),
+  }),
+  Object.freeze({
+    heading: '### Spark MD5 3.0.2 — MIT',
+    notices: Object.freeze([SPARK_MD5_MIT_NOTICE]),
+  }),
+]);
+
 export const REQUIRED_BUNDLED_LICENSE_MARKERS = Object.freeze([
   '## jszip - 3.10.1 ((MIT OR GPL-3.0-or-later))',
   '## dingbat-to-unicode - 1.0.1 (BSD-2-Clause)',
@@ -169,7 +264,44 @@ export function verifySha256(content, expectedSha256, label) {
   assert.equal(actualSha256, expectedSha256, `${label} SHA-256 changed; review vendored legal notices`);
 }
 
-export function verifyNoRemoteGoogleFonts(html) {
+function verifyNoGoogleFontsUrl(value, baseUrl, label) {
+  let url;
+  try {
+    url = new URL(value, baseUrl);
+  } catch {
+    assert.fail(`${label} must contain a valid remote URL or local reference`);
+  }
+
+  const hostname = url.hostname.toLowerCase().replace(/\.+$/u, '');
+  assert.ok(
+    !GOOGLE_FONTS_HOSTNAMES.includes(hostname),
+    `${label} must not load mutable Google Fonts resources outside the locked dependency graph`,
+  );
+}
+
+export function verifyNoRemoteGoogleFontsInCss(
+  css,
+  label = 'CSS artifact',
+  baseUrl = 'https://admin.lcv.dev/',
+) {
+  let dependencies;
+  try {
+    ({ dependencies = [] } = transform({
+      filename: label,
+      code: Buffer.from(css),
+      analyzeDependencies: true,
+      minify: false,
+    }));
+  } catch (error) {
+    assert.fail(`${label} must be valid CSS: ${error.message}`);
+  }
+
+  for (const dependency of dependencies) {
+    verifyNoGoogleFontsUrl(dependency.url, baseUrl, `${label} resource URL`);
+  }
+}
+
+export function verifyNoRemoteGoogleFonts(html, label = ROOT_HTML) {
   const window = new Window({
     url: 'https://admin.lcv.dev/',
     settings: {
@@ -181,22 +313,28 @@ export function verifyNoRemoteGoogleFonts(html) {
   });
 
   try {
+    window.document.open();
     window.document.write(html);
+    window.document.close();
+    const baseUrl = window.document.baseURI;
+
     for (const link of window.document.querySelectorAll('link[href]')) {
       const href = link.getAttribute('href');
-      assert.ok(href, `${ROOT_HTML} link[href] must contain a valid remote URL or local reference`);
+      assert.ok(href, `${label} link[href] must contain a valid remote URL or local reference`);
+      verifyNoGoogleFontsUrl(href, baseUrl, `${label} link[href]`);
+    }
 
-      let url;
-      try {
-        url = new URL(href, window.location.href);
-      } catch {
-        assert.fail(`${ROOT_HTML} link[href] must contain a valid remote URL or local reference`);
-      }
+    for (const [index, style] of [...window.document.querySelectorAll('style')].entries()) {
+      verifyNoRemoteGoogleFontsInCss(style.textContent ?? '', `${label} style[${index}]`, baseUrl);
+    }
 
-      const hostname = url.hostname.toLowerCase().replace(/\.+$/u, '');
-      assert.ok(
-        !GOOGLE_FONTS_HOSTNAMES.includes(hostname),
-        `${ROOT_HTML} must not load mutable Google Fonts resources outside the locked dependency graph`,
+    for (const [index, element] of [...window.document.querySelectorAll('[style]')].entries()) {
+      const declaration = element.getAttribute('style');
+      assert.notEqual(declaration, null, `${label} style attribute is missing`);
+      verifyNoRemoteGoogleFontsInCss(
+        `:root { ${declaration} }`,
+        `${label} style-attribute[${index}]`,
+        baseUrl,
       );
     }
   } finally {
@@ -217,6 +355,52 @@ function assertContainsNotice(content, notice, label) {
     normalizeNotice(content).includes(normalizeNotice(notice)),
     `${label} is missing a complete required legal notice`,
   );
+}
+
+function markdownHeadingRecords(markdown) {
+  const lines = markdown.split(/\r?\n/u);
+  const headings = [];
+  let inFence = false;
+  for (const [index, line] of lines.entries()) {
+    if (/^\s*```/u.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const match = /^(#+)\s/u.exec(line);
+    if (match) headings.push({ heading: line.trim(), index, level: match[1].length });
+  }
+  return { headings, lines };
+}
+
+function markdownSection(markdown, heading, label) {
+  const { headings, lines } = markdownHeadingRecords(markdown);
+  const matches = headings.filter((record) => record.heading === heading);
+  assert.equal(matches.length, 1, `${label} must contain exactly one ${heading} section`);
+  const end = headings.find(
+    (record) => record.index > matches[0].index && record.level <= matches[0].level,
+  );
+  return lines.slice(matches[0].index + 1, end?.index).join('\n');
+}
+
+function markdownSectionStartingWith(markdown, headingPrefix, label) {
+  const headings = markdownHeadingRecords(markdown).headings
+    .filter((record) => record.level === 2 && record.heading.startsWith(headingPrefix))
+    .map((record) => record.heading);
+  assert.equal(headings.length, 1, `${label} must contain exactly one section starting with ${headingPrefix}`);
+  return {
+    heading: headings[0],
+    body: markdownSection(markdown, headings[0], label),
+  };
+}
+
+function assertNoticeSections(markdown, sections, label) {
+  for (const section of sections) {
+    const body = markdownSection(markdown, section.heading, label);
+    for (const notice of section.notices) {
+      assertContainsNotice(body, notice, `${label} section ${section.heading}`);
+    }
+  }
 }
 
 function parseTable(markdown, heading) {
@@ -366,8 +550,12 @@ export function verifyThirdPartyInventory({
   artifactNotice,
   artifactBundledLicenses,
   artifactJavaScript,
+  artifactHtml,
+  artifactCss,
   workerArtifact,
+  workerArtifacts,
   requiredStaticNoticeMarkers = [],
+  requiredStaticNoticeSections = [],
   requiredBundledLicenseMarkers = [],
   bundledLicenseSupplementHeadings = [],
   requiredWorkerNoticeMarkers = [],
@@ -378,6 +566,7 @@ export function verifyThirdPartyInventory({
   for (const marker of requiredStaticNoticeMarkers) {
     assertContainsNotice(rootInventory, marker, 'THIRDPARTY');
   }
+  assertNoticeSections(rootInventory, requiredStaticNoticeSections, 'THIRDPARTY');
 
   for (const manifest of manifests) {
     const actual = parseTable(rootInventory, manifest.heading);
@@ -440,10 +629,48 @@ export function verifyThirdPartyInventory({
     }
   }
 
+  if (artifactHtml !== undefined) {
+    assert.ok(
+      Array.isArray(artifactHtml) && artifactHtml.length > 0,
+      'Vite build must emit at least one HTML artifact',
+    );
+    for (const artifact of artifactHtml) {
+      assert.equal(typeof artifact.path, 'string', 'Vite HTML artifact path is missing');
+      assert.equal(typeof artifact.content, 'string', `${artifact.path} content is missing`);
+      verifyNoRemoteGoogleFonts(artifact.content, artifact.path);
+    }
+  }
+
+  if (artifactCss !== undefined) {
+    assert.ok(
+      Array.isArray(artifactCss) && artifactCss.length > 0,
+      'Vite build must emit at least one CSS artifact',
+    );
+    for (const artifact of artifactCss) {
+      assert.equal(typeof artifact.path, 'string', 'Vite CSS artifact path is missing');
+      assert.equal(typeof artifact.content, 'string', `${artifact.path} content is missing`);
+      verifyNoRemoteGoogleFontsInCss(artifact.content, artifact.path);
+    }
+  }
+
   if (workerArtifact !== undefined) {
-    assert.equal(typeof workerArtifact, 'string', `${WORKER_ARTIFACT} must be emitted by Wrangler`);
+    assert.equal(typeof workerArtifact, 'string', `${TLSRPT_WORKER_ARTIFACT} must be emitted by Wrangler`);
     for (const marker of requiredWorkerNoticeMarkers) {
-      assertContainsNotice(workerArtifact, marker, WORKER_ARTIFACT);
+      assertContainsNotice(workerArtifact, marker, TLSRPT_WORKER_ARTIFACT);
+    }
+  }
+
+  if (workerArtifacts !== undefined) {
+    assert.ok(
+      Array.isArray(workerArtifacts) && workerArtifacts.length > 0,
+      'Wrangler must emit at least one configured Worker artifact',
+    );
+    for (const artifact of workerArtifacts) {
+      assert.equal(typeof artifact.path, 'string', 'Wrangler Worker artifact path is missing');
+      assert.equal(typeof artifact.content, 'string', `${artifact.path} content is missing`);
+      for (const notice of artifact.requiredNotices ?? []) {
+        assertContainsNotice(artifact.content, notice, artifact.path);
+      }
     }
   }
 }
@@ -456,13 +683,13 @@ async function loadManifest(root, config) {
   return { ...config, packageJson, packageLock };
 }
 
-async function loadJavaScriptArtifacts(root, directory = resolve(root, 'dist/assets')) {
+async function loadTextArtifacts(root, extensions, directory = resolve(root, 'dist')) {
   const artifacts = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const entryPath = join(directory, entry.name);
     if (entry.isDirectory()) {
-      artifacts.push(...(await loadJavaScriptArtifacts(root, entryPath)));
-    } else if (entry.isFile() && entry.name.endsWith('.js')) {
+      artifacts.push(...(await loadTextArtifacts(root, extensions, entryPath)));
+    } else if (entry.isFile() && extensions.some((extension) => entry.name.endsWith(extension))) {
       artifacts.push({
         path: relative(root, entryPath).replaceAll('\\', '/'),
         content: await readFile(entryPath, 'utf8'),
@@ -472,10 +699,165 @@ async function loadJavaScriptArtifacts(root, directory = resolve(root, 'dist/ass
   return artifacts;
 }
 
+function assertPathInside(parent, candidate, label) {
+  const child = relative(parent, candidate);
+  assert.ok(
+    child && !isAbsolute(child) && child !== '..' && !child.startsWith('../') && !child.startsWith('..\\'),
+    `${label} must remain inside ${relative(process.cwd(), parent).replaceAll('\\', '/')}`,
+  );
+}
+
+function packageFromMetafileInput(inputPath) {
+  const normalized = inputPath.replaceAll('\\', '/');
+  if (normalized.startsWith('(disabled):')) return undefined;
+
+  const segments = normalized.split('/').filter((segment) => segment && segment !== '.' && segment !== '..');
+  const firstNodeModules = segments.indexOf('node_modules');
+  const lastNodeModules = segments.lastIndexOf('node_modules');
+  if (lastNodeModules === -1) return undefined;
+
+  const firstPackageSegment = segments[lastNodeModules + 1];
+  assert.ok(firstPackageSegment, `cannot identify package from Wrangler input ${inputPath}`);
+  const packageEnd = firstPackageSegment.startsWith('@') ? lastNodeModules + 3 : lastNodeModules + 2;
+  assert.ok(segments[packageEnd - 1], `cannot identify scoped package from Wrangler input ${inputPath}`);
+  const packageName = segments.slice(lastNodeModules + 1, packageEnd).join('/');
+  const lockKey = segments.slice(firstNodeModules, packageEnd).join('/');
+  return { lockKey, packageName };
+}
+
+async function packageLicenseNotice(root, lockKey) {
+  const packageDirectory = resolve(root, lockKey);
+  const candidates = (await readdir(packageDirectory, { withFileTypes: true }))
+    .filter(
+      (entry) =>
+        entry.isFile() && /^(?:licen[cs]e|copying|notice)(?:[._-].*)?$/iu.test(entry.name),
+    )
+    .map((entry) => entry.name)
+    .sort();
+  assert.ok(candidates.length <= 1, `${lockKey} has multiple legal notice files; map them explicitly`);
+  if (candidates.length === 0) return undefined;
+
+  const content = await readFile(resolve(packageDirectory, candidates[0]), 'utf8');
+  return {
+    name: candidates[0],
+    content,
+    sha256: createHash('sha256').update(content).digest('hex'),
+  };
+}
+
+export async function verifyAdminWorkerBundle({
+  root,
+  metafile,
+  packageLock,
+  sourceNotice,
+  emittedNotice,
+}) {
+  assert.equal(
+    emittedNotice,
+    sourceNotice,
+    `${ADMIN_WORKER_NOTICE_ARTIFACT} must be byte-identical to ${ADMIN_WORKER_NOTICE_SOURCE}`,
+  );
+
+  const entryOutputs = Object.entries(metafile.outputs ?? {}).filter(
+    ([, output]) => output.entryPoint !== undefined,
+  );
+  assert.equal(entryOutputs.length, 1, `${ADMIN_WORKER_METAFILE} must describe exactly one Worker entry`);
+  const [entryOutputPath, entryOutput] = entryOutputs[0];
+  assert.equal(entryOutput.entryPoint, 'src/index.ts', 'Admin Motor metafile must describe src/index.ts');
+
+  const outdir = resolve(root, ADMIN_WORKER_OUTDIR);
+  const entryPath = resolve(root, 'admin-motor', entryOutputPath);
+  assertPathInside(outdir, entryPath, entryOutputPath);
+  const entryContent = await readFile(entryPath, 'utf8');
+  assert.equal(
+    Buffer.byteLength(entryContent),
+    entryOutput.bytes,
+    `${entryOutputPath} byte size must match the Wrangler metafile`,
+  );
+
+  const packages = new Map();
+  for (const [inputPath, input] of Object.entries(entryOutput.inputs ?? {})) {
+    if (!(input.bytesInOutput > 0)) continue;
+    const resolvedPackage = packageFromMetafileInput(inputPath);
+    if (!resolvedPackage) continue;
+    packages.set(resolvedPackage.lockKey, resolvedPackage);
+  }
+  assert.ok(packages.size > 0, 'Admin Motor metafile must identify at least one bundled npm package');
+
+  const expectedHeadingPrefixes = [...packages.values()].map(({ lockKey, packageName }) => {
+    const lockEntry = packageLock.packages?.[lockKey];
+    assert.ok(lockEntry, `${lockKey} from the Admin Motor metafile is missing from package-lock.json`);
+    return `## ${packageName} ${lockEntry.version}`;
+  });
+  const documentHeadings = markdownHeadingRecords(sourceNotice).headings
+    .filter((record) => record.level === 2 && record.heading !== '## Inventário efetivo')
+    .map((record) => record.heading);
+  assert.equal(
+    documentHeadings.length,
+    packages.size,
+    `${ADMIN_WORKER_NOTICE_SOURCE} must contain exactly one section per bundled npm package`,
+  );
+  for (const heading of documentHeadings) {
+    assert.equal(
+      expectedHeadingPrefixes.filter((prefix) => heading.startsWith(prefix)).length,
+      1,
+      `${ADMIN_WORKER_NOTICE_SOURCE} contains an unexpected package section: ${heading}`,
+    );
+  }
+
+  for (const { lockKey, packageName } of [...packages.values()].sort((left, right) =>
+    left.lockKey.localeCompare(right.lockKey),
+  )) {
+    const lockEntry = packageLock.packages?.[lockKey];
+    assert.ok(lockEntry, `${lockKey} from the Admin Motor metafile is missing from package-lock.json`);
+    assertImmutableRegistryProvenance(`admin-motor:${lockKey}`, packageName, lockEntry);
+
+    const section = markdownSectionStartingWith(
+      sourceNotice,
+      `## ${packageName} ${lockEntry.version}`,
+      ADMIN_WORKER_NOTICE_SOURCE,
+    );
+    const sectionText = `${section.heading}\n${section.body}`;
+    for (const marker of [lockKey, lockEntry.license, lockEntry.resolved, lockEntry.integrity]) {
+      assertContainsNotice(
+        sectionText,
+        marker,
+        `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
+      );
+    }
+
+    const upstreamNotice = await packageLicenseNotice(root, lockKey);
+    if (packageName === 'launder') {
+      assert.equal(
+        upstreamNotice,
+        undefined,
+        'launder 1.7.1 handling must be re-evaluated if upstream starts shipping a license file',
+      );
+      assert.match(
+        section.body,
+        /não (?:contém|fornece|traz)[^\n]*LICENSE/iu,
+        'launder section must disclose that the exact upstream package lacks a LICENSE file',
+      );
+      assertContainsNotice(section.body, 'e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3', 'launder section');
+      assertContainsNotice(section.body, LAUNDER_MIT_TERMS, 'launder section');
+    } else {
+      assert.ok(upstreamNotice, `${lockKey} must ship a legal notice file`);
+      assertContainsNotice(section.body, upstreamNotice.content, `${packageName} section`);
+      assertContainsNotice(section.body, upstreamNotice.sha256, `${packageName} section`);
+    }
+  }
+
+  return {
+    entryOutputPath,
+    packageCount: packages.size,
+  };
+}
+
 async function main() {
   const root = process.cwd();
   const artifactMode = process.argv.includes('--artifact');
-  const workerArtifactMode = process.argv.includes('--worker-artifact');
+  const workerArtifactMode =
+    process.argv.includes('--worker-artifact') || process.argv.includes('--worker-artifacts');
   const [
     manifests,
     rootInventory,
@@ -505,15 +887,49 @@ async function main() {
     verifySha256(viteScaffoldAssets[index], asset.sha256, asset.path);
   }
 
-  const [artifactInventory, artifactNotice, artifactBundledLicenses, artifactJavaScript] = artifactMode
+  const [
+    artifactInventory,
+    artifactNotice,
+    artifactBundledLicenses,
+    artifactJavaScript,
+    artifactHtml,
+    artifactCss,
+  ] = artifactMode
     ? await Promise.all([
         readFile(resolve(root, ARTIFACT_INVENTORY), 'utf8'),
         readFile(resolve(root, ARTIFACT_NOTICE), 'utf8'),
         readFile(resolve(root, ARTIFACT_BUNDLED_LICENSES), 'utf8'),
-        loadJavaScriptArtifacts(root),
+        loadTextArtifacts(root, ['.js']),
+        loadTextArtifacts(root, ['.html']),
+        loadTextArtifacts(root, ['.css']),
       ])
-    : [undefined, undefined, undefined, undefined];
-  const workerArtifact = workerArtifactMode ? await readFile(resolve(root, WORKER_ARTIFACT), 'utf8') : undefined;
+    : [undefined, undefined, undefined, undefined, undefined, undefined];
+  const workerArtifacts = workerArtifactMode
+    ? [
+        {
+          path: TLSRPT_WORKER_ARTIFACT,
+          content: await readFile(resolve(root, TLSRPT_WORKER_ARTIFACT), 'utf8'),
+          requiredNotices: REQUIRED_WORKER_NOTICE_MARKERS,
+        },
+      ]
+    : undefined;
+
+  let adminWorkerVerification;
+  if (workerArtifactMode) {
+    const [metafile, packageLock, sourceNotice, emittedNotice] = await Promise.all([
+      readFile(resolve(root, ADMIN_WORKER_METAFILE), 'utf8').then(JSON.parse),
+      readFile(resolve(root, 'package-lock.json'), 'utf8').then(JSON.parse),
+      readFile(resolve(root, ADMIN_WORKER_NOTICE_SOURCE), 'utf8'),
+      readFile(resolve(root, ADMIN_WORKER_NOTICE_ARTIFACT), 'utf8'),
+    ]);
+    adminWorkerVerification = await verifyAdminWorkerBundle({
+      root,
+      metafile,
+      packageLock,
+      sourceNotice,
+      emittedNotice,
+    });
+  }
 
   verifyThirdPartyInventory({
     manifests,
@@ -525,16 +941,20 @@ async function main() {
     artifactNotice,
     artifactBundledLicenses,
     artifactJavaScript,
-    workerArtifact,
+    artifactHtml,
+    artifactCss,
+    workerArtifacts,
     requiredStaticNoticeMarkers: REQUIRED_STATIC_NOTICE_MARKERS,
+    requiredStaticNoticeSections: REQUIRED_STATIC_NOTICE_SECTIONS,
     requiredBundledLicenseMarkers: REQUIRED_BUNDLED_LICENSE_MARKERS,
     bundledLicenseSupplementHeadings: BUNDLED_LICENSE_SUPPLEMENT_HEADINGS,
-    requiredWorkerNoticeMarkers: REQUIRED_WORKER_NOTICE_MARKERS,
   });
   const verifiedTargets = [
     'direct dependency inventory and public legal copies',
     artifactMode ? 'Vite legal artifact' : undefined,
-    workerArtifactMode ? 'Wrangler Worker legal notice' : undefined,
+    workerArtifactMode
+      ? `Wrangler Worker legal notices (${adminWorkerVerification.packageCount} Admin Motor packages)`
+      : undefined,
   ].filter(Boolean);
   console.log(`${verifiedTargets.join(', ')} are current.`);
 }

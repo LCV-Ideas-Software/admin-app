@@ -18,3 +18,14 @@ topojson-client 3.1.0 (ISC), sua dependência transitiva commander 2.20.3 (MIT) 
 world-atlas 2.0.2 (ISC). O mapa-base 1:110m deriva do Natural Earth 4.1.0, cujos
 dados são disponibilizados em domínio público. "Natural Earth" indica apenas a
 proveniência dos dados e não constitui endosso.
+
+Os artefatos implantáveis preservam avisos por limites independentes:
+
+- o GitHub Pages/Cloudflare Pages publica `legal/THIRDPARTY.md`,
+  `legal/NOTICE.txt` e o inventário nativo `legal/BUNDLED-LICENSES.md` do
+  Vite;
+- o TLS-RPT Motor incorpora no bundle Wrangler o aviso MIT integral de
+  `base64ArrayBuffer`;
+- o Admin Motor transporta `legal/THIRDPARTY.md` como módulo Text adicional
+  do Wrangler, contendo uma seção e o aviso integral para cada pacote
+  efetivamente identificado pelo metafile do bundle.

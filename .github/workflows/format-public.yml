@@ -53,5 +53,6 @@ jobs:
           npm run typecheck:admin-motor
           npm run build
           npm run verify:thirdparty:artifact
-          (cd tlsrpt-motor && npm exec -- wrangler deploy --dry-run --outdir dist/legal-audit --metafile dist/legal-audit/bundle-meta.json)
-          npm run verify:thirdparty:worker-artifact
+          npm exec -- wrangler deploy --dry-run --strict --cwd tlsrpt-motor --outdir dist/legal-audit --metafile
+          npm exec -- wrangler deploy --dry-run --strict --cwd admin-motor --outdir dist/legal-audit --metafile
+          npm run verify:thirdparty:worker-artifacts

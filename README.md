@@ -292,6 +292,9 @@ not request an administrative PAT or GitHub App credential to self-enable it.
 
 - **License**: [AGPL-3.0-or-later](./LICENSE). Network-service trigger applies: running a modified fork as a public service obligates you to publish modifications.
 - **Notices**: see [NOTICE](./NOTICE) and [THIRDPARTY](./THIRDPARTY.md).
+  Pages publishes the Vite-native bundled-license inventory; each Worker is
+  validated independently from its Wrangler dry-run, and the Admin Motor ships
+  its complete notices as an additional `Text` module.
 - **Security disclosure**: see [SECURITY.md](./SECURITY.md).
 - **Code of conduct**: see [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 - **Changelog**: [CHANGELOG.md](./CHANGELOG.md).

@@ -16,7 +16,12 @@
   ser auto-hospedada pelo pacote oficial Fontsource, fixado no lockfile. O ativo
   `icons.svg`, originado do scaffold Vite mas sem consumidor, foi removido; os
   demais assets fonte do scaffold foram documentados. O bundle do Worker
-  TLS-RPT passa a preservar o aviso MIT incorporado por `postal-mime`.
+  TLS-RPT passa a preservar o aviso MIT incorporado por `postal-mime`. O gate
+  também analisa o HTML e o CSS finais com parsers sem rede e rejeita qualquer
+  retorno dos hosts mutáveis do Google Fonts. Para o Admin Motor, o dry-run
+  oficial do Wrangler deriva do metafile todos os pacotes efetivamente
+  incorporados e envia, como módulo adicional `Text`, um aviso integral
+  fail-closed e byte-idêntico para cada um deles.
 
 - **Linear Release usa a action oficial da Linear.** O workflow pós-Deploy
   substitui o download manual pelo `linear/linear-release-action` v0.16.0,
