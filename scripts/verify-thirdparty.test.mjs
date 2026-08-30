@@ -45,23 +45,34 @@ SOFTWARE.`;
 const TEST_LICENSE_SHA256 = createHash('sha256').update(TEST_LICENSE).digest('hex');
 const LAUNDER_MIT_TERMS = TEST_LICENSE.slice(TEST_LICENSE.indexOf('Permission is hereby granted'));
 
+function adminWorkerPreamble(packageCount) {
+  return `# Avisos de componentes de terceiros — Admin Motor
+
+Este arquivo acompanha o Worker \`admin-motor\` como módulo adicional do tipo \`Text\`. O inventário cobre exatamente os ${packageCount} pacotes npm com código efetivamente incorporado ao bundle Wrangler informado para este artefato. Pacotes de desenvolvimento, ferramentas externas e entradas desabilitadas de zero byte não pertencem a este escopo.
+
+Versão, licença declarada, URL \`resolved\` e SRI \`integrity\` foram conferidos na entrada \`packages\` de \`package-lock.json\`; o texto de cada aviso foi reproduzido integralmente do pacote da mesma versão instalado em \`node_modules\`. O caminho e o SHA-256 de cada fonte permitem verificar o texto sem confundi-lo com outra versão homônima.`;
+}
+
 function launderSectionBody({
-  license = 'MIT',
   resolved = 'https://registry.npmjs.org/launder/-/launder-1.7.1.tgz',
   integrity = LAUNDER_AUDITED_SRI,
   packageJsonSha256 = LAUNDER_PACKAGE_JSON_SHA256,
   upstreamCommit = LAUNDER_UPSTREAM_COMMIT,
 } = {}) {
   return `- **Caminho no lockfile:** \`package-lock.json -> packages["node_modules/launder"]\`
-- **Licença:** \`${license}\`
 - **Resolved:** \`${resolved}\`
 - **Integrity:** \`${integrity}\`
+- **Origem imutável/hash:** tarball npm versionado indicado em \`Resolved\`, autenticado pelo SRI SHA-512 indicado em \`Integrity\`.
 - **Evidência da licença declarada:** \`node_modules/launder/package.json\` (\`SHA-256: ${packageJsonSha256}\`).
 - **Origem upstream imutável:** tag anotada \`launder@1.7.1\`, commit \`${upstreamCommit}\`, caminho \`packages/launder\` no repositório \`apostrophecms/apostrophe\`.
 
-O pacote npm não contém arquivo LICENSE.
+O pacote npm e a tag upstream \`launder@1.7.1\` declaram \`MIT\`, mas o pacote/tarball dessa versão não traz arquivo \`LICENSE\`. Por isso, os termos canônicos da MIT são reproduzidos abaixo sem inventar titular, ano ou aviso de copyright ausente no upstream.
 
-${LAUNDER_MIT_TERMS}`;
+\`\`\`text
+MIT License
+
+${LAUNDER_MIT_TERMS}
+\`\`\``;
 }
 
 async function withAdminWorkerFixture(
@@ -73,6 +84,7 @@ async function withAdminWorkerFixture(
     resolved: resolvedOverride,
     integrity = `sha512-${Buffer.alloc(64, 4).toString('base64')}`,
     includeLicense = true,
+    licenseContent = TEST_LICENSE,
     sectionBody,
     sourceNoticeTransform = (notice) => notice,
     packageJsonTransform = (content) => content,
@@ -84,14 +96,17 @@ async function withAdminWorkerFixture(
   const entryContent = 'export default {};\n';
   const resolved =
     resolvedOverride ?? `https://registry.npmjs.org/${packageName}/-/${packageName}-${version}.tgz`;
-  const licenseSha256 = createHash('sha256').update(TEST_LICENSE).digest('hex');
+  const licenseSha256 = createHash('sha256').update(licenseContent).digest('hex');
   const defaultSectionBody = `- **Caminho no lockfile:** \`package-lock.json -> packages["${lockKey}"]\`
 - **Resolved:** \`${resolved}\`
 - **Integrity:** \`${integrity}\`
+- **Origem imutável/hash:** tarball npm versionado indicado em \`Resolved\`, autenticado pelo SRI SHA-512 indicado em \`Integrity\`.
 - **Fonte do aviso integral:** \`${lockKey}/LICENSE\` (\`SHA-256: ${licenseSha256}\`).
 
-${TEST_LICENSE}`;
-  const sourceNotice = sourceNoticeTransform(`# Admin Motor third-party notices
+\`\`\`text
+${licenseContent}
+\`\`\``;
+  const sourceNotice = sourceNoticeTransform(`${adminWorkerPreamble(1)}
 
 ## Inventário efetivo
 
@@ -108,7 +123,7 @@ ${sectionBody ?? defaultSectionBody}
     await mkdir(join(root, 'admin-motor', 'dist', 'legal-audit'), { recursive: true });
     await mkdir(join(root, lockKey), { recursive: true });
     await writeFile(join(root, 'admin-motor', 'dist', 'legal-audit', 'index.js'), entryContent);
-    if (includeLicense) await writeFile(join(root, lockKey, 'LICENSE'), TEST_LICENSE);
+    if (includeLicense) await writeFile(join(root, lockKey, 'LICENSE'), licenseContent);
     const packageJson =
       packageName === 'launder'
         ? await readFile(join(process.cwd(), 'node_modules', 'launder', 'package.json'))
@@ -153,7 +168,7 @@ async function withRepeatedAdminWorkerFixture({ includeBothLockPaths }, assertio
     (lockKey) =>
       `- **Fonte do aviso integral:** \`${lockKey}/LICENSE\` (\`SHA-256: ${licenseSha256}\`).`,
   );
-  const sourceNotice = `# Admin Motor third-party notices
+  const sourceNotice = `${adminWorkerPreamble(2)}
 
 ## Inventário efetivo
 
@@ -166,9 +181,12 @@ ${lockKeys.map((lockKey) => `| \`foo\` | \`${version}\` | \`MIT\` | \`packages["
 ${lockMarkers.join('\n')}
 - **Resolved:** \`${resolved}\`
 - **Integrity:** \`${integrity}\`
+- **Origem imutável/hash:** tarball npm versionado indicado em \`Resolved\`, autenticado pelo SRI SHA-512 indicado em \`Integrity\`.
 ${sourceMarkers.join('\n')}
 
+\`\`\`text
 ${TEST_LICENSE}
+\`\`\`
 `;
 
   try {
@@ -248,6 +266,14 @@ const motorManifest = {
   },
 };
 
+const ROOT_TEST_DOCUMENT_SCHEMA = Object.freeze({
+  title: '# Third-party inventory',
+  headings: Object.freeze([rootManifest.heading, motorManifest.heading]),
+  paragraphCount: 0,
+  tableCount: 2,
+  codeBlockCount: 0,
+});
+
 function inventory({ omitBeta = false } = {}) {
   return `# Third-party inventory
 
@@ -283,6 +309,7 @@ function verify(overrides = {}) {
     workerArtifacts: overrides.workerArtifacts,
     requiredStaticNoticeMarkers: overrides.requiredStaticNoticeMarkers,
     requiredStaticNoticeSections: overrides.requiredStaticNoticeSections,
+    rootDocumentSchema: overrides.rootDocumentSchema,
     requiredBundledLicenseMarkers: overrides.requiredBundledLicenseMarkers,
     bundledLicenseSupplementHeadings: overrides.bundledLicenseSupplementHeadings,
     requiredWorkerNoticeMarkers: overrides.requiredWorkerNoticeMarkers,
@@ -291,6 +318,301 @@ function verify(overrides = {}) {
 
 test('accepts complete inventories for both manifests', () => {
   expect(() => verify()).not.toThrow();
+});
+
+test('rejects a root inventory table with a malformed separator', () => {
+  const changed = inventory().replace(
+    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    'this is not a Markdown table separator',
+  );
+  expect(() => verify({ rootInventory: changed })).toThrow(/inventory table|separator/iu);
+});
+
+test.each([
+  ['tilde fence', (content) => `~~~markdown\n${content}\n~~~`],
+  ['HTML comment', (content) => `<!--\n${content}\n-->`],
+  ['raw pre block', (content) => `<pre>\n${content}\n</pre>`],
+])('rejects a root inventory rendered as %s', (_label, transform) => {
+  expect(() => verify({ rootInventory: transform(inventory()) })).toThrow(/Inventário|inventory/iu);
+});
+
+test('rejects a duplicate indented inventory heading', () => {
+  const changed = `${inventory()}\n  ## Inventário: package.json (raiz)\n\nContraditório.\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|inventory/iu);
+});
+
+test('rejects a rendered-equivalent duplicate inventory heading', () => {
+  const changed = `${inventory()}\n## Inventário&#58; *package.json* (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|top-level|inventory/iu);
+});
+
+test('rejects a Unicode-normalized duplicate inventory heading', () => {
+  const changed = `${inventory()}\n## Inventa\u0301rio: package.json (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|top-level|inventory/iu);
+});
+
+test('rejects a duplicate heading whose canonical form emerges after invisible formatting is removed', () => {
+  const changed = `${inventory()}\n## Inventa\u200b\u0301rio: package.json (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|top-level|inventory/iu);
+});
+
+test.each([
+  ['combining grapheme joiner', '\u034f'],
+  ['variation selector', '\ufe0f'],
+])('rejects a duplicate inventory heading containing a default-ignorable %s', (_label, marker) => {
+  const changed = `${inventory()}\n## Inventário${marker}: package.json (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|top-level|inventory/iu);
+});
+
+test.each([
+  ['backspace', '\u0008'],
+  ['delete', '\u007f'],
+])('rejects a duplicate inventory heading containing an invisible %s control', (_label, control) => {
+  const changed = `${inventory()}\n## Inventário${control}: package.json (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/control|visible legal evidence/iu);
+});
+
+test('rejects an NFKC-equivalent duplicate inventory heading', () => {
+  const changed = `${inventory()}\n## Inventário： package.json (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|canonical|inventory/iu);
+});
+
+test.each([
+  ['lowercase', '## inventário: package.json (raiz)'],
+  ['space before colon', '## Inventário : package.json (raiz)'],
+])('rejects a %s duplicate inventory heading', (_variant, heading) => {
+  const changed = `${inventory()}\n${heading}\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|canonical|inventory/iu);
+});
+
+test('rejects a required legal notice rendered as struck-through Markdown', () => {
+  const changed = `${inventory()}\n### Review notice\n\n~~complete legal notice~~\n`;
+  expect(() =>
+    verify({
+      rootInventory: changed,
+      requiredStaticNoticeSections: [
+        { heading: '### Review notice', notices: ['complete legal notice'] },
+      ],
+    }),
+  ).toThrow(/struck-through|deleted|visible legal evidence/iu);
+});
+
+test('rejects a required heading rendered as struck-through Markdown', () => {
+  const changed = `${inventory()}\n### ~~JSZip 3.10.1 — MIT~~\n`;
+  expect(() =>
+    verify({
+      rootInventory: changed,
+      requiredStaticNoticeMarkers: ['### JSZip 3.10.1 — MIT'],
+    }),
+  ).toThrow(/struck-through|deleted|visible legal evidence/iu);
+});
+
+test('rejects bidirectional controls in visible legal evidence', () => {
+  const changed = `${inventory()}\n### Review notice\n\ncomplete \u202elegal\u202c notice\n`;
+  expect(() =>
+    verify({
+      rootInventory: changed,
+      requiredStaticNoticeSections: [
+        { heading: '### Review notice', notices: ['complete legal notice'] },
+      ],
+    }),
+  ).toThrow(/bidirectional|bidi|visible legal evidence/iu);
+});
+
+test('rejects a duplicate inventory heading nested in a blockquote', () => {
+  const changed = `${inventory()}\n> ## Inventário: package.json (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|top-level|inventory/iu);
+});
+
+test('rejects a duplicate inventory heading nested in a list item', () => {
+  const changed = `${inventory()}\n- Wrapper\n\n  ## Inventário: package.json (raiz)\n`;
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one|top-level|inventory/iu);
+});
+
+test.each([
+  ['hidden div', (content) => `<div hidden>\n\n${content}\n\n</div>`],
+  ['closed details', (content) => `<details>\n\n${content}\n\n</details>`],
+  ['remote iframe', (content) => `<iframe src="https://example.invalid/probe"></iframe>\n\n${content}`],
+])('rejects a root inventory nested in a raw HTML %s', (_label, transform) => {
+  expect(() => verify({ rootInventory: transform(inventory()) })).toThrow(/top-level|raw HTML|inventory/iu);
+});
+
+test('rejects a second visible inventory table in the same section', () => {
+  const duplicate = `| Escopo | Componente | Versão declarada | Versão resolvida | Licença do pacote | Eleição | Integridade | Origem imutável |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| runtime | attacker | 9.9.9 | 9.9.9 | MIT | — | ${ALPHA_SRI} | https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz |`;
+  const changed = inventory().replace(
+    '## Inventário: tlsrpt-motor/package.json',
+    `${duplicate}\n\n## Inventário: tlsrpt-motor/package.json`,
+  );
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one visible Markdown inventory table/iu);
+});
+
+test('rejects a second inventory table nested in a blockquote', () => {
+  const nested = `> | Escopo | Componente | Versão declarada | Versão resolvida | Licença do pacote | Eleição | Integridade | Origem imutável |
+> | --- | --- | --- | --- | --- | --- | --- | --- |
+> | runtime | attacker | 9.9.9 | 9.9.9 | MIT | — | ${ALPHA_SRI} | https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz |`;
+  const changed = inventory().replace(
+    '## Inventário: tlsrpt-motor/package.json',
+    `${nested}\n\n## Inventário: tlsrpt-motor/package.json`,
+  );
+  expect(() => verify({ rootInventory: changed })).toThrow(/exactly one visible Markdown inventory table/iu);
+});
+
+test('rejects an inventory-shaped table under a different heading', () => {
+  const extra = `## Inventário contraditório
+
+| Escopo | Componente | Versão declarada | Versão resolvida | Licença do pacote | Eleição | Integridade | Origem imutável |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| runtime | attacker | 9.9.9 | 9.9.9 | MIT | — | ${ALPHA_SRI} | https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz |`;
+  expect(() => verify({ rootInventory: `${inventory()}\n${extra}\n` })).toThrow(
+    /exactly one visible Markdown inventory table/iu,
+  );
+});
+
+test('rejects an additional noncanonical table outside the closed root inventory outline', () => {
+  const extra = `# Apêndice contraditório
+
+| Componente | Licença |
+| --- | --- |
+| pacote-fantasma | Proprietária |`;
+  expect(() =>
+    verify({
+      rootInventory: `${inventory()}\n${extra}\n`,
+      rootDocumentSchema: ROOT_TEST_DOCUMENT_SCHEMA,
+    }),
+  ).toThrow(/closed document|exactly two visible Markdown tables|table count/iu);
+});
+
+test('rejects an additional H1 and contradictory prose outside the closed root outline', () => {
+  const extra = `# Avisos revogados
+
+Este documento não concede qualquer permissão.`;
+  expect(() =>
+    verify({
+      rootInventory: `${inventory()}\n${extra}\n`,
+      rootDocumentSchema: ROOT_TEST_DOCUMENT_SCHEMA,
+    }),
+  ).toThrow(/closed document|heading outline|paragraph count|title/iu);
+});
+
+test('rejects legal drift inside a closed static root table', () => {
+  const staticTable = `## Complementos legais
+
+| Componente | Licença aplicada |
+| --- | --- |
+| JSZip | Proprietária; redistribuição proibida |`;
+  expect(() =>
+    verify({
+      rootInventory: `${inventory()}\n${staticTable}\n`,
+      rootDocumentSchema: {
+        ...ROOT_TEST_DOCUMENT_SCHEMA,
+        headings: [...ROOT_TEST_DOCUMENT_SCHEMA.headings, '## Complementos legais'],
+        tableCount: 3,
+        dynamicTableCount: 2,
+        staticTableDigests: [
+          '58c4b5700269607e51b0d6f2badcdd2d0304cbb0c230ecb3b726acad1cfb696f',
+        ],
+      },
+    }),
+  ).toThrow(/static legal table|audited table/iu);
+});
+
+test('rejects moving an unchanged legal block into a different root section', () => {
+  const misplaced = `## Componente incorporado
+
+### Aviso integral
+
+## Complementos
+
+\`\`\`text
+LEGAL
+\`\`\``;
+  const headings = [
+    ...ROOT_TEST_DOCUMENT_SCHEMA.headings,
+    '## Componente incorporado',
+    '### Aviso integral',
+    '## Complementos',
+  ];
+  expect(() =>
+    verify({
+      rootInventory: `${inventory()}\n${misplaced}\n`,
+      rootDocumentSchema: {
+        ...ROOT_TEST_DOCUMENT_SCHEMA,
+        headings,
+        codeBlockCount: 1,
+        codeBlockDigests: [
+          'ab0730acb114a4ef42c2b4e3d80cf0f3a580ff5d4cd54a2d6c2a3d75c05c952b',
+        ],
+        sections: [
+          { heading: '# Third-party inventory', tokens: [] },
+          { heading: rootManifest.heading, tokens: [{ type: 'table' }] },
+          { heading: motorManifest.heading, tokens: [{ type: 'table' }] },
+          { heading: '## Componente incorporado', tokens: [] },
+          {
+            heading: '### Aviso integral',
+            tokens: [
+              {
+                type: 'code',
+                digest: 'ab0730acb114a4ef42c2b4e3d80cf0f3a580ff5d4cd54a2d6c2a3d75c05c952b',
+              },
+            ],
+          },
+          { heading: '## Complementos', tokens: [] },
+        ],
+      },
+    }),
+  ).toThrow(/section content|assigned.*section|Aviso integral/iu);
+});
+
+test('rejects an inventory-shaped table with an NFKC-equivalent header', () => {
+  const extra = `## Inventário contraditório
+
+| Ｅｓｃｏｐｏ | Componente | Versão declarada | Versão resolvida | Licença do pacote | Eleição | Integridade | Origem imutável |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| runtime | attacker | 9.9.9 | 9.9.9 | MIT | — | ${ALPHA_SRI} | https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz |`;
+  expect(() => verify({ rootInventory: `${inventory()}\n${extra}\n` })).toThrow(
+    /exactly one visible Markdown inventory table/iu,
+  );
+});
+
+test.each([
+  ['a cross-script homograph', 'Escоpo'],
+  ['a simple typo', 'Escop'],
+])('rejects an additional eight-column inventory table with %s in its header', (_label, scopeHeader) => {
+  const extra = `## Inventário contraditório
+
+| ${scopeHeader} | Componente | Versão declarada | Versão resolvida | Licença do pacote | Eleição | Integridade | Origem imutável |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| runtime | attacker | 9.9.9 | 9.9.9 | MIT | — | ${ALPHA_SRI} | https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz |`;
+  expect(() => verify({ rootInventory: `${inventory()}\n${extra}\n` })).toThrow(
+    /exactly two|eight-column|inventory table/iu,
+  );
+});
+
+test('rejects an inventory-shaped table whose header contains a zero-width character', () => {
+  const extra = `## Inventário contraditório
+
+| Escopo\u200b | Componente | Versão declarada | Versão resolvida | Licença do pacote | Eleição | Integridade | Origem imutável |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| runtime | attacker | 9.9.9 | 9.9.9 | MIT | — | ${ALPHA_SRI} | https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz |`;
+  expect(() => verify({ rootInventory: `${inventory()}\n${extra}\n` })).toThrow(
+    /exactly one visible Markdown inventory table/iu,
+  );
+});
+
+test.each([
+  ['combining grapheme joiner', '\u034f'],
+  ['variation selector', '\ufe0f'],
+])('rejects an inventory-shaped table whose header contains a default-ignorable %s', (_label, marker) => {
+  const extra = `## Inventário contraditório
+
+| Escopo${marker} | Componente | Versão declarada | Versão resolvida | Licença do pacote | Eleição | Integridade | Origem imutável |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| runtime | attacker | 9.9.9 | 9.9.9 | MIT | — | ${ALPHA_SRI} | https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz |`;
+  expect(() => verify({ rootInventory: `${inventory()}\n${extra}\n` })).toThrow(
+    /exactly one visible Markdown inventory table/iu,
+  );
 });
 
 test('rejects drift in a vendored browser distribution', () => {
@@ -342,6 +664,22 @@ test('rejects a false visible field backed only by the exact value inside a code
   );
 });
 
+test('rejects a false visible field backed only by the exact value inside raw HTML', async () => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  const falseVisible = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(exact, `${falseVisible}\n\n<pre>\n${exact}\n</pre>`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/raw HTML|structural Resolved|exactly one/iu);
+    },
+  );
+});
+
 test('rejects a contradictory duplicate visible field beside the exact value', async () => {
   const exact = '- **Integrity:** `sha512-BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA==`';
   const contradiction = `- **Integrity:** \`${ALPHA_SRI}\``;
@@ -352,7 +690,9 @@ test('rejects a contradictory duplicate visible field beside the exact value', a
       sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/visible Integrity field|exactly one/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /visible Integrity field|exactly one|metadata/iu,
+      );
     },
   );
 });
@@ -369,7 +709,176 @@ test.each([
       sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/exactly one structural Resolved/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one (?:structural Resolved|structural visible list item)|metadata/iu,
+      );
+    },
+  );
+});
+
+test.each([
+  ['a blockquote', '> **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`'],
+  ['a paragraph', '**Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`'],
+])('rejects a contradictory duplicate field rendered as %s', async (_variant, contradiction) => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n\n${contradiction}`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one structural Resolved field|metadata|closed document/iu,
+      );
+    },
+  );
+});
+
+test.each([
+  [
+    'adjacent strong elements',
+    '- **Resolved****:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`',
+  ],
+  [
+    'strong text and a plain colon',
+    '- **Resolved**: `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`',
+  ],
+])('rejects a contradictory field label split across %s', async (_variant, contradiction) => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one structural Resolved field|metadata/iu,
+      );
+    },
+  );
+});
+
+test.each([
+  [
+    'an icon-prefixed fragmented strong label',
+    '- ⚠ **Resolved****:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`',
+    '\n',
+  ],
+  [
+    'an icon-prefixed strong label',
+    '- ⚠ **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`',
+    '\n',
+  ],
+  [
+    'a heading',
+    '### **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`',
+    '\n\n',
+  ],
+])(
+  'rejects a contradictory field label rendered inside %s',
+  async (_variant, contradiction, separator) => {
+    const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+    await withAdminWorkerFixture(
+      {
+        packageName: 'alpha',
+        version: '1.0.1',
+        sourceNoticeTransform: (notice) =>
+          notice.replace(exact, `${exact}${separator}${contradiction}`),
+      },
+      async (fixture) => {
+        await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+          /exactly one structural Resolved field|metadata|heading outline/iu,
+        );
+      },
+    );
+  },
+);
+
+test('rejects a contradictory NFKC-equivalent Admin Worker field label', async () => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  const contradiction =
+    '- **Ｒｅｓｏｌｖｅｄ:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one structural Resolved field|metadata/iu,
+      );
+    },
+  );
+});
+
+test('rejects an invisible control inside a contradictory Admin Worker field label', async () => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  const contradiction =
+    '- **Resolved\u0008:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /control|visible legal evidence/iu,
+      );
+    },
+  );
+});
+
+test.each([
+  ['lowercase', '- **resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`'],
+  ['space before colon', '- **Resolved :** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`'],
+  ['cross-script homograph', '- **Rеsolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`'],
+])('rejects an additional %s metadata field', async (_variant, contradiction) => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /metadata|list item|exactly one structural Resolved field/iu,
+      );
+    },
+  );
+});
+
+test('accepts an upstream legal notice whose prose contains a field-like word', async () => {
+  const licenseContent = `${TEST_LICENSE}\n\nThis historical dispute was Resolved: amicably.`;
+  await withAdminWorkerFixture(
+    { packageName: 'alpha', version: '1.0.1', licenseContent },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).resolves.toEqual({
+        entryOutputPath: 'dist/legal-audit/index.js',
+        packageCount: 1,
+      });
+    },
+  );
+});
+
+test('rejects drift in the Admin Worker immutable-origin metadata field', async () => {
+  const exact =
+    '- **Origem imutável/hash:** tarball npm versionado indicado em `Resolved`, autenticado pelo SRI SHA-512 indicado em `Integrity`.';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(exact, '- **Origem imutável/hash:** origem mutável sem autenticação.'),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /Origem imutável\/hash|immutable-origin|metadata/iu,
+      );
     },
   );
 });
@@ -439,6 +948,64 @@ test('rejects a truncated legal notice inside its configured section', () => {
       ],
     }),
   ).toThrow(/complete required legal notice/u);
+});
+
+test('rejects a legal notice whose inline token boundaries do not render whitespace', () => {
+  const rootInventory = `${inventory()}\n### Review notice\n\ncomplete**MIT**notice\n`;
+  expect(() =>
+    verify({
+      rootInventory,
+      requiredStaticNoticeSections: [
+        {
+          heading: '### Review notice',
+          notices: ['complete MIT notice'],
+        },
+      ],
+    }),
+  ).toThrow(/complete required legal notice/u);
+});
+
+test('rejects a configured legal notice supplied only as raw HTML', () => {
+  const rootInventory = `${inventory()}\n### Pako 1.0.5 — MIT e Zlib\n\n<pre>\ncomplete MIT notice\ncomplete Zlib notice\n</pre>\n`;
+  expect(() =>
+    verify({
+      rootInventory,
+      requiredStaticNoticeSections: [
+        {
+          heading: '### Pako 1.0.5 — MIT e Zlib',
+          notices: ['complete MIT notice', 'complete Zlib notice'],
+        },
+      ],
+    }),
+  ).toThrow(/complete required legal notice|raw HTML/u);
+});
+
+test('rejects a configured legal notice supplied only as image alt text', () => {
+  const rootInventory = `${inventory()}\n### Review notice\n\n![complete legal notice](data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==)\n`;
+  expect(() =>
+    verify({
+      rootInventory,
+      requiredStaticNoticeSections: [
+        {
+          heading: '### Review notice',
+          notices: ['complete legal notice'],
+        },
+      ],
+    }),
+  ).toThrow(/complete required legal notice/u);
+});
+
+test('rejects a required legal heading supplied only as an invisible link title', () => {
+  const changed = inventory().replace(
+    '### JSZip 3.10.1 — MIT',
+    '[supplement](https://example.invalid "### JSZip 3.10.1 — MIT")',
+  );
+  expect(() =>
+    verify({
+      rootInventory: changed,
+      requiredStaticNoticeMarkers: ['### JSZip 3.10.1 — MIT'],
+    }),
+  ).toThrow(/exactly one semantic|section/u);
 });
 
 test('rejects a deployed Worker whose configured complete notice is absent', () => {
@@ -586,6 +1153,25 @@ test('accepts a Wrangler Worker artifact with its required legal notice', () => 
   ).not.toThrow();
 });
 
+test('accepts an unrelated control in Worker code when the complete legal notice is intact', () => {
+  expect(() =>
+    verify({
+      workerArtifact: `const sentinel = "\u0001";\n/*! ${BASE64_ARRAY_BUFFER_MIT_NOTICE} */`,
+      requiredWorkerNoticeMarkers: [BASE64_ARRAY_BUFFER_MIT_NOTICE],
+    }),
+  ).not.toThrow();
+});
+
+test('rejects a Worker legal notice altered with a default-ignorable character', () => {
+  const alteredNotice = BASE64_ARRAY_BUFFER_MIT_NOTICE.replace('Copyright', 'Copy\u200bright');
+  expect(() =>
+    verify({
+      workerArtifact: `/*! ${alteredNotice} */`,
+      requiredWorkerNoticeMarkers: [BASE64_ARRAY_BUFFER_MIT_NOTICE],
+    }),
+  ).toThrow(/complete required legal notice/u);
+});
+
 test('rejects a truncated Wrangler Worker legal notice', () => {
   expect(() =>
     verify({
@@ -614,6 +1200,104 @@ test('rejects drift in the Admin Worker effective inventory table', async () => 
   );
 });
 
+test('rejects a replaced Admin Worker title', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '# Avisos de componentes de terceiros — Admin Motor',
+          '# Licenças revogadas — Admin Motor',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/canonical title|heading outline/iu);
+    },
+  );
+});
+
+test('rejects an additional Admin Worker H1 and contradictory prose', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        `${notice}\n# Avisos revogados\n\nEste documento não concede qualquer permissão.\n`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/heading outline|closed document/iu);
+    },
+  );
+});
+
+test('rejects contradictory metadata before the Admin Worker inventory', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '## Inventário efetivo',
+          '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`\n\n## Inventário efetivo',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/canonical preamble|closed document/iu);
+    },
+  );
+});
+
+test('rejects contradictory prose inside an Admin Worker package section', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '\n```text\n',
+          '\nEste aviso foi revogado e não concede qualquer permissão.\n\n```text\n',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /canonical prose|closed section|noncanonical package prose/iu,
+      );
+    },
+  );
+});
+
+test('rejects a duplicate integral license block in an Admin Worker package section', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `${notice}\n\n\`\`\`text\n${TEST_LICENSE}\n\`\`\`\n`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /one fenced legal-text block|closed section|legal-text block per package/iu,
+      );
+    },
+  );
+});
+
+test('rejects an unfenced integral license in an Admin Worker package section', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(`\`\`\`text\n${TEST_LICENSE}\n\`\`\``, TEST_LICENSE),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /one fenced legal-text block|closed section|legal-text block per package/iu,
+      );
+    },
+  );
+});
+
 test('rejects an Admin Worker inventory hidden in an HTML comment', async () => {
   await withAdminWorkerFixture(
     {
@@ -626,7 +1310,7 @@ test('rejects an Admin Worker inventory hidden in an HTML comment', async () => 
         ),
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/HTML comments|visible contiguous table/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/raw HTML|visible contiguous table/iu);
     },
   );
 });
@@ -644,7 +1328,7 @@ test('rejects an Admin Worker legal document hidden entirely in an HTML comment'
   );
 });
 
-test('rejects the HTML comment end-tag variant --!>', async () => {
+test('rejects an unexpected standalone HTML comment end-tag marker outside the closed outline', async () => {
   await withAdminWorkerFixture(
     {
       packageName: 'alpha',
@@ -652,7 +1336,141 @@ test('rejects the HTML comment end-tag variant --!>', async () => {
       sourceNoticeTransform: (notice) => `${notice}\n--!>`,
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/HTML comments/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/closed document|heading outline/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker legal document rendered as a raw pre block', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `<pre>\n${notice}\n</pre>`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/Inventário efetivo|visible/iu);
+    },
+  );
+});
+
+test('rejects an encoded bidirectional control after GFM entity decoding', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '# Avisos de componentes de terceiros — Admin Motor',
+          '# Avisos de componentes de terceiros — Admin Motor &#x202e;etiqueta&#x202c;',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /bidirectional|bidi|visible legal evidence/iu,
+      );
+    },
+  );
+});
+
+test('rejects an encoded invisible control after GFM entity decoding', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '# Avisos de componentes de terceiros — Admin Motor',
+          '# Avisos de componentes de terceiros — Admin Motor &#x7f;',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /control|visible legal evidence/iu,
+      );
+    },
+  );
+});
+
+test.each([
+  ['hidden div', (notice) => `<div hidden>\n\n${notice}\n\n</div>`],
+  ['closed details', (notice) => `<details>\n\n${notice}\n\n</details>`],
+])('rejects an Admin Worker legal document nested in a raw HTML %s', async (_label, transform) => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: transform,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/top-level|raw HTML|visible/iu);
+    },
+  );
+});
+
+test('rejects a duplicate Admin Worker inventory heading nested in a blockquote', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `${notice}\n> ## Inventário efetivo\n`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/exactly one semantic|top-level/iu);
+    },
+  );
+});
+
+test('rejects an unexpected Admin Worker dependency heading nested in a blockquote', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        `${notice}\n> ## attacker 9.9.9 — MIT\n>\n> Contraditório.\n`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /dependency sections.*top-level|closed document/iu,
+      );
+    },
+  );
+});
+
+test('rejects an extra Admin Worker inventory-shaped table under another heading', async () => {
+  const extra = `## Inventário contraditório
+
+| Componente | Versão | Licença | Caminho no lockfile |
+| --- | --- | --- | --- |
+| \`attacker\` | \`9.9.9\` | \`MIT\` | \`packages["node_modules/attacker"]\` |`;
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `${notice}\n${extra}\n`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one (?:effective inventory-shaped|visible contiguous|visible Markdown table)/iu,
+      );
+    },
+  );
+});
+
+test('rejects an extra noncanonical table inside an Admin Worker dependency section', async () => {
+  const extra = `| Componentе | Versão | Licença | Caminho no lockfile |
+| --- | --- | --- | --- |
+| \`attacker\` | \`9.9.9\` | \`MIT\` | \`packages["node_modules/attacker"]\` |`;
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `${notice}\n${extra}\n`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one visible Markdown table/iu,
+      );
     },
   );
 });
@@ -669,7 +1487,9 @@ test('rejects an Admin Worker inventory indented as a Markdown code block', asyn
         ),
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/visible contiguous table/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /visible contiguous table|visible Markdown table/iu,
+      );
     },
   );
 });
@@ -686,7 +1506,9 @@ test('rejects an Admin Worker inventory whose first header row alone is a Markdo
         ),
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/visible contiguous table/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /visible contiguous table|visible Markdown table/iu,
+      );
     },
   );
 });
@@ -699,7 +1521,9 @@ test('rejects an Admin Worker legal document hidden in a tilde code fence', asyn
       sourceNoticeTransform: (notice) => `~~~markdown\n${notice}\n~~~`,
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/Inventário efetivo|exact bundled npm artifact/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /Inventário efetivo|exact bundled npm artifact|visible Markdown table/iu,
+      );
     },
   );
 });
@@ -712,7 +1536,9 @@ test('rejects an Admin Worker legal document hidden by a longer backtick fence',
       sourceNoticeTransform: (notice) => `\`\`\`\`markdown\n\`\`\`\n${notice}\n\`\`\`\n\`\`\`\``,
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/Inventário efetivo|exact bundled npm artifact/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /Inventário efetivo|exact bundled npm artifact|visible Markdown table/iu,
+      );
     },
   );
 });
@@ -725,7 +1551,9 @@ test('rejects an Admin Worker inventory with a malformed separator cardinality',
       sourceNoticeTransform: (notice) => notice.replace('| --- | --- | --- | --- |', '| --- |'),
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/separator is invalid/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /separator is invalid|visible Markdown table/iu,
+      );
     },
   );
 });
@@ -738,14 +1566,18 @@ test('rejects an Admin Worker package heading whose version only shares the expe
       sourceNoticeTransform: (notice) => notice.replace('## alpha 1.0.1 — MIT', '## alpha 1.0.10 — MIT'),
     },
     async (fixture) => {
-      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/exactly one section per.*artifact/iu);
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one section per.*artifact|heading outline/iu,
+      );
     },
   );
 });
 
 test('rejects a shared package section that omits one exact repeated lockfile path', async () => {
   await withRepeatedAdminWorkerFixture({ includeBothLockPaths: false }, async (fixture) => {
-    await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/must contain exactly once.*node_modules\/foo/iu);
+    await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+      /must contain exactly (?:once|one structural).*node_modules\/foo/iu,
+    );
   });
 });
 
@@ -756,6 +1588,66 @@ test('accepts one exact package section that names every repeated lockfile path'
       packageCount: 2,
     });
   });
+});
+
+test('rejects a rendered-equivalent Admin Worker field label with collapsed whitespace', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '- **Caminho no lockfile:** `package-lock.json -> packages["node_modules/alpha"]`',
+          '- **Caminho no lockfile:** `package-lock.json -> packages["node_modules/alpha"]`\n' +
+            '- **Caminho  no lockfile:** `package-lock.json -> packages["node_modules/attacker"]`',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one structural lockfile field|metadata/iu,
+      );
+    },
+  );
+});
+
+test.each([
+  ['zero-width character', '\u200b'],
+  ['combining grapheme joiner', '\u034f'],
+  ['variation selector', '\ufe0f'],
+])('rejects a rendered-equivalent Admin Worker field label containing a %s', async (_label, marker) => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`',
+          '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`\n' +
+            `- **Resolved${marker}:** \`https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz\``,
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly one structural Resolved field|metadata/iu,
+      );
+    },
+  );
+});
+
+test('accepts an HTML-comment marker when it belongs to the exact upstream legal text', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      licenseContent: `${TEST_LICENSE}\n\n<!-- literal upstream text -->`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).resolves.toEqual({
+        entryOutputPath: 'dist/legal-audit/index.js',
+        packageCount: 1,
+      });
+    },
+  );
 });
 
 test.each([
