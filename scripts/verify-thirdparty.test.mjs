@@ -1,7 +1,13 @@
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { expect, test } from 'vitest';
 
 import {
   BASE64_ARRAY_BUFFER_MIT_NOTICE,
+  verifyAdminWorkerBundle,
   verifyNoRemoteGoogleFonts,
   verifySha256,
   verifyThirdPartyInventory,
@@ -11,6 +17,193 @@ const ALPHA_SRI = `sha512-${Buffer.alloc(64, 1).toString('base64')}`;
 const BETA_SRI = `sha512-${Buffer.alloc(64, 2).toString('base64')}`;
 const GAMMA_SRI = `sha512-${Buffer.alloc(64, 3).toString('base64')}`;
 const LICENSE_BANNER = '/* Third-party licenses: /legal/BUNDLED-LICENSES.md */';
+const LAUNDER_AUDITED_SRI =
+  'sha512-mU6WRz5EusL9ZZuiZ5SO4Y6C0P9PAUR9iwdb6bzj4KDihm28DiHFw+/yk9DBH4f+Pv1wuzQ4e2jV3oQ7mkIqvw==';
+const LAUNDER_PACKAGE_JSON_SHA256 = 'b111ad703bae61d8cef17863c38f4618e813b24284a874d0b81db1b5cfbdf601';
+const LAUNDER_UPSTREAM_COMMIT = 'e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3';
+const TEST_LICENSE = `MIT License
+
+Copyright (c) Test Author
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+const TEST_LICENSE_SHA256 = createHash('sha256').update(TEST_LICENSE).digest('hex');
+const LAUNDER_MIT_TERMS = TEST_LICENSE.slice(TEST_LICENSE.indexOf('Permission is hereby granted'));
+
+function launderSectionBody({
+  license = 'MIT',
+  resolved = 'https://registry.npmjs.org/launder/-/launder-1.7.1.tgz',
+  integrity = LAUNDER_AUDITED_SRI,
+  packageJsonSha256 = LAUNDER_PACKAGE_JSON_SHA256,
+  upstreamCommit = LAUNDER_UPSTREAM_COMMIT,
+} = {}) {
+  return `- **Caminho no lockfile:** \`package-lock.json -> packages["node_modules/launder"]\`
+- **Licença:** \`${license}\`
+- **Resolved:** \`${resolved}\`
+- **Integrity:** \`${integrity}\`
+- **Evidência da licença declarada:** \`node_modules/launder/package.json\` (\`SHA-256: ${packageJsonSha256}\`).
+- **Origem upstream imutável:** tag anotada \`launder@1.7.1\`, commit \`${upstreamCommit}\`, caminho \`packages/launder\` no repositório \`apostrophecms/apostrophe\`.
+
+O pacote npm não contém arquivo LICENSE.
+
+${LAUNDER_MIT_TERMS}`;
+}
+
+async function withAdminWorkerFixture(
+  {
+    packageName,
+    version,
+    tableVersion = version,
+    license = 'MIT',
+    resolved: resolvedOverride,
+    integrity = `sha512-${Buffer.alloc(64, 4).toString('base64')}`,
+    includeLicense = true,
+    sectionBody,
+    sourceNoticeTransform = (notice) => notice,
+    packageJsonTransform = (content) => content,
+  },
+  assertion,
+) {
+  const root = await mkdtemp(join(tmpdir(), 'admin-worker-legal-'));
+  const lockKey = `node_modules/${packageName}`;
+  const entryContent = 'export default {};\n';
+  const resolved =
+    resolvedOverride ?? `https://registry.npmjs.org/${packageName}/-/${packageName}-${version}.tgz`;
+  const licenseSha256 = createHash('sha256').update(TEST_LICENSE).digest('hex');
+  const defaultSectionBody = `- **Caminho no lockfile:** \`package-lock.json -> packages["${lockKey}"]\`
+- **Resolved:** \`${resolved}\`
+- **Integrity:** \`${integrity}\`
+- **Fonte do aviso integral:** \`${lockKey}/LICENSE\` (\`SHA-256: ${licenseSha256}\`).
+
+${TEST_LICENSE}`;
+  const sourceNotice = sourceNoticeTransform(`# Admin Motor third-party notices
+
+## Inventário efetivo
+
+| Componente | Versão | Licença | Caminho no lockfile |
+| --- | --- | --- | --- |
+| \`${packageName}\` | \`${tableVersion}\` | \`${license}\` | \`packages["${lockKey}"]\` |
+
+## ${packageName} ${version} — ${license}
+
+${sectionBody ?? defaultSectionBody}
+`);
+
+  try {
+    await mkdir(join(root, 'admin-motor', 'dist', 'legal-audit'), { recursive: true });
+    await mkdir(join(root, lockKey), { recursive: true });
+    await writeFile(join(root, 'admin-motor', 'dist', 'legal-audit', 'index.js'), entryContent);
+    if (includeLicense) await writeFile(join(root, lockKey, 'LICENSE'), TEST_LICENSE);
+    const packageJson =
+      packageName === 'launder'
+        ? await readFile(join(process.cwd(), 'node_modules', 'launder', 'package.json'))
+        : Buffer.from(JSON.stringify({ name: packageName, version, license }));
+    await writeFile(join(root, lockKey, 'package.json'), packageJsonTransform(packageJson));
+
+    await assertion({
+      root,
+      metafile: {
+        outputs: {
+          'dist/legal-audit/index.js': {
+            entryPoint: 'src/index.ts',
+            bytes: Buffer.byteLength(entryContent),
+            inputs: { [`../${lockKey}/index.js`]: { bytesInOutput: 1 } },
+          },
+        },
+      },
+      packageLock: {
+        packages: {
+          [lockKey]: { version, license, resolved, integrity },
+        },
+      },
+      sourceNotice,
+      emittedNotice: sourceNotice,
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+async function withRepeatedAdminWorkerFixture({ includeBothLockPaths }, assertion) {
+  const root = await mkdtemp(join(tmpdir(), 'admin-worker-repeated-'));
+  const lockKeys = ['node_modules/foo', 'node_modules/parent/node_modules/foo'];
+  const version = '1.2.3';
+  const integrity = `sha512-${Buffer.alloc(64, 6).toString('base64')}`;
+  const resolved = `https://registry.npmjs.org/foo/-/foo-${version}.tgz`;
+  const licenseSha256 = createHash('sha256').update(TEST_LICENSE).digest('hex');
+  const lockMarkers = includeBothLockPaths
+    ? lockKeys.map((lockKey) => `- **Caminho no lockfile:** \`package-lock.json -> packages["${lockKey}"]\``)
+    : [`- **Caminho no lockfile:** \`package-lock.json -> packages["${lockKeys[1]}"]\``];
+  const sourceMarkers = (includeBothLockPaths ? lockKeys : [lockKeys[1]]).map(
+    (lockKey) =>
+      `- **Fonte do aviso integral:** \`${lockKey}/LICENSE\` (\`SHA-256: ${licenseSha256}\`).`,
+  );
+  const sourceNotice = `# Admin Motor third-party notices
+
+## Inventário efetivo
+
+| Componente | Versão | Licença | Caminho no lockfile |
+| --- | --- | --- | --- |
+${lockKeys.map((lockKey) => `| \`foo\` | \`${version}\` | \`MIT\` | \`packages["${lockKey}"]\` |`).join('\n')}
+
+## foo ${version} — MIT
+
+${lockMarkers.join('\n')}
+- **Resolved:** \`${resolved}\`
+- **Integrity:** \`${integrity}\`
+${sourceMarkers.join('\n')}
+
+${TEST_LICENSE}
+`;
+
+  try {
+    await mkdir(join(root, 'admin-motor', 'dist', 'legal-audit'), { recursive: true });
+    await writeFile(join(root, 'admin-motor', 'dist', 'legal-audit', 'index.js'), 'export default {};\n');
+    for (const lockKey of lockKeys) {
+      await mkdir(join(root, lockKey), { recursive: true });
+      await writeFile(join(root, lockKey, 'LICENSE'), TEST_LICENSE);
+      await writeFile(join(root, lockKey, 'package.json'), JSON.stringify({ name: 'foo', version, license: 'MIT' }));
+    }
+    await assertion({
+      root,
+      metafile: {
+        outputs: {
+          'dist/legal-audit/index.js': {
+            entryPoint: 'src/index.ts',
+            bytes: Buffer.byteLength('export default {};\n'),
+            inputs: Object.fromEntries(
+              lockKeys.map((lockKey) => [`../${lockKey}/index.js`, { bytesInOutput: 1 }]),
+            ),
+          },
+        },
+      },
+      packageLock: {
+        packages: Object.fromEntries(
+          lockKeys.map((lockKey) => [lockKey, { version, license: 'MIT', resolved, integrity }]),
+        ),
+      },
+      sourceNotice,
+      emittedNotice: sourceNotice,
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
 
 const rootManifest = {
   id: 'root',
@@ -130,6 +323,54 @@ test.each([
 ])('rejects the canonical Google Fonts hosts after HTML and URL normalization: %s', (href) => {
   expect(() => verifyNoRemoteGoogleFonts(`<link rel="stylesheet" href="${href}">`)).toThrow(
     /outside the locked dependency graph/u,
+  );
+});
+
+test('rejects a false visible field backed only by the exact value inside a code fence', async () => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  const falseVisible = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(exact, `${falseVisible}\n\n\`\`\`text\n${exact}\n\`\`\``),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/visible Resolved field|exactly one/iu);
+    },
+  );
+});
+
+test('rejects a contradictory duplicate visible field beside the exact value', async () => {
+  const exact = '- **Integrity:** `sha512-BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA==`';
+  const contradiction = `- **Integrity:** \`${ALPHA_SRI}\``;
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/visible Integrity field|exactly one/iu);
+    },
+  );
+});
+
+test.each([
+  ['an indented list marker', '  - **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`'],
+  ['extra list-marker spacing', '-  **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-9.9.9.tgz`'],
+])('rejects a contradictory duplicate field rendered with %s', async (_variant, contradiction) => {
+  const exact = '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`';
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace(exact, `${exact}\n${contradiction}`),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/exactly one structural Resolved/iu);
+    },
   );
 });
 
@@ -362,4 +603,328 @@ test('rejects a Wrangler Worker artifact without its required legal notice', () 
       requiredWorkerNoticeMarkers: [BASE64_ARRAY_BUFFER_MIT_NOTICE],
     }),
   ).toThrow(/complete required legal notice/u);
+});
+
+test('rejects drift in the Admin Worker effective inventory table', async () => {
+  await withAdminWorkerFixture(
+    { packageName: 'alpha', version: '1.0.1', tableVersion: '1.0.0' },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/inventory table.*lockfile-derived/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker inventory hidden in an HTML comment', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          /## Inventário efetivo\n\n([\s\S]*?)\n\n## alpha/u,
+          '## Inventário efetivo\n\n<!--\n$1\n-->\n\n## alpha',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/HTML comments|visible contiguous table/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker legal document hidden entirely in an HTML comment', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `<!--\n${notice}\n-->`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/HTML comments|visible/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker inventory indented as a Markdown code block', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          /\| Componente \| Versão \| Licença \| Caminho no lockfile \|\n\| --- \| --- \| --- \| --- \|\n\| `alpha` \| `1\.0\.1` \| `MIT` \| `packages\["node_modules\/alpha"\]` \|/u,
+          (table) => table.split('\n').map((line) => `    ${line}`).join('\n'),
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/visible contiguous table/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker inventory whose first header row alone is a Markdown code block', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) =>
+        notice.replace(
+          '| Componente | Versão | Licença | Caminho no lockfile |',
+          '    | Componente | Versão | Licença | Caminho no lockfile |',
+        ),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/visible contiguous table/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker legal document hidden in a tilde code fence', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `~~~markdown\n${notice}\n~~~`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/Inventário efetivo|exact bundled npm artifact/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker legal document hidden by a longer backtick fence', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `\`\`\`\`markdown\n\`\`\`\n${notice}\n\`\`\`\n\`\`\`\``,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/Inventário efetivo|exact bundled npm artifact/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker inventory with a malformed separator cardinality', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace('| --- | --- | --- | --- |', '| --- |'),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/separator is invalid/iu);
+    },
+  );
+});
+
+test('rejects an Admin Worker package heading whose version only shares the expected prefix', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => notice.replace('## alpha 1.0.1 — MIT', '## alpha 1.0.10 — MIT'),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/exactly one section per.*artifact/iu);
+    },
+  );
+});
+
+test('rejects a shared package section that omits one exact repeated lockfile path', async () => {
+  await withRepeatedAdminWorkerFixture({ includeBothLockPaths: false }, async (fixture) => {
+    await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/must contain exactly once.*node_modules\/foo/iu);
+  });
+});
+
+test('accepts one exact package section that names every repeated lockfile path', async () => {
+  await withRepeatedAdminWorkerFixture({ includeBothLockPaths: true }, async (fixture) => {
+    await expect(verifyAdminWorkerBundle(fixture)).resolves.toEqual({
+      entryOutputPath: 'dist/legal-audit/index.js',
+      packageCount: 2,
+    });
+  });
+});
+
+test.each([
+  [
+    'lock path',
+    '- **Caminho no lockfile:** `package-lock.json -> packages["node_modules/alpha"]`',
+    '- **Caminho no lockfile:** `package-lock.json -> packages["node_modules/alpha"]-decoy`',
+  ],
+  [
+    'resolved URL',
+    '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz`',
+    '- **Resolved:** `https://registry.npmjs.org/alpha/-/alpha-1.0.1.tgz?tampered`',
+  ],
+  [
+    'integrity',
+    `- **Integrity:** \`${ALPHA_SRI}\``,
+    `- **Integrity:** \`${ALPHA_SRI}decoy\``,
+  ],
+  [
+    'license source SHA-256',
+    `- **Fonte do aviso integral:** \`node_modules/alpha/LICENSE\` (\`SHA-256: ${TEST_LICENSE_SHA256}\`).`,
+    `- **Fonte do aviso integral:** \`node_modules/alpha/LICENSE\` (\`SHA-256: ${TEST_LICENSE_SHA256}dead\`).`,
+  ],
+])('rejects an Admin Worker package section with an extended %s decoy', async (_field, exact, decoy) => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      integrity: ALPHA_SRI,
+      sourceNoticeTransform: (notice) => notice.replace(exact, decoy),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly (?:once|one structural)|required legal notice/iu,
+      );
+    },
+  );
+});
+
+test('rejects the launder exception for any version other than the audited 1.7.1', async () => {
+  const version = '1.7.2';
+  const integrity = `sha512-${Buffer.alloc(64, 4).toString('base64')}`;
+  const resolved = `https://registry.npmjs.org/launder/-/launder-${version}.tgz`;
+  const sectionBody = `- **Caminho no lockfile:** \`package-lock.json -> packages["node_modules/launder"]\`
+- **Resolved:** \`${resolved}\`
+- **Integrity:** \`${integrity}\`
+- **Origem upstream imutável:** commit \`e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3\`
+
+O pacote npm não contém arquivo LICENSE.
+
+${LAUNDER_MIT_TERMS}`;
+
+  await withAdminWorkerFixture(
+    { packageName: 'launder', version, includeLicense: false, sectionBody },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/exact audited provenance.*re-audit/iu);
+    },
+  );
+});
+
+test.each([
+  ['license', 'ISC', LAUNDER_AUDITED_SRI],
+  ['integrity', 'MIT', `sha512-${Buffer.alloc(64, 5).toString('base64')}`],
+])('rejects launder 1.7.1 when its audited %s changes', async (_field, license, integrity) => {
+  const version = '1.7.1';
+  const resolved = `https://registry.npmjs.org/launder/-/launder-${version}.tgz`;
+  const sectionBody = `- **Caminho no lockfile:** \`package-lock.json -> packages["node_modules/launder"]\`
+- **Licença:** \`${license}\`
+- **Resolved:** \`${resolved}\`
+- **Integrity:** \`${integrity}\`
+- **Origem upstream imutável:** commit \`e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3\`
+
+O pacote npm não contém arquivo LICENSE.
+
+${LAUNDER_MIT_TERMS}`;
+
+  await withAdminWorkerFixture(
+    { packageName: 'launder', version, license, integrity, includeLicense: false, sectionBody },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/exact audited provenance/iu);
+    },
+  );
+});
+
+test('accepts the exact audited launder 1.7.1 artifact and evidence', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'launder',
+      version: '1.7.1',
+      integrity: LAUNDER_AUDITED_SRI,
+      includeLicense: false,
+      sectionBody: launderSectionBody(),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).resolves.toEqual({
+        entryOutputPath: 'dist/legal-audit/index.js',
+        packageCount: 1,
+      });
+    },
+  );
+});
+
+test('rejects launder when the exact package.json bytes drift', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'launder',
+      version: '1.7.1',
+      integrity: LAUNDER_AUDITED_SRI,
+      includeLicense: false,
+      sectionBody: launderSectionBody(),
+      packageJsonTransform: (content) => Buffer.concat([content, Buffer.from(' ')]),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/package\.json.*exact audited artifact/iu);
+    },
+  );
+});
+
+test.each([
+  [
+    'resolved URL',
+    {
+      resolved: 'https://registry.npmjs.org/launder/-/launder-1.7.1-repacked.tgz',
+      sectionBody: launderSectionBody({
+        resolved: 'https://registry.npmjs.org/launder/-/launder-1.7.1-repacked.tgz',
+      }),
+    },
+    /source must match its exact package name|exact audited provenance/iu,
+  ],
+  [
+    'documented package.json hash',
+    {
+      sectionBody: launderSectionBody({ packageJsonSha256: '0'.repeat(64) }),
+    },
+    /must contain exactly (?:once|one structural)/iu,
+  ],
+  [
+    'documented upstream commit',
+    {
+      sectionBody: launderSectionBody({ upstreamCommit: '0'.repeat(40) }),
+    },
+    /must contain exactly (?:once|one structural)/iu,
+  ],
+])('rejects launder when its exact audited %s drifts', async (_field, overrides, expectedError) => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'launder',
+      version: '1.7.1',
+      integrity: LAUNDER_AUDITED_SRI,
+      includeLicense: false,
+      ...overrides,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(expectedError);
+    },
+  );
+});
+
+test.each([
+  [
+    'manifest SHA-256',
+    `SHA-256: ${LAUNDER_PACKAGE_JSON_SHA256}`,
+    `SHA-256: ${LAUNDER_PACKAGE_JSON_SHA256}dead`,
+  ],
+  [
+    'upstream commit',
+    `commit \`${LAUNDER_UPSTREAM_COMMIT}\``,
+    `commit \`${LAUNDER_UPSTREAM_COMMIT}dead\``,
+  ],
+])('rejects launder when the documented exact %s is only a decoy prefix', async (_field, exact, decoy) => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'launder',
+      version: '1.7.1',
+      integrity: LAUNDER_AUDITED_SRI,
+      includeLicense: false,
+      sectionBody: launderSectionBody().replace(exact, decoy),
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(
+        /exactly (?:once|one structural)|required legal notice/iu,
+      );
+    },
+  );
 });

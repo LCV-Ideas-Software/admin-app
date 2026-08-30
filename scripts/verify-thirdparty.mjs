@@ -19,6 +19,21 @@ const ADMIN_WORKER_OUTDIR = 'admin-motor/dist/legal-audit';
 const ADMIN_WORKER_METAFILE = `${ADMIN_WORKER_OUTDIR}/bundle-meta.json`;
 const ADMIN_WORKER_NOTICE_SOURCE = 'admin-motor/src/legal/THIRDPARTY.md';
 const ADMIN_WORKER_NOTICE_ARTIFACT = `${ADMIN_WORKER_OUTDIR}/legal/THIRDPARTY.md`;
+const ADMIN_WORKER_INVENTORY_HEADER = Object.freeze([
+  'Componente',
+  'Versão',
+  'Licença',
+  'Caminho no lockfile',
+]);
+const LAUNDER_AUDITED_ARTIFACT = Object.freeze({
+  version: '1.7.1',
+  license: 'MIT',
+  resolved: 'https://registry.npmjs.org/launder/-/launder-1.7.1.tgz',
+  integrity:
+    'sha512-mU6WRz5EusL9ZZuiZ5SO4Y6C0P9PAUR9iwdb6bzj4KDihm28DiHFw+/yk9DBH4f+Pv1wuzQ4e2jV3oQ7mkIqvw==',
+  packageJsonSha256: 'b111ad703bae61d8cef17863c38f4618e813b24284a874d0b81db1b5cfbdf601',
+  upstreamCommit: 'e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3',
+});
 const ROOT_HTML = 'index.html';
 const JSZIP_BROWSER_DISTRIBUTION = 'node_modules/jszip/dist/jszip.min.js';
 const JSZIP_BROWSER_DISTRIBUTION_SHA256 = 'ACC7E41455A80765B5FD9C7EE1B8078A6D160BBBCA455AEAE854DE65C947D59E';
@@ -357,18 +372,68 @@ function assertContainsNotice(content, notice, label) {
   );
 }
 
-function markdownHeadingRecords(markdown) {
+function markdownStructuralLineRecords(markdown) {
   const lines = markdown.split(/\r?\n/u);
-  const headings = [];
-  let inFence = false;
+  const records = [];
+  let fence;
   for (const [index, line] of lines.entries()) {
-    if (/^\s*```/u.test(line)) {
-      inFence = !inFence;
+    if (fence) {
+      const closing = /^ {0,3}(`+|~+)\s*$/u.exec(line);
+      if (
+        closing &&
+        closing[1][0] === fence.marker &&
+        closing[1].length >= fence.minimumLength
+      ) {
+        fence = undefined;
+      }
       continue;
     }
-    if (inFence) continue;
-    const match = /^(#+)\s/u.exec(line);
-    if (match) headings.push({ heading: line.trim(), index, level: match[1].length });
+
+    const opening = /^ {0,3}(`{3,}|~{3,})/u.exec(line);
+    if (opening) {
+      fence = { marker: opening[1][0], minimumLength: opening[1].length };
+      continue;
+    }
+
+    records.push({ index, line });
+  }
+  return { lines, records };
+}
+
+function assertExactMarkdownLine(content, expectedLine, label) {
+  const occurrences = markdownStructuralLineRecords(content).records.filter(
+    ({ line }) => line === expectedLine,
+  ).length;
+  assert.equal(occurrences, 1, `${label} must contain exactly once: ${expectedLine}`);
+}
+
+function markdownFieldLines(content, field) {
+  const marker = `**${field}:**`;
+  return markdownStructuralLineRecords(content).records
+    .map(({ line }) => line)
+    .filter((line) => line.includes(marker));
+}
+
+function assertExactMarkdownField(content, field, expectedLine, label) {
+  assert.deepEqual(
+    markdownFieldLines(content, field),
+    [expectedLine],
+    `${label} must contain exactly one structural ${field} field with the exact audited value`,
+  );
+}
+
+function markdownHeadingRecords(markdown) {
+  const { lines, records } = markdownStructuralLineRecords(markdown);
+  const headings = [];
+  for (const { index, line } of records) {
+    const match = /^( {0,3})(#+)\s/u.exec(line);
+    if (match) {
+      headings.push({
+        heading: line.slice(match[1].length).trim(),
+        index,
+        level: match[2].length,
+      });
+    }
   }
   return { headings, lines };
 }
@@ -381,17 +446,6 @@ function markdownSection(markdown, heading, label) {
     (record) => record.index > matches[0].index && record.level <= matches[0].level,
   );
   return lines.slice(matches[0].index + 1, end?.index).join('\n');
-}
-
-function markdownSectionStartingWith(markdown, headingPrefix, label) {
-  const headings = markdownHeadingRecords(markdown).headings
-    .filter((record) => record.level === 2 && record.heading.startsWith(headingPrefix))
-    .map((record) => record.heading);
-  assert.equal(headings.length, 1, `${label} must contain exactly one section starting with ${headingPrefix}`);
-  return {
-    heading: headings[0],
-    body: markdownSection(markdown, headings[0], label),
-  };
 }
 
 function assertNoticeSections(markdown, sections, label) {
@@ -439,6 +493,55 @@ function parseTable(markdown, heading) {
       origin: cells[7],
     });
   }
+  return records;
+}
+
+function parseAdminWorkerInventory(markdown) {
+  const section = markdownSection(markdown, '## Inventário efetivo', ADMIN_WORKER_NOTICE_SOURCE);
+  const tableLines = section.split(/\r?\n/u);
+  while (tableLines[0]?.trim() === '') tableLines.shift();
+  while (tableLines.at(-1)?.trim() === '') tableLines.pop();
+  assert.ok(
+    tableLines.length >= 3 && tableLines.every((line) => /^\|.*\|$/u.test(line)),
+    `${ADMIN_WORKER_NOTICE_SOURCE} effective inventory must be one visible contiguous table`,
+  );
+
+  const cells = (line) => line.split('|').slice(1, -1).map(normalizeCell);
+  assert.deepEqual(
+    cells(tableLines[0]),
+    ADMIN_WORKER_INVENTORY_HEADER,
+    `${ADMIN_WORKER_NOTICE_SOURCE} effective inventory header changed`,
+  );
+  const separator = cells(tableLines[1]);
+  assert.ok(
+    separator.length === ADMIN_WORKER_INVENTORY_HEADER.length &&
+      separator.every((cell) => /^:?-{3,}:?$/u.test(cell)),
+    `${ADMIN_WORKER_NOTICE_SOURCE} effective inventory separator is invalid`,
+  );
+
+  const records = tableLines.slice(2).map((line) => {
+    const row = cells(line);
+    assert.equal(
+      row.length,
+      ADMIN_WORKER_INVENTORY_HEADER.length,
+      `${ADMIN_WORKER_NOTICE_SOURCE} has an invalid effective inventory row: ${line}`,
+    );
+    assert.ok(
+      row.every((value) => value.length > 0),
+      `${ADMIN_WORKER_NOTICE_SOURCE} has an empty effective inventory cell: ${line}`,
+    );
+    return {
+      packageName: row[0],
+      version: row[1],
+      license: row[2],
+      lockPath: row[3],
+    };
+  });
+  assert.equal(
+    new Set(records.map(({ lockPath }) => lockPath)).size,
+    records.length,
+    `${ADMIN_WORKER_NOTICE_SOURCE} effective inventory repeats a lockfile path`,
+  );
   return records;
 }
 
@@ -757,6 +860,11 @@ export async function verifyAdminWorkerBundle({
     sourceNotice,
     `${ADMIN_WORKER_NOTICE_ARTIFACT} must be byte-identical to ${ADMIN_WORKER_NOTICE_SOURCE}`,
   );
+  assert.doesNotMatch(
+    sourceNotice,
+    /<!--|-->/u,
+    `${ADMIN_WORKER_NOTICE_SOURCE} must not contain HTML comments because all legal evidence must render visibly`,
+  );
 
   const entryOutputs = Object.entries(metafile.outputs ?? {}).filter(
     ([, output]) => output.entryPoint !== undefined,
@@ -784,26 +892,42 @@ export async function verifyAdminWorkerBundle({
   }
   assert.ok(packages.size > 0, 'Admin Motor metafile must identify at least one bundled npm package');
 
-  const expectedHeadingPrefixes = [...packages.values()].map(({ lockKey, packageName }) => {
-    const lockEntry = packageLock.packages?.[lockKey];
-    assert.ok(lockEntry, `${lockKey} from the Admin Motor metafile is missing from package-lock.json`);
-    return `## ${packageName} ${lockEntry.version}`;
-  });
+  const byLockPath = (left, right) => left.lockPath.localeCompare(right.lockPath);
+  const expectedInventory = [...packages.values()]
+    .map(({ lockKey, packageName }) => {
+      const lockEntry = packageLock.packages?.[lockKey];
+      assert.ok(lockEntry, `${lockKey} from the Admin Motor metafile is missing from package-lock.json`);
+      return {
+        packageName,
+        version: lockEntry.version,
+        license: lockEntry.license,
+        lockPath: `packages["${lockKey}"]`,
+      };
+    })
+    .sort(byLockPath);
+  const actualInventory = parseAdminWorkerInventory(sourceNotice).sort(byLockPath);
+  assert.deepEqual(
+    actualInventory,
+    expectedInventory,
+    `${ADMIN_WORKER_NOTICE_SOURCE} effective inventory table must equal the Wrangler metafile and lockfile-derived inventory`,
+  );
+
+  const expectedSectionHeadings = [
+    ...new Set(
+      expectedInventory.map(
+        ({ packageName, version, license }) => `## ${packageName} ${version} — ${license}`,
+      ),
+    ),
+  ].sort();
   const documentHeadings = markdownHeadingRecords(sourceNotice).headings
     .filter((record) => record.level === 2 && record.heading !== '## Inventário efetivo')
-    .map((record) => record.heading);
-  assert.equal(
-    documentHeadings.length,
-    packages.size,
-    `${ADMIN_WORKER_NOTICE_SOURCE} must contain exactly one section per bundled npm package`,
+    .map((record) => record.heading)
+    .sort();
+  assert.deepEqual(
+    documentHeadings,
+    expectedSectionHeadings,
+    `${ADMIN_WORKER_NOTICE_SOURCE} must contain exactly one section per exact bundled npm artifact`,
   );
-  for (const heading of documentHeadings) {
-    assert.equal(
-      expectedHeadingPrefixes.filter((prefix) => heading.startsWith(prefix)).length,
-      1,
-      `${ADMIN_WORKER_NOTICE_SOURCE} contains an unexpected package section: ${heading}`,
-    );
-  }
 
   for (const { lockKey, packageName } of [...packages.values()].sort((left, right) =>
     left.lockKey.localeCompare(right.lockKey),
@@ -812,38 +936,96 @@ export async function verifyAdminWorkerBundle({
     assert.ok(lockEntry, `${lockKey} from the Admin Motor metafile is missing from package-lock.json`);
     assertImmutableRegistryProvenance(`admin-motor:${lockKey}`, packageName, lockEntry);
 
-    const section = markdownSectionStartingWith(
-      sourceNotice,
-      `## ${packageName} ${lockEntry.version}`,
-      ADMIN_WORKER_NOTICE_SOURCE,
+    const sectionHeading = `## ${packageName} ${lockEntry.version} — ${lockEntry.license}`;
+    const sectionBody = markdownSection(sourceNotice, sectionHeading, ADMIN_WORKER_NOTICE_SOURCE);
+    const sectionPackageCount = expectedInventory.filter(
+      (record) =>
+        record.packageName === packageName &&
+        record.version === lockEntry.version &&
+        record.license === lockEntry.license,
+    ).length;
+    assertExactMarkdownLine(
+      sectionBody,
+      `- **Caminho no lockfile:** \`package-lock.json -> packages["${lockKey}"]\``,
+      `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
     );
-    const sectionText = `${section.heading}\n${section.body}`;
-    for (const marker of [lockKey, lockEntry.license, lockEntry.resolved, lockEntry.integrity]) {
-      assertContainsNotice(
-        sectionText,
-        marker,
-        `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
-      );
-    }
+    assert.equal(
+      markdownFieldLines(sectionBody, 'Caminho no lockfile').length,
+      sectionPackageCount,
+      `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version} must contain exactly one structural lockfile field per bundled artifact`,
+    );
+    assertExactMarkdownField(
+      sectionBody,
+      'Resolved',
+      `- **Resolved:** \`${lockEntry.resolved}\``,
+      `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
+    );
+    assertExactMarkdownField(
+      sectionBody,
+      'Integrity',
+      `- **Integrity:** \`${lockEntry.integrity}\``,
+      `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
+    );
 
     const upstreamNotice = await packageLicenseNotice(root, lockKey);
     if (packageName === 'launder') {
+      assert.deepEqual(
+        {
+          version: lockEntry.version,
+          license: lockEntry.license,
+          resolved: lockEntry.resolved,
+          integrity: lockEntry.integrity,
+        },
+        {
+          version: LAUNDER_AUDITED_ARTIFACT.version,
+          license: LAUNDER_AUDITED_ARTIFACT.license,
+          resolved: LAUNDER_AUDITED_ARTIFACT.resolved,
+          integrity: LAUNDER_AUDITED_ARTIFACT.integrity,
+        },
+        'launder must match the exact audited provenance; any drift requires a legal re-audit',
+      );
       assert.equal(
         upstreamNotice,
         undefined,
         'launder 1.7.1 handling must be re-evaluated if upstream starts shipping a license file',
       );
+      const packageJson = await readFile(resolve(root, lockKey, 'package.json'));
+      assert.equal(
+        createHash('sha256').update(packageJson).digest('hex'),
+        LAUNDER_AUDITED_ARTIFACT.packageJsonSha256,
+        'launder package.json must match the exact audited artifact',
+      );
       assert.match(
-        section.body,
+        sectionBody,
         /não (?:contém|fornece|traz)[^\n]*LICENSE/iu,
         'launder section must disclose that the exact upstream package lacks a LICENSE file',
       );
-      assertContainsNotice(section.body, 'e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3', 'launder section');
-      assertContainsNotice(section.body, LAUNDER_MIT_TERMS, 'launder section');
+      assertExactMarkdownField(
+        sectionBody,
+        'Evidência da licença declarada',
+        `- **Evidência da licença declarada:** \`node_modules/launder/package.json\` (\`SHA-256: ${LAUNDER_AUDITED_ARTIFACT.packageJsonSha256}\`).`,
+        'launder section',
+      );
+      assertExactMarkdownField(
+        sectionBody,
+        'Origem upstream imutável',
+        `- **Origem upstream imutável:** tag anotada \`launder@1.7.1\`, commit \`${LAUNDER_AUDITED_ARTIFACT.upstreamCommit}\`, caminho \`packages/launder\` no repositório \`apostrophecms/apostrophe\`.`,
+        'launder section',
+      );
+      assertContainsNotice(sectionBody, LAUNDER_MIT_TERMS, 'launder section');
     } else {
       assert.ok(upstreamNotice, `${lockKey} must ship a legal notice file`);
-      assertContainsNotice(section.body, upstreamNotice.content, `${packageName} section`);
-      assertContainsNotice(section.body, upstreamNotice.sha256, `${packageName} section`);
+      assertContainsNotice(sectionBody, upstreamNotice.content, `${packageName} section`);
+      assertExactMarkdownLine(
+        sectionBody,
+        `- **Fonte do aviso integral:** \`${lockKey}/${upstreamNotice.name}\` (\`SHA-256: ${upstreamNotice.sha256}\`).`,
+        `${packageName} section`,
+      );
+      assert.equal(
+        markdownFieldLines(sectionBody, 'Fonte do aviso integral').length,
+        sectionPackageCount,
+        `${packageName} section must contain exactly one structural legal-notice source field per bundled artifact`,
+      );
     }
   }
 
