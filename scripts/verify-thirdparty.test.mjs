@@ -644,6 +644,19 @@ test('rejects an Admin Worker legal document hidden entirely in an HTML comment'
   );
 });
 
+test('rejects the HTML comment end-tag variant --!>', async () => {
+  await withAdminWorkerFixture(
+    {
+      packageName: 'alpha',
+      version: '1.0.1',
+      sourceNoticeTransform: (notice) => `${notice}\n--!>`,
+    },
+    async (fixture) => {
+      await expect(verifyAdminWorkerBundle(fixture)).rejects.toThrow(/HTML comments/iu);
+    },
+  );
+});
+
 test('rejects an Admin Worker inventory indented as a Markdown code block', async () => {
   await withAdminWorkerFixture(
     {

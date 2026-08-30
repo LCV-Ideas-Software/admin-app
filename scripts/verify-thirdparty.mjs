@@ -860,9 +860,8 @@ export async function verifyAdminWorkerBundle({
     sourceNotice,
     `${ADMIN_WORKER_NOTICE_ARTIFACT} must be byte-identical to ${ADMIN_WORKER_NOTICE_SOURCE}`,
   );
-  assert.doesNotMatch(
-    sourceNotice,
-    /<!--|-->/u,
+  assert.ok(
+    !['<!--', '-->', '--!>'].some((marker) => sourceNotice.includes(marker)),
     `${ADMIN_WORKER_NOTICE_SOURCE} must not contain HTML comments because all legal evidence must render visibly`,
   );
 
