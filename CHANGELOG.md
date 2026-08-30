@@ -45,6 +45,15 @@
 
 ### Corrigido
 
+- **Parser estrutural dos inventários legais fechado a bypasses de Markdown.**
+  O gate usa o parser GFM já adotado pelo projeto para validar o outline e a
+  cardinalidade completos dos documentos, além da prosa e dos blocos legais
+  auditados. Separadores inválidos, tabelas cercadas ou extras, HTML bruto,
+  headings duplicados ou confusáveis, campos fora da gramática, prosa
+  contraditória e licenças duplicadas ou sem cerca agora falham de modo
+  explícito. No Admin Motor, cada seção contém somente a lista canônica e um
+  bloco `text` equivalente ao aviso da versão instalada.
+
 - **Fallback do token dedicado de armazenamento.** O ambiente bruto do
   `admin-motor` tipa `CLOUDFLARE_STORAGE` como `SecretsStoreSecret`, lê o valor
   pela chamada assíncrona `get()` e, se a leitura do binding opcional falhar,

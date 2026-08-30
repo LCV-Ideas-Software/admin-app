@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 import { Window } from 'happy-dom';
 import { transform } from 'lightningcss';
+import { marked } from 'marked';
 
 const ROOT_INVENTORY = 'THIRDPARTY.md';
 const ROOT_NOTICE = 'NOTICE';
@@ -19,6 +20,7 @@ const ADMIN_WORKER_OUTDIR = 'admin-motor/dist/legal-audit';
 const ADMIN_WORKER_METAFILE = `${ADMIN_WORKER_OUTDIR}/bundle-meta.json`;
 const ADMIN_WORKER_NOTICE_SOURCE = 'admin-motor/src/legal/THIRDPARTY.md';
 const ADMIN_WORKER_NOTICE_ARTIFACT = `${ADMIN_WORKER_OUTDIR}/legal/THIRDPARTY.md`;
+const ADMIN_WORKER_TITLE = '# Avisos de componentes de terceiros — Admin Motor';
 const ADMIN_WORKER_INVENTORY_HEADER = Object.freeze([
   'Componente',
   'Versão',
@@ -34,6 +36,10 @@ const LAUNDER_AUDITED_ARTIFACT = Object.freeze({
   packageJsonSha256: 'b111ad703bae61d8cef17863c38f4618e813b24284a874d0b81db1b5cfbdf601',
   upstreamCommit: 'e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3',
 });
+const LAUNDER_DISCLOSURE =
+  'O pacote npm e a tag upstream `launder@1.7.1` declaram `MIT`, mas o pacote/tarball dessa versão não traz arquivo `LICENSE`. Por isso, os termos canônicos da MIT são reproduzidos abaixo sem inventar titular, ano ou aviso de copyright ausente no upstream.';
+const MARKED_DISCLOSURE =
+  'O `LICENSE` de Marked contém tanto os termos MIT de Marked quanto o aviso BSD-3-Clause integral do componente Markdown incorporado; ambos seguem reproduzidos sem redução.';
 const ROOT_HTML = 'index.html';
 const JSZIP_BROWSER_DISTRIBUTION = 'node_modules/jszip/dist/jszip.min.js';
 const JSZIP_BROWSER_DISTRIBUTION_SHA256 = 'ACC7E41455A80765B5FD9C7EE1B8078A6D160BBBCA455AEAE854DE65C947D59E';
@@ -261,6 +267,83 @@ export const REQUIRED_STATIC_NOTICE_SECTIONS = Object.freeze([
   }),
 ]);
 
+const ROOT_DOCUMENT_SCHEMA = (() => {
+  const paragraphDigests = Object.freeze([
+    '9bab20a62df1c95df7c4f41826b2043f57d13086b6fcb7dab7f7649dd57454a6',
+    '6368032d6cd1fb14fe34fb4303e56e053ccd824b296f84be0bd56c7d53e6d48e',
+    'f9217459944bc8d30a7083bbfe7ebfc051ea7e51429ea5f8642912ea6767ac93',
+    'f7ebc7c3f34069daf29f96bd17b27f0dda176a756ebc29258094b232ecea96d2',
+    'a287ef08363a2f9aa3e339cc54d4b02c97439f9cdb53e28d51daffd8f753eed5',
+    '2bd045c34c582095d72e33a3184ae3fa04aa13509b23d8161a36293abe6d468d',
+    '8aa9b4d5a20a0091628c62615c6dedf028cea06c539b1c397b140fb49771089c',
+    '6681f9df11fce09360a300b0d5b789ffdfbc9e476e8c051986f426fa421827d2',
+    '608e94a2b431b884dee76f739b85d4eaf3524cd74e20d00d316b0bafb575315e',
+    'e348e036ff14139783bd38220796591680b3db555e0c79f42ce23d91c9668fdd',
+    '44abe5998af13e517b197c592319e87e5ca4056947fe1886e56771d5058bcb09',
+    'e56a8cc6060745bdc403b9a66aa93983327e523612623698f3de6a36b8a158c3',
+  ]);
+  const codeBlockDigests = Object.freeze([
+    '8a3c2abaecf6a5d4af7b06f564727babf141aa3b1708ad399d2e9cffeb9c4692',
+    'e824161e0aab3814aca1883bd7058e67034d25fce254e6629495e78d3f8a53c3',
+    'f2c7bd8d9e43896c730ad9e095cc9b861c5aa8741119fb7237666ef03c21b608',
+    'ededb65e4fd8561af59d0ec209a3dd4012a458e8364e532ce320181757c9f4b6',
+    'dc0711f67148ef151102483996a3caa360c0aef631ba2562afed140ab9742daf',
+    'ceedc02ca6ecc228bec601367e8d3905331c33cd74f7131d4d45ad2562d23bb4',
+    'ac22553a5f529c8bca6305b6f445de70b384d922dc0560a6ad86c662bb9cad3e',
+    'f57e3a2cabf2b43ab2fc942a8e9f4b38366ab0d1f859c6439b1fb69e80d9af73',
+    'f4bb8f655fdb4d119878a0eea6dfcb871da509d83baa7426794f7c70b9bb9d46',
+    '5d72d08481a4760883a0242accc9cd076c78775e1735ccfdec443b3eae80d288',
+    '4cc9c2af4eb0056cd4d2297b7404819e3816b4c44b7f8012c42d5fd671d783d3',
+    '7f7a686a9e08517613587583611772c18a60ca99dabfabd96641d9ac210d0c7d',
+  ]);
+  const staticTableDigests = Object.freeze([
+    '811c781139c97acd137093850a7817293769002be642fc03823c1062df88b7ca',
+    '0cbd8ef384944e9223fdcf1acb98df4412c2fd6cbc6e322854bfa86201f5c1df',
+  ]);
+  const paragraph = (index) => ({ type: 'paragraph', digest: paragraphDigests[index] });
+  const code = (index) => ({ type: 'code', digest: codeBlockDigests[index] });
+  const sections = Object.freeze([
+    { heading: '# Inventário de componentes de terceiros', tokens: [paragraph(0), paragraph(1)] },
+    { heading: MANIFESTS[0].heading, tokens: [{ type: 'table' }] },
+    { heading: MANIFESTS[1].heading, tokens: [{ type: 'table' }] },
+    {
+      heading: '## Componente incorporado ao Worker TLS-RPT',
+      tokens: [paragraph(2), { type: 'table', digest: staticTableDigests[0] }],
+    },
+    { heading: '### base64ArrayBuffer — MIT', tokens: [code(0)] },
+    {
+      heading: '## Complementos para componentes incorporados ao bundle',
+      tokens: [paragraph(3), { type: 'table', digest: staticTableDigests[1] }],
+    },
+    { heading: '### Assets do scaffold create-vite 8.0.0 — MIT', tokens: [paragraph(4), code(1)] },
+    { heading: '### JSZip 3.10.1 — MIT', tokens: [paragraph(5)] },
+    { heading: '### Pako 1.0.5 — MIT e Zlib', tokens: [paragraph(6), code(2)] },
+    { heading: '### Spark MD5 3.0.2 — MIT', tokens: [paragraph(7), code(3)] },
+    { heading: '### dingbat-to-unicode 1.0.1 — BSD-2-Clause', tokens: [paragraph(8), code(4)] },
+    { heading: '### react-remove-scroll-bar 2.3.8 — MIT', tokens: [paragraph(9), code(5)] },
+    { heading: '## Cartografia local e dados Natural Earth', tokens: [paragraph(10), paragraph(11)] },
+    { heading: '## Avisos de licenças da cartografia', tokens: [] },
+    { heading: '### d3-geo 3.1.1 — ISC e GeographicLib — MIT', tokens: [code(6)] },
+    { heading: '### d3-array 3.2.4 — ISC', tokens: [code(7)] },
+    { heading: '### internmap 2.0.3 — ISC', tokens: [code(8)] },
+    { heading: '### topojson-client 3.1.0 — ISC', tokens: [code(9)] },
+    { heading: '### commander 2.20.3 — MIT', tokens: [code(10)] },
+    { heading: '### world-atlas 2.0.2 — ISC', tokens: [code(11)] },
+  ]);
+  return Object.freeze({
+    title: sections[0].heading,
+    headings: Object.freeze(sections.slice(1).map(({ heading }) => heading)),
+    paragraphCount: paragraphDigests.length,
+    tableCount: MANIFESTS.length + staticTableDigests.length,
+    codeBlockCount: codeBlockDigests.length,
+    dynamicTableCount: MANIFESTS.length,
+    paragraphDigests,
+    codeBlockDigests,
+    staticTableDigests,
+    sections,
+  });
+})();
+
 export const REQUIRED_BUNDLED_LICENSE_MARKERS = Object.freeze([
   '## jszip - 3.10.1 ((MIT OR GPL-3.0-or-later))',
   '## dingbat-to-unicode - 1.0.1 (BSD-2-Clause)',
@@ -361,8 +444,58 @@ function normalizeCell(value) {
   return value.trim().replace(/^`|`$/gu, '');
 }
 
+const INVISIBLE_CONTROL_PATTERN =
+  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u;
+
+function assertNoInvisibleControls(value, label = 'visible legal evidence') {
+  assert.equal(
+    INVISIBLE_CONTROL_PATTERN.test(value),
+    false,
+    `${label} must not contain invisible Unicode control characters`,
+  );
+}
+
 function normalizeNotice(value) {
-  return value.replace(/\s+/gu, ' ').trim();
+  return value.normalize('NFC').replace(/\s+/gu, ' ').trim();
+}
+
+function normalizeLegalText(value) {
+  return value.replace(/\r\n/gu, '\n').replace(/\n+$/u, '');
+}
+
+function normalizeEmbeddedLegalText(value) {
+  return normalizeLegalText(value)
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n');
+}
+
+function normalizedSha256(value, normalizer) {
+  return createHash('sha256').update(normalizer(value)).digest('hex');
+}
+
+function markdownTableDigest(table) {
+  const rows = [table.header, ...table.rows].map((row) =>
+    row.map((cell) => normalizeNotice(cell.text)),
+  );
+  return createHash('sha256').update(JSON.stringify(rows)).digest('hex');
+}
+
+function structuralTokenDigest(token) {
+  if (token.type === 'paragraph') return normalizedSha256(token.text, normalizeNotice);
+  if (token.type === 'code') return normalizedSha256(token.text, normalizeLegalText);
+  if (token.type === 'table') return markdownTableDigest(token);
+  return undefined;
+}
+
+function normalizeStructuralIdentifier(value) {
+  return value
+    .replace(/\p{Default_Ignorable_Code_Point}+/gu, '')
+    .normalize('NFKC')
+    .replace(/\s+/gu, ' ')
+    .replace(/\s*:\s*/gu, ':')
+    .toLowerCase()
+    .trim();
 }
 
 function assertContainsNotice(content, notice, label) {
@@ -372,117 +505,530 @@ function assertContainsNotice(content, notice, label) {
   );
 }
 
-function markdownStructuralLineRecords(markdown) {
-  const lines = markdown.split(/\r?\n/u);
-  const records = [];
-  let fence;
-  for (const [index, line] of lines.entries()) {
-    if (fence) {
-      const closing = /^ {0,3}(`+|~+)\s*$/u.exec(line);
-      if (
-        closing &&
-        closing[1][0] === fence.marker &&
-        closing[1].length >= fence.minimumLength
-      ) {
-        fence = undefined;
-      }
-      continue;
-    }
-
-    const opening = /^ {0,3}(`{3,}|~{3,})/u.exec(line);
-    if (opening) {
-      fence = { marker: opening[1][0], minimumLength: opening[1].length };
-      continue;
-    }
-
-    records.push({ index, line });
+function markdownTokenChildren(token) {
+  if (token.type === 'list') return token.items.flatMap((item) => item.tokens ?? []);
+  if (token.type === 'table') {
+    return [...token.header, ...token.rows.flat()].flatMap((cell) => cell.tokens ?? []);
   }
-  return { lines, records };
+  return Array.isArray(token.tokens) ? token.tokens : [];
+}
+
+function markdownTokensMatching(tokens, predicate) {
+  const matches = [];
+  for (const token of tokens) {
+    if (predicate(token)) matches.push(token);
+    matches.push(...markdownTokensMatching(markdownTokenChildren(token), predicate));
+  }
+  return matches;
+}
+
+function renderedMarkdownText(markdown) {
+  return withRenderedMarkdown(markdown, (document) => document.body.textContent ?? '');
+}
+
+function assertContainsMarkdownNotice(markdown, notice, label) {
+  assertContainsNotice(renderedMarkdownText(markdown), notice, label);
+}
+
+function assertContainsRenderedMarkdown(markdown, expectedMarkdown, label) {
+  const actualText = renderedMarkdownText(markdown);
+  const expectedText = expectedMarkdown.replace(/`([^`\r\n]+)`/gu, '$1');
+  assertContainsNotice(actualText, expectedText, label);
+}
+
+function assertVisibleMarkdownEvidence(markdown, label) {
+  assertNoInvisibleControls(markdown, `${label} visible legal evidence`);
+  assert.equal(
+    /\p{Bidi_Control}/u.test(markdown),
+    false,
+    `${label} visible legal evidence must not contain Unicode bidirectional controls`,
+  );
+  assert.equal(
+    markdownTokensMatching(marked.lexer(markdown, { gfm: true }), (token) => token.type === 'html')
+      .length,
+    0,
+    `${label} must not contain raw HTML; visible structural inventory and legal evidence must remain auditable`,
+  );
+  const rendered = withRenderedMarkdown(markdown, (document) => ({
+    deletedElementCount: document.querySelectorAll('del').length,
+    text: document.body.textContent ?? '',
+  }));
+  assert.equal(
+    /\p{Bidi_Control}/u.test(rendered.text),
+    false,
+    `${label} visible legal evidence must not contain encoded Unicode bidirectional controls`,
+  );
+  assertNoInvisibleControls(rendered.text, `${label} rendered visible legal evidence`);
+  assert.equal(
+    rendered.deletedElementCount,
+    0,
+    `${label} visible legal evidence must not contain struck-through Markdown`,
+  );
+}
+
+const markdownWindow = new Window({
+  url: 'https://legal.local.invalid/',
+  settings: {
+    disableCSSFileLoading: true,
+    disableIframePageLoading: true,
+    disableJavaScriptEvaluation: true,
+    disableJavaScriptFileLoading: true,
+  },
+});
+
+function withRenderedMarkdown(markdown, callback) {
+  const html = marked.parse(markdown, { gfm: true });
+  assert.equal(typeof html, 'string', 'GFM rendering must be synchronous');
+  const document = markdownWindow.document;
+  try {
+    document.body.innerHTML = html;
+    return callback(document);
+  } finally {
+    document.body.replaceChildren();
+  }
+}
+
+function renderedListItemRecords(markdown) {
+  return withRenderedMarkdown(markdown, (document) =>
+    [...document.querySelectorAll('li')].map((item) => ({
+      html: item.innerHTML,
+      topLevel:
+        (item.parentElement?.tagName === 'UL' || item.parentElement?.tagName === 'OL') &&
+        item.parentElement?.parentElement === document.body,
+    })),
+  );
+}
+
+function renderedExpectedListItem(expectedLine, label) {
+  const records = renderedListItemRecords(expectedLine);
+  assert.equal(records.length, 1, `${label} expected list item is invalid: ${expectedLine}`);
+  assert.equal(records[0].topLevel, true, `${label} expected list item must be top-level`);
+  return records[0].html;
 }
 
 function assertExactMarkdownLine(content, expectedLine, label) {
-  const occurrences = markdownStructuralLineRecords(content).records.filter(
-    ({ line }) => line === expectedLine,
+  const expectedHtml = renderedExpectedListItem(expectedLine, label);
+  const occurrences = renderedListItemRecords(content).filter(
+    ({ html, topLevel }) => topLevel && html === expectedHtml,
   ).length;
-  assert.equal(occurrences, 1, `${label} must contain exactly once: ${expectedLine}`);
-}
-
-function markdownFieldLines(content, field) {
-  const marker = `**${field}:**`;
-  return markdownStructuralLineRecords(content).records
-    .map(({ line }) => line)
-    .filter((line) => line.includes(marker));
+  assert.equal(
+    occurrences,
+    1,
+    `${label} must contain exactly one structural visible list item: ${expectedLine}`,
+  );
 }
 
 function assertExactMarkdownField(content, field, expectedLine, label) {
-  assert.deepEqual(
-    markdownFieldLines(content, field),
-    [expectedLine],
-    `${label} must contain exactly one structural ${field} field with the exact audited value`,
+  assertExactMarkdownLine(content, expectedLine, `${label} ${field} field`);
+}
+
+function adminWorkerPreamble(packageCount) {
+  return [
+    `Este arquivo acompanha o Worker \`admin-motor\` como módulo adicional do tipo \`Text\`. O inventário cobre exatamente os ${packageCount} pacotes npm com código efetivamente incorporado ao bundle Wrangler informado para este artefato. Pacotes de desenvolvimento, ferramentas externas e entradas desabilitadas de zero byte não pertencem a este escopo.`,
+    'Versão, licença declarada, URL `resolved` e SRI `integrity` foram conferidos na entrada `packages` de `package-lock.json`; o texto de cada aviso foi reproduzido integralmente do pacote da mesma versão instalado em `node_modules`. O caminho e o SHA-256 de cada fonte permitem verificar o texto sem confundi-lo com outra versão homônima.',
+  ];
+}
+
+function expectedAdminSectionProse(packageName) {
+  if (packageName === 'launder') return [LAUNDER_DISCLOSURE];
+  if (packageName === 'marked') return [MARKED_DISCLOSURE];
+  return [];
+}
+
+function assertAdminSectionStructure(
+  markdown,
+  expectedMetadataItems,
+  expectedProse,
+  expectedLegalText,
+  label,
+) {
+  const tokens = marked.lexer(markdown, { gfm: true });
+  const topLevelLists = tokens.filter((token) => token.type === 'list');
+  const allLists = markdownTokensMatching(tokens, (token) => token.type === 'list');
+  assert.equal(topLevelLists.length, 1, `${label} must contain exactly one top-level metadata list`);
+  assert.equal(allLists.length, 1, `${label} must not contain nested or additional metadata lists`);
+  assert.equal(topLevelLists[0].ordered, false, `${label} metadata must use one unordered list`);
+  assert.equal(
+    topLevelLists[0].items.length,
+    expectedMetadataItems,
+    `${label} metadata list must contain exactly ${expectedMetadataItems} canonical list items`,
   );
+
+  const structuralTokens = tokens.filter((token) => token.type !== 'space');
+  const expectedTypes = [
+    'list',
+    ...expectedProse.map(() => 'paragraph'),
+    'code',
+  ];
+  assert.deepEqual(
+    structuralTokens.map((token) => token.type),
+    expectedTypes,
+    `${label} must be one closed section: metadata, canonical prose when required, and one fenced legal-text block`,
+  );
+
+  const actualProse = structuralTokens
+    .filter((token) => token.type === 'paragraph')
+    .map((token) => normalizeNotice(token.text));
+  assert.deepEqual(
+    actualProse,
+    expectedProse.map(normalizeNotice),
+    `${label} must contain exactly its canonical prose`,
+  );
+
+  const codeBlocks = structuralTokens.filter((token) => token.type === 'code');
+  assert.equal(codeBlocks.length, 1, `${label} must contain exactly one fenced legal-text block`);
+  assert.equal(codeBlocks[0].lang, 'text', `${label} legal-text block must use the text info string`);
+  assert.equal(
+    normalizeEmbeddedLegalText(codeBlocks[0].text),
+    normalizeEmbeddedLegalText(expectedLegalText),
+    `${label} fenced legal text must equal its exact audited source after line-ending and trailing-whitespace normalization`,
+  );
+}
+
+function parseExpectedHeading(heading, label) {
+  const match = /^(#+)\s+(.+)$/u.exec(heading);
+  assert.ok(match, `${label} expected heading is invalid: ${heading}`);
+  return { depth: match[1].length, text: match[2].trim() };
 }
 
 function markdownHeadingRecords(markdown) {
-  const { lines, records } = markdownStructuralLineRecords(markdown);
-  const headings = [];
-  for (const { index, line } of records) {
-    const match = /^( {0,3})(#+)\s/u.exec(line);
-    if (match) {
-      headings.push({
-        heading: line.slice(match[1].length).trim(),
-        index,
-        level: match[2].length,
-      });
+  const tokens = marked.lexer(markdown, { gfm: true });
+  const headings = tokens
+    .map((token, index) => ({ token, index }))
+    .filter(({ token }) => token.type === 'heading')
+    .map(({ token, index }) => ({
+      heading: `${'#'.repeat(token.depth)} ${token.text.trim()}`,
+      index,
+      level: token.depth,
+    }));
+  return { headings, tokens };
+}
+
+function assertClosedMarkdownDocument(markdown, schema, label) {
+  const tokens = marked.lexer(markdown, { gfm: true });
+  const allowedTypes = new Set(['heading', 'space', 'paragraph', 'table', 'code']);
+  const unexpectedTypes = [
+    ...new Set(tokens.filter((token) => !allowedTypes.has(token.type)).map((token) => token.type)),
+  ];
+  assert.deepEqual(
+    unexpectedTypes,
+    [],
+    `${label} closed document contains unexpected top-level Markdown structures`,
+  );
+
+  const headings = tokens
+    .filter((token) => token.type === 'heading')
+    .map((token) => `${'#'.repeat(token.depth)} ${token.text.trim()}`);
+  assert.deepEqual(
+    headings,
+    [schema.title, ...schema.headings],
+    `${label} closed document heading outline must remain exact and canonical`,
+  );
+
+  const paragraphs = tokens.filter((token) => token.type === 'paragraph');
+  const tables = tokens.filter((token) => token.type === 'table');
+  const codeBlocks = tokens.filter((token) => token.type === 'code');
+  assert.equal(
+    paragraphs.length,
+    schema.paragraphCount,
+    `${label} closed document paragraph count changed`,
+  );
+  assert.equal(
+    tables.length,
+    schema.tableCount,
+    `${label} closed document must contain exactly ${schema.tableCount} visible Markdown tables`,
+  );
+  assert.equal(
+    codeBlocks.length,
+    schema.codeBlockCount,
+    `${label} closed document legal-text block count changed`,
+  );
+  assert.equal(
+    codeBlocks.every((token) => token.lang === 'text'),
+    true,
+    `${label} closed document legal-text blocks must use the text info string`,
+  );
+
+  if (schema.paragraphDigests) {
+    assert.deepEqual(
+      paragraphs.map((token) => normalizedSha256(token.text, normalizeNotice)),
+      schema.paragraphDigests,
+      `${label} closed document explanatory legal prose changed`,
+    );
+  }
+  if (schema.codeBlockDigests) {
+    assert.deepEqual(
+      codeBlocks.map((token) => normalizedSha256(token.text, normalizeLegalText)),
+      schema.codeBlockDigests,
+      `${label} closed document audited legal text changed`,
+    );
+  }
+  if (schema.staticTableDigests) {
+    assert.deepEqual(
+      tables.slice(schema.dynamicTableCount ?? 0).map(markdownTableDigest),
+      schema.staticTableDigests,
+      `${label} closed document static legal tables changed`,
+    );
+  }
+  if (schema.sections) {
+    const actualSections = [];
+    for (const token of tokens) {
+      if (token.type === 'heading') {
+        actualSections.push({
+          heading: `${'#'.repeat(token.depth)} ${token.text.trim()}`,
+          tokens: [],
+        });
+      } else if (token.type !== 'space') {
+        assert.ok(actualSections.length > 0, `${label} content appears before its canonical title`);
+        actualSections.at(-1).tokens.push({
+          type: token.type,
+          digest: structuralTokenDigest(token),
+        });
+      }
+    }
+
+    assert.equal(
+      actualSections.length,
+      schema.sections.length,
+      `${label} closed document section count changed`,
+    );
+    for (const [index, expectedSection] of schema.sections.entries()) {
+      const actualSection = actualSections[index];
+      assert.equal(
+        actualSection.heading,
+        expectedSection.heading,
+        `${label} closed document section order changed`,
+      );
+      assert.deepEqual(
+        actualSection.tokens.map(({ type }) => type),
+        expectedSection.tokens.map(({ type }) => type),
+        `${label} ${expectedSection.heading} section content types changed`,
+      );
+      for (const [tokenIndex, expectedToken] of expectedSection.tokens.entries()) {
+        if (!expectedToken.digest) continue;
+        assert.equal(
+          actualSection.tokens[tokenIndex].digest,
+          expectedToken.digest,
+          `${label} ${expectedSection.heading} section content changed or was assigned to another section`,
+        );
+      }
     }
   }
-  return { headings, lines };
+}
+
+function assertAdminDocumentStructure(markdown, expectedSectionHeadings, packageCount) {
+  const tokens = marked.lexer(markdown, { gfm: true });
+  const allowedTypes = new Set(['heading', 'space', 'paragraph', 'table', 'list', 'code']);
+  const unexpectedTypes = [
+    ...new Set(tokens.filter((token) => !allowedTypes.has(token.type)).map((token) => token.type)),
+  ];
+  assert.deepEqual(
+    unexpectedTypes,
+    [],
+    `${ADMIN_WORKER_NOTICE_SOURCE} closed document contains unexpected top-level Markdown structures`,
+  );
+
+  const headings = tokens
+    .filter((token) => token.type === 'heading')
+    .map((token) => `${'#'.repeat(token.depth)} ${token.text.trim()}`);
+  assert.deepEqual(
+    headings,
+    [ADMIN_WORKER_TITLE, '## Inventário efetivo', ...expectedSectionHeadings],
+    `${ADMIN_WORKER_NOTICE_SOURCE} heading outline and canonical title must remain exact`,
+  );
+
+  const inventoryHeadingIndex = tokens.findIndex(
+    (token) => token.type === 'heading' && token.depth === 2 && token.text === 'Inventário efetivo',
+  );
+  assert.notEqual(inventoryHeadingIndex, -1, `${ADMIN_WORKER_NOTICE_SOURCE} lacks its canonical inventory heading`);
+  const preamble = tokens.slice(1, inventoryHeadingIndex).filter((token) => token.type !== 'space');
+  assert.deepEqual(
+    preamble.map((token) => token.type),
+    ['paragraph', 'paragraph'],
+    `${ADMIN_WORKER_NOTICE_SOURCE} must contain only its two canonical preamble paragraphs before the inventory`,
+  );
+  assert.deepEqual(
+    preamble.map((token) => normalizeNotice(token.text)),
+    adminWorkerPreamble(packageCount).map((paragraph) => normalizeNotice(paragraph)),
+    `${ADMIN_WORKER_NOTICE_SOURCE} canonical preamble changed`,
+  );
+
+  const inventoryTokens = markdownSectionTokens(
+    markdown,
+    '## Inventário efetivo',
+    ADMIN_WORKER_NOTICE_SOURCE,
+  ).filter((token) => token.type !== 'space');
+  assert.deepEqual(
+    inventoryTokens.map((token) => token.type),
+    ['table'],
+    `${ADMIN_WORKER_NOTICE_SOURCE} effective inventory section must contain only its canonical table`,
+  );
+
+  assert.equal(
+    tokens.filter((token) => token.type === 'table').length,
+    1,
+    `${ADMIN_WORKER_NOTICE_SOURCE} closed document must contain exactly one table`,
+  );
+  assert.equal(
+    tokens.filter((token) => token.type === 'list').length,
+    expectedSectionHeadings.length,
+    `${ADMIN_WORKER_NOTICE_SOURCE} closed document must contain exactly one metadata list per package section`,
+  );
+  assert.equal(
+    tokens.filter((token) => token.type === 'code').length,
+    expectedSectionHeadings.length,
+    `${ADMIN_WORKER_NOTICE_SOURCE} closed document must contain exactly one legal-text block per package section`,
+  );
+  assert.equal(
+    tokens.filter((token) => token.type === 'paragraph').length,
+    2 + expectedSectionHeadings.filter((heading) => /^(?:## launder |## marked )/u.test(heading)).length,
+    `${ADMIN_WORKER_NOTICE_SOURCE} closed document contains noncanonical package prose`,
+  );
+}
+
+function renderedSectionInspection(markdown, heading, label, selector) {
+  const expected = parseExpectedHeading(heading, label);
+  return withRenderedMarkdown(markdown, (document) => {
+    const matches = [...document.querySelectorAll(`h${expected.depth}`)].filter(
+      (element) =>
+        normalizeStructuralIdentifier(element.textContent ?? '') ===
+        normalizeStructuralIdentifier(expected.text),
+    );
+    assert.equal(matches.length, 1, `${label} must contain exactly one semantic ${heading} section`);
+    const [sectionHeading] = matches;
+    assert.equal(
+      normalizeNotice(sectionHeading.textContent ?? ''),
+      normalizeNotice(expected.text),
+      `${label} ${heading} section must use the exact canonical rendered identifier`,
+    );
+    assert.equal(
+      sectionHeading.parentElement,
+      document.body,
+      `${label} ${heading} section must be top-level rendered GFM`,
+    );
+
+    const elements = [];
+    for (let sibling = sectionHeading.nextElementSibling; sibling; sibling = sibling.nextElementSibling) {
+      const headingMatch = /^H([1-6])$/u.exec(sibling.tagName);
+      if (headingMatch && Number(headingMatch[1]) <= expected.depth) break;
+      if (selector) {
+        if (sibling.matches(selector)) elements.push(sibling);
+        elements.push(...sibling.querySelectorAll(selector));
+      }
+    }
+    return {
+      elementCount: elements.length,
+      allElementsTopLevel: elements.every((element) => element.parentElement === document.body),
+    };
+  });
+}
+
+function renderedHeadingRecords(markdown, depth) {
+  return withRenderedMarkdown(markdown, (document) =>
+    [...document.querySelectorAll(`h${depth}`)].map((heading) => ({
+      heading: `${'#'.repeat(depth)} ${normalizeNotice(heading.textContent ?? '')}`,
+      topLevel: heading.parentElement === document.body,
+    })),
+  );
+}
+
+function assertSingleTopLevelSectionElement(markdown, heading, label, selector, elementLabel) {
+  const inspection = renderedSectionInspection(markdown, heading, label, selector);
+  assert.equal(
+    inspection.elementCount,
+    1,
+    `${heading} must contain exactly one visible Markdown ${elementLabel}`,
+  );
+  assert.equal(
+    inspection.allElementsTopLevel,
+    true,
+    `${heading} ${elementLabel} must be top-level rendered GFM`,
+  );
+}
+
+function renderedTableCountWithHeader(markdown, expectedHeader) {
+  return withRenderedMarkdown(markdown, (document) =>
+    [...document.querySelectorAll('table')].filter((table) => {
+      const firstRow = table.querySelector('thead tr') ?? table.querySelector('tr');
+      if (!firstRow) return false;
+      const header = [...firstRow.children].map((cell) =>
+        normalizeStructuralIdentifier(cell.textContent ?? ''),
+      );
+      return header.length === expectedHeader.length &&
+        header.every(
+          (cell, index) => cell === normalizeStructuralIdentifier(expectedHeader[index]),
+        );
+    }).length,
+  );
+}
+
+function renderedTableCountWithColumnCount(markdown, expectedColumnCount) {
+  return withRenderedMarkdown(markdown, (document) =>
+    [...document.querySelectorAll('table')].filter((table) => {
+      const firstRow = table.querySelector('thead tr') ?? table.querySelector('tr');
+      return firstRow?.children.length === expectedColumnCount;
+    }).length,
+  );
+}
+
+function renderedTableCount(markdown) {
+  return withRenderedMarkdown(markdown, (document) => document.querySelectorAll('table').length);
+}
+
+function markdownSectionTokens(markdown, heading, label) {
+  renderedSectionInspection(markdown, heading, label);
+  const { tokens } = markdownHeadingRecords(markdown);
+  const expected = parseExpectedHeading(heading, label);
+  const matches = tokens
+    .map((token, index) => ({ token, index }))
+    .filter(
+      ({ token }) =>
+        token.type === 'heading' && token.depth === expected.depth && token.text.trim() === expected.text,
+    );
+  assert.equal(matches.length, 1, `${label} must contain exactly one ${heading} section`);
+  const end = tokens.findIndex(
+    (token, index) =>
+      index > matches[0].index && token.type === 'heading' && token.depth <= expected.depth,
+  );
+  const sectionTokens = tokens.slice(matches[0].index + 1, end === -1 ? undefined : end);
+  assert.equal(
+    markdownTokensMatching(sectionTokens, (token) => token.type === 'html').length,
+    0,
+    `${label} ${heading} section must not contain raw HTML`,
+  );
+  return sectionTokens;
 }
 
 function markdownSection(markdown, heading, label) {
-  const { headings, lines } = markdownHeadingRecords(markdown);
-  const matches = headings.filter((record) => record.heading === heading);
-  assert.equal(matches.length, 1, `${label} must contain exactly one ${heading} section`);
-  const end = headings.find(
-    (record) => record.index > matches[0].index && record.level <= matches[0].level,
-  );
-  return lines.slice(matches[0].index + 1, end?.index).join('\n');
+  return markdownSectionTokens(markdown, heading, label)
+    .map((token) => token.raw)
+    .join('');
 }
 
 function assertNoticeSections(markdown, sections, label) {
   for (const section of sections) {
     const body = markdownSection(markdown, section.heading, label);
     for (const notice of section.notices) {
-      assertContainsNotice(body, notice, `${label} section ${section.heading}`);
+      assertContainsMarkdownNotice(body, notice, `${label} section ${section.heading}`);
     }
   }
 }
 
 function parseTable(markdown, heading) {
-  const lines = markdown.split(/\r?\n/u);
-  const headingIndex = lines.indexOf(heading);
-  assert.notEqual(headingIndex, -1, `${heading} is missing from THIRDPARTY`);
-
-  const headerIndex = lines.findIndex(
-    (line, index) =>
-      index > headingIndex && line.startsWith('|') && normalizeCell(line.split('|')[1] ?? '') === 'Escopo',
+  assertSingleTopLevelSectionElement(markdown, heading, 'THIRDPARTY', 'table', 'inventory table');
+  const tables = markdownSectionTokens(markdown, heading, 'THIRDPARTY').filter(
+    (token) => token.type === 'table',
   );
-  assert.notEqual(headerIndex, -1, `${heading} inventory table is missing`);
+  assert.equal(tables.length, 1, `${heading} must contain exactly one visible Markdown inventory table`);
+  const [table] = tables;
 
-  const nextHeadingIndex = lines.findIndex((line, index) => index > headingIndex && line.startsWith('## '));
-  assert.ok(
-    nextHeadingIndex === -1 || headerIndex < nextHeadingIndex,
-    `${heading} inventory table is outside its section`,
-  );
-
-  const header = lines[headerIndex].split('|').slice(1, -1).map(normalizeCell);
+  const header = table.header.map((cell) => normalizeCell(cell.text));
   assert.deepEqual(header, TABLE_HEADER, `${heading} inventory header changed`);
 
-  const records = [];
-  for (const line of lines.slice(headerIndex + 2)) {
-    if (!line.startsWith('|')) break;
-    const cells = line.split('|').slice(1, -1).map(normalizeCell);
-    assert.equal(cells.length, TABLE_HEADER.length, `invalid THIRDPARTY row: ${line}`);
-    records.push({
+  return table.rows.map((row) => {
+    const cells = row.map((cell) => normalizeCell(cell.text));
+    assert.equal(cells.length, TABLE_HEADER.length, `invalid THIRDPARTY row: ${table.raw}`);
+    return {
       scope: cells[0],
       name: cells[1],
       declaredVersion: cells[2],
@@ -491,12 +1037,28 @@ function parseTable(markdown, heading) {
       election: cells[5],
       integrity: cells[6],
       origin: cells[7],
-    });
-  }
-  return records;
+    };
+  });
 }
 
 function parseAdminWorkerInventory(markdown) {
+  assert.equal(
+    renderedTableCount(markdown),
+    1,
+    `${ADMIN_WORKER_NOTICE_SOURCE} must contain exactly one visible Markdown table`,
+  );
+  assert.equal(
+    renderedTableCountWithHeader(markdown, ADMIN_WORKER_INVENTORY_HEADER),
+    1,
+    `${ADMIN_WORKER_NOTICE_SOURCE} Inventário efetivo must contain exactly one visible contiguous table; separator is invalid when no such GFM table exists`,
+  );
+  assertSingleTopLevelSectionElement(
+    markdown,
+    '## Inventário efetivo',
+    ADMIN_WORKER_NOTICE_SOURCE,
+    'table',
+    'effective inventory table',
+  );
   const section = markdownSection(markdown, '## Inventário efetivo', ADMIN_WORKER_NOTICE_SOURCE);
   const tableLines = section.split(/\r?\n/u);
   while (tableLines[0]?.trim() === '') tableLines.shift();
@@ -659,17 +1221,37 @@ export function verifyThirdPartyInventory({
   workerArtifacts,
   requiredStaticNoticeMarkers = [],
   requiredStaticNoticeSections = [],
+  rootDocumentSchema,
   requiredBundledLicenseMarkers = [],
   bundledLicenseSupplementHeadings = [],
   requiredWorkerNoticeMarkers = [],
 }) {
   assert.equal(publicInventory, rootInventory, `${ROOT_INVENTORY} and ${PUBLIC_INVENTORY} must be byte-identical`);
   assert.equal(rootNotice, publicNotice, `${ROOT_NOTICE} and ${PUBLIC_NOTICE} must be byte-identical`);
+  assertVisibleMarkdownEvidence(rootInventory, 'THIRDPARTY');
+  if (rootDocumentSchema) {
+    assertClosedMarkdownDocument(rootInventory, rootDocumentSchema, 'THIRDPARTY');
+  }
 
   for (const marker of requiredStaticNoticeMarkers) {
-    assertContainsNotice(rootInventory, marker, 'THIRDPARTY');
+    if (/^#{1,6}\s/u.test(marker)) {
+      renderedSectionInspection(rootInventory, marker, 'THIRDPARTY');
+    } else {
+      assertContainsRenderedMarkdown(rootInventory, marker, 'THIRDPARTY');
+    }
   }
   assertNoticeSections(rootInventory, requiredStaticNoticeSections, 'THIRDPARTY');
+
+  assert.equal(
+    renderedTableCountWithHeader(rootInventory, TABLE_HEADER),
+    manifests.length,
+    `THIRDPARTY must contain exactly one visible Markdown inventory table per manifest (${manifests.length} total)`,
+  );
+  assert.equal(
+    renderedTableCountWithColumnCount(rootInventory, TABLE_HEADER.length),
+    manifests.length,
+    `THIRDPARTY must contain exactly ${manifests.length} eight-column inventory tables`,
+  );
 
   for (const manifest of manifests) {
     const actual = parseTable(rootInventory, manifest.heading);
@@ -860,10 +1442,7 @@ export async function verifyAdminWorkerBundle({
     sourceNotice,
     `${ADMIN_WORKER_NOTICE_ARTIFACT} must be byte-identical to ${ADMIN_WORKER_NOTICE_SOURCE}`,
   );
-  assert.ok(
-    !['<!--', '-->', '--!>'].some((marker) => sourceNotice.includes(marker)),
-    `${ADMIN_WORKER_NOTICE_SOURCE} must not contain HTML comments because all legal evidence must render visibly`,
-  );
+  assertVisibleMarkdownEvidence(sourceNotice, ADMIN_WORKER_NOTICE_SOURCE);
 
   const entryOutputs = Object.entries(metafile.outputs ?? {}).filter(
     ([, output]) => output.entryPoint !== undefined,
@@ -918,8 +1497,36 @@ export async function verifyAdminWorkerBundle({
       ),
     ),
   ].sort();
-  const documentHeadings = markdownHeadingRecords(sourceNotice).headings
-    .filter((record) => record.level === 2 && record.heading !== '## Inventário efetivo')
+  for (const { lockKey, packageName } of packages.values()) {
+    if (packageName !== 'launder') continue;
+    const lockEntry = packageLock.packages?.[lockKey];
+    assert.ok(lockEntry, `${lockKey} from the Admin Motor metafile is missing from package-lock.json`);
+    assert.deepEqual(
+      {
+        version: lockEntry.version,
+        license: lockEntry.license,
+        resolved: lockEntry.resolved,
+        integrity: lockEntry.integrity,
+      },
+      {
+        version: LAUNDER_AUDITED_ARTIFACT.version,
+        license: LAUNDER_AUDITED_ARTIFACT.license,
+        resolved: LAUNDER_AUDITED_ARTIFACT.resolved,
+        integrity: LAUNDER_AUDITED_ARTIFACT.integrity,
+      },
+      'launder must match the exact audited provenance; any drift requires a legal re-audit',
+    );
+  }
+  assertAdminDocumentStructure(sourceNotice, expectedSectionHeadings, packages.size);
+  const renderedPackageHeadings = renderedHeadingRecords(sourceNotice, 2).filter(
+    (record) => record.heading !== '## Inventário efetivo',
+  );
+  assert.equal(
+    renderedPackageHeadings.every((record) => record.topLevel),
+    true,
+    `${ADMIN_WORKER_NOTICE_SOURCE} dependency sections must all be top-level rendered GFM`,
+  );
+  const documentHeadings = renderedPackageHeadings
     .map((record) => record.heading)
     .sort();
   assert.deepEqual(
@@ -934,7 +1541,6 @@ export async function verifyAdminWorkerBundle({
     const lockEntry = packageLock.packages?.[lockKey];
     assert.ok(lockEntry, `${lockKey} from the Admin Motor metafile is missing from package-lock.json`);
     assertImmutableRegistryProvenance(`admin-motor:${lockKey}`, packageName, lockEntry);
-
     const sectionHeading = `## ${packageName} ${lockEntry.version} — ${lockEntry.license}`;
     const sectionBody = markdownSection(sourceNotice, sectionHeading, ADMIN_WORKER_NOTICE_SOURCE);
     const sectionPackageCount = expectedInventory.filter(
@@ -948,11 +1554,6 @@ export async function verifyAdminWorkerBundle({
       `- **Caminho no lockfile:** \`package-lock.json -> packages["${lockKey}"]\``,
       `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
     );
-    assert.equal(
-      markdownFieldLines(sectionBody, 'Caminho no lockfile').length,
-      sectionPackageCount,
-      `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version} must contain exactly one structural lockfile field per bundled artifact`,
-    );
     assertExactMarkdownField(
       sectionBody,
       'Resolved',
@@ -965,24 +1566,16 @@ export async function verifyAdminWorkerBundle({
       `- **Integrity:** \`${lockEntry.integrity}\``,
       `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
     );
+    assertExactMarkdownField(
+      sectionBody,
+      'Origem imutável/hash',
+      '- **Origem imutável/hash:** tarball npm versionado indicado em `Resolved`, autenticado pelo SRI SHA-512 indicado em `Integrity`.',
+      `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
+    );
 
     const upstreamNotice = await packageLicenseNotice(root, lockKey);
+    let expectedLegalText;
     if (packageName === 'launder') {
-      assert.deepEqual(
-        {
-          version: lockEntry.version,
-          license: lockEntry.license,
-          resolved: lockEntry.resolved,
-          integrity: lockEntry.integrity,
-        },
-        {
-          version: LAUNDER_AUDITED_ARTIFACT.version,
-          license: LAUNDER_AUDITED_ARTIFACT.license,
-          resolved: LAUNDER_AUDITED_ARTIFACT.resolved,
-          integrity: LAUNDER_AUDITED_ARTIFACT.integrity,
-        },
-        'launder must match the exact audited provenance; any drift requires a legal re-audit',
-      );
       assert.equal(
         upstreamNotice,
         undefined,
@@ -1011,21 +1604,25 @@ export async function verifyAdminWorkerBundle({
         `- **Origem upstream imutável:** tag anotada \`launder@1.7.1\`, commit \`${LAUNDER_AUDITED_ARTIFACT.upstreamCommit}\`, caminho \`packages/launder\` no repositório \`apostrophecms/apostrophe\`.`,
         'launder section',
       );
-      assertContainsNotice(sectionBody, LAUNDER_MIT_TERMS, 'launder section');
+      assertContainsMarkdownNotice(sectionBody, LAUNDER_MIT_TERMS, 'launder section');
+      expectedLegalText = `MIT License\n\n${LAUNDER_MIT_TERMS}`;
     } else {
       assert.ok(upstreamNotice, `${lockKey} must ship a legal notice file`);
-      assertContainsNotice(sectionBody, upstreamNotice.content, `${packageName} section`);
+      assertContainsMarkdownNotice(sectionBody, upstreamNotice.content, `${packageName} section`);
       assertExactMarkdownLine(
         sectionBody,
         `- **Fonte do aviso integral:** \`${lockKey}/${upstreamNotice.name}\` (\`SHA-256: ${upstreamNotice.sha256}\`).`,
         `${packageName} section`,
       );
-      assert.equal(
-        markdownFieldLines(sectionBody, 'Fonte do aviso integral').length,
-        sectionPackageCount,
-        `${packageName} section must contain exactly one structural legal-notice source field per bundled artifact`,
-      );
+      expectedLegalText = upstreamNotice.content;
     }
+    assertAdminSectionStructure(
+      sectionBody,
+      packageName === 'launder' ? sectionPackageCount + 5 : sectionPackageCount * 2 + 3,
+      expectedAdminSectionProse(packageName),
+      expectedLegalText,
+      `${ADMIN_WORKER_NOTICE_SOURCE} section ${packageName} ${lockEntry.version}`,
+    );
   }
 
   return {
@@ -1127,6 +1724,7 @@ async function main() {
     workerArtifacts,
     requiredStaticNoticeMarkers: REQUIRED_STATIC_NOTICE_MARKERS,
     requiredStaticNoticeSections: REQUIRED_STATIC_NOTICE_SECTIONS,
+    rootDocumentSchema: ROOT_DOCUMENT_SCHEMA,
     requiredBundledLicenseMarkers: REQUIRED_BUNDLED_LICENSE_MARKERS,
     bundledLicenseSupplementHeadings: BUNDLED_LICENSE_SUPPLEMENT_HEADINGS,
   });
