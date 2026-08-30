@@ -4,6 +4,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { Window } from 'happy-dom';
+
 const ROOT_INVENTORY = 'THIRDPARTY.md';
 const ROOT_NOTICE = 'NOTICE';
 const PUBLIC_INVENTORY = 'public/legal/THIRDPARTY.md';
@@ -18,6 +20,7 @@ const JSZIP_BROWSER_DISTRIBUTION_SHA256 = 'ACC7E41455A80765B5FD9C7EE1B8078A6D160
 const POSTAL_MIME_BASE64_SOURCE = 'tlsrpt-motor/node_modules/postal-mime/src/base64-encoder.js';
 const POSTAL_MIME_BASE64_SOURCE_SHA256 = '71161FF0AB6BEDF58A047D3FC5631B50D5F60655938A418D9F49CAC75BC01251';
 const ARTIFACT_LICENSE_BANNER = 'Third-party licenses: /legal/BUNDLED-LICENSES.md';
+const GOOGLE_FONTS_HOSTNAMES = Object.freeze(['fonts.googleapis.com', 'fonts.gstatic.com']);
 const VITE_SCAFFOLD_ASSETS = Object.freeze([
   Object.freeze({
     path: 'src/assets/hero.png',
@@ -167,11 +170,38 @@ export function verifySha256(content, expectedSha256, label) {
 }
 
 export function verifyNoRemoteGoogleFonts(html) {
-  assert.doesNotMatch(
-    html,
-    /https:\/\/fonts\.(?:googleapis|gstatic)\.com/iu,
-    `${ROOT_HTML} must not load mutable Google Fonts resources outside the locked dependency graph`,
-  );
+  const window = new Window({
+    url: 'https://admin.lcv.dev/',
+    settings: {
+      disableCSSFileLoading: true,
+      disableIframePageLoading: true,
+      disableJavaScriptEvaluation: true,
+      disableJavaScriptFileLoading: true,
+    },
+  });
+
+  try {
+    window.document.write(html);
+    for (const link of window.document.querySelectorAll('link[href]')) {
+      const href = link.getAttribute('href');
+      assert.ok(href, `${ROOT_HTML} link[href] must contain a valid remote URL or local reference`);
+
+      let url;
+      try {
+        url = new URL(href, window.location.href);
+      } catch {
+        assert.fail(`${ROOT_HTML} link[href] must contain a valid remote URL or local reference`);
+      }
+
+      const hostname = url.hostname.toLowerCase().replace(/\.+$/u, '');
+      assert.ok(
+        !GOOGLE_FONTS_HOSTNAMES.includes(hostname),
+        `${ROOT_HTML} must not load mutable Google Fonts resources outside the locked dependency graph`,
+      );
+    }
+  } finally {
+    window.close();
+  }
 }
 
 function normalizeCell(value) {

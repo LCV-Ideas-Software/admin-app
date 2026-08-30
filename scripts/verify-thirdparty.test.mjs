@@ -110,6 +110,51 @@ test('rejects a mutable Google Fonts runtime dependency', () => {
   ).toThrow(/outside the locked dependency graph/u);
 });
 
+test('rejects protocol-relative Google Fonts runtime dependencies', () => {
+  expect(() => verifyNoRemoteGoogleFonts('<link rel="preconnect" href="//fonts.gstatic.com">')).toThrow(
+    /outside the locked dependency graph/u,
+  );
+});
+
+test.each([
+  'http://fonts.googleapis.com/css2?family=Inter',
+  'https://FONTS.GOOGLEAPIS.COM:443/css2?family=Inter',
+  'https://fonts.googleapis.com./css2?family=Inter',
+  'https://fonts&#46;googleapis&#46;com/css2?family=Inter',
+  'https://fonts.gstatic.com/s/inter/v20/font.woff2',
+  'https://fonts.gstatic.com./s/inter/v20/font.woff2',
+])('rejects the canonical Google Fonts hosts after HTML and URL normalization: %s', (href) => {
+  expect(() => verifyNoRemoteGoogleFonts(`<link rel="stylesheet" href="${href}">`)).toThrow(
+    /outside the locked dependency graph/u,
+  );
+});
+
+test('accepts unrelated hosts whose names merely contain a Google Fonts hostname', () => {
+  expect(() =>
+    verifyNoRemoteGoogleFonts(
+      '<link rel="stylesheet" href="https://fonts.googleapis.com.example.invalid/local.css">',
+    ),
+  ).not.toThrow();
+});
+
+test('accepts local resources and non-resource mentions of Google Fonts hosts', () => {
+  expect(() =>
+    verifyNoRemoteGoogleFonts(`
+      <!-- https://fonts.googleapis.com/css2?family=Inter -->
+      <p>https://fonts.gstatic.com is documented here without being loaded.</p>
+      <link rel="stylesheet" href="/assets/inter.css">
+      <link rel="stylesheet" href="https://example.invalid/fonts.googleapis.com/local.css">
+      <link rel="stylesheet" href="https://example.invalid/local.css?source=fonts.gstatic.com">
+    `),
+  ).not.toThrow();
+});
+
+test('fails closed on malformed remote resource URLs', () => {
+  expect(() => verifyNoRemoteGoogleFonts('<link rel="stylesheet" href="https://[">')).toThrow(
+    /valid remote URL/u,
+  );
+});
+
 test('rejects a missing configured supplemental notice', () => {
   expect(() => verify({ requiredStaticNoticeMarkers: ['required legal notice'] })).toThrow(
     /missing a complete required legal notice/u,
