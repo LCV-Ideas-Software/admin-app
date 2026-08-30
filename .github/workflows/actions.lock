@@ -18,7 +18,7 @@ workflows:
         - 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
     '.github/workflows/linear-release.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
-        - 'linear/linear-release-action@0a25abab892a91062ebf42260dbb2ce6277aa205'
+        - 'linear/linear-release-action@3f31fcf14c110cc53579fcc3575a26d469c413b4'
     '.github/workflows/pages.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
         - 'actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d'
@@ -90,9 +90,9 @@ dependencies:
         commit: 'sha1-cdf488f595d80d6e07e03d4674febd5ab45fa938'
         owner_id: 9919
         repo_id: 259445878
-    'linear/linear-release-action@0a25abab892a91062ebf42260dbb2ce6277aa205':
-        ref: 'v0.16.0'
-        commit: 'sha1-0a25abab892a91062ebf42260dbb2ce6277aa205'
+    'linear/linear-release-action@3f31fcf14c110cc53579fcc3575a26d469c413b4':
+        ref: 'v0.17.1'
+        commit: 'sha1-3f31fcf14c110cc53579fcc3575a26d469c413b4'
         owner_id: 46686594
         repo_id: 1150447766
     'ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc':
