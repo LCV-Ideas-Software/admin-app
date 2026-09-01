@@ -16,7 +16,7 @@ Versão, licença declarada, URL `resolved` e SRI `integrity` foram conferidos n
 | `domutils` | `4.0.2` | `BSD-2-Clause` | `packages["node_modules/sanitize-html/node_modules/domutils"]` |
 | `entities` | `8.0.0` | `BSD-2-Clause` | `packages["node_modules/sanitize-html/node_modules/entities"]` |
 | `escape-string-regexp` | `4.0.0` | `MIT` | `packages["node_modules/escape-string-regexp"]` |
-| `hono` | `4.13.3` | `MIT` | `packages["node_modules/hono"]` |
+| `hono` | `4.13.4` | `MIT` | `packages["node_modules/hono"]` |
 | `htmlparser2` | `12.0.0` | `MIT` | `packages["node_modules/sanitize-html/node_modules/htmlparser2"]` |
 | `is-plain-object` | `5.0.0` | `MIT` | `packages["node_modules/is-plain-object"]` |
 | `launder` | `1.7.1` | `MIT` | `packages["node_modules/launder"]` |
@@ -217,11 +217,11 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## hono 4.13.3 — MIT
+## hono 4.13.4 — MIT
 
 - **Caminho no lockfile:** `package-lock.json -> packages["node_modules/hono"]`
-- **Resolved:** `https://registry.npmjs.org/hono/-/hono-4.13.3.tgz`
-- **Integrity:** `sha512-r8AO2mYHoLxSHkgafNeC/BXyb2vWRxD3jem4Ts+ptav8oTG5FIRifAjuJEmZI4bSvvc2ns0GxmIYiZnHqN3mMw==`
+- **Resolved:** `https://registry.npmjs.org/hono/-/hono-4.13.4.tgz`
+- **Integrity:** `sha512-AGEwKIyRMHRv1t8Wjwa3LHxQ61X5CqrdFT+4BRNTpqS5aJNnpl5WLjADb7vFlJzI/8uK7T5QLVApCMQKNa3LgQ==`
 - **Origem imutável/hash:** tarball npm versionado indicado em `Resolved`, autenticado pelo SRI SHA-512 indicado em `Integrity`.
 - **Fonte do aviso integral:** `node_modules/hono/LICENSE` (`SHA-256: a6ab98e5c77b9070c443eaff2ff81034a6f8cc05a7524d5098eb0f24defa0115`).
 
