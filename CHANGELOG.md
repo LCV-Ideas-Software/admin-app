@@ -45,6 +45,16 @@
 
 ### Corrigido
 
+- **Suplementos npm sem arquivo de licença deixam de inventar avisos autorais.**
+  A proveniência de `dingbat-to-unicode@1.0.1` e
+  `react-remove-scroll-bar@2.3.8` agora fixa o SRI, os hashes dos manifestos e
+  READMEs publicados e os refs upstream efetivamente observáveis. Os termos
+  canônicos SPDX continuam disponíveis no artefato, separados da atribuição
+  literal dos manifestos, enquanto o aviso de copyright permanece marcado como
+  inconclusivo. O gate rejeita a reintrodução dos copyrights inferidos,
+  recomputa os hashes dos três arquivos instalados que sustentam a declaração
+  de licença e mantém os refs documentados dentro do esquema fechado.
+
 - **Parser estrutural dos inventários legais fechado a bypasses de Markdown.**
   O gate usa o parser GFM já adotado pelo projeto para validar o outline e a
   cardinalidade completos dos documentos, além da prosa e dos blocos legais

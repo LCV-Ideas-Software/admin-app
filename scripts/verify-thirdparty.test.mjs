@@ -7,7 +7,9 @@ import { expect, test } from 'vitest';
 
 import {
   BASE64_ARRAY_BUFFER_MIT_NOTICE,
+  LICENSE_FILE_FREE_PACKAGE_EVIDENCE,
   verifyAdminWorkerBundle,
+  verifyLicenseFileFreePackageEvidence,
   verifyNoRemoteGoogleFonts,
   verifySha256,
   verifyThirdPartyInventory,
@@ -318,6 +320,50 @@ function verify(overrides = {}) {
 
 test('accepts complete inventories for both manifests', () => {
   expect(() => verify()).not.toThrow();
+});
+
+test('publishes exact evidence without inventing notices for license-file-free tarballs', async () => {
+  const [rootNotice, publicNotice] = await Promise.all([
+    readFile(join(process.cwd(), 'THIRDPARTY.md'), 'utf8'),
+    readFile(join(process.cwd(), 'public', 'legal', 'THIRDPARTY.md'), 'utf8'),
+  ]);
+
+  expect(publicNotice).toBe(rootNotice);
+  expect(rootNotice.match(/Resultado: \*\*INCONCLUSIVO\*\*/gu)).toHaveLength(2);
+  expect(rootNotice).not.toContain('Copyright (c) Michael Williamson <mike@zwobble.org>');
+  expect(rootNotice).not.toContain('Copyright (c) 2025 Anton Korzunov <thekashey@gmail.com>');
+  expect(rootNotice).toContain('E34A07AF5C8074EC60FDC1F9DB775D117D2B2F985D88175C455C9FC37F898D59');
+  expect(rootNotice).toContain('E372F857CE05F266137C65293436B5380FEC42AC311E6ACB9378ED78B98D75D0');
+  expect(rootNotice).toContain('486442209236FFA3893312E508694699A6B8834D30A2F9C083C1F3379983E4F9');
+  expect(rootNotice).toMatch(/sem\s+inventar titular, ano ou aviso de copyright ausente/gu);
+});
+
+test('recomputes the exact installed evidence for license-file-free tarballs', async () => {
+  const artifacts = await Promise.all(
+    LICENSE_FILE_FREE_PACKAGE_EVIDENCE.map(({ path }) => readFile(join(process.cwd(), path))),
+  );
+  expect(() => verifyLicenseFileFreePackageEvidence(artifacts)).not.toThrow();
+
+  const drifted = [...artifacts];
+  drifted[1] = Buffer.concat([drifted[1], Buffer.from(' ')]);
+  expect(() => verifyLicenseFileFreePackageEvidence(drifted)).toThrow(
+    /react-remove-scroll-bar[/\\]package\.json exact audited evidence SHA-256 changed/iu,
+  );
+});
+
+test('labels license text without an upstream copyright notice as reference terms', () => {
+  const rootInventory = `${inventory()}\n### Review terms\n\ntruncated terms\n`;
+  expect(() =>
+    verify({
+      rootInventory,
+      requiredStaticNoticeSections: [
+        {
+          heading: '### Review terms',
+          referenceTerms: ['complete canonical terms'],
+        },
+      ],
+    }),
+  ).toThrow(/required canonical license reference terms/iu);
 });
 
 test('rejects a root inventory table with a malformed separator', () => {

@@ -150,14 +150,14 @@ acompanha o tarball npm ou uma seção nativa vazia porque o pacote publicado n�
 inclui o arquivo de licença. Estes complementos não substituem
 `legal/BUNDLED-LICENSES.md`; cobrem precisamente essas fronteiras comprovadas.
 
-| Componente                           | Relação com o bundle                                                                                                     | Licença aplicada                              | Proveniência imutável                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| JSZip 3.10.1                         | Incorporado por Mammoth e detectado pelo inventário nativo do Vite                                                       | `(MIT OR GPL-3.0-or-later)`; eleição: **MIT** | SRI `sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==`; `https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz`                                                                                                                                                                                                                                 |
-| Pako 1.0.5                           | Vendorizado na distribuição browser do JSZip 3.10.1; não recebe seção própria do inventário nativo                       | `(MIT AND Zlib)`; **ambas** se aplicam        | JSZip `v3.10.1`/commit `0f2f1e4d0509514417db83fe5b86bde90e0ffe8d`; lock oficial fixa `pako@1.0.5`; `dist/jszip.min.js` SHA-256 `ACC7E41455A80765B5FD9C7EE1B8078A6D160BBBCA455AEAE854DE65C947D59E`; SRI `sha512-umumrxStF9I4G8OZlhzEgTlwktjp4bofYq7E0mfH/IM7fctJ1pzLBhVrhNmP86hA1b3RNP5gAzxJJ4mjj0Up6Q==`; `https://registry.npmjs.org/pako/-/pako-1.0.5.tgz`                                 |
-| Spark MD5 3.0.2                      | Dependência direta detectada pelo Vite; o projeto usa a alternativa oficial MIT                                          | `(WTFPL OR MIT)`; eleição: **MIT**            | tag oficial `v3.0.2`, commit `9315385868fe11076674d4ddd763005319a462a7`, arquivo `LICENSE2`, SHA-256 `6E7ABBD885F650C938CF377A6EDCAD56C7DCB61DE092853AF6141D806F8C9F04`                                                                                                                                                                                                                      |
-| dingbat-to-unicode 1.0.1             | Detectado pelo Vite, mas o tarball npm gera seção vazia porque não contém arquivo de licença                             | BSD-2-Clause                                  | SRI `sha512-98l0sW87ZT58pU4i61wa2OHwxbiYSbuxsCBozaVnYX2iCnr3bLM3fIes1/ej7h1YdOKuKt/MLs706TVnALA65w==`; `https://registry.npmjs.org/dingbat-to-unicode/-/dingbat-to-unicode-1.0.1.tgz`; tag oficial `js-1.0.1`, commit `b27f259b49907f99b1b9097abba5a9668106b779`                                                                                                                             |
-| react-remove-scroll-bar 2.3.8        | Detectado pelo Vite, mas o tarball npm gera seção vazia porque não contém arquivo de licença                             | MIT                                           | SRI `sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==`; `https://registry.npmjs.org/react-remove-scroll-bar/-/react-remove-scroll-bar-2.3.8.tgz`; licença oficial posterior no commit `7301c160fda44cb8cf2b9fdfde61efad35736196`, SHA-256 `A79AAE0C0F21990D9D963BB3C5A79CDCEA9A46F8523BA55C58D7FE776B6EBC84`                                  |
-| Assets do scaffold create-vite 8.0.0 | `src/assets/hero.png`, `react.svg` e `vite.svg`; distribuídos no código-fonte, sem consumidores e fora do bundle público | MIT                                           | tag oficial `v8.0.0`, commit `b565af6f1123a62b3058253b2147574b8515e89f`; SHA-256 respectivos `72A860570EDDF1DD9988F26C7106C67BE286BC9F2FD3303C465CE87EDB1AE6CD`, `35EF61ED53B323AE94A16A8EC659B3D0AF3880698791133F23B084085AB1C2E5` e `5BE21ACD42EB7B896E517F4E0F0F11EB5C5D9E54FBBCEBE9453F033008FCCA6F`; licença SHA-256 `692057AF3D664CBB79AC38293EB50AA3C4987F8182E2A440136E59E08F1B4A54` |
+| Componente                           | Relação com o bundle                                                                                                     | Licença aplicada                              | Proveniência imutável                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JSZip 3.10.1                         | Incorporado por Mammoth e detectado pelo inventário nativo do Vite                                                       | `(MIT OR GPL-3.0-or-later)`; eleição: **MIT** | SRI `sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==`; `https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz`                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Pako 1.0.5                           | Vendorizado na distribuição browser do JSZip 3.10.1; não recebe seção própria do inventário nativo                       | `(MIT AND Zlib)`; **ambas** se aplicam        | JSZip `v3.10.1`/commit `0f2f1e4d0509514417db83fe5b86bde90e0ffe8d`; lock oficial fixa `pako@1.0.5`; `dist/jszip.min.js` SHA-256 `ACC7E41455A80765B5FD9C7EE1B8078A6D160BBBCA455AEAE854DE65C947D59E`; SRI `sha512-umumrxStF9I4G8OZlhzEgTlwktjp4bofYq7E0mfH/IM7fctJ1pzLBhVrhNmP86hA1b3RNP5gAzxJJ4mjj0Up6Q==`; `https://registry.npmjs.org/pako/-/pako-1.0.5.tgz`                                                                                                                                                                                                                                                                      |
+| Spark MD5 3.0.2                      | Dependência direta detectada pelo Vite; o projeto usa a alternativa oficial MIT                                          | `(WTFPL OR MIT)`; eleição: **MIT**            | tag oficial `v3.0.2`, commit `9315385868fe11076674d4ddd763005319a462a7`, arquivo `LICENSE2`, SHA-256 `6E7ABBD885F650C938CF377A6EDCAD56C7DCB61DE092853AF6141D806F8C9F04`                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| dingbat-to-unicode 1.0.1             | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | BSD-2-Clause; aviso de copyright inconclusivo | SRI `sha512-98l0sW87ZT58pU4i61wa2OHwxbiYSbuxsCBozaVnYX2iCnr3bLM3fIes1/ej7h1YdOKuKt/MLs706TVnALA65w==`; `https://registry.npmjs.org/dingbat-to-unicode/-/dingbat-to-unicode-1.0.1.tgz`; `package/package.json` SHA-256 `E34A07AF5C8074EC60FDC1F9DB775D117D2B2F985D88175C455C9FC37F898D59`, byte-idêntico ao blob `ebe4c8b90b43316a9e2a2e4cdf3a075895aecf60` da tag anotada `js-1.0.1`, objeto `bf8184cc2522b6f30a4c35e5062418382ff03667`, commit `b27f259b49907f99b1b9097abba5a9668106b779`                                                                                                                                        |
+| react-remove-scroll-bar 2.3.8        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; aviso de copyright inconclusivo          | SRI `sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==`; `https://registry.npmjs.org/react-remove-scroll-bar/-/react-remove-scroll-bar-2.3.8.tgz`; `package/package.json` SHA-256 `E372F857CE05F266137C65293436B5380FEC42AC311E6ACB9378ED78B98D75D0`; `package/README.md` SHA-256 `486442209236FFA3893312E508694699A6B8834D30A2F9C083C1F3379983E4F9`; `gitHead` npm `b3b1287aad81def2e2ae707274b74531b61ddbaf` não alcançável; `LICENSE` posterior no commit `7301c160fda44cb8cf2b9fdfde61efad35736196`, SHA-256 `A79AAE0C0F21990D9D963BB3C5A79CDCEA9A46F8523BA55C58D7FE776B6EBC84` |
+| Assets do scaffold create-vite 8.0.0 | `src/assets/hero.png`, `react.svg` e `vite.svg`; distribuídos no código-fonte, sem consumidores e fora do bundle público | MIT                                           | tag oficial `v8.0.0`, commit `b565af6f1123a62b3058253b2147574b8515e89f`; SHA-256 respectivos `72A860570EDDF1DD9988F26C7106C67BE286BC9F2FD3303C465CE87EDB1AE6CD`, `35EF61ED53B323AE94A16A8EC659B3D0AF3880698791133F23B084085AB1C2E5` e `5BE21ACD42EB7B896E517F4E0F0F11EB5C5D9E54FBBCEBE9453F033008FCCA6F`; licença SHA-256 `692057AF3D664CBB79AC38293EB50AA3C4987F8182E2A440136E59E08F1B4A54`                                                                                                                                                                                                                                      |
 
 ### Assets do scaffold create-vite 8.0.0 — MIT
 
@@ -277,14 +277,18 @@ SOFTWARE.
 
 ### dingbat-to-unicode 1.0.1 — BSD-2-Clause
 
-O tarball e a tag exatos declaram BSD-2-Clause no `package.json`, mas não
-contêm `LICENSE` ou `COPYING`. O texto abaixo é a forma canônica BSD-2-Clause;
-a atribuição foi derivada do campo `author` e não é apresentada como aviso
-autoral upstream comprovado. Aviso da versão exata: **inconclusivo**.
+O tarball npm autenticado pelo SRI e o `js/package.json` da tag anotada
+`js-1.0.1` são byte-idênticos; ambos declaram `BSD-2-Clause` e identificam
+Michael Williamson como autor. O
+[contrato oficial do npm](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#license)
+usa o identificador SPDX para declarar como o pacote pode ser usado, mas
+nenhuma versão upstream contém `LICENSE` ou `COPYING` e o campo `author` não
+comprova titularidade. Resultado: **INCONCLUSIVO** quanto ao aviso de copyright
+da versão exata. O suplemento separa a atribuição literal do manifesto dos
+[termos canônicos da BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause), sem
+inventar titular, ano ou aviso de copyright ausente no upstream.
 
 ```text
-Copyright (c) Michael Williamson <mike@zwobble.org>
-
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
@@ -310,16 +314,17 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ### react-remove-scroll-bar 2.3.8 — MIT
 
-O tarball 2.3.8 declara MIT e não contém `LICENSE`. O arquivo citado foi
-adicionado ao repositório oficial em 21/05/2025, depois da publicação de 2.3.8
-em 15/12/2024; ele corrobora posteriormente a licença do projeto, mas não
-comprova o aviso autoral do artefato 2.3.8. Aviso da versão exata:
-**inconclusivo**.
+O `package.json` e o `README.md` do tarball npm autenticado pelo SRI declaram
+`MIT` de forma independente e o manifesto identifica Anton Korzunov como autor.
+O `gitHead` publicado no registro npm já não é alcançável no repositório; o
+`LICENSE` acrescentado depois apenas corrobora os termos e não comprova o aviso
+histórico da versão 2.3.8. Resultado: **INCONCLUSIVO** quanto ao aviso de
+copyright da versão exata. O suplemento separa a atribuição literal do manifesto
+dos [termos canônicos da MIT](https://spdx.org/licenses/MIT), sem inventar
+titular, ano ou aviso de copyright ausente no artefato.
 
 ```text
 MIT License
-
-Copyright (c) 2025 Anton Korzunov <thekashey@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

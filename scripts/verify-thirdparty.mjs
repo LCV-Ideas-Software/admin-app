@@ -36,6 +36,21 @@ const LAUNDER_AUDITED_ARTIFACT = Object.freeze({
   packageJsonSha256: 'b111ad703bae61d8cef17863c38f4618e813b24284a874d0b81db1b5cfbdf601',
   upstreamCommit: 'e9b0ab0849a5dfea0f75335fbdf99b5c6bf9e4b3',
 });
+
+export const LICENSE_FILE_FREE_PACKAGE_EVIDENCE = Object.freeze([
+  Object.freeze({
+    path: 'node_modules/dingbat-to-unicode/package.json',
+    sha256: 'E34A07AF5C8074EC60FDC1F9DB775D117D2B2F985D88175C455C9FC37F898D59',
+  }),
+  Object.freeze({
+    path: 'node_modules/react-remove-scroll-bar/package.json',
+    sha256: 'E372F857CE05F266137C65293436B5380FEC42AC311E6ACB9378ED78B98D75D0',
+  }),
+  Object.freeze({
+    path: 'node_modules/react-remove-scroll-bar/README.md',
+    sha256: '486442209236FFA3893312E508694699A6B8834D30A2F9C083C1F3379983E4F9',
+  }),
+]);
 const LAUNDER_DISCLOSURE =
   'O pacote npm e a tag upstream `launder@1.7.1` declaram `MIT`, mas o pacote/tarball dessa versão não traz arquivo `LICENSE`. Por isso, os termos canônicos da MIT são reproduzidos abaixo sem inventar titular, ano ou aviso de copyright ausente no upstream.';
 const MARKED_DISCLOSURE =
@@ -72,9 +87,13 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.`;
 
-export const DINGBAT_TO_UNICODE_BSD_NOTICE = `Copyright (c) Michael Williamson <mike@zwobble.org>
+const DINGBAT_TO_UNICODE_DISCLOSURE =
+  'O tarball npm autenticado pelo SRI e o `js/package.json` da tag anotada `js-1.0.1` são byte-idênticos; ambos declaram `BSD-2-Clause` e identificam Michael Williamson como autor. O contrato oficial do npm usa o identificador SPDX para declarar como o pacote pode ser usado, mas nenhuma versão upstream contém `LICENSE` ou `COPYING` e o campo `author` não comprova titularidade. Resultado: INCONCLUSIVO quanto ao aviso de copyright da versão exata. O suplemento separa a atribuição literal do manifesto dos termos canônicos da BSD-2-Clause, sem inventar titular, ano ou aviso de copyright ausente no upstream.';
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+const REACT_REMOVE_SCROLL_BAR_DISCLOSURE =
+  'O `package.json` e o `README.md` do tarball npm autenticado pelo SRI declaram `MIT` de forma independente e o manifesto identifica Anton Korzunov como autor. O `gitHead` publicado no registro npm já não é alcançável no repositório; o `LICENSE` acrescentado depois apenas corrobora os termos e não comprova o aviso histórico da versão 2.3.8. Resultado: INCONCLUSIVO quanto ao aviso de copyright da versão exata. O suplemento separa a atribuição literal do manifesto dos termos canônicos da MIT, sem inventar titular, ano ou aviso de copyright ausente no artefato.';
+
+export const DINGBAT_TO_UNICODE_BSD_TERMS = `Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 
@@ -82,9 +101,7 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 
-export const REACT_REMOVE_SCROLL_BAR_MIT_NOTICE = `MIT License
-
-Copyright (c) 2025 Anton Korzunov <thekashey@gmail.com>
+export const REACT_REMOVE_SCROLL_BAR_MIT_TERMS = `MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -243,11 +260,20 @@ export const REQUIRED_STATIC_NOTICE_MARKERS = Object.freeze([
   '71161FF0AB6BEDF58A047D3FC5631B50D5F60655938A418D9F49CAC75BC01251',
   BASE64_ARRAY_BUFFER_MIT_NOTICE,
   '### dingbat-to-unicode 1.0.1 — BSD-2-Clause',
+  'bf8184cc2522b6f30a4c35e5062418382ff03667',
   'b27f259b49907f99b1b9097abba5a9668106b779',
-  DINGBAT_TO_UNICODE_BSD_NOTICE,
+  'ebe4c8b90b43316a9e2a2e4cdf3a075895aecf60',
+  'E34A07AF5C8074EC60FDC1F9DB775D117D2B2F985D88175C455C9FC37F898D59',
+  DINGBAT_TO_UNICODE_DISCLOSURE,
+  DINGBAT_TO_UNICODE_BSD_TERMS,
   '### react-remove-scroll-bar 2.3.8 — MIT',
+  'b3b1287aad81def2e2ae707274b74531b61ddbaf',
   '7301c160fda44cb8cf2b9fdfde61efad35736196',
-  REACT_REMOVE_SCROLL_BAR_MIT_NOTICE,
+  'E372F857CE05F266137C65293436B5380FEC42AC311E6ACB9378ED78B98D75D0',
+  '486442209236FFA3893312E508694699A6B8834D30A2F9C083C1F3379983E4F9',
+  'A79AAE0C0F21990D9D963BB3C5A79CDCEA9A46F8523BA55C58D7FE776B6EBC84',
+  REACT_REMOVE_SCROLL_BAR_DISCLOSURE,
+  REACT_REMOVE_SCROLL_BAR_MIT_TERMS,
   '### Assets do scaffold create-vite 8.0.0 — MIT',
   'b565af6f1123a62b3058253b2147574b8515e89f',
   '72A860570EDDF1DD9988F26C7106C67BE286BC9F2FD3303C465CE87EDB1AE6CD',
@@ -265,6 +291,14 @@ export const REQUIRED_STATIC_NOTICE_SECTIONS = Object.freeze([
     heading: '### Spark MD5 3.0.2 — MIT',
     notices: Object.freeze([SPARK_MD5_MIT_NOTICE]),
   }),
+  Object.freeze({
+    heading: '### dingbat-to-unicode 1.0.1 — BSD-2-Clause',
+    referenceTerms: Object.freeze([DINGBAT_TO_UNICODE_BSD_TERMS]),
+  }),
+  Object.freeze({
+    heading: '### react-remove-scroll-bar 2.3.8 — MIT',
+    referenceTerms: Object.freeze([REACT_REMOVE_SCROLL_BAR_MIT_TERMS]),
+  }),
 ]);
 
 const ROOT_DOCUMENT_SCHEMA = (() => {
@@ -277,8 +311,8 @@ const ROOT_DOCUMENT_SCHEMA = (() => {
     '2bd045c34c582095d72e33a3184ae3fa04aa13509b23d8161a36293abe6d468d',
     '8aa9b4d5a20a0091628c62615c6dedf028cea06c539b1c397b140fb49771089c',
     '6681f9df11fce09360a300b0d5b789ffdfbc9e476e8c051986f426fa421827d2',
-    '608e94a2b431b884dee76f739b85d4eaf3524cd74e20d00d316b0bafb575315e',
-    'e348e036ff14139783bd38220796591680b3db555e0c79f42ce23d91c9668fdd',
+    'f9d948f36ec91610d760bbc6074145de549e097a313924e5cf75c6b88816b55e',
+    'e54abca2444787b0a2439bba1bf965b073f41a63c551e67c1e3a1ef61eac2da8',
     '44abe5998af13e517b197c592319e87e5ca4056947fe1886e56771d5058bcb09',
     'e56a8cc6060745bdc403b9a66aa93983327e523612623698f3de6a36b8a158c3',
   ]);
@@ -287,8 +321,8 @@ const ROOT_DOCUMENT_SCHEMA = (() => {
     'e824161e0aab3814aca1883bd7058e67034d25fce254e6629495e78d3f8a53c3',
     'f2c7bd8d9e43896c730ad9e095cc9b861c5aa8741119fb7237666ef03c21b608',
     'ededb65e4fd8561af59d0ec209a3dd4012a458e8364e532ce320181757c9f4b6',
-    'dc0711f67148ef151102483996a3caa360c0aef631ba2562afed140ab9742daf',
-    'ceedc02ca6ecc228bec601367e8d3905331c33cd74f7131d4d45ad2562d23bb4',
+    '2e0a07c5dbcc44ec0aeac24085828770be3ba5e3d5b5acec793fc5a368334cd7',
+    '1847e0e0698142ed4347c1441a9fa81c8fbddd44b1d8bbcd5e3647f991759d7f',
     'ac22553a5f529c8bca6305b6f445de70b384d922dc0560a6ad86c662bb9cad3e',
     'f57e3a2cabf2b43ab2fc942a8e9f4b38366ab0d1f859c6439b1fb69e80d9af73',
     'f4bb8f655fdb4d119878a0eea6dfcb871da509d83baa7426794f7c70b9bb9d46',
@@ -298,7 +332,7 @@ const ROOT_DOCUMENT_SCHEMA = (() => {
   ]);
   const staticTableDigests = Object.freeze([
     '811c781139c97acd137093850a7817293769002be642fc03823c1062df88b7ca',
-    '0cbd8ef384944e9223fdcf1acb98df4412c2fd6cbc6e322854bfa86201f5c1df',
+    'eecdb10ccee6af617cdac17da9b47d6a05af45f0cea6ee835a90d2e9f47133c6',
   ]);
   const paragraph = (index) => ({ type: 'paragraph', digest: paragraphDigests[index] });
   const code = (index) => ({ type: 'code', digest: codeBlockDigests[index] });
@@ -498,11 +532,20 @@ function normalizeStructuralIdentifier(value) {
     .trim();
 }
 
-function assertContainsNotice(content, notice, label) {
+function assertContainsRequiredText(content, expectedText, label, requirementLabel) {
+  const normalizedExpectedText = normalizeNotice(expectedText);
   assert.ok(
-    normalizeNotice(content).includes(normalizeNotice(notice)),
-    `${label} is missing a complete required legal notice`,
+    normalizeNotice(content).includes(normalizedExpectedText),
+    `${label} is missing ${requirementLabel} (${createHash('sha256').update(normalizedExpectedText).digest('hex').slice(0, 12)})`,
   );
+}
+
+function assertContainsNotice(content, notice, label) {
+  assertContainsRequiredText(content, notice, label, 'a complete required legal notice');
+}
+
+function assertContainsReferenceTerms(content, terms, label) {
+  assertContainsRequiredText(content, terms, label, 'the required canonical license reference terms');
 }
 
 function markdownTokenChildren(token) {
@@ -528,6 +571,10 @@ function renderedMarkdownText(markdown) {
 
 function assertContainsMarkdownNotice(markdown, notice, label) {
   assertContainsNotice(renderedMarkdownText(markdown), notice, label);
+}
+
+function assertContainsMarkdownReferenceTerms(markdown, terms, label) {
+  assertContainsReferenceTerms(renderedMarkdownText(markdown), terms, label);
 }
 
 function assertContainsRenderedMarkdown(markdown, expectedMarkdown, label) {
@@ -1008,9 +1055,23 @@ function markdownSection(markdown, heading, label) {
 function assertNoticeSections(markdown, sections, label) {
   for (const section of sections) {
     const body = markdownSection(markdown, section.heading, label);
-    for (const notice of section.notices) {
+    for (const notice of section.notices ?? []) {
       assertContainsMarkdownNotice(body, notice, `${label} section ${section.heading}`);
     }
+    for (const terms of section.referenceTerms ?? []) {
+      assertContainsMarkdownReferenceTerms(body, terms, `${label} section ${section.heading}`);
+    }
+  }
+}
+
+export function verifyLicenseFileFreePackageEvidence(artifacts) {
+  assert.equal(
+    artifacts.length,
+    LICENSE_FILE_FREE_PACKAGE_EVIDENCE.length,
+    'license-file-free package evidence set is incomplete',
+  );
+  for (const [index, evidence] of LICENSE_FILE_FREE_PACKAGE_EVIDENCE.entries()) {
+    verifySha256(artifacts[index], evidence.sha256, `${evidence.path} exact audited evidence`);
   }
 }
 
@@ -1646,6 +1707,7 @@ async function main() {
     jszipBrowserDistribution,
     postalMimeBase64Source,
     viteScaffoldAssets,
+    licenseFileFreePackageEvidence,
   ] = await Promise.all([
     Promise.all(MANIFESTS.map((config) => loadManifest(root, config))),
     readFile(resolve(root, ROOT_INVENTORY), 'utf8'),
@@ -1656,6 +1718,9 @@ async function main() {
     readFile(resolve(root, JSZIP_BROWSER_DISTRIBUTION)),
     readFile(resolve(root, POSTAL_MIME_BASE64_SOURCE)),
     Promise.all(VITE_SCAFFOLD_ASSETS.map(({ path }) => readFile(resolve(root, path)))),
+    Promise.all(
+      LICENSE_FILE_FREE_PACKAGE_EVIDENCE.map(({ path }) => readFile(resolve(root, path))),
+    ),
   ]);
 
   verifyNoRemoteGoogleFonts(rootHtml);
@@ -1664,6 +1729,7 @@ async function main() {
   for (const [index, asset] of VITE_SCAFFOLD_ASSETS.entries()) {
     verifySha256(viteScaffoldAssets[index], asset.sha256, asset.path);
   }
+  verifyLicenseFileFreePackageEvidence(licenseFileFreePackageEvidence);
 
   const [
     artifactInventory,
