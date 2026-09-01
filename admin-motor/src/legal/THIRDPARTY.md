@@ -20,7 +20,7 @@ Versão, licença declarada, URL `resolved` e SRI `integrity` foram conferidos n
 | `htmlparser2` | `12.0.0` | `MIT` | `packages["node_modules/sanitize-html/node_modules/htmlparser2"]` |
 | `is-plain-object` | `5.0.0` | `MIT` | `packages["node_modules/is-plain-object"]` |
 | `launder` | `1.7.1` | `MIT` | `packages["node_modules/launder"]` |
-| `marked` | `18.0.10` | `MIT` | `packages["node_modules/marked"]` |
+| `marked` | `18.0.11` | `MIT` | `packages["node_modules/marked"]` |
 | `nanoid` | `3.3.18` | `MIT` | `packages["node_modules/nanoid"]` |
 | `parse-srcset` | `1.0.2` | `MIT` | `packages["node_modules/parse-srcset"]` |
 | `picocolors` | `1.1.1` | `ISC` | `packages["node_modules/picocolors"]` |
@@ -343,11 +343,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## marked 18.0.10 — MIT
+## marked 18.0.11 — MIT
 
 - **Caminho no lockfile:** `package-lock.json -> packages["node_modules/marked"]`
-- **Resolved:** `https://registry.npmjs.org/marked/-/marked-18.0.10.tgz`
-- **Integrity:** `sha512-FJeH4bRpYoXiggcgriCGItKCSv3xkngJc4QCZ/rkQCogU3VYaLxYJoZl8Nw/b4+x7iij/pd+09mZ6A1dXzpL0A==`
+- **Resolved:** `https://registry.npmjs.org/marked/-/marked-18.0.11.tgz`
+- **Integrity:** `sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==`
 - **Origem imutável/hash:** tarball npm versionado indicado em `Resolved`, autenticado pelo SRI SHA-512 indicado em `Integrity`.
 - **Fonte do aviso integral:** `node_modules/marked/LICENSE` (`SHA-256: 8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c`).
 
