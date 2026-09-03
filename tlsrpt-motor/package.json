@@ -13,10 +13,10 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.10",
+		"@biomejs/biome": "^2.5.11",
 		"@cloudflare/vitest-pool-workers": "^0.22.0",
 		"vitest": "^4.1.11",
-		"wrangler": "^4.125.0"
+		"wrangler": "^4.127.0"
 	},
 	"dependencies": {
 		"postal-mime": "^3.0.0"
