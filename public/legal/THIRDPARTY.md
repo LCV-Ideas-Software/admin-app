@@ -1,131 +1,131 @@
 # Inventário de componentes de terceiros
 
-Este documento separa os dois manifestos do repositório. Cada linha corresponde a uma dependência direta declarada e a identifica por nome, licença e fonte: a expressão SPDX publicada no pacote, com a eleição explícita quando a expressão contém `OR`, e a URL do repositório upstream declarado pelo próprio pacote. A coluna **Escopo** reproduz a declaração no manifesto e não presume se o componente foi ou não empacotado. Versões, intervalos e resoluções imutáveis das dependências diretas vivem em `package.json`, `tlsrpt-motor/package.json` e nos respectivos lockfiles, onde o Dependabot as atualiza, e não se repetem nestas tabelas; o grafo de dependências do GitHub é o inventário versionado e fornece o SBOM sob demanda. Os complementos abaixo e o `NOTICE` continuam fixados à versão instalada e exigem atualização manual a cada bump; o módulo Text do Admin Motor lista os pacotes incorporados por nome, licença e fonte.
+Este documento separa os dois manifestos do repositório. Cada linha corresponde a uma dependência direta declarada e a identifica por nome, licença e fonte: a expressão SPDX publicada no pacote, com a eleição explícita quando a expressão contém `OR`, e a URL do repositório upstream declarado pelo próprio pacote. A coluna **Escopo** reproduz a declaração no manifesto e não presume se o componente foi ou não empacotado. Versões, intervalos e resoluções imutáveis das dependências diretas vivem em `package.json`, `tlsrpt-motor/package.json` e nos respectivos lockfiles, onde o Dependabot as atualiza, e não se repetem nestas tabelas; o grafo de dependências do GitHub é o inventário versionado e fornece o SBOM sob demanda. Os complementos abaixo, o `NOTICE` e o módulo Text do Admin Motor também identificam os componentes por nome, licença e fonte; os textos de licença reproduzem a versão instalada no momento da escrita.
 
 No build público, o recurso nativo `build.license` do Vite gera `legal/BUNDLED-LICENSES.md` diretamente do grafo efetivamente empacotado, incluindo dependências transitivas e componentes declarados como desenvolvimento que acabem no bundle. Quando o pacote publica um arquivo reconhecido, o inventário reproduz o texto; algumas seções podem ficar vazias. Os avisos abaixo fornecem suplementos documentados para essas lacunas, código vendorizado, eleições e ativos. A divulgação do build público é o conjunto dos dois arquivos; nenhum é declarado completo isoladamente.
 
 ## Inventário: package.json (raiz)
 
-| Escopo      | Componente                            | Licença                                     | Fonte                                                       |
-| ----------- | ------------------------------------- | ------------------------------------------- | ----------------------------------------------------------- |
-| runtime     | @codemirror/lang-javascript           | MIT                                         | https://github.com/codemirror/lang-javascript               |
-| runtime     | @fontsource/inter                     | OFL-1.1                                     | https://github.com/fontsource/font-files                    |
-| runtime     | @radix-ui/react-dialog                | MIT                                         | https://github.com/radix-ui/primitives                      |
-| runtime     | @tanstack/react-query                 | MIT                                         | https://github.com/TanStack/query                           |
-| runtime     | @tanstack/react-query-devtools        | MIT                                         | https://github.com/TanStack/query                           |
-| runtime     | @tiptap/core                          | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-character-count     | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-code-block-lowlight | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-collaboration       | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-color               | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-drag-handle         | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-drag-handle-react   | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-dropcursor          | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-focus               | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-font-family         | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-highlight           | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-image               | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-link                | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-mention             | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-node-range          | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-placeholder         | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-subscript           | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-superscript         | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-table               | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-table-cell          | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-table-header        | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-table-row           | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-task-item           | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-task-list           | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-text-align          | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-text-style          | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-typography          | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/extension-youtube             | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/pm                            | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/react                         | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/starter-kit                   | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/suggestion                    | MIT                                         | https://github.com/ueberdosis/tiptap                        |
-| runtime     | @tiptap/y-tiptap                      | MIT                                         | https://github.com/ueberdosis/y-tiptap                      |
-| runtime     | codemirror                            | MIT                                         | https://github.com/codemirror/basic-setup                   |
-| runtime     | croner                                | MIT                                         | https://github.com/hexagon/croner                           |
-| runtime     | cronstrue                             | MIT                                         | https://github.com/bradymholt/cRonstrue                     |
-| runtime     | d3-geo                                | ISC                                         | https://github.com/d3/d3-geo                                |
-| runtime     | dompurify                             | (MPL-2.0 OR Apache-2.0), eleição Apache-2.0 | https://github.com/cure53/DOMPurify                         |
-| runtime     | hono                                  | MIT                                         | https://github.com/honojs/hono                              |
-| runtime     | lowlight                              | MIT                                         | https://github.com/wooorm/lowlight                          |
-| runtime     | lucide-react                          | ISC                                         | https://github.com/lucide-icons/lucide                      |
-| runtime     | mammoth                               | BSD-2-Clause                                | https://github.com/mwilliamson/mammoth.js                   |
-| runtime     | marked                                | MIT                                         | https://github.com/markedjs/marked                          |
-| runtime     | prosemirror-model                     | MIT                                         | https://code.haverbeke.berlin/prosemirror/prosemirror-model |
-| runtime     | prosemirror-state                     | MIT                                         | https://github.com/prosemirror/prosemirror-state            |
-| runtime     | prosemirror-view                      | MIT                                         | https://code.haverbeke.berlin/prosemirror/prosemirror-view  |
-| runtime     | react                                 | MIT                                         | https://github.com/react/react                              |
-| runtime     | react-dom                             | MIT                                         | https://github.com/react/react                              |
-| runtime     | sanitize-html                         | MIT                                         | https://github.com/apostrophecms/apostrophe                 |
-| runtime     | spark-md5                             | (WTFPL OR MIT), eleição MIT                 | https://github.com/satazor/js-spark-md5                     |
-| runtime     | tiptap-markdown                       | MIT                                         | https://github.com/aguingand/tiptap-markdown                |
-| runtime     | topojson-client                       | ISC                                         | https://github.com/topojson/topojson-client                 |
-| runtime     | world-atlas                           | ISC                                         | https://github.com/topojson/world-atlas                     |
-| runtime     | y-protocols                           | MIT                                         | https://github.com/yjs/y-protocols                          |
-| runtime     | yjs                                   | MIT                                         | https://github.com/yjs/yjs                                  |
-| development | @biomejs/biome                        | MIT OR Apache-2.0, eleição MIT              | https://github.com/biomejs/biome                            |
-| development | @cloudflare/workers-types             | MIT OR Apache-2.0, eleição MIT              | https://github.com/cloudflare/workerd                       |
-| development | @eslint/js                            | MIT                                         | https://github.com/eslint/eslint                            |
-| development | @playwright/test                      | Apache-2.0                                  | https://github.com/microsoft/playwright                     |
-| development | @testing-library/dom                  | MIT                                         | https://github.com/testing-library/dom-testing-library      |
-| development | @testing-library/jest-dom             | MIT                                         | https://github.com/testing-library/jest-dom                 |
-| development | @testing-library/react                | MIT                                         | https://github.com/testing-library/react-testing-library    |
-| development | @testing-library/user-event           | MIT                                         | https://github.com/testing-library/user-event               |
-| development | @types/d3-geo                         | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped          |
-| development | @types/node                           | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped          |
-| development | @types/react                          | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped          |
-| development | @types/react-dom                      | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped          |
-| development | @types/sanitize-html                  | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped          |
-| development | @types/spark-md5                      | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped          |
-| development | @types/topojson-client                | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped          |
-| development | @vitejs/plugin-react                  | MIT                                         | https://github.com/vitejs/vite-plugin-react                 |
-| development | @vitest/coverage-v8                   | MIT                                         | https://github.com/vitest-dev/vitest                        |
-| development | @vitest/ui                            | MIT                                         | https://github.com/vitest-dev/vitest                        |
-| development | eslint                                | MIT                                         | https://github.com/eslint/eslint                            |
-| development | eslint-config-prettier                | MIT                                         | https://github.com/prettier/eslint-config-prettier          |
-| development | eslint-plugin-react-hooks             | MIT                                         | https://github.com/facebook/react                           |
-| development | eslint-plugin-react-refresh           | MIT                                         | https://github.com/ArnaudBarre/eslint-plugin-react-refresh  |
-| development | globals                               | MIT                                         | https://github.com/sindresorhus/globals                     |
-| development | happy-dom                             | MIT                                         | https://github.com/capricorn86/happy-dom                    |
-| development | husky                                 | MIT                                         | https://github.com/typicode/husky                           |
-| development | knip                                  | ISC                                         | https://github.com/webpro-nl/knip                           |
-| development | lightningcss                          | MPL-2.0                                     | https://github.com/parcel-bundler/lightningcss              |
-| development | lint-staged                           | MIT                                         | https://github.com/lint-staged/lint-staged                  |
-| development | prettier                              | MIT                                         | https://github.com/prettier/prettier                        |
-| development | rollup-plugin-visualizer              | MIT                                         | https://github.com/btd/rollup-plugin-visualizer             |
-| development | typescript                            | Apache-2.0                                  | https://github.com/microsoft/TypeScript                     |
-| development | typescript-eslint                     | MIT                                         | https://github.com/typescript-eslint/typescript-eslint      |
-| development | vite                                  | MIT                                         | https://github.com/vitejs/vite                              |
-| development | vitest                                | MIT                                         | https://github.com/vitest-dev/vitest                        |
-| development | wrangler                              | MIT OR Apache-2.0, eleição MIT              | https://github.com/cloudflare/workers-sdk                   |
+| Escopo      | Componente                            | Licença                                     | Fonte                                                                                  |
+| ----------- | ------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| runtime     | @codemirror/lang-javascript           | MIT                                         | https://github.com/codemirror/lang-javascript                                          |
+| runtime     | @fontsource/inter                     | OFL-1.1                                     | https://github.com/fontsource/font-files (`fonts/google/inter`)                        |
+| runtime     | @radix-ui/react-dialog                | MIT                                         | https://github.com/radix-ui/primitives (`packages/react/dialog`)                       |
+| runtime     | @tanstack/react-query                 | MIT                                         | https://github.com/TanStack/query (`packages/react-query`)                             |
+| runtime     | @tanstack/react-query-devtools        | MIT                                         | https://github.com/TanStack/query (`packages/react-query-devtools`)                    |
+| runtime     | @tiptap/core                          | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/core`)                                 |
+| runtime     | @tiptap/extension-character-count     | MIT                                         | https://github.com/ueberdosis/tiptap (`packages-deprecated/extension-character-count`) |
+| runtime     | @tiptap/extension-code-block-lowlight | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-code-block-lowlight`)        |
+| runtime     | @tiptap/extension-collaboration       | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-collaboration`)              |
+| runtime     | @tiptap/extension-color               | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-color`)                      |
+| runtime     | @tiptap/extension-drag-handle         | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-drag-handle`)                |
+| runtime     | @tiptap/extension-drag-handle-react   | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-drag-handle-react`)          |
+| runtime     | @tiptap/extension-dropcursor          | MIT                                         | https://github.com/ueberdosis/tiptap (`packages-deprecated/extension-dropcursor`)      |
+| runtime     | @tiptap/extension-focus               | MIT                                         | https://github.com/ueberdosis/tiptap (`packages-deprecated/extension-focus`)           |
+| runtime     | @tiptap/extension-font-family         | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-font-family`)                |
+| runtime     | @tiptap/extension-highlight           | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-highlight`)                  |
+| runtime     | @tiptap/extension-image               | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-image`)                      |
+| runtime     | @tiptap/extension-link                | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-link`)                       |
+| runtime     | @tiptap/extension-mention             | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-mention`)                    |
+| runtime     | @tiptap/extension-node-range          | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-node-range`)                 |
+| runtime     | @tiptap/extension-placeholder         | MIT                                         | https://github.com/ueberdosis/tiptap (`packages-deprecated/extension-placeholder`)     |
+| runtime     | @tiptap/extension-subscript           | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-subscript`)                  |
+| runtime     | @tiptap/extension-superscript         | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-superscript`)                |
+| runtime     | @tiptap/extension-table               | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-table`)                      |
+| runtime     | @tiptap/extension-table-cell          | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-table-cell`)                 |
+| runtime     | @tiptap/extension-table-header        | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-table-header`)               |
+| runtime     | @tiptap/extension-table-row           | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-table-row`)                  |
+| runtime     | @tiptap/extension-task-item           | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-task-item`)                  |
+| runtime     | @tiptap/extension-task-list           | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-task-list`)                  |
+| runtime     | @tiptap/extension-text-align          | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-text-align`)                 |
+| runtime     | @tiptap/extension-text-style          | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-text-style`)                 |
+| runtime     | @tiptap/extension-typography          | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-typography`)                 |
+| runtime     | @tiptap/extension-youtube             | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/extension-youtube`)                    |
+| runtime     | @tiptap/pm                            | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/pm`)                                   |
+| runtime     | @tiptap/react                         | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/react`)                                |
+| runtime     | @tiptap/starter-kit                   | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/starter-kit`)                          |
+| runtime     | @tiptap/suggestion                    | MIT                                         | https://github.com/ueberdosis/tiptap (`packages/suggestion`)                           |
+| runtime     | @tiptap/y-tiptap                      | MIT                                         | https://github.com/ueberdosis/y-tiptap                                                 |
+| runtime     | codemirror                            | MIT                                         | https://github.com/codemirror/basic-setup                                              |
+| runtime     | croner                                | MIT                                         | https://github.com/hexagon/croner                                                      |
+| runtime     | cronstrue                             | MIT                                         | https://github.com/bradymholt/cRonstrue                                                |
+| runtime     | d3-geo                                | ISC                                         | https://github.com/d3/d3-geo                                                           |
+| runtime     | dompurify                             | (MPL-2.0 OR Apache-2.0), eleição Apache-2.0 | https://github.com/cure53/DOMPurify                                                    |
+| runtime     | hono                                  | MIT                                         | https://github.com/honojs/hono                                                         |
+| runtime     | lowlight                              | MIT                                         | https://github.com/wooorm/lowlight                                                     |
+| runtime     | lucide-react                          | ISC                                         | https://github.com/lucide-icons/lucide (`packages/lucide-react`)                       |
+| runtime     | mammoth                               | BSD-2-Clause                                | https://github.com/mwilliamson/mammoth.js                                              |
+| runtime     | marked                                | MIT                                         | https://github.com/markedjs/marked                                                     |
+| runtime     | prosemirror-model                     | MIT                                         | https://code.haverbeke.berlin/prosemirror/prosemirror-model                            |
+| runtime     | prosemirror-state                     | MIT                                         | https://github.com/prosemirror/prosemirror-state                                       |
+| runtime     | prosemirror-view                      | MIT                                         | https://code.haverbeke.berlin/prosemirror/prosemirror-view                             |
+| runtime     | react                                 | MIT                                         | https://github.com/react/react (`packages/react`)                                      |
+| runtime     | react-dom                             | MIT                                         | https://github.com/react/react (`packages/react-dom`)                                  |
+| runtime     | sanitize-html                         | MIT                                         | https://github.com/apostrophecms/apostrophe (`packages/sanitize-html`)                 |
+| runtime     | spark-md5                             | (WTFPL OR MIT), eleição MIT                 | https://github.com/satazor/js-spark-md5                                                |
+| runtime     | tiptap-markdown                       | MIT                                         | https://github.com/aguingand/tiptap-markdown                                           |
+| runtime     | topojson-client                       | ISC                                         | https://github.com/topojson/topojson-client                                            |
+| runtime     | world-atlas                           | ISC                                         | https://github.com/topojson/world-atlas                                                |
+| runtime     | y-protocols                           | MIT                                         | https://github.com/yjs/y-protocols                                                     |
+| runtime     | yjs                                   | MIT                                         | https://github.com/yjs/yjs                                                             |
+| development | @biomejs/biome                        | MIT OR Apache-2.0, eleição MIT              | https://github.com/biomejs/biome (`packages/@biomejs/biome`)                           |
+| development | @cloudflare/workers-types             | MIT OR Apache-2.0, eleição MIT              | https://github.com/cloudflare/workerd                                                  |
+| development | @eslint/js                            | MIT                                         | https://github.com/eslint/eslint (`packages/js`)                                       |
+| development | @playwright/test                      | Apache-2.0                                  | https://github.com/microsoft/playwright                                                |
+| development | @testing-library/dom                  | MIT                                         | https://github.com/testing-library/dom-testing-library                                 |
+| development | @testing-library/jest-dom             | MIT                                         | https://github.com/testing-library/jest-dom                                            |
+| development | @testing-library/react                | MIT                                         | https://github.com/testing-library/react-testing-library                               |
+| development | @testing-library/user-event           | MIT                                         | https://github.com/testing-library/user-event                                          |
+| development | @types/d3-geo                         | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped (`types/d3-geo`)                    |
+| development | @types/node                           | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped (`types/node`)                      |
+| development | @types/react                          | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped (`types/react`)                     |
+| development | @types/react-dom                      | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped (`types/react-dom`)                 |
+| development | @types/sanitize-html                  | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped (`types/sanitize-html`)             |
+| development | @types/spark-md5                      | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped (`types/spark-md5`)                 |
+| development | @types/topojson-client                | MIT                                         | https://github.com/DefinitelyTyped/DefinitelyTyped (`types/topojson-client`)           |
+| development | @vitejs/plugin-react                  | MIT                                         | https://github.com/vitejs/vite-plugin-react (`packages/plugin-react`)                  |
+| development | @vitest/coverage-v8                   | MIT                                         | https://github.com/vitest-dev/vitest (`packages/coverage-v8`)                          |
+| development | @vitest/ui                            | MIT                                         | https://github.com/vitest-dev/vitest (`packages/ui`)                                   |
+| development | eslint                                | MIT                                         | https://github.com/eslint/eslint                                                       |
+| development | eslint-config-prettier                | MIT                                         | https://github.com/prettier/eslint-config-prettier                                     |
+| development | eslint-plugin-react-hooks             | MIT                                         | https://github.com/facebook/react (`packages/eslint-plugin-react-hooks`)               |
+| development | eslint-plugin-react-refresh           | MIT                                         | https://github.com/ArnaudBarre/eslint-plugin-react-refresh                             |
+| development | globals                               | MIT                                         | https://github.com/sindresorhus/globals                                                |
+| development | happy-dom                             | MIT                                         | https://github.com/capricorn86/happy-dom                                               |
+| development | husky                                 | MIT                                         | https://github.com/typicode/husky                                                      |
+| development | knip                                  | ISC                                         | https://github.com/webpro-nl/knip (`packages/knip`)                                    |
+| development | lightningcss                          | MPL-2.0                                     | https://github.com/parcel-bundler/lightningcss                                         |
+| development | lint-staged                           | MIT                                         | https://github.com/lint-staged/lint-staged                                             |
+| development | prettier                              | MIT                                         | https://github.com/prettier/prettier                                                   |
+| development | rollup-plugin-visualizer              | MIT                                         | https://github.com/btd/rollup-plugin-visualizer                                        |
+| development | typescript                            | Apache-2.0                                  | https://github.com/microsoft/TypeScript                                                |
+| development | typescript-eslint                     | MIT                                         | https://github.com/typescript-eslint/typescript-eslint (`packages/typescript-eslint`)  |
+| development | vite                                  | MIT                                         | https://github.com/vitejs/vite (`packages/vite`)                                       |
+| development | vitest                                | MIT                                         | https://github.com/vitest-dev/vitest (`packages/vitest`)                               |
+| development | wrangler                              | MIT OR Apache-2.0, eleição MIT              | https://github.com/cloudflare/workers-sdk (`packages/wrangler`)                        |
 
 ## Inventário: tlsrpt-motor/package.json
 
-| Escopo      | Componente                      | Licença                        | Fonte                                     |
-| ----------- | ------------------------------- | ------------------------------ | ----------------------------------------- |
-| runtime     | postal-mime                     | MIT-0                          | https://github.com/postalsys/postal-mime  |
-| development | @biomejs/biome                  | MIT OR Apache-2.0, eleição MIT | https://github.com/biomejs/biome          |
-| development | @cloudflare/vitest-pool-workers | MIT                            | https://github.com/cloudflare/workers-sdk |
-| development | vitest                          | MIT                            | https://github.com/vitest-dev/vitest      |
-| development | wrangler                        | MIT OR Apache-2.0, eleição MIT | https://github.com/cloudflare/workers-sdk |
+| Escopo      | Componente                      | Licença                        | Fonte                                                                      |
+| ----------- | ------------------------------- | ------------------------------ | -------------------------------------------------------------------------- |
+| runtime     | postal-mime                     | MIT-0                          | https://github.com/postalsys/postal-mime                                   |
+| development | @biomejs/biome                  | MIT OR Apache-2.0, eleição MIT | https://github.com/biomejs/biome (`packages/@biomejs/biome`)               |
+| development | @cloudflare/vitest-pool-workers | MIT                            | https://github.com/cloudflare/workers-sdk (`packages/vitest-pool-workers`) |
+| development | vitest                          | MIT                            | https://github.com/vitest-dev/vitest (`packages/vitest`)                   |
+| development | wrangler                        | MIT OR Apache-2.0, eleição MIT | https://github.com/cloudflare/workers-sdk (`packages/wrangler`)            |
 
 ## Componente incorporado ao Worker TLS-RPT
 
-`postal-mime@3.0.0` é publicado sob MIT-0, mas incorpora em
+`postal-mime` é publicado sob MIT-0, mas incorpora em
 `src/base64-encoder.js` o componente `base64ArrayBuffer`, de Jon Leighton, sob
 MIT clássica. O Worker usa esse código em runtime. Como o comentário original
 não possui um marcador de comentário legal reconhecido pelo esbuild, o
 entrypoint local reproduz o aviso abaixo com `/*!`, formato preservado pelo
 empacotador oficial usado pelo Wrangler.
 
-| Componente                       | Relação com o Worker                                               | Licença aplicada | Proveniência imutável                                                                                                                                                                                                                                                               |
-| -------------------------------- | ------------------------------------------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| base64ArrayBuffer (Jon Leighton) | Incorporado por `postal-mime@3.0.0` e alcançável no bundle TLS-RPT | MIT              | Tarball `https://registry.npmjs.org/postal-mime/-/postal-mime-3.0.0.tgz`; SRI `sha512-Z4a9ar2Bv3YpK3IXag+Yda30k7bMZfpRuUGyqtHnZ2pjHG8Bl62EhZIk4n1dzv00gfzP9g+94e9kd8+XmjVWLA==`; `src/base64-encoder.js` SHA-256 `71161FF0AB6BEDF58A047D3FC5631B50D5F60655938A418D9F49CAC75BC01251` |
+| Componente                       | Relação com o Worker                                         | Licença aplicada | Fonte                                                                |
+| -------------------------------- | ------------------------------------------------------------ | ---------------- | -------------------------------------------------------------------- |
+| base64ArrayBuffer (Jon Leighton) | Incorporado por `postal-mime` e alcançável no bundle TLS-RPT | MIT              | <https://github.com/postalsys/postal-mime> (`src/base64-encoder.js`) |
 
 ### base64ArrayBuffer — MIT
 
@@ -150,16 +150,16 @@ acompanha o tarball npm ou uma seção nativa vazia porque o pacote publicado n�
 inclui o arquivo de licença. Estes complementos não substituem
 `legal/BUNDLED-LICENSES.md`; cobrem precisamente essas fronteiras comprovadas.
 
-| Componente                           | Relação com o bundle                                                                                                     | Licença aplicada                              | Proveniência imutável                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| JSZip 3.10.1                         | Incorporado por Mammoth e detectado pelo inventário nativo do Vite                                                       | `(MIT OR GPL-3.0-or-later)`; eleição: **MIT** | SRI `sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==`; `https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz`                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Pako 1.0.5                           | Vendorizado na distribuição browser do JSZip 3.10.1; não recebe seção própria do inventário nativo                       | `(MIT AND Zlib)`; **ambas** se aplicam        | JSZip `v3.10.1`/commit `0f2f1e4d0509514417db83fe5b86bde90e0ffe8d`; lock oficial fixa `pako@1.0.5`; `dist/jszip.min.js` SHA-256 `ACC7E41455A80765B5FD9C7EE1B8078A6D160BBBCA455AEAE854DE65C947D59E`; SRI `sha512-umumrxStF9I4G8OZlhzEgTlwktjp4bofYq7E0mfH/IM7fctJ1pzLBhVrhNmP86hA1b3RNP5gAzxJJ4mjj0Up6Q==`; `https://registry.npmjs.org/pako/-/pako-1.0.5.tgz`                                                                                                                                                                                                                                                                      |
-| Spark MD5 3.0.2                      | Dependência direta detectada pelo Vite; o projeto usa a alternativa oficial MIT                                          | `(WTFPL OR MIT)`; eleição: **MIT**            | tag oficial `v3.0.2`, commit `9315385868fe11076674d4ddd763005319a462a7`, arquivo `LICENSE2`, SHA-256 `6E7ABBD885F650C938CF377A6EDCAD56C7DCB61DE092853AF6141D806F8C9F04`                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| dingbat-to-unicode 1.0.1             | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | BSD-2-Clause; aviso de copyright inconclusivo | SRI `sha512-98l0sW87ZT58pU4i61wa2OHwxbiYSbuxsCBozaVnYX2iCnr3bLM3fIes1/ej7h1YdOKuKt/MLs706TVnALA65w==`; `https://registry.npmjs.org/dingbat-to-unicode/-/dingbat-to-unicode-1.0.1.tgz`; `package/package.json` SHA-256 `E34A07AF5C8074EC60FDC1F9DB775D117D2B2F985D88175C455C9FC37F898D59`, byte-idêntico ao blob `ebe4c8b90b43316a9e2a2e4cdf3a075895aecf60` da tag anotada `js-1.0.1`, objeto `bf8184cc2522b6f30a4c35e5062418382ff03667`, commit `b27f259b49907f99b1b9097abba5a9668106b779`                                                                                                                                        |
-| react-remove-scroll-bar 2.3.8        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; aviso de copyright inconclusivo          | SRI `sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==`; `https://registry.npmjs.org/react-remove-scroll-bar/-/react-remove-scroll-bar-2.3.8.tgz`; `package/package.json` SHA-256 `E372F857CE05F266137C65293436B5380FEC42AC311E6ACB9378ED78B98D75D0`; `package/README.md` SHA-256 `486442209236FFA3893312E508694699A6B8834D30A2F9C083C1F3379983E4F9`; `gitHead` npm `b3b1287aad81def2e2ae707274b74531b61ddbaf` não alcançável; `LICENSE` posterior no commit `7301c160fda44cb8cf2b9fdfde61efad35736196`, SHA-256 `A79AAE0C0F21990D9D963BB3C5A79CDCEA9A46F8523BA55C58D7FE776B6EBC84` |
-| Assets do scaffold create-vite 8.0.0 | `src/assets/hero.png`, `react.svg` e `vite.svg`; distribuídos no código-fonte, sem consumidores e fora do bundle público | MIT                                           | tag oficial `v8.0.0`, commit `b565af6f1123a62b3058253b2147574b8515e89f`; SHA-256 respectivos `72A860570EDDF1DD9988F26C7106C67BE286BC9F2FD3303C465CE87EDB1AE6CD`, `35EF61ED53B323AE94A16A8EC659B3D0AF3880698791133F23B084085AB1C2E5` e `5BE21ACD42EB7B896E517F4E0F0F11EB5C5D9E54FBBCEBE9453F033008FCCA6F`; licença SHA-256 `692057AF3D664CBB79AC38293EB50AA3C4987F8182E2A440136E59E08F1B4A54`                                                                                                                                                                                                                                      |
+| Componente                     | Relação com o bundle                                                                                                     | Licença aplicada                              | Fonte                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------- |
+| JSZip                          | Incorporado por Mammoth e detectado pelo inventário nativo do Vite                                                       | `(MIT OR GPL-3.0-or-later)`; eleição: **MIT** | <https://github.com/Stuk/jszip>                                |
+| Pako                           | Vendorizado na distribuição browser do JSZip; não recebe seção própria do inventário nativo                              | `(MIT AND Zlib)`; **ambas** se aplicam        | <https://github.com/nodeca/pako>                               |
+| Spark MD5                      | Dependência direta detectada pelo Vite; o projeto usa a alternativa oficial MIT                                          | `(WTFPL OR MIT)`; eleição: **MIT**            | <https://github.com/satazor/js-spark-md5> (arquivo `LICENSE2`) |
+| dingbat-to-unicode             | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | BSD-2-Clause; aviso de copyright inconclusivo | <https://github.com/mwilliamson/dingbat-to-unicode>            |
+| react-remove-scroll-bar        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; aviso de copyright inconclusivo          | <https://github.com/theKashey/react-remove-scroll-bar>         |
+| Assets do scaffold create-vite | `src/assets/hero.png`, `react.svg` e `vite.svg`; distribuídos no código-fonte, sem consumidores e fora do bundle público | MIT                                           | <https://github.com/vitejs/vite> (`packages/create-vite`)      |
 
-### Assets do scaffold create-vite 8.0.0 — MIT
+### Assets do scaffold create-vite — MIT
 
 Os três assets fonte identificados na tabela coincidem byte a byte com o
 template React TypeScript da tag oficial `v8.0.0`. Eles não são importados e
@@ -190,18 +190,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### JSZip 3.10.1 — MIT
+### JSZip — MIT
 
 O texto MIT integral do JSZip é preservado automaticamente em
 `legal/BUNDLED-LICENSES.md`. A eleição acima evita aplicar a alternativa GPLv3
 ao componente.
 
-### Pako 1.0.5 — MIT e Zlib
+### Pako — MIT e Zlib
 
-Embora o lockfile deste repositório também resolva `pako@1.0.11` como pacote
-transitivo, o campo `browser` do JSZip seleciona `dist/jszip.min.js`, gerado com
-`pako@1.0.5` segundo o lockfile oficial e imutável do próprio JSZip 3.10.1. Os
-avisos a seguir correspondem aos bytes efetivamente distribuídos.
+O campo `browser` do JSZip seleciona `dist/jszip.min.js`, gerado com a versão
+do Pako fixada pelo lockfile oficial do próprio JSZip, distinta do `pako`
+transitivo resolvido neste repositório. Os avisos a seguir correspondem aos
+bytes efetivamente distribuídos.
 
 ```text
 (The MIT License)
@@ -248,10 +248,10 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 ```
 
-### Spark MD5 3.0.2 — MIT
+### Spark MD5 — MIT
 
-O repositório oficial oferece a MIT como alternativa no `LICENSE2` da tag
-`v3.0.2`; o SHA-256 registrado na tabela de complementos fixa o texto escolhido à versão instalada.
+O repositório oficial oferece a MIT como alternativa no arquivo `LICENSE2`; o
+texto abaixo reproduz o da versão instalada no momento da escrita.
 
 ```text
 Copyright (c) 2015 André Cruz <amdfcruz@gmail.com>
@@ -275,10 +275,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### dingbat-to-unicode 1.0.1 — BSD-2-Clause
+### dingbat-to-unicode — BSD-2-Clause
 
-O tarball npm identificado pelo SRI registrado na tabela de complementos e o `js/package.json` da tag anotada
-`js-1.0.1` são byte-idênticos; ambos declaram `BSD-2-Clause` e identificam
+O tarball npm e o `js/package.json` da tag correspondente no repositório
+upstream são byte-idênticos; ambos declaram `BSD-2-Clause` e identificam
 Michael Williamson como autor. O
 [contrato oficial do npm](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#license)
 usa o identificador SPDX para declarar como o pacote pode ser usado, mas
@@ -312,13 +312,13 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### react-remove-scroll-bar 2.3.8 — MIT
+### react-remove-scroll-bar — MIT
 
-O `package.json` e o `README.md` do tarball npm identificado pelo SRI registrado na tabela de complementos declaram
-`MIT` de forma independente e o manifesto identifica Anton Korzunov como autor.
+O `package.json` e o `README.md` do tarball npm declaram `MIT` de forma
+independente e o manifesto identifica Anton Korzunov como autor.
 O `gitHead` publicado no registro npm já não é alcançável no repositório; o
 `LICENSE` acrescentado depois apenas corrobora os termos e não comprova o aviso
-histórico da versão 2.3.8. Resultado: **INCONCLUSIVO** quanto ao aviso de
+histórico da versão instalada. Resultado: **INCONCLUSIVO** quanto ao aviso de
 copyright da versão exata. O suplemento separa a atribuição literal do manifesto
 dos [termos canônicos da MIT](https://spdx.org/licenses/MIT), sem inventar
 titular, ano ou aviso de copyright ausente no artefato.
@@ -347,10 +347,9 @@ SOFTWARE.
 
 ## Cartografia local e dados Natural Earth
 
-O mapa planetário de localidade é renderizado no navegador com `d3-geo@3.1.1`,
-`topojson-client@3.1.0` e o arquivo `countries-110m.json` de
-`world-atlas@2.0.2`. As três dependências estão fixadas exatamente no manifesto
-e no lockfile. O arquivo cartográfico deriva dos limites administrativos
+O mapa planetário de localidade é renderizado no navegador com `d3-geo`,
+`topojson-client` e o arquivo `countries-110m.json` de `world-atlas`. As três
+dependências estão declaradas no manifesto e resolvidas no lockfile. O arquivo cartográfico deriva dos limites administrativos
 Natural Earth 4.1.0 em escala 1:110m. Segundo os
 [termos de uso oficiais](https://www.naturalearthdata.com/about/terms-of-use/),
 os dados vetoriais e raster Natural Earth são de domínio público.
@@ -362,7 +361,7 @@ o aplicativo.
 
 ## Avisos de licenças da cartografia
 
-### d3-geo 3.1.1 — ISC e GeographicLib — MIT
+### d3-geo — ISC e GeographicLib — MIT
 
 ```text
 Copyright 2010-2024 Mike Bostock
@@ -401,7 +400,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### d3-array 3.2.4 — ISC
+### d3-array — ISC
 
 ```text
 Copyright 2010-2023 Mike Bostock
@@ -419,7 +418,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### internmap 2.0.3 — ISC
+### internmap — ISC
 
 ```text
 Copyright 2021 Mike Bostock
@@ -437,7 +436,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### topojson-client 3.1.0 — ISC
+### topojson-client — ISC
 
 ```text
 Copyright 2012-2019 Michael Bostock
@@ -455,7 +454,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### commander 2.20.3 — MIT
+### commander — MIT
 
 ```text
 (The MIT License)
@@ -482,7 +481,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### world-atlas 2.0.2 — ISC
+### world-atlas — ISC
 
 ```text
 Copyright 2013-2019 Michael Bostock

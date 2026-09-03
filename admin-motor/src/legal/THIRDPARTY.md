@@ -6,26 +6,26 @@ A versão instalada de cada pacote vive em `package-lock.json`, onde o Dependabo
 
 ## Inventário efetivo
 
-| Componente | Licença | Fonte |
-| --- | --- | --- |
-| `dayjs` | `MIT` | <https://github.com/iamkun/dayjs> |
-| `deepmerge` | `MIT` | <https://github.com/TehShrike/deepmerge> |
-| `dom-serializer` | `MIT` | <https://github.com/cheeriojs/dom-serializer> |
-| `domelementtype` | `BSD-2-Clause` | <https://github.com/fb55/domelementtype> |
-| `domhandler` | `BSD-2-Clause` | <https://github.com/fb55/domhandler> |
-| `domutils` | `BSD-2-Clause` | <https://github.com/fb55/domutils> |
-| `entities` | `BSD-2-Clause` | <https://github.com/fb55/entities> |
-| `escape-string-regexp` | `MIT` | <https://github.com/sindresorhus/escape-string-regexp> |
-| `hono` | `MIT` | <https://github.com/honojs/hono> |
-| `htmlparser2` | `MIT` | <https://github.com/fb55/htmlparser2> |
-| `is-plain-object` | `MIT` | <https://github.com/jonschlinkert/is-plain-object> |
-| `launder` | `MIT` | <https://github.com/apostrophecms/apostrophe> |
-| `marked` | `MIT` | <https://github.com/markedjs/marked> |
-| `nanoid` | `MIT` | <https://github.com/ai/nanoid> |
-| `parse-srcset` | `MIT` | <https://github.com/albell/parse-srcset> |
-| `picocolors` | `ISC` | <https://github.com/alexeyraspopov/picocolors> |
-| `postcss` | `MIT` | <https://github.com/postcss/postcss> |
-| `sanitize-html` | `MIT` | <https://github.com/apostrophecms/apostrophe> |
+| Componente             | Licença        | Fonte                                                                    |
+| ---------------------- | -------------- | ------------------------------------------------------------------------ |
+| `dayjs`                | `MIT`          | <https://github.com/iamkun/dayjs>                                        |
+| `deepmerge`            | `MIT`          | <https://github.com/TehShrike/deepmerge>                                 |
+| `dom-serializer`       | `MIT`          | <https://github.com/cheeriojs/dom-serializer>                            |
+| `domelementtype`       | `BSD-2-Clause` | <https://github.com/fb55/domelementtype>                                 |
+| `domhandler`           | `BSD-2-Clause` | <https://github.com/fb55/domhandler>                                     |
+| `domutils`             | `BSD-2-Clause` | <https://github.com/fb55/domutils>                                       |
+| `entities`             | `BSD-2-Clause` | <https://github.com/fb55/entities>                                       |
+| `escape-string-regexp` | `MIT`          | <https://github.com/sindresorhus/escape-string-regexp>                   |
+| `hono`                 | `MIT`          | <https://github.com/honojs/hono>                                         |
+| `htmlparser2`          | `MIT`          | <https://github.com/fb55/htmlparser2>                                    |
+| `is-plain-object`      | `MIT`          | <https://github.com/jonschlinkert/is-plain-object>                       |
+| `launder`              | `MIT`          | <https://github.com/apostrophecms/apostrophe> (`packages/launder`)       |
+| `marked`               | `MIT`          | <https://github.com/markedjs/marked>                                     |
+| `nanoid`               | `MIT`          | <https://github.com/ai/nanoid>                                           |
+| `parse-srcset`         | `MIT`          | <https://github.com/albell/parse-srcset>                                 |
+| `picocolors`           | `ISC`          | <https://github.com/alexeyraspopov/picocolors>                           |
+| `postcss`              | `MIT`          | <https://github.com/postcss/postcss>                                     |
+| `sanitize-html`        | `MIT`          | <https://github.com/apostrophecms/apostrophe> (`packages/sanitize-html`) |
 
 ## dayjs — MIT
 

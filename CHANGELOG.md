@@ -31,9 +31,9 @@
   `tlsrpt-motor` sem versão, SRI ou tarball nas tabelas de dependências
   diretas: versões e resoluções imutáveis vivem nos manifestos e nos lockfiles,
   onde o Dependabot as atualiza, e o grafo de dependências do GitHub é o
-  inventário versionado; os complementos e o `NOTICE` continuam fixados à
-  versão instalada e exigem atualização manual a cada bump, e o módulo Text do
-  Admin Motor passa a listar os pacotes incorporados por nome, licença e fonte.
+  inventário versionado; os complementos, o `NOTICE` e o módulo Text do Admin
+  Motor também identificam os componentes por nome, licença e fonte, e os
+  textos de licença reproduzem a versão instalada no momento da escrita.
   O build público
   continua usando `build.license`, recurso nativo do Vite, para publicar em
   `legal/BUNDLED-LICENSES.md` os textos disponibilizados por todo componente
