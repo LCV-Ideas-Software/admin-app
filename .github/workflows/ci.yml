@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ['main']
+    # `edited` covers a pull request retargeted to main; without it the
+    # required check would not run until the next push.
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - edited
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NODE_OPTIONS: '--no-deprecation'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          check-latest: true
+          package-manager-cache: false
+
+      - name: Verify npm registry
+        shell: bash
+        run: test "$(npm config get registry)" = "https://registry.npmjs.org/"
+
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --prefix tlsrpt-motor --ignore-scripts --no-audit --no-fund
+
+      - name: Validate admin application
+        run: |
+          npm run lint
+          npm run biome
+          npm test
+          npm run test:admin-motor
+          npm run typecheck:admin-motor
+          npm run build
+
+      - name: Validate TLS-RPT Motor
+        working-directory: tlsrpt-motor
+        run: |
+          npm run lint
+          npm test
+
+      - name: Validate Worker bundles
+        run: |
+          npm exec -- wrangler deploy --dry-run --strict --cwd tlsrpt-motor
+          npm exec -- wrangler deploy --dry-run --strict --cwd admin-motor

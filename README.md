@@ -7,7 +7,6 @@
 [![status: stable](https://img.shields.io/badge/status-stable-brightgreen.svg)](#status)
 [![Deploy](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/deploy.yml/badge.svg)](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/deploy.yml)
 [![Pages](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/pages.yml/badge.svg)](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/pages.yml)
-[![CodeQL](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/codeql.yml/badge.svg)](https://github.com/LCV-Ideas-Software/admin-app/actions/workflows/codeql.yml)
 [![runtime: Cloudflare Pages + Workers](https://img.shields.io/badge/runtime-Cloudflare%20Pages%20%2B%20Workers-orange.svg)](https://workers.cloudflare.com/)
 [![framework: React 19 + Vite 8](https://img.shields.io/badge/framework-React%2019%20%2B%20Vite%208-61dafb.svg)](https://react.dev/)
 [![backend: Hono on Workers](https://img.shields.io/badge/backend-Hono%20on%20Workers-f97316.svg)](https://hono.dev/)
@@ -15,7 +14,7 @@
 
 **Operator admin dashboard** for a multi-app Cloudflare workspace. Single-tenant by design: it's the operator's control plane for moderation, configuration, AI model selection, DNS, Pages/Workers ops, and operational telemetry across a fleet of public apps that share a single Cloudflare D1 database.
 
-**Status.** Stable. Current internal source version: **APP v02.15.26**. The last
+**Status.** Stable. Current internal source version: **APP v02.15.27**. The last
 historical tagged release is `v02.15.22`; web deployments after that point keep
 their visible version and changelog without creating package, tag, or GitHub
 Release artifacts. See [CHANGELOG.md](./CHANGELOG.md) for the full history.
@@ -24,6 +23,7 @@ The version history at a glance:
 
 | Release         | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`APP v02.15.27`** | **Governança nativa da organização.** Saem o lockfile de Actions, o workflow avançado do CodeQL, o `Public Format` e o verificador legal próprio; entram o workflow `CI` em pull requests para `main`, o `dependabot-auto-merge.yml` canônico, o Dependabot semanal agrupado e o `INBOUND.md`; `THIRDPARTY.md` e a cópia servida passam a listar por nome, licença e fonte. Versão interna de fonte, sem tag ou GitHub Release. |
 | **`APP v02.15.26`** | **Endurece o sanitizador de e-mail do relatório astrológico.** O fallback sem `DOMParser` de `htmlToPlainText` passa a remover tags até estabilizar (antes vazava HTML cru para o corpo do e-mail), tags estruturais preservam quebras de linha no relatório texto e a sonda de esquema de atributos ignora caracteres de controle embutidos (`java&#x0d;script:`). Versão interna de fonte, sem tag ou GitHub Release. |
 | **`APP v02.15.25`** | **Endurece o guard de auditoria de links do Maestro AI.** A normalização de hostname em `isBlockedAuditHost` passa a remover o ponto-raiz final de FQDNs (`localhost.`, `*.internal.`) antes dos predicados de bloqueio, e a regex canônica de extração de links torna-se case-insensitive para que esquemas em maiúsculas (`HTTPS://…`) entrem no pipeline de auditoria em vez de contorná-lo. Versão interna de fonte, sem tag ou GitHub Release. |
 | **`APP v02.15.24`** | **Aposenta o modelo Anthropic datado da lista de sondagem do Maestro AI.** Remove `claude-opus-4-1-20250805` (aposentado upstream em 05/08/2026) dos candidatos Claude em `sessions.ts`; a seleção por sonda deixa de tentar um id morto. Versão interna de fonte, sem tag ou GitHub Release. |
@@ -292,9 +292,8 @@ not request an administrative PAT or GitHub App credential to self-enable it.
 
 - **License**: [AGPL-3.0-or-later](./LICENSE). Network-service trigger applies: running a modified fork as a public service obligates you to publish modifications.
 - **Notices**: see [NOTICE](./NOTICE) and [THIRDPARTY](./THIRDPARTY.md).
-  Pages publishes the Vite-native bundled-license inventory; each Worker is
-  validated independently from its Wrangler dry-run, and the Admin Motor ships
-  its complete notices as an additional `Text` module.
+  Pages publishes the Vite-native bundled-license inventory, and the Admin
+  Motor ships its notices as an additional `Text` module.
 - **Security disclosure**: see [SECURITY.md](./SECURITY.md).
 - **Code of conduct**: see [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 - **Changelog**: [CHANGELOG.md](./CHANGELOG.md).

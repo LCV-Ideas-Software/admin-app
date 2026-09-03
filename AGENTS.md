@@ -23,7 +23,10 @@ npm run lint
 npm run biome
 npm run typecheck:admin-motor
 npm run build
-npm run format:public:check
+npm --prefix tlsrpt-motor run lint
+npm --prefix tlsrpt-motor test -- --run
+npm exec -- wrangler deploy --dry-run --strict --cwd tlsrpt-motor
+npm exec -- wrangler deploy --dry-run --strict --cwd admin-motor
 ```
 
 ## Workspace Policy

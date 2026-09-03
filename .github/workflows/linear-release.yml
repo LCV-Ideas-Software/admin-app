@@ -1,63 +1,57 @@
-# This workflow is managed by gh actions-lock.
-
 name: Linear Release
-# Fase 2: a release no Linear só é criada quando o Deploy CONCLUIU COM SUCESSO —
-# release descreve mudança em produção, não merge. O gatilho workflow_run é
-# marcado pela persona auditor do zizmor como perigoso por poder executar código
-# de PR em contexto privilegiado; aqui não há essa superfície: o job exige
-# conclusão success do Deploy em main, faz checkout do SHA daquele run (código já
-# mergeado e confiável), roda com contents: read e nenhum dado controlado por
-# terceiros toca shell. Ignore pontual e justificado abaixo.
+
 on:
   workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows:
       - Deploy
     types:
       - completed
-# Política enterprise (Discussion #150): sem write-all. Conjunto vazio no escopo do
-# workflow e grant mínimo declarado no job.
+
 permissions: {}
-# Cada Deploy bem-sucedido precisa gerar sua própria release. `queue: max`
-# preserva todos os runs pendentes do grupo, e a conclusão na chave mantém runs
-# falhados (que o job ignora) separados dos runs de sucesso.
+
+# Each successful deployment records its own release. `queue: max` keeps every
+# pending run instead of replacing it, and the conclusion in the group keeps
+# failed runs, which the job skips, apart from successful ones.
 concurrency:
   group: linear-release-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.conclusion }}
   queue: max
+
 jobs:
   linear_release:
     name: Linear Release
-    # Só após Deploy bem-sucedido de main; deploy falhado ou de outra ref não
-    # gera release — a pipeline do Linear descreve somente o que chegou em produção.
+    # zizmor flags workflow_run because it runs with the privileges of the
+    # default branch. This job admits only a successful push-triggered run of
+    # the "Deploy" workflow on the default branch of this repository, checks
+    # out exactly the revision that run published, runs with contents: read
+    # and passes no run-controlled value to a shell.
     if: >-
+      github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Política zizmor da casa: secret só é lido dentro de environment dedicado.
-    # LINEAR_ACCESS_KEY vive como environment secret de linear-release — escopo
-    # restrito a criar releases na pipeline deste repositório, nada além.
     environment: linear-release
     permissions:
-      contents: read # o CLI lê o histórico de commits para associar issues à release
+      contents: read # The CLI reads commit history to associate issues with the release.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out the deployed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }} # o SHA que o Deploy publicou
-          fetch-depth: 0 # histórico completo: o CLI varre commits desde a última release
+          ref: ${{ github.event.workflow_run.head_sha }} # The revision the Deploy workflow published.
+          fetch-depth: 0 # Full history: the CLI scans commits since the last release.
           persist-credentials: false
 
-      # Action oficial da Linear, pinada ao commit da release v0.17.1, com a
-      # versão do CLI selecionada explicitamente. Desde a v0.16.1 o instalador
-      # verifica o CLI baixado contra um checksum SHA-256 publicado antes de
-      # executá-lo, fechando a lacuna rastreada em
-      # linear/linear-release-action#59.
+      # Linear's official action, pinned to the full-length SHA of v0.17.2. The
+      # CLI version is selected explicitly so a future rebuild of the action
+      # cannot change the tool that runs. The installer verifies the downloaded
+      # CLI against a published SHA-256 checksum before executing it.
       #
-      # A sincronização falha de forma visível: indisponibilidade, segredo
-      # expirado ou erro upstream deixam o workflow vermelho, evitando perder
-      # silenciosamente a release do SHA publicado.
-      - name: Create Linear release (action oficial)
+      # Fail-closed: an outage, a CLI error or an expired secret leaves the run
+      # red instead of hiding a divergence between GitHub and Linear.
+      - name: Create Linear release with the official action
         id: linear_release
-        uses: linear/linear-release-action@3f31fcf14c110cc53579fcc3575a26d469c413b4 # v0.17.1
+        uses: linear/linear-release-action@53ad0f863963e7f8e270fba18426bbb55ef55384 # v0.17.2
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
-          cli_version: v0.17.1
+          cli_version: v0.17.2

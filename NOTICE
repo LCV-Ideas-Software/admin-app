@@ -12,20 +12,19 @@ módulos e os textos disponibilizados pelos pacotes; THIRDPARTY.md complementa
 as seções upstream vazias, código vendorizado, eleições, dados, ativos e
 atribuições específicas. A divulgação completa é o conjunto dos dois arquivos.
 
-A cartografia local usa d3-geo 3.1.1 (ISC; inclui código GeographicLib sob MIT),
-suas dependências transitivas d3-array 3.2.4 e internmap 2.0.3 (ISC),
-topojson-client 3.1.0 (ISC), sua dependência transitiva commander 2.20.3 (MIT) e
-world-atlas 2.0.2 (ISC). O mapa-base 1:110m deriva do Natural Earth 4.1.0, cujos
+A cartografia local usa d3-geo (ISC; inclui código GeographicLib sob MIT), suas
+dependências transitivas d3-array e internmap (ISC), topojson-client (ISC), sua
+dependência transitiva commander (MIT) e world-atlas (ISC). O mapa-base 1:110m
+deriva do Natural Earth 4.1.0, cujos
 dados são disponibilizados em domínio público. "Natural Earth" indica apenas a
 proveniência dos dados e não constitui endosso.
 
 Os artefatos implantáveis preservam avisos por limites independentes:
 
-- o GitHub Pages/Cloudflare Pages publica `legal/THIRDPARTY.md`,
-  `legal/NOTICE.txt` e o inventário nativo `legal/BUNDLED-LICENSES.md` do
-  Vite;
+- o Cloudflare Pages publica, a partir do build do Vite, `legal/THIRDPARTY.md`,
+  `legal/NOTICE.txt` e o inventário nativo `legal/BUNDLED-LICENSES.md`;
 - o TLS-RPT Motor incorpora no bundle Wrangler o aviso MIT integral de
   `base64ArrayBuffer`;
 - o Admin Motor transporta `legal/THIRDPARTY.md` como módulo Text adicional
-  do Wrangler, contendo uma seção e o aviso integral para cada pacote
-  efetivamente identificado pelo metafile do bundle.
+  do Wrangler (regra nativa `rules`), com um aviso para cada pacote
+  inventariado em `admin-motor/src/legal/THIRDPARTY.md`.
