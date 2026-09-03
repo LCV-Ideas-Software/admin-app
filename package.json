@@ -133,7 +133,7 @@
       "undici": "7.29.0"
     },
     "vite": "$vite",
-    "@xmldom/xmldom": "^0.9.10",
+    "@xmldom/xmldom": "^0.9.12",
     "ws": "8.21.0",
     "esbuild": "0.28.1",
     "@babel/core": "7.29.6",
