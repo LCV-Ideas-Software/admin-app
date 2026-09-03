@@ -1,8 +1,8 @@
 # Avisos de componentes de terceiros — Admin Motor
 
-Este arquivo acompanha o Worker `admin-motor` como módulo adicional do tipo `Text`. O inventário cobre exatamente os 18 pacotes npm com código efetivamente incorporado ao bundle Wrangler informado para este artefato. Pacotes de desenvolvimento, ferramentas externas e entradas desabilitadas de zero byte não pertencem a este escopo.
+Este arquivo acompanha o Worker `admin-motor` como módulo adicional do tipo `Text`. O inventário cobre os 18 pacotes npm com código incorporado ao bundle Wrangler do Worker. Pacotes de desenvolvimento, ferramentas externas e entradas desabilitadas de zero byte não pertencem a este escopo.
 
-Versão, licença declarada, URL `resolved` e SRI `integrity` foram conferidos na entrada `packages` de `package-lock.json`; o texto de cada aviso foi reproduzido integralmente do pacote da mesma versão instalado em `node_modules`. O caminho e o SHA-256 de cada fonte permitem verificar o texto sem confundi-lo com outra versão homônima.
+Versão, licença declarada, URL `resolved` e SRI `integrity` reproduzem a entrada `packages` de `package-lock.json` no momento em que este aviso foi escrito; o texto de cada aviso foi reproduzido integralmente do pacote da mesma versão instalado em `node_modules`. O caminho e o SHA-256 de cada fonte permitem verificar o texto sem confundi-lo com outra versão homônima.
 
 ## Inventário efetivo
 

@@ -21,11 +21,10 @@ proveniência dos dados e não constitui endosso.
 
 Os artefatos implantáveis preservam avisos por limites independentes:
 
-- o GitHub Pages/Cloudflare Pages publica `legal/THIRDPARTY.md`,
-  `legal/NOTICE.txt` e o inventário nativo `legal/BUNDLED-LICENSES.md` do
-  Vite;
+- o Cloudflare Pages publica, a partir do build do Vite, `legal/THIRDPARTY.md`,
+  `legal/NOTICE.txt` e o inventário nativo `legal/BUNDLED-LICENSES.md`;
 - o TLS-RPT Motor incorpora no bundle Wrangler o aviso MIT integral de
   `base64ArrayBuffer`;
 - o Admin Motor transporta `legal/THIRDPARTY.md` como módulo Text adicional
-  do Wrangler, contendo uma seção e o aviso integral para cada pacote
-  efetivamente identificado pelo metafile do bundle.
+  do Wrangler (regra nativa `rules`), com um aviso para cada pacote
+  inventariado em `admin-motor/src/legal/THIRDPARTY.md`.

@@ -1,55 +1,73 @@
-# This workflow is managed by gh actions-lock.
-
 name: Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - ".github/workflows/pages.yml"
-      - "site/**"
+      - .github/workflows/pages.yml
+      - site/**
+  pull_request:
+    branches:
+      - main
+    # `edited` covers a pull request retargeted to the default branch;
+    # without it a required check would not run until the next push.
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - edited
   workflow_dispatch:
 
 permissions: {}
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
     name: Build Pages artifact
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
-      contents: read
-      pages: read # Read the existing Pages configuration before building.
+      contents: read # Build the Pages artifact from the repository.
+      pages: read # Read the existing Pages configuration.
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Configure Pages
+      # Add the build and validation steps for the site here, if the repository
+      # has any. This template publishes the static directory as it stands.
+
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
-      - name: Upload Pages artifact
+      - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
   deploy:
-    name: Deploy GitHub Pages
+    # Deploy only from the default branch. The main placeholder is
+    # substituted when the workflow is created from this template.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: build
+    name: Deploy GitHub Pages
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
-      id-token: write # Request the OIDC token used by Pages deployment.
-      pages: write # Publish the validated Pages artifact.
+      id-token: write # Authenticate the trusted Pages deployment.
+      pages: write # Publish the Pages deployment.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

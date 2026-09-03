@@ -1,40 +1,68 @@
 # Changelog — Admin App
 
-## [Unreleased]
+## [APP v02.15.27] — 03/09/2026
 
 ### Infraestrutura
 
-- **Inventário jurídico derivado dos dois manifestos e do bundle real.** O
-  gate cobre todas as dependências diretas da raiz e de `tlsrpt-motor`, com
-  versões declarada e resolvida, expressão SPDX, eleição `OR`, SRI e tarball
-  imutável. O build público passa a usar `build.license`, recurso nativo do
-  Vite 8, para publicar em `legal/BUNDLED-LICENSES.md` o inventário nativo e os
-  textos disponibilizados por todo componente efetivamente empacotado,
-  inclusive transitivos; `THIRDPARTY.md` complementa as lacunas upstream
-  documentadas. O gate pós-build exige as duas saídas e a paridade das cópias
-  públicas. A fonte Inter deixa a API remota mutável do Google Fonts e passa a
-  ser auto-hospedada pelo pacote oficial Fontsource, fixado no lockfile. O ativo
-  `icons.svg`, originado do scaffold Vite mas sem consumidor, foi removido; os
-  demais assets fonte do scaffold foram documentados. O bundle do Worker
-  TLS-RPT passa a preservar o aviso MIT incorporado por `postal-mime`. O gate
-  também analisa o HTML e o CSS finais com parsers sem rede e rejeita qualquer
-  retorno dos hosts mutáveis do Google Fonts. Para o Admin Motor, o dry-run
-  oficial do Wrangler deriva do metafile todos os pacotes efetivamente
-  incorporados e envia, como módulo adicional `Text`, um aviso integral
-  fail-closed e byte-idêntico para cada um deles.
-
-- **Linear Release usa a action oficial da Linear.** O workflow pós-Deploy
-  substitui o download manual pelo `linear/linear-release-action` v0.16.0,
-  fixado por SHA completo e com a versão do CLI explícita. Permanecem o
-  checkout do SHA efetivamente implantado, o histórico completo, o environment
-  dedicado e as permissões mínimas. A concorrência usa `queue: max` para
-  preservar os runs pendentes, e falhas da action tornam o workflow vermelho.
-  O instalador upstream ainda não valida o digest do binário; o
-  risco residual está registrado em ADMIAPP-12 e em
-  `linear/linear-release-action#59`.
+- **Governança nativa da organização.** O repositório passa a usar somente
+  recursos nativos do GitHub e integrações oficiais: saem o lockfile de Actions
+  e seus cabeçalhos, o workflow avançado do CodeQL (o default setup do CodeQL,
+  aplicado pela configuração de segurança da Enterprise, já analisa `actions`
+  e `javascript-typescript`), o workflow
+  `Public Format` e os gatilhos de merge queue. Entra o workflow `CI`, que roda
+  em todo pull request para `main` os mesmos portões de produto do `Deploy`
+  (lint, Biome, testes da raiz e do Admin Motor, verificação de tipos do Admin
+  Motor e build da raiz; lint e testes do `tlsrpt-motor`; dry-run estrito do
+  Wrangler dos dois Workers). O `Deploy`
+  mantém `npm audit`, o dry-run antes da migração D1 e os quatro passos do
+  Wrangler; a release no Linear passa a ser registrada só para deploys por
+  `push`, como no starter da organização.
+  Entram também o `dependabot-auto-merge.yml` canônico da organização e o
+  `INBOUND.md`. Zizmor (v0.6.3), Scorecard, Pages (gatilho de pull request,
+  deploy-pages v5.0.1) e Dependency Review seguem os starters da organização.
+- **Dependabot semanal e agrupado.** Verificação às segundas, 06:00
+  America/Sao_Paulo, com um grupo `minor-e-patch` por ecossistema, majors em
+  pull requests próprios, cooldown de sete dias (sem cooldown para `actions/*`
+  e `github/*` nas Actions), `rebase-strategy: auto` e o
+  bloqueio do TypeScript 6.1 preservado; os grupos próprios e os grupos
+  `codeql-action` saem.
+- **Inventário legal por nome, licença e fonte.** `THIRDPARTY.md` e a cópia
+  servida em `public/legal/` listam cada dependência direta da raiz e do
+  `tlsrpt-motor` sem versão, SRI ou tarball nas tabelas de dependências
+  diretas: versões e resoluções imutáveis vivem nos manifestos e nos lockfiles,
+  onde o Dependabot as atualiza, e o grafo de dependências do GitHub é o
+  inventário versionado; os complementos, o `NOTICE` e o módulo Text do Admin
+  Motor continuam fixados à versão instalada e exigem atualização manual a cada
+  bump. O build público
+  continua usando `build.license`, recurso nativo do Vite, para publicar em
+  `legal/BUNDLED-LICENSES.md` os textos disponibilizados por todo componente
+  efetivamente
+  empacotado, inclusive transitivos; `THIRDPARTY.md` complementa as lacunas
+  upstream documentadas. A fonte Inter continua auto-hospedada pelo pacote
+  oficial Fontsource. O Worker TLS-RPT carrega o aviso MIT incorporado por
+  `postal-mime` como comentário legal no código-fonte, e o Admin Motor envia
+  `legal/THIRDPARTY.md` como módulo adicional `Text` do Wrangler.
+- **Linear Release usa a action oficial da Linear.** O workflow pós-Deploy usa
+  `linear/linear-release-action` v0.17.2, fixado por SHA completo e com a
+  versão do CLI explícita, e só registra a release quando o `Deploy` conclui
+  com sucesso em `main`, por evento `push` e no próprio repositório.
+  Permanecem o checkout do SHA efetivamente implantado, o histórico completo, o
+  environment dedicado e as permissões mínimas. A concorrência usa `queue: max`
+  para preservar os runs pendentes. Desde a v0.16.1 o instalador confere o
+  SHA-256 do CLI contra o `checksums.txt` da release, o que fecha o risco
+  registrado em ADMIAPP-12; resta o checksum vir da mesma origem do binário.
 
 ### Removido
 
+- **Verificador legal próprio.** Saem `scripts/verify-thirdparty.mjs`, seu
+  teste, `vitest.thirdparty.config.mjs`, os scripts `test:thirdparty`,
+  `verify:thirdparty`, `verify:thirdparty:artifact`,
+  `verify:thirdparty:worker-artifacts`, `format:public` e
+  `format:public:check`, e as opções `--outdir dist/legal-audit --metafile`
+  dos dry-runs, que existiam só para alimentá-lo. Vulnerabilidades conhecidas
+  passam a ser cobertas pelo Dependency Review, pelo `npm audit` do `Deploy` e
+  pelas atualizações de segurança do Dependabot; licenças, pela regra
+  Enterprise de conformidade de licenças; o CodeQL cobre o código.
 - **Duas tabelas D1 legadas da Calculadora.** A migração nativa `0002` e a
   etapa de bootstrap `019` aposentam `calc_email_rate_limit` e
   `calc_parametros_calculo`, ambas sem consumidor runtime e vazias no inventário
@@ -46,24 +74,9 @@
 ### Corrigido
 
 - **Suplementos npm sem arquivo de licença deixam de inventar avisos autorais.**
-  A proveniência de `dingbat-to-unicode@1.0.1` e
-  `react-remove-scroll-bar@2.3.8` agora fixa o SRI, os hashes dos manifestos e
-  READMEs publicados e os refs upstream efetivamente observáveis. Os termos
-  canônicos SPDX continuam disponíveis no artefato, separados da atribuição
-  literal dos manifestos, enquanto o aviso de copyright permanece marcado como
-  inconclusivo. O gate rejeita a reintrodução dos copyrights inferidos,
-  recomputa os hashes dos três arquivos instalados que sustentam a declaração
-  de licença e mantém os refs documentados dentro do esquema fechado.
-
-- **Parser estrutural dos inventários legais fechado a bypasses de Markdown.**
-  O gate usa o parser GFM já adotado pelo projeto para validar o outline e a
-  cardinalidade completos dos documentos, além da prosa e dos blocos legais
-  auditados. Separadores inválidos, tabelas cercadas ou extras, HTML bruto,
-  headings duplicados ou confusáveis, campos fora da gramática, prosa
-  contraditória e licenças duplicadas ou sem cerca agora falham de modo
-  explícito. No Admin Motor, cada seção contém somente a lista canônica e um
-  bloco `text` equivalente ao aviso da versão instalada.
-
+  Os complementos de `dingbat-to-unicode` e `react-remove-scroll-bar` mantêm a
+  atribuição literal dos manifestos publicados, com os termos canônicos SPDX
+  disponíveis no artefato e o aviso de copyright marcado como inconclusivo.
 - **Fallback do token dedicado de armazenamento.** O ambiente bruto do
   `admin-motor` tipa `CLOUDFLARE_STORAGE` como `SecretsStoreSecret`, lê o valor
   pela chamada assíncrona `get()` e, se a leitura do binding opcional falhar,
