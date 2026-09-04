@@ -1,5 +1,21 @@
 # Changelog — Admin App
 
+## [Unreleased]
+
+### Infraestrutura
+
+- **`npm audit` do `Deploy` distingue vulnerabilidade de requisição de advisories falha.**
+  Os passos de auditoria (Admin App e TLS-RPT Motor) continuam reprovando o deploy quando
+  o relatório traz vulnerabilidade alta ou crítica; quando a requisição de advisories ao
+  registro do npm falha (mensagem do próprio npm, "audit endpoint returned an error":
+  serviço fora, inalcançável ou respondendo qualquer coisa que não um relatório),
+  registram um aviso e um resumo no job e o deploy segue sobre a cobertura nativa
+  (alertas e atualizações de segurança do Dependabot, Dependency Review, CodeQL);
+  qualquer erro do npm fora dessa requisição reprova. A espera por uma requisição
+  travada cai de cerca de quinze minutos para cerca de dois (`fetch-retries` 1,
+  `fetch-timeout` 60 s). Motivo: em 03/09 o serviço ficou horas sem responder e nenhum
+  deploy saía, hotfix incluído (ADMIAPP-22 / #604).
+
 ## [APP v02.15.27] — 03/09/2026
 
 ### Infraestrutura
