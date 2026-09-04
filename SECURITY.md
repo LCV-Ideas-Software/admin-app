@@ -40,8 +40,11 @@ Out of scope: social engineering, physical attacks, denial-of-service testing wi
 - Pull requests against `main` run the `CI` workflow (lint, Biome, root and Admin Motor tests,
   Admin Motor type check, the root build with `tsc -b && vite build`, lint plus tests for
   `tlsrpt-motor`, and a strict Wrangler dry run of both Workers), Dependency Review, zizmor and
-  the Pages build; pushes to `main` additionally run `npm audit`, the same dry run before the D1
-  migration and the Wrangler deployments inside the `Deploy` workflow. The repository ruleset
+  the Pages build; pushes to `main` additionally run `npm audit` (a report with a high or critical
+  finding stops the deploy; when the advisory request to the npm registry fails, the audit step
+  records a warning and the deploy continues on the native coverage: Dependabot alerts and
+  security updates, Dependency Review, CodeQL; any other npm error stops the deploy), the same
+  dry run before the D1 migration and the Wrangler deployments inside the `Deploy` workflow. The repository ruleset
   `main: required checks` requires `CI`, `Build Pages artifact`, `Dependency Review` and
   `Run zizmor` before any merge into `main`.
 - This repository handles its own Dependabot pull requests with the repository-local workflow

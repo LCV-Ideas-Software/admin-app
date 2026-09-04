@@ -47,9 +47,55 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm ci --prefix tlsrpt-motor --ignore-scripts --no-audit --no-fund
 
+      - name: Audit Admin App dependencies
+        shell: bash
+        env:
+          AUDIT_LABEL: admin-app
+        run: |
+          # `npm audit --audit-level=high` with its failure classes kept apart: a
+          # report whose high or critical counts are above zero fails the step; a
+          # failed advisory request (npm's own message "audit endpoint returned an
+          # error": the registry advisory service down, unreachable or answering
+          # anything but a report) is a warning and the deploy continues on the
+          # native coverage (Dependabot alerts and security updates, Dependency
+          # Review, CodeQL); any npm error outside the advisory request fails the
+          # step. fetch-retries and fetch-timeout bound a hung request to about
+          # two minutes instead of npm's default of about fifteen.
+          set -u
+          out="$RUNNER_TEMP/npm-audit-$AUDIT_LABEL.json"
+          err="$RUNNER_TEMP/npm-audit-$AUDIT_LABEL.err"
+          status=0
+          npm audit --audit-level=high --json --fetch-retries=1 --fetch-timeout=60000 > "$out" 2> "$err" || status=$?
+          if node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.exit(Number.isInteger(r.auditReportVersion) ? 0 : 1)' "$out" 2> /dev/null; then
+            report_status=0
+            node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = r.metadata.vulnerabilities; console.log(JSON.stringify(m)); for (const [name, v] of Object.entries(r.vulnerabilities)) if (v.severity === "high" || v.severity === "critical") console.log(v.severity + ": " + name + " " + v.range); process.exit(m.high + m.critical > 0 ? 3 : 0)' "$out" || report_status=$?
+            if [ "$report_status" -eq 3 ]; then
+              echo "::error title=npm audit ($AUDIT_LABEL)::the report lists high or critical vulnerabilities; see the step log"
+              exit 1
+            fi
+            if [ "$report_status" -ne 0 ]; then
+              echo "::error title=npm audit ($AUDIT_LABEL)::the audit report could not be read"
+              exit "$report_status"
+            fi
+            if [ "$status" -ne 0 ]; then
+              echo "::error title=npm audit ($AUDIT_LABEL)::npm audit exited $status although the report lists no high or critical vulnerability"
+              exit "$status"
+            fi
+            echo "npm audit ($AUDIT_LABEL): no high or critical vulnerability"
+            exit 0
+          fi
+          cat "$err"
+          if grep -q "audit endpoint returned an error" "$err"; then
+            echo "::warning title=npm audit ($AUDIT_LABEL)::the advisory request to the npm registry failed; the deploy continues on the native coverage (Dependabot alerts and security updates, Dependency Review, CodeQL)"
+            printf '### npm audit (%s)\n\nThe advisory request to the npm registry failed; the deploy continued without an audit result. Native coverage (Dependabot alerts and security updates, Dependency Review, CodeQL) still applies.\n\n' "$AUDIT_LABEL" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::error title=npm audit ($AUDIT_LABEL)::npm audit failed before producing a report, for a reason outside the advisory request"
+          [ "$status" -ne 0 ] || status=1
+          exit "$status"
+
       - name: Validate admin application
         run: |
-          npm audit --audit-level=high
           npm run lint
           npm run biome
           npm test
@@ -57,10 +103,57 @@ jobs:
           npm run typecheck:admin-motor
           npm run build
 
+      - name: Audit TLS-RPT Motor dependencies
+        working-directory: tlsrpt-motor
+        shell: bash
+        env:
+          AUDIT_LABEL: tlsrpt-motor
+        run: |
+          # `npm audit --audit-level=high` with its failure classes kept apart: a
+          # report whose high or critical counts are above zero fails the step; a
+          # failed advisory request (npm's own message "audit endpoint returned an
+          # error": the registry advisory service down, unreachable or answering
+          # anything but a report) is a warning and the deploy continues on the
+          # native coverage (Dependabot alerts and security updates, Dependency
+          # Review, CodeQL); any npm error outside the advisory request fails the
+          # step. fetch-retries and fetch-timeout bound a hung request to about
+          # two minutes instead of npm's default of about fifteen.
+          set -u
+          out="$RUNNER_TEMP/npm-audit-$AUDIT_LABEL.json"
+          err="$RUNNER_TEMP/npm-audit-$AUDIT_LABEL.err"
+          status=0
+          npm audit --audit-level=high --json --fetch-retries=1 --fetch-timeout=60000 > "$out" 2> "$err" || status=$?
+          if node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.exit(Number.isInteger(r.auditReportVersion) ? 0 : 1)' "$out" 2> /dev/null; then
+            report_status=0
+            node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = r.metadata.vulnerabilities; console.log(JSON.stringify(m)); for (const [name, v] of Object.entries(r.vulnerabilities)) if (v.severity === "high" || v.severity === "critical") console.log(v.severity + ": " + name + " " + v.range); process.exit(m.high + m.critical > 0 ? 3 : 0)' "$out" || report_status=$?
+            if [ "$report_status" -eq 3 ]; then
+              echo "::error title=npm audit ($AUDIT_LABEL)::the report lists high or critical vulnerabilities; see the step log"
+              exit 1
+            fi
+            if [ "$report_status" -ne 0 ]; then
+              echo "::error title=npm audit ($AUDIT_LABEL)::the audit report could not be read"
+              exit "$report_status"
+            fi
+            if [ "$status" -ne 0 ]; then
+              echo "::error title=npm audit ($AUDIT_LABEL)::npm audit exited $status although the report lists no high or critical vulnerability"
+              exit "$status"
+            fi
+            echo "npm audit ($AUDIT_LABEL): no high or critical vulnerability"
+            exit 0
+          fi
+          cat "$err"
+          if grep -q "audit endpoint returned an error" "$err"; then
+            echo "::warning title=npm audit ($AUDIT_LABEL)::the advisory request to the npm registry failed; the deploy continues on the native coverage (Dependabot alerts and security updates, Dependency Review, CodeQL)"
+            printf '### npm audit (%s)\n\nThe advisory request to the npm registry failed; the deploy continued without an audit result. Native coverage (Dependabot alerts and security updates, Dependency Review, CodeQL) still applies.\n\n' "$AUDIT_LABEL" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::error title=npm audit ($AUDIT_LABEL)::npm audit failed before producing a report, for a reason outside the advisory request"
+          [ "$status" -ne 0 ] || status=1
+          exit "$status"
+
       - name: Validate TLS-RPT Motor
         working-directory: tlsrpt-motor
         run: |
-          npm audit --audit-level=high
           npm run lint
           npm test
 
