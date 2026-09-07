@@ -159,7 +159,7 @@ You will need:
 - A Cloudflare Zero Trust account (free for ≤50 users) for Access JWT auth.
 - The Cloudflare CLI [`wrangler`](https://developers.cloudflare.com/workers/wrangler/).
 - Node.js 24+.
-- A Google AI Studio API key for Gemini integration.
+- A Google Cloud project with Vertex AI enabled and a service-account JSON credential for the `VERTEX_SA_KEY` binding (see step 5); a Google AI Studio API key is not used by this integration.
 - A Resend API key (only if running e-mail dispatch features).
 
 ### 1. Clone + install

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Documentação
+
+- Corrigido o pré-requisito de Gemini no guia de fork: a integração existente usa Vertex AI
+  com credencial JSON de service account em `VERTEX_SA_KEY`, não uma API key do Google AI Studio.
+  Nenhuma credencial, configuração ou implementação foi alterada (GIT-202/GIT-203).
+
 ### Infraestrutura
 
 - **`npm audit` do `Deploy` distingue vulnerabilidade de requisição de advisories falha.**
