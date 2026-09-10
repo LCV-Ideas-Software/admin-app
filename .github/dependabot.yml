@@ -72,6 +72,12 @@ updates:
 
   - package-ecosystem: 'npm'
     directory: '/tlsrpt-motor'
+    ignore:
+      # Cloudflare's Workers test integration currently requires Vitest ^4.1.0.
+      # Remove after the official integration supports Vitest 5 and CI passes.
+      - dependency-name: 'vitest'
+        versions:
+          - '>=5.0.0'
     schedule:
       interval: 'cron'
       cronjob: '0 5 * * *'
