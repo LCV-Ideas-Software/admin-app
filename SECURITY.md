@@ -76,6 +76,13 @@ adjusting the native group configuration or recreating a pull request. Any
 configured version ignores also constrain security fixes, so review them when
 upstream compatibility changes. Native auto-merge remains subject to every required check.
 
+The TLS reporting worker retains Vitest 4 because Cloudflare's official Workers
+test integration requires `vitest: ^4.1.0`. Its scoped Dependabot ignore excludes
+Vitest 5 and later, including security updates in that range. Remove this ignore
+when the official integration supports the new Vitest version and the repository
+checks pass; investigate any security fix blocked by this compatibility constraint.
+See Cloudflare's [Workers testing prerequisites](https://developers.cloudflare.com/workers/testing/vitest-integration/write-your-first-test/).
+
 See the [Dependabot options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)
 and [security update documentation](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-security-updates).
 
