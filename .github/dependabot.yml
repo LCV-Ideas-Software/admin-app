@@ -3,10 +3,9 @@ updates:
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
-      time: '06:00'
-      timezone: 'America/Sao_Paulo'
+      interval: 'cron'
+      cronjob: '0 5 * * *'
+      timezone: 'Etc/GMT+3'
     cooldown:
       default-days: 7
       exclude:
@@ -20,6 +19,10 @@ updates:
       include: 'scope'
     open-pull-requests-limit: 10
     groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - '*'
       minor-e-patch:
         applies-to: version-updates
         patterns:
@@ -31,10 +34,9 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
-      time: '06:00'
-      timezone: 'America/Sao_Paulo'
+      interval: 'cron'
+      cronjob: '0 5 * * *'
+      timezone: 'Etc/GMT+3'
     cooldown:
       default-days: 7
     rebase-strategy: auto
@@ -51,6 +53,10 @@ updates:
           - '>=6.1.0'
     open-pull-requests-limit: 10
     groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - '*'
       minor-e-patch:
         applies-to: version-updates
         patterns:
@@ -62,10 +68,9 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/tlsrpt-motor'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
-      time: '06:00'
-      timezone: 'America/Sao_Paulo'
+      interval: 'cron'
+      cronjob: '0 5 * * *'
+      timezone: 'Etc/GMT+3'
     cooldown:
       default-days: 7
     rebase-strategy: auto
@@ -77,6 +82,10 @@ updates:
     versioning-strategy: increase
     open-pull-requests-limit: 10
     groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - '*'
       minor-e-patch:
         applies-to: version-updates
         patterns:
