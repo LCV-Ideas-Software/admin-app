@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Segurança
+
+- Atualizados os overrides existentes de `sharp` para `0.35.4` nos dois pacotes npm,
+  com os lockfiles regenerados pelo npm, para corrigir GHSA-rgj7-g3m4-5g8c
+  na cadeia de desenvolvimento do Wrangler/Miniflare.
+
 ### Documentação
 
 - Corrigido o pré-requisito de Gemini no guia de fork: a integração existente usa Vertex AI
@@ -9,6 +15,9 @@
   Nenhuma credencial, configuração ou implementação foi alterada (GIT-202/GIT-203).
 
 ### Infraestrutura
+
+- Atualizados os pins oficiais de CodeQL para 4.38.0 e zizmor-action para 0.6.4.
+  Os quatro inputs do deploy usam o Wrangler 4.127.1 já fixado nos lockfiles.
 
 - **`npm audit` do `Deploy` distingue vulnerabilidade de requisição de advisories falha.**
   Os passos de auditoria (Admin App e TLS-RPT Motor) continuam reprovando o deploy quando

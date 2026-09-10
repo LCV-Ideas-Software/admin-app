@@ -138,6 +138,6 @@
     "esbuild": "0.28.1",
     "@babel/core": "7.29.6",
     "linkify-it": "5.0.2",
-    "sharp": "0.35.3"
+    "sharp": "0.35.4"
   }
 }
