@@ -57,6 +57,11 @@ updates:
         applies-to: security-updates
         patterns:
           - '*'
+      vitest:
+        applies-to: version-updates
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
       minor-e-patch:
         applies-to: version-updates
         patterns:
