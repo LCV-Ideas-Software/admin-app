@@ -17,7 +17,7 @@
 ### Infraestrutura
 
 - Atualizados os pins oficiais de CodeQL para 4.38.0 e zizmor-action para 0.6.4.
-  Os quatro inputs do deploy usam o Wrangler 4.127.1 já fixado nos lockfiles.
+  Alinhados os quatro inputs do deploy ao Wrangler 4.129.0 já fixado nos lockfiles.
 
 - **`npm audit` do `Deploy` distingue vulnerabilidade de requisição de advisories falha.**
   Os passos de auditoria (Admin App e TLS-RPT Motor) continuam reprovando o deploy quando
