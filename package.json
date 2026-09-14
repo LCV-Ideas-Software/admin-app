@@ -64,7 +64,7 @@
     "croner": "^10.0.1",
     "cronstrue": "^3.24.0",
     "d3-geo": "3.1.1",
-    "dompurify": "^3.4.14",
+    "dompurify": "^3.4.15",
     "hono": "^4.13.7",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.41.0",
@@ -85,7 +85,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
-    "@cloudflare/workers-types": "^5.20260906.1",
+    "@cloudflare/workers-types": "^5.20260907.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.1",
