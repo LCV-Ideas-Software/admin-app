@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Corrigido
+
+- Atualizada a dependência transitiva opcional de desenvolvimento `@tybys/wasm-util`
+  para `0.10.4` nos dois lockfiles, incluindo o aviso MIT integral publicado pelo upstream.
+
 ### Segurança
 
 - Atualizados os overrides existentes de `sharp` para `0.35.4` nos dois pacotes npm,
