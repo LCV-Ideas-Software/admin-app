@@ -4,10 +4,16 @@
 
 ### Corrigido
 
+- O auto-merge do Dependabot usa uma mensagem fixa no commit de squash para que
+  notas upstream na descrição do PR não suprimam os workflows após o merge.
+
 - Atualizada a dependência transitiva opcional de desenvolvimento `@tybys/wasm-util`
   para `0.10.4` nos dois lockfiles, incluindo o aviso MIT integral publicado pelo upstream.
 
 ### Segurança
+
+- Atualizadas a Action oficial e a CLI do Linear Release para `v0.18.0`, com pin
+  por SHA completo, incorporando a correção upstream na execução de comandos Git.
 
 - Atualizados os overrides existentes de `sharp` para `0.35.4` nos dois pacotes npm,
   com os lockfiles regenerados pelo npm, para corrigir GHSA-rgj7-g3m4-5g8c
@@ -22,7 +28,7 @@
 ### Infraestrutura
 
 - Atualizados os pins oficiais de CodeQL para 4.38.0 e zizmor-action para 0.6.4.
-  Alinhados os quatro inputs do deploy ao Wrangler 4.129.0 já fixado nos lockfiles.
+  Alinhados os quatro inputs do deploy ao Wrangler 4.129.1 já fixado nos lockfiles.
 
 - **`npm audit` do `Deploy` distingue vulnerabilidade de requisição de advisories falha.**
   Os passos de auditoria (Admin App e TLS-RPT Motor) continuam reprovando o deploy quando
