@@ -67,9 +67,9 @@
     "dompurify": "^3.4.15",
     "hono": "^4.13.7",
     "lowlight": "^3.3.0",
-    "lucide-react": "^1.41.0",
+    "lucide-react": "^1.42.0",
     "mammoth": "^1.12.2",
-    "marked": "^18.0.11",
+    "marked": "^18.0.12",
     "prosemirror-model": "^1.25.11",
     "prosemirror-state": "^1.4.4",
     "prosemirror-view": "^1.42.3",
@@ -85,7 +85,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
-    "@cloudflare/workers-types": "^5.20260907.1",
+    "@cloudflare/workers-types": "^5.20260908.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.1",
@@ -93,7 +93,7 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
     "@types/d3-geo": "3.1.1",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@types/sanitize-html": "^2.16.1",
@@ -115,10 +115,10 @@
     "prettier": "^3.9.6",
     "rollup-plugin-visualizer": "^7.1.1",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.69.0",
+    "typescript-eslint": "^8.70.0",
     "vite": "^8.2.2",
     "vitest": "^5.0.0",
-    "wrangler": "^4.129.0"
+    "wrangler": "^4.129.1"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
