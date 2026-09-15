@@ -42,7 +42,7 @@ jobs:
           fetch-depth: 0 # Full history: the CLI scans commits since the last release.
           persist-credentials: false
 
-      # Linear's official action, pinned to the full-length SHA of v0.17.2. The
+      # Linear's official action, pinned to the full-length SHA of v0.18.0. The
       # CLI version is selected explicitly so a future rebuild of the action
       # cannot change the tool that runs. The installer verifies the downloaded
       # CLI against a published SHA-256 checksum before executing it.
@@ -51,7 +51,7 @@ jobs:
       # red instead of hiding a divergence between GitHub and Linear.
       - name: Create Linear release with the official action
         id: linear_release
-        uses: linear/linear-release-action@53ad0f863963e7f8e270fba18426bbb55ef55384 # v0.17.2
+        uses: linear/linear-release-action@d4af10092984f9bc6d5efa075b242bdf01333463 # v0.18.0
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
-          cli_version: v0.17.2
+          cli_version: v0.18.0
