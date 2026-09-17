@@ -4,6 +4,12 @@
 
 ### Corrigido
 
+- Os quatro passos da Cloudflare Wrangler Action no Deploy (migrações D1,
+  TLS-RPT Motor, Admin Motor e Admin Pages) deixam de pinar `wranglerVersion`
+  e passam a usar o Wrangler que `npm ci` instala a partir do lockfile do
+  diretório em que rodam, hoje 4.130.0; o pin manual ficava para trás a cada
+  atualização do Dependabot (ADMIAPP-26 / #634, GIT-230).
+
 - O auto-merge do Dependabot usa uma mensagem fixa no commit de squash para que
   notas upstream na descrição do PR não suprimam os workflows após o merge.
 
