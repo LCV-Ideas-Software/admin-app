@@ -118,7 +118,7 @@
     "typescript-eslint": "^8.70.0",
     "vite": "^8.2.2",
     "vitest": "^5.0.0",
-    "wrangler": "^4.130.0"
+    "wrangler": "4.130.0"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [

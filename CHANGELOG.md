@@ -16,6 +16,15 @@
 - Atualizada a dependência transitiva opcional de desenvolvimento `@tybys/wasm-util`
   para `0.10.4` nos dois lockfiles, incluindo o aviso MIT integral publicado pelo upstream.
 
+### Alterado
+
+- O Wrangler passa a ser declarado com pin exato `4.130.0` nos dois manifestos
+  (raiz e `tlsrpt-motor`), em vez da faixa `^4.130.0`, com os lockfiles
+  regenerados pelo npm; a versão instalada não muda. Padroniza a grafia com os
+  demais repositórios da frota depois que o Deploy passou a usar o Wrangler do
+  lockfile, e corrige a frase do README que ainda falava em versão fixa no
+  workflow (ADMIAPP-27 / #636, GIT-230).
+
 ### Segurança
 
 - Atualizadas a Action oficial e a CLI do Linear Release para `v0.18.0`, com pin
