@@ -168,7 +168,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.129.1
           command: d1 migrations apply BIGDATA_DB --remote --config wrangler.json
 
       - name: Deploy TLS-RPT Motor with Wrangler
@@ -177,7 +176,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.129.1
           workingDirectory: tlsrpt-motor
           command: deploy --strict
 
@@ -187,7 +185,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.129.1
           command: deploy --strict --config admin-motor/wrangler.json
 
       - name: Deploy Admin Pages with Wrangler
@@ -196,5 +193,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: 4.129.1
           command: pages deploy dist --project-name=admin-app --branch=main
