@@ -277,8 +277,8 @@ The Pages app, `admin-motor`, and `tlsrpt-motor` are deployed independently but 
 This repo's [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on
 every push to `main`. One least-privilege job validates both Node workspaces and
 then serially deploys `tlsrpt-motor`, `admin-motor`, and the Pages application
-with the SHA-pinned official Cloudflare Wrangler Action and a fixed Wrangler
-version. The D1 binding uses the versioned, non-secret database identifier from
+with the SHA-pinned official Cloudflare Wrangler Action and the Wrangler version
+that `npm ci` installs from each lockfile. The D1 binding uses the versioned, non-secret database identifier from
 each `wrangler.json`. Before deploying any Worker, the workflow applies only
 pending files from `db/admin-app-migrations` with Wrangler's native migration
 command; a migration failure blocks every deploy. It never mutates configuration
