@@ -155,7 +155,7 @@ inclui o arquivo de licença. Estes complementos não substituem
 | JSZip                          | Incorporado por Mammoth e detectado pelo inventário nativo do Vite                                                       | `(MIT OR GPL-3.0-or-later)`; eleição: **MIT** | <https://github.com/Stuk/jszip>                                |
 | Pako                           | Vendorizado na distribuição browser do JSZip; não recebe seção própria do inventário nativo                              | `(MIT AND Zlib)`; **ambas** se aplicam        | <https://github.com/nodeca/pako>                               |
 | Spark MD5                      | Dependência direta detectada pelo Vite; o projeto usa a alternativa oficial MIT                                          | `(WTFPL OR MIT)`; eleição: **MIT**            | <https://github.com/satazor/js-spark-md5> (arquivo `LICENSE2`) |
-| dingbat-to-unicode             | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | BSD-2-Clause; aviso de copyright inconclusivo | <https://github.com/mwilliamson/dingbat-to-unicode>            |
+| dingbat-to-unicode             | Detectado pelo Vite; o tarball 1.0.1 não contém arquivo de licença, e o titular confirmou o aviso aplicável em 19/09/2026 (ver suplemento) | BSD-2-Clause; `Copyright (c) 2021, Michael Williamson` | <https://github.com/mwilliamson/dingbat-to-unicode>            |
 | react-remove-scroll-bar        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; aviso de copyright inconclusivo          | <https://github.com/theKashey/react-remove-scroll-bar>         |
 | Assets do scaffold create-vite | `src/assets/hero.png`, `react.svg` e `vite.svg`; distribuídos no código-fonte, sem consumidores e fora do bundle público | MIT                                           | <https://github.com/vitejs/vite> (`packages/create-vite`)      |
 
@@ -277,39 +277,41 @@ SOFTWARE.
 
 ### dingbat-to-unicode — BSD-2-Clause
 
-O tarball npm e o `js/package.json` da tag correspondente no repositório
-upstream são byte-idênticos; ambos declaram `BSD-2-Clause` e identificam
-Michael Williamson como autor. O
-[contrato oficial do npm](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#license)
-usa o identificador SPDX para declarar como o pacote pode ser usado, mas
-nenhuma versão upstream contém `LICENSE` ou `COPYING` e o campo `author` não
-comprova titularidade. Resultado: **INCONCLUSIVO** quanto ao aviso de copyright
-da versão exata. O suplemento separa a atribuição literal do manifesto dos
-[termos canônicos da BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause), sem
-inventar titular, ano ou aviso de copyright ausente no upstream.
+O tarball npm da versão instalada (1.0.1) e o `js/package.json` da tag
+correspondente no repositório upstream declaram `BSD-2-Clause` e identificam
+Michael Williamson como autor, mas o tarball 1.0.1 não contém `LICENSE` ou
+`COPYING`. Em 19/09/2026 o titular acrescentou `js/LICENSE` ao repositório
+(commit `a89b69198c2dd030b097cbf44b4eb7dd8b85722d`), publicou 1.0.2 com esse
+arquivo no tarball e declarou em
+[dingbat-to-unicode#1](https://github.com/mwilliamson/dingbat-to-unicode/issues/1#issuecomment-5740760399)
+que a licença "also applies to any previous versions". O aviso abaixo é o
+texto integral de `js/LICENSE` (1.304 bytes; tarball 1.0.2 SHA-256
+`3ff52fb8c0586a748aa11cbbac2f16524cf9971767f06077ff344729a69321c1`), reproduzido
+sem alteração, e cobre a versão 1.0.1 por declaração expressa do titular.
 
 ```text
+Copyright (c) 2021, Michael Williamson
+All rights reserved.
+
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
-1. Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
 2. Redistributions in binary form must reproduce the above copyright notice,
    this list of conditions and the following disclaimer in the documentation
    and/or other materials provided with the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ### react-remove-scroll-bar — MIT
