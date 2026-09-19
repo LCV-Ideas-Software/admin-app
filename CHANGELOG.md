@@ -18,6 +18,13 @@
 
 ### Alterado
 
+- `THIRDPARTY.md` e `public/legal/THIRDPARTY.md` (byte-idênticos) passam a
+  registrar o aviso de copyright confirmado para `dingbat-to-unicode@1.0.1`:
+  em 19/09/2026 o titular publicou `js/LICENSE` (BSD-2-Clause,
+  `Copyright (c) 2021, Michael Williamson`) na versão 1.0.2 e declarou que ele
+  se aplica às versões anteriores; o registro deixa de ser `INCONCLUSIVO`
+  (ADMIAPP-18 / #581). `react-remove-scroll-bar@2.3.8` permanece inconclusivo.
+
 - O Wrangler passa a ser declarado com pin exato `4.130.0` nos dois manifestos
   (raiz e `tlsrpt-motor`), em vez da faixa `^4.130.0`, com os lockfiles
   regenerados pelo npm; a versão instalada não muda. Padroniza a grafia com os
