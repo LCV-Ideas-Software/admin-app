@@ -28,6 +28,9 @@
 - Atualizado o pin exato do Wrangler para `4.136.2` nos dois manifestos
   (raiz e `tlsrpt-motor`), com os lockfiles regenerados pelo npm. O Deploy
   continua usando a versão instalada pelo lockfile (ADMIAPP-27 / #636, GIT-230).
+  A padronização anterior substituiu a faixa `^4.130.0` por pin exato e corrigiu
+  o README que ainda descrevia uma versão fixa no workflow. Esta atualização
+  para `4.136.2` integra a LCV-213.
 
 ### Segurança
 
@@ -37,7 +40,8 @@
 - Removidos os overrides de `sharp` e `miniflare > undici` da raiz: o novo
   Miniflare já exige `0.35.4` e `7.29.0` diretamente. Os overrides do
   `tlsrpt-motor` permanecem necessários para o Miniflare anterior usado pelo
-  `@cloudflare/vitest-pool-workers`.
+  `@cloudflare/vitest-pool-workers`: a atualização anterior do override de
+  `sharp` para `0.35.4` corrige GHSA-rgj7-g3m4-5g8c nesse pacote.
 
 ### Documentação
 
