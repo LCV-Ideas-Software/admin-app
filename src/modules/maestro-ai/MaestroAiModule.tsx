@@ -1387,7 +1387,9 @@ export function MaestroAiModule() {
                     <input
                       value={models[agent.key]}
                       onChange={(event) => setModels((current) => ({ ...current, [agent.key]: event.target.value }))}
-                      placeholder="Modelo padrão"
+                      placeholder={agent.key === 'perplexity' ? 'Preset Agent API' : 'Modelo padrão'}
+                      readOnly={agent.key === 'perplexity'}
+                      title={agent.key === 'perplexity' ? 'Preset medium da Agent API' : undefined}
                     />
                   </div>
                 ))}

@@ -66,6 +66,20 @@
   `fetch-timeout` 60 s). Motivo: em 03/09 o serviço ficou horas sem responder e nenhum
   deploy saía, hotfix incluído (ADMIAPP-22 / #604).
 
+## [APP v02.15.28] — 22/09/2026
+
+### Corrigido
+
+- A trava de conteúdo do Maestro AI valida declarações como JSON estrito,
+  rejeita permissões extraídas de prosa e entradas duplicadas, limita o
+  crescimento à quantidade de blocos novos declarada e preserva a atribuição
+  de blocos idênticos editados (ADMIAPP-29 / #650).
+
+- O Maestro AI usa a Agent API da Perplexity com o preset oficial `medium` e
+  lê a resposta tipada; contabiliza `usage.cost.total_cost` quando disponível,
+  registra a origem do custo no jornal e mantém a estimativa como fallback
+  (ADMIAPP-28 / #646).
+
 ## [APP v02.15.27] — 03/09/2026
 
 ### Infraestrutura

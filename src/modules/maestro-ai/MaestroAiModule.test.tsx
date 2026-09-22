@@ -22,7 +22,7 @@ const settingsPayload = {
     max_runtime_minutes: null,
     max_cycles: 2,
     rates: Object.fromEntries(AGENT_KEYS.map((key) => [key, rate])),
-    models: Object.fromEntries(AGENT_KEYS.map((key) => [key, `${key}-model`])),
+    models: Object.fromEntries(AGENT_KEYS.map((key) => [key, key === 'perplexity' ? 'medium' : `${key}-model`])),
     agents: AGENT_KEYS.map((key) => ({
       key,
       label: key,
@@ -30,7 +30,7 @@ const settingsPayload = {
       configured: true,
       runtime_ready: true,
       financially_ready: true,
-      model: `${key}-model`,
+      model: key === 'perplexity' ? 'medium' : `${key}-model`,
       rates: rate,
     })),
     updated_at: '2026-08-09T00:00:00Z',
@@ -81,6 +81,17 @@ afterEach(() => {
 });
 
 describe('MaestroAiModule — credencial do Gemini é gerida pela infraestrutura', () => {
+  it('mostra o preset oficial da Perplexity sem permitir um modelo ignorado pelo Worker', async () => {
+    renderModule();
+    const preset = await waitFor(() => {
+      const input = document.querySelector('input[title="Preset medium da Agent API"]') as HTMLInputElement | null;
+      expect(input).not.toBeNull();
+      return input as HTMLInputElement;
+    });
+    expect(preset.value).toBe('medium');
+    expect(preset.readOnly).toBe(true);
+  });
+
   it('desabilita o campo de chave do Gemini e explica onde a credencial vive', async () => {
     renderModule();
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());

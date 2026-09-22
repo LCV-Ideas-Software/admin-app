@@ -1,4 +1,4 @@
-// Approved-content lock — byte-exact port of maestro-app (canonical)
+// Approved-content lock adapted from maestro-app (canonical)
 // src-tauri/src/editorial_content_lock.rs. Blocks are segmented on blank
 // lines, identified as B0001.., and compared via whitespace-normalized text;
 // a revised custody may only change/reorder/grow blocks that the
@@ -20,7 +20,7 @@ type EditorialContentBlock = {
 
 type ChangedBlockDeclaration = {
   hasProtocolBasis: boolean;
-  allowsBlockCountGrowth: boolean;
+  allowedBlockCountGrowth: number;
   allowsReorder: boolean;
 };
 
@@ -31,18 +31,6 @@ const WS_CLASS = '[\\t\\n\\u000B\\f\\r \\u0085\\u00A0\\u1680\\u2000-\\u200A\\u20
 const WS_RUN = new RegExp(`${WS_CLASS}+`, 'g');
 const WS_EDGES = new RegExp(`^${WS_CLASS}+|${WS_CLASS}+$`, 'g');
 const WS_START = new RegExp(`^${WS_CLASS}+`);
-// Rust splits the bare protocol_basis token on char::is_whitespace or , } ].
-const BARE_TOKEN_BOUNDARY = new RegExp(`${WS_CLASS}|[,}\\]]`);
-// Field-extraction regexes mirror the Rust regex crate classes exactly:
-// \s there is Unicode White_Space (NEL in, FEFF out) -> WS_CLASS here;
-// \d there is Unicode \p{Nd}; the trailing boundary is the Unicode word
-// class ([\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}]) as a negative
-// lookahead, since JS \b/\s/\d are ASCII or ES-specific classes.
-const BLOCK_ID_FIELD = new RegExp(
-  `["']?block_id["']?${WS_CLASS}*[:=]${WS_CLASS}*["']?(B\\p{Nd}{4})(?![\\p{Alphabetic}\\p{M}\\p{Nd}\\p{Pc}\\p{Join_Control}])`,
-  'isu',
-);
-const PROTOCOL_BASIS_KEY = new RegExp(`["']?protocol_basis["']?${WS_CLASS}*[:=]${WS_CLASS}*`, 'isu');
 
 function rustTrim(text: string): string {
   return text.replace(WS_EDGES, '');
@@ -50,10 +38,6 @@ function rustTrim(text: string): string {
 
 function rustTrimStart(text: string): string {
   return text.replace(WS_START, '');
-}
-
-function asciiLowercase(text: string): string {
-  return text.replace(/[A-Z]/g, (character) => character.toLowerCase());
 }
 
 function normalizeBlockText(text: string): string {
@@ -64,7 +48,7 @@ export function segmentEditorialBlocks(text: string): EditorialContentBlock[] {
   return text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    .split('\n\n')
+    .split(new RegExp(`\n${WS_CLASS.replace('\\n', '')}*\n`))
     .map((rawBlock) => rustTrim(rawBlock))
     .filter((block) => block !== '')
     .map((block, index) => ({
@@ -138,18 +122,16 @@ export function validateRevisionContentLock(before: string, after: string, repor
   const changedIds = changedReceivedBlockIds(beforeBlocks, afterBlocks);
   const reorderedIds = reorderedReceivedBlockIds(beforeBlocks, afterBlocks);
   const reordered = reorderedIds.length > 0;
-  const changedSection = extractChangedBlocksSection(report);
-  if (changedSection === null) {
-    if (changedIds.length === 0 && afterBlocks.length <= beforeBlocks.length && !reordered) {
-      return null;
-    }
+  if (changedIds.length === 0 && afterBlocks.length <= beforeBlocks.length && !reordered) return null;
+  const parsed = parseChangedBlockDeclarations(report);
+  if (parsed.error) return parsed.error;
+  const declarations = parsed.declarations;
+  if (declarations === null) {
     if (reordered) {
       return `approved-content lock violation: revised custody reordered received blocks ${reorderedIds.join(', ')} but maestro_revision_report has no changed_blocks section with change_type reorder`;
     }
     return `approved-content lock violation: revised custody changed received blocks ${changedIds.join(', ')} but maestro_revision_report has no changed_blocks section with block IDs`;
   }
-  const declarations = extractChangedBlockDeclarations(changedSection);
-
   const undeclared = changedIds.filter((id) => !declarations.has(id));
   if (undeclared.length > 0) {
     return `approved-content lock violation: changed received blocks ${undeclared.join(', ')} without matching changed_blocks declaration`;
@@ -170,7 +152,8 @@ export function validateRevisionContentLock(before: string, after: string, repor
 
   if (
     afterBlocks.length > beforeBlocks.length &&
-    ![...declarations.values()].some((declaration) => declaration.allowsBlockCountGrowth)
+    [...declarations.values()].reduce((sum, declaration) => sum + declaration.allowedBlockCountGrowth, 0) <
+      afterBlocks.length - beforeBlocks.length
   ) {
     return 'approved-content lock violation: revised custody added new blocks without declaring change_type split/addition in changed_blocks';
   }
@@ -196,12 +179,32 @@ function changedReceivedBlockIds(
   beforeBlocks: EditorialContentBlock[],
   afterBlocks: EditorialContentBlock[],
 ): string[] {
+  // Match identical text at stable positions first. This preserves the ID of
+  // the first edited occurrence when adjacent blocks have identical text.
+  let start = 0;
+  while (
+    start < beforeBlocks.length &&
+    start < afterBlocks.length &&
+    beforeBlocks[start]?.normalizedKey === afterBlocks[start]?.normalizedKey
+  ) {
+    start += 1;
+  }
+  let beforeEnd = beforeBlocks.length;
+  let afterEnd = afterBlocks.length;
+  while (
+    beforeEnd > start &&
+    afterEnd > start &&
+    beforeBlocks[beforeEnd - 1]?.normalizedKey === afterBlocks[afterEnd - 1]?.normalizedKey
+  ) {
+    beforeEnd -= 1;
+    afterEnd -= 1;
+  }
   const afterKeyCounts = new Map<string, number>();
-  for (const after of afterBlocks) {
+  for (const after of afterBlocks.slice(start, afterEnd)) {
     afterKeyCounts.set(after.normalizedKey, (afterKeyCounts.get(after.normalizedKey) ?? 0) + 1);
   }
   const changed: string[] = [];
-  for (const before of beforeBlocks) {
+  for (const before of beforeBlocks.slice(start, beforeEnd)) {
     const count = afterKeyCounts.get(before.normalizedKey) ?? 0;
     if (count === 0) {
       changed.push(before.id);
@@ -286,241 +289,67 @@ function commonBlockIdSequence(
   return sequence;
 }
 
-function extractChangedBlocksSection(report: string): string | null {
-  const lower = asciiLowercase(report);
-  const start = findFirstReportFieldKey(lower, ['changed_blocks', 'changes']);
-  if (start === null) return null;
-  const relativeEnd = findFirstReportFieldKey(lower.slice(start + 1), [
-    'operator_evidence_required',
-    'out_of_scope',
-    'quality_preservation',
-    'unchanged_approved_blocks',
-    'custody',
-  ]);
-  const end = relativeEnd === null ? report.length : start + 1 + relativeEnd;
-  return report.slice(start, end);
-}
-
-// Rust u8::is_ascii_whitespace: space, tab, LF, CR and form feed.
-function isAsciiWhitespaceChar(character: string): boolean {
-  return character === ' ' || character === '\t' || character === '\n' || character === '\r' || character === '\f';
-}
-
-function findFirstReportFieldKey(haystack: string, keys: string[]): number | null {
-  let index = 0;
-  let inQuote: string | null = null;
-  let escaped = false;
-  while (index < haystack.length) {
-    const character = haystack.charAt(index);
-    if (inQuote !== null) {
-      if (escaped) {
-        escaped = false;
-      } else if (character === '\\') {
-        escaped = true;
-      } else if (character === inQuote) {
-        inQuote = null;
-      }
-      index += 1;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      const fieldStart = index;
-      const endQuote = haystack.indexOf(character, index + 1);
-      if (endQuote !== -1) {
-        const candidate = haystack.slice(index + 1, endQuote);
-        const after = endQuote + 1;
-        if (
-          keys.includes(candidate) &&
-          fieldKeyIsDelimitedBefore(haystack, fieldStart) &&
-          fieldKeyHasAssignmentAfter(haystack, after)
-        ) {
-          return fieldStart;
-        }
-      }
-      inQuote = character;
-      index += 1;
-      continue;
-    }
-    if (fieldKeyIsDelimitedBefore(haystack, index)) {
-      for (const key of keys) {
-        if (haystack.startsWith(key, index)) {
-          const after = index + key.length;
-          if (fieldKeyHasAssignmentAfter(haystack, after)) {
-            return index;
-          }
-        }
-      }
-    }
-    index += 1;
-  }
-  return null;
-}
-
-function fieldKeyIsDelimitedBefore(haystack: string, index: number): boolean {
-  if (index === 0) return true;
-  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-    const character = haystack.charAt(cursor);
-    if (isAsciiWhitespaceChar(character)) continue;
-    return character === '{' || character === '[' || character === ',' || character === '\n' || character === '\r';
-  }
-  return true;
-}
-
-function fieldKeyHasAssignmentAfter(haystack: string, index: number): boolean {
-  for (let cursor = index; cursor < haystack.length; cursor += 1) {
-    const character = haystack.charAt(cursor);
-    if (isAsciiWhitespaceChar(character)) continue;
-    return character === ':' || character === '=';
-  }
-  return false;
-}
-
-function extractChangedBlockDeclarations(section: string): Map<string, ChangedBlockDeclaration> {
-  const declarations = new Map<string, ChangedBlockDeclaration>();
-  for (const fragment of changedBlockEntryFragments(section)) {
-    const blockId = extractBlockIdField(fragment);
-    if (blockId === null) continue;
-    const declaration: ChangedBlockDeclaration = {
-      hasProtocolBasis: fragmentHasNonemptyProtocolBasis(fragment),
-      allowsBlockCountGrowth: fragmentDeclaresBlockCountGrowth(fragment),
-      allowsReorder: fragmentDeclaresReorder(fragment),
+function parseChangedBlockDeclarations(report: string): {
+  declarations: Map<string, ChangedBlockDeclaration> | null;
+  error: string | null;
+} {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(report);
+  } catch {
+    return {
+      declarations: null,
+      error: 'approved-content lock violation: maestro_revision_report must be one strict JSON object',
     };
-    const existing = declarations.get(blockId);
-    if (existing) {
-      existing.hasProtocolBasis ||= declaration.hasProtocolBasis;
-      existing.allowsBlockCountGrowth ||= declaration.allowsBlockCountGrowth;
-      existing.allowsReorder ||= declaration.allowsReorder;
-    } else {
-      declarations.set(blockId, declaration);
-    }
   }
-  return declarations;
-}
-
-function changedBlockEntryFragments(section: string): string[] {
-  const fragments: string[] = [];
-  let depth = 0;
-  let start: number | null = null;
-  for (let index = 0; index < section.length; index += 1) {
-    const character = section.charAt(index);
-    if (character === '{') {
-      if (depth === 0) start = index;
-      depth += 1;
-    } else if (character === '}' && depth > 0) {
-      depth -= 1;
-      if (depth === 0 && start !== null) {
-        fragments.push(section.slice(start, index + 1));
-        start = null;
-      }
-    }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return {
+      declarations: null,
+      error: 'approved-content lock violation: maestro_revision_report must be one strict JSON object',
+    };
   }
-  if (fragments.length === 0) {
-    for (const line of section.split('\n')) {
-      if (asciiLowercase(line).includes('block_id')) fragments.push(line);
-    }
+  const changedBlocks = (parsed as Record<string, unknown>).changed_blocks;
+  if (changedBlocks === undefined) return { declarations: null, error: null };
+  if (!Array.isArray(changedBlocks)) {
+    return {
+      declarations: null,
+      error: 'approved-content lock violation: changed_blocks must be a JSON array',
+    };
   }
-  return fragments;
-}
-
-function extractBlockIdField(fragment: string): string | null {
-  const match = BLOCK_ID_FIELD.exec(fragment);
-  return match?.[1] ?? null;
-}
-
-function fragmentHasNonemptyProtocolBasis(fragment: string): boolean {
-  const match = PROTOCOL_BASIS_KEY.exec(fragment);
-  if (!match) return false;
-  return protocolBasisValueIsNonempty(fragment.slice(match.index + match[0].length));
-}
-
-function protocolBasisValueIsNonempty(value: string): boolean {
-  const trimmed = rustTrimStart(value);
-  if (trimmed === '') return false;
-  if (trimmed.startsWith('"')) return quotedValueIsNonempty(trimmed.slice(1), '"');
-  if (trimmed.startsWith("'")) return quotedValueIsNonempty(trimmed.slice(1), "'");
-  if (trimmed.startsWith('[')) return bracketedValueIsNonempty(trimmed.slice(1), '[', ']');
-  if (trimmed.startsWith('{')) return bracketedValueIsNonempty(trimmed.slice(1), '{', '}');
-  const bareValue = rustTrim(trimmed.split(BARE_TOKEN_BOUNDARY)[0] ?? '');
-  return bareValue !== '' && asciiLowercase(bareValue) !== 'null' && bareValue !== '[]' && bareValue !== '{}';
-}
-
-function quotedValueIsNonempty(rest: string, quote: string): boolean {
-  let escaped = false;
-  let value = '';
-  for (const character of rest) {
-    if (escaped) {
-      value += character;
-      escaped = false;
-      continue;
+  const declarations = new Map<string, ChangedBlockDeclaration>();
+  for (const entry of changedBlocks) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      return {
+        declarations: null,
+        error: 'approved-content lock violation: each changed_blocks entry must be a JSON object',
+      };
     }
-    if (character === '\\') {
-      escaped = true;
-      continue;
+    const fields = entry as Record<string, unknown>;
+    const blockId = fields.block_id;
+    if (typeof blockId !== 'string' || !/^B\p{Nd}{4,}$/u.test(blockId)) continue;
+    if (declarations.has(blockId)) {
+      return {
+        declarations: null,
+        error: `approved-content lock violation: duplicate changed_blocks declaration for ${blockId}`,
+      };
     }
-    if (character === quote) {
-      return rustTrim(value) !== '';
-    }
-    value += character;
+    const basis = fields.protocol_basis;
+    const changeType = fields.change_type;
+    declarations.set(blockId, {
+      hasProtocolBasis:
+        (typeof basis === 'string' && rustTrim(basis) !== '') ||
+        (Array.isArray(basis) && basis.length > 0) ||
+        (typeof basis === 'object' && basis !== null && !Array.isArray(basis) && Object.keys(basis).length > 0),
+      allowedBlockCountGrowth:
+        changeType === 'split' || changeType === 'addition'
+          ? Number.isSafeInteger(fields.new_block_count) && Number(fields.new_block_count) > 0
+            ? Number(fields.new_block_count)
+            : fields.new_block_count === undefined
+              ? 1
+              : 0
+          : 0,
+      allowsReorder: changeType === 'reorder',
+    });
   }
-  return false;
-}
-
-function bracketedValueIsNonempty(rest: string, open: string, close: string): boolean {
-  let depth = 1;
-  let body = '';
-  let inQuote: string | null = null;
-  let escaped = false;
-  for (const character of rest) {
-    if (inQuote !== null) {
-      body += character;
-      if (escaped) {
-        escaped = false;
-      } else if (character === '\\') {
-        escaped = true;
-      } else if (character === inQuote) {
-        inQuote = null;
-      }
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      inQuote = character;
-      body += character;
-      continue;
-    }
-    if (character === open) {
-      depth += 1;
-      body += character;
-      continue;
-    }
-    if (character === close) {
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) {
-        return rustTrim(body) !== '';
-      }
-      body += character;
-      continue;
-    }
-    body += character;
-  }
-  return false;
-}
-
-function fragmentDeclaresBlockCountGrowth(fragment: string): boolean {
-  const lower = asciiLowercase(fragment);
-  return (
-    lower.includes('change_type') &&
-    (lower.includes('split') ||
-      lower.includes('addition') ||
-      lower.includes('added') ||
-      lower.includes('new_block') ||
-      lower.includes('new block'))
-  );
-}
-
-function fragmentDeclaresReorder(fragment: string): boolean {
-  const lower = asciiLowercase(fragment);
-  return (
-    lower.includes('change_type') &&
-    (lower.includes('reorder') || lower.includes('reordered') || lower.includes('move') || lower.includes('moved'))
-  );
+  return { declarations, error: null };
 }
