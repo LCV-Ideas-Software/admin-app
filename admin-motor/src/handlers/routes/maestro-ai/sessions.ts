@@ -160,21 +160,26 @@ type CircularReviewState = {
 
 type ProviderCallResult = {
   text: string;
+  operationalError?: string | undefined;
   inputTokens?: number | undefined;
   outputTokens?: number | undefined;
+  observedCostUsd?: number | undefined;
   model: string;
 };
 
 type ProviderResponsePayload = {
+  model?: string;
   content?: Array<{ type?: string; text?: string }>;
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
     prompt_tokens?: number;
     completion_tokens?: number;
+    cost?: { currency?: string; total_cost?: number };
   };
   output_text?: string;
-  output?: Array<{ content?: Array<{ text?: string; type?: string }> }>;
+  output?: Array<{ type?: string; role?: string; content?: Array<{ text?: string; type?: string }> }>;
+  status?: string;
   choices?: Array<{ message?: { content?: string } }>;
   error?: { message?: string };
   message?: string;
@@ -195,6 +200,7 @@ type SessionEvent = {
   status: 'queued' | 'running' | 'ready' | 'not_ready' | 'blocked' | 'error' | 'finished';
   message: string;
   cost_usd?: number;
+  cost_source?: 'provider' | 'estimate';
   model?: string;
   link_audit?: LinkAuditResult[];
   /** Structured release-audit context (canonical audit_context), persisted in
@@ -242,7 +248,7 @@ const DEFAULT_MODELS: Record<ProviderKey, string> = {
   gemini: 'gemini-2.5-pro',
   deepseek: 'deepseek-v4-pro',
   grok: 'grok-4.5',
-  perplexity: 'sonar-reasoning-pro',
+  perplexity: 'medium',
 };
 
 const DEFAULT_RATES: Record<
@@ -389,7 +395,10 @@ function sanitizeRates(value: unknown): Record<ProviderKey, ProviderRates> {
 function sanitizeModels(value: unknown): Record<ProviderKey, string> {
   const raw = value && typeof value === 'object' ? (value as Partial<Record<ProviderKey, string>>) : {};
   return Object.fromEntries(
-    PROVIDER_KEYS.map((agent) => [agent, sanitizeText(raw[agent], 120) || DEFAULT_MODELS[agent]]),
+    PROVIDER_KEYS.map((agent) => [
+      agent,
+      agent === 'perplexity' ? 'medium' : sanitizeText(raw[agent], 120) || DEFAULT_MODELS[agent],
+    ]),
   ) as Record<ProviderKey, string>;
 }
 
@@ -971,6 +980,13 @@ function estimateCost(prompt: string, maxOutputTokens: number, rates: ProviderRa
 }
 
 function calculateObservedCost(result: ProviderCallResult, fallbackPrompt: string, rates: ProviderRates): number {
+  if (
+    typeof result.observedCostUsd === 'number' &&
+    Number.isFinite(result.observedCostUsd) &&
+    result.observedCostUsd >= 0
+  ) {
+    return result.observedCostUsd;
+  }
   const inputTokens = result.inputTokens ?? Math.ceil(fallbackPrompt.length / 4);
   const outputTokens = result.outputTokens ?? Math.ceil(result.text.length / 4);
   const inputRate = Number(rates.input_usd_per_million);
@@ -980,6 +996,14 @@ function calculateObservedCost(result: ProviderCallResult, fallbackPrompt: strin
     return Number.NaN;
   }
   return (inputTokens / 1_000_000) * inputRate + (outputTokens / 1_000_000) * outputRate + requestRate / 1000;
+}
+
+function observedCostSource(result: ProviderCallResult): 'provider' | 'estimate' {
+  return typeof result.observedCostUsd === 'number' &&
+    Number.isFinite(result.observedCostUsd) &&
+    result.observedCostUsd >= 0
+    ? 'provider'
+    : 'estimate';
 }
 
 // Canonical session time budget (editorial_inputs.rs:205-215 / session_orchestration.rs):
@@ -1478,6 +1502,7 @@ function validateSerialTurnOutput(
   if (finalTagError) return finalTagError;
   if (report === null) return 'missing complete maestro_revision_report block';
   if (rustTrim(report) === '') return 'empty maestro_revision_report block';
+  if (tryParseJsonObject(report) === null) return 'maestro_revision_report must be one strict JSON object';
   const hasRevisedCustody = reportDeclaresCustodyValue(report, 'revised');
   const hasUnchangedCustody = reportDeclaresCustodyValue(report, 'unchanged');
   if (hasRevisedCustody && hasUnchangedCustody) return 'ambiguous custody declaration in maestro_revision_report';
@@ -2156,11 +2181,11 @@ If you are unsure, preserve the passage and report the concern instead of rewrit
 The answer MUST contain exactly these parts:
 
 1. First line: MAESTRO_STATUS: READY or MAESTRO_STATUS: NOT_READY.
-2. <maestro_revision_report> containing en_US JSON-like audit data:
+2. <maestro_revision_report> containing exactly one valid en_US JSON object, without prose or Markdown code fences before or after it:
    - reviewer
    - current_author
    - status
-   - changed_blocks: list every changed received block using block_id, change_type, reason, protocol_basis, and required: true|false. Use change_type: "split" or "addition" whenever the revised article creates extra blocks, and change_type: "reorder" whenever approved blocks move.
+   - changed_blocks: list every changed received block using unique block_id, change_type, reason, protocol_basis, and required: true|false. For growth, use change_type: "split" or "addition" on the relevant received block, with new_block_count equal to the number of extra blocks it creates (omit only when it creates exactly one). Use change_type: "reorder" whenever approved blocks move. Do not duplicate block_id entries.
    - unchanged_approved_blocks: list approved block IDs that you intentionally preserved.
    - changes: list of changed passages, received line/passage reference, reason, protocol citation, and whether the change was required.
    - operator_evidence_required: list of blockers that cannot be corrected from supplied materials and require external evidence or operator decision.
@@ -2172,7 +2197,7 @@ The answer MUST contain exactly these parts:
 5. MAESTRO_STATUS: NOT_READY with custody: "unchanged" is a contract violation: either fix the blocker and transfer revised custody, or approve the current version as READY unchanged.
 
 Anything outside those tags may be discarded by the app.
-An incomplete tag, missing closing tag, reproduced protocol text, or truncated JSON/report is a contract violation and will not count as READY.
+An incomplete tag, missing closing tag, reproduced protocol text, malformed or truncated JSON/report is a contract violation and will not count as READY.
 
 ## Current Text Block Manifest
 
@@ -2474,7 +2499,7 @@ async function callProvider(
   // Plan F precedence: an operator-configured model (anything other than the
   // seeded default) wins; otherwise resolve live against the provider's
   // /models list (canonical), memoized per execution via options.modelCache.
-  const configured = sanitizeText(models[agent], 120);
+  const configured = agent === 'perplexity' ? '' : sanitizeText(models[agent], 120);
   // Uma escolha persistida vence a resolução ao vivo — mas o catálogo do Vertex
   // é global e anuncia previews que uma região não serve. Sem esta checagem, um
   // `gemini-3.1-pro-preview` salvo antes contornaria o fallback regional e toda
@@ -2554,6 +2579,10 @@ async function callProvider(
     };
   }
 
+  if (agent === 'perplexity') {
+    return parsePerplexityAgentResult(parsed, model);
+  }
+
   const text = parsed.choices?.[0]?.message?.content ?? '';
   return {
     text: String(text)
@@ -2562,6 +2591,28 @@ async function callProvider(
     inputTokens: parsed.usage?.prompt_tokens ?? parsed.usage?.input_tokens,
     outputTokens: parsed.usage?.completion_tokens ?? parsed.usage?.output_tokens,
     model,
+  };
+}
+
+function parsePerplexityAgentResult(parsed: ProviderResponsePayload, fallbackModel: string): ProviderCallResult {
+  const text = (parsed.output ?? [])
+    .filter((item) => item.type === 'message' && item.role === 'assistant')
+    .flatMap((item) => item.content ?? [])
+    .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
+    .map((item) => item.text)
+    .join('\n')
+    .trim();
+  const cost = parsed.usage?.cost;
+  return {
+    text,
+    operationalError:
+      parsed.status === 'completed'
+        ? undefined
+        : `PROVIDER_RESPONSE_${sanitizeText(parsed.status ?? 'invalid', 50)}: Perplexity Agent API did not complete`,
+    inputTokens: parsed.usage?.input_tokens,
+    outputTokens: parsed.usage?.output_tokens,
+    observedCostUsd: cost?.currency === 'USD' ? cost.total_cost : undefined,
+    model: parsed.model ?? fallbackModel,
   };
 }
 
@@ -2645,8 +2696,25 @@ function buildProviderHttpRequest(
     };
   }
 
-  const endpoint =
-    agent === 'deepseek' ? 'https://api.deepseek.com/chat/completions' : 'https://api.perplexity.ai/v1/sonar';
+  if (agent === 'perplexity') {
+    return {
+      endpoint: 'https://api.perplexity.ai/v1/agent',
+      init: {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          preset: 'medium',
+          instructions: system,
+          input: prompt,
+          max_output_tokens: maxOutputTokens,
+          stream: false,
+          store: false,
+        }),
+      },
+    };
+  }
+
+  const endpoint = 'https://api.deepseek.com/chat/completions';
   return {
     endpoint,
     init: {
@@ -2665,15 +2733,6 @@ function buildProviderHttpRequest(
         max_tokens: maxOutputTokens,
         temperature: 0.2,
         top_p: 0.9,
-        ...(agent === 'perplexity'
-          ? {
-              search_mode: 'web',
-              reasoning_effort: 'high',
-              web_search_options: { search_context_size: 'high' },
-              return_images: false,
-              return_related_questions: false,
-            }
-          : {}),
       }),
     },
   };
@@ -2714,6 +2773,9 @@ const RESUMABLE_STATUSES = new Set([
 
 export const maestroAiTestHooks = {
   buildProviderHttpRequest,
+  parsePerplexityAgentResult,
+  calculateObservedCost,
+  observedCostSource,
   buildRevisionPrompt,
   publicApiHealthResult,
   extractStatus,
@@ -3228,6 +3290,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
       status: event.status,
       message: event.message,
       cost_usd: event.cost_usd,
+      cost_source: event.cost_source,
       model: event.model,
       invalid_links: event.link_audit?.filter((link) => !link.ok).length ?? 0,
     });
@@ -3491,6 +3554,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           logMaestro('warn', 'session_interrupted', { session_id: id, status: beforeCallLive?.status });
           return;
         }
+        let draftCostSource: 'provider' | 'estimate' | undefined;
         try {
           const attempt = await callProvider(
             env,
@@ -3502,8 +3566,10 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
             callOptions(),
           );
           draftCost = calculateObservedCost(attempt, draftPrompt, draftRates);
+          draftCostSource = observedCostSource(attempt);
           observedCost += draftCost;
           await persistObservedCostFloor(db, id, observedCost);
+          if (attempt.operationalError) throw new Error(attempt.operationalError);
           // M3: an empty provider response (e.g. a thinking-only completion) is a
           // draft failure, not a silent blank custody — fall through to the next agent.
           if (!attempt.text.trim()) {
@@ -3525,6 +3591,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               error instanceof Error ? error.message : String(error),
               300,
             )}. Trying next active agent.`,
+            ...(draftCostSource ? { cost_usd: draftCost, cost_source: draftCostSource } : {}),
           });
           await persistSession(db, id, { observed_cost_usd: observedCost });
           continue;
@@ -3586,6 +3653,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         status: 'ready',
         message: 'Initial draft produced.',
         cost_usd: draftCost,
+        cost_source: observedCostSource(draft),
         model: draft.model,
       };
       if (
@@ -3609,7 +3677,11 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     // preserved, and three consecutive operational failures
     // escalate to paused_reviewer_outage. A clean turn resets the counter. A
     // failure on the round's closing turn pauses as paused_round_incomplete.
-    const handleOperationalFailure = async (reviewer: ProviderKey, message: string): Promise<'stop' | 'skip'> => {
+    const handleOperationalFailure = async (
+      reviewer: ProviderKey,
+      message: string,
+      billed?: { cost: number; source: 'provider' | 'estimate'; model: string },
+    ): Promise<'stop' | 'skip'> => {
       consecutiveOutages += 1;
       await pushEvent({
         at: nowIso(),
@@ -3617,6 +3689,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
         role: 'revision',
         status: 'blocked',
         message: `Operational turn failure (${consecutiveOutages}/${REVIEWER_OUTAGE_ESCALATION_THRESHOLD}): ${sanitizeText(message, 300)}`,
+        ...(billed ? { cost_usd: billed.cost, cost_source: billed.source, model: billed.model } : {}),
       });
       if (consecutiveOutages >= REVIEWER_OUTAGE_ESCALATION_THRESHOLD) {
         await persistCircularProgress(
@@ -3831,6 +3904,15 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
           const cost = calculateObservedCost(result, prompt, rates);
           observedCost += cost;
           await persistObservedCostFloor(db, id, observedCost);
+          if (result.operationalError) {
+            const action = await handleOperationalFailure(reviewer, result.operationalError, {
+              cost,
+              source: observedCostSource(result),
+              model: result.model,
+            });
+            if (action === 'stop') return;
+            break;
+          }
           // Cooperative cancellation (post-call): if cancelled while the reviewer
           // call was in flight, do not write revision artifacts/events for the
           // now-cancelled session.
@@ -3928,6 +4010,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
               status: 'blocked',
               message: `Reclassificado para CONTRACT_VIOLATION: ${sanitizeText(contractError, 300)}`,
               cost_usd: cost,
+              cost_source: observedCostSource(result),
               model: result.model,
               ...(unchangedAuditFailure
                 ? {
@@ -4018,6 +4101,7 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
                 ? 'Reviewer revised custody text.'
                 : 'Reviewer left custody unchanged.',
             cost_usd: cost,
+            cost_source: observedCostSource(result),
             model: result.model,
             ...(unchangedAuditFailure && readyRejectedReason
               ? {

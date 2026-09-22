@@ -496,7 +496,7 @@ describe('Maestro AI settings', () => {
       gemini: 'gemini-2.5-pro',
       deepseek: 'deepseek-v4-pro',
       grok: 'grok-4.5',
-      perplexity: 'sonar-reasoning-pro',
+      perplexity: 'medium',
     });
     expect(JSON.stringify(payload)).not.toContain('secret-claude');
   });
@@ -677,7 +677,7 @@ describe('Maestro AI revision prompt teaches the block contract', () => {
     expect(prompt).toContain('## Current Text Block Manifest');
     expect(prompt).toContain('| block_id | kind | chars | sha256_12 | locked_by_default | excerpt |');
     expect(prompt).toContain('| B0001 | heading |');
-    expect(prompt).toContain('changed_blocks: list every changed received block using block_id');
+    expect(prompt).toContain('changed_blocks: list every changed received block using unique block_id');
     expect(prompt).toContain('unchanged_approved_blocks');
     expect(prompt).toContain('change_type: "reorder"');
     expect(prompt).toContain('## Evidence and Bibliographic Integrity Gate');
@@ -827,7 +827,7 @@ describe('Maestro AI prior-reports feed, prompt sections and model resolution (P
     expect(await resolveProviderModel('grok', 'key')).toBe('grok-4.5');
     // Perplexity has NO live resolution (canonical): no fetch, default returned.
     endpoints.length = 0;
-    expect(await resolveProviderModel('perplexity', 'key')).toBe('sonar-reasoning-pro');
+    expect(await resolveProviderModel('perplexity', 'key')).toBe('medium');
     expect(endpoints).toEqual([]);
     vi.unstubAllGlobals();
   });
@@ -1424,7 +1424,7 @@ describe('Maestro AI serial turn contract (Plan B1)', () => {
     expect(containsPromptOrProtocolEcho('normal reviewer output')).toBe(false);
   });
 
-  it('validateSerialTurnOutput enforces the desktop output contract in order', () => {
+  it('validateSerialTurnOutput enforces the web strict-JSON output contract in order', () => {
     const { validateSerialTurnOutput } = maestroAiTestHooks;
     const wrap = (report: string, finalText?: string) =>
       `MAESTRO_STATUS: READY\n<maestro_revision_report>${report}</maestro_revision_report>${
@@ -1447,43 +1447,43 @@ describe('Maestro AI serial turn contract (Plan B1)', () => {
     );
     const ambiguous = 'custody: "revised"\ncustody: "unchanged"';
     expect(validateSerialTurnOutput(wrap(ambiguous), 'READY', ambiguous, null)).toBe(
-      'ambiguous custody declaration in maestro_revision_report',
+      'maestro_revision_report must be one strict JSON object',
     );
     expect(
       validateSerialTurnOutput(
-        wrap('custody: "unchanged"', 'novo texto'),
+        wrap('{"custody":"unchanged"}', 'novo texto'),
         'READY',
-        'custody: "unchanged"',
+        '{"custody":"unchanged"}',
         'novo texto',
       ),
     ).toBe('maestro_final_text requires custody revised in the report');
     expect(
       validateSerialTurnOutput(
-        wrap('custody: "revised"', 'texto com [EVIDENCIA_PENDENTE]'),
+        wrap('{"custody":"revised"}', 'texto com [EVIDENCIA_PENDENTE]'),
         'READY',
-        'custody: "revised"',
+        '{"custody":"revised"}',
         'texto com [EVIDENCIA_PENDENTE]',
       ),
     ).toBe(
       'final candidate failed bibliographic integrity gate: unresolved evidence marker or bibliographic lacuna found',
     );
-    expect(validateSerialTurnOutput(wrap('custody: "revised"'), 'READY', 'custody: "revised"', null)).toBe(
+    expect(validateSerialTurnOutput(wrap('{"custody":"revised"}'), 'READY', '{"custody":"revised"}', null)).toBe(
       'revised custody requires a complete maestro_final_text block',
     );
-    expect(validateSerialTurnOutput(wrap('relatorio sem custody'), 'READY', 'relatorio sem custody', null)).toBe(
+    expect(validateSerialTurnOutput(wrap('{}'), 'READY', '{}', null)).toBe(
       'READY without maestro_final_text must explicitly declare custody unchanged',
     );
-    const correctable = 'custody: "unchanged"\nchanges: ["algo corrigivel"]';
+    const correctable = '{"custody":"unchanged","changes":["algo corrigivel"]}';
     expect(validateSerialTurnOutput(wrap(correctable), 'NOT_READY', correctable, null)).toBe(
       'correctable changes require custody revised and a complete maestro_final_text block',
     );
-    const cleanUnchanged = 'custody: "unchanged"\nchanges: []';
+    const cleanUnchanged = '{"custody":"unchanged","changes":[]}';
     expect(validateSerialTurnOutput(wrap(cleanUnchanged), 'READY', cleanUnchanged, null)).toBeNull();
     expect(
       validateSerialTurnOutput(
-        wrap('custody: "revised"', 'texto novo limpo'),
+        wrap('{"custody":"revised"}', 'texto novo limpo'),
         'NOT_READY',
-        'custody: "revised"',
+        '{"custody":"revised"}',
         'texto novo limpo',
       ),
     ).toBeNull();
@@ -1500,9 +1500,9 @@ describe('Maestro AI serial turn contract (Plan B1)', () => {
       'missing complete maestro_revision_report block',
     );
     const emptyFinal =
-      'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "revised"\nchanges: ["x"]</maestro_revision_report>\n<maestro_final_text></maestro_final_text>';
+      'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>{"custody":"revised","changes":["x"]}</maestro_revision_report>\n<maestro_final_text></maestro_final_text>';
     expect(extractTagged(emptyFinal, 'maestro_final_text')).toBeNull();
-    expect(validateSerialTurnOutput(emptyFinal, 'NOT_READY', 'custody: "revised"\nchanges: ["x"]', null)).toBe(
+    expect(validateSerialTurnOutput(emptyFinal, 'NOT_READY', '{"custody":"revised","changes":["x"]}', null)).toBe(
       'revised custody requires a complete maestro_final_text block',
     );
   });
@@ -1670,7 +1670,7 @@ describe('runSession orchestrator', () => {
           JSON.stringify({
             output_text:
               opts.codexText ??
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -1694,12 +1694,131 @@ describe('runSession orchestrator', () => {
     MAESTRO_OPENAI_API_KEY: 'k-codex',
   };
 
+  it('runs a Perplexity draft through the Agent API and journals its billed cost', async () => {
+    const db = createInMemoryDb({
+      sessions: [
+        runnableSession({
+          initial_agent: 'perplexity',
+          cycle_lead: 'perplexity',
+          active_agents_json: JSON.stringify(['perplexity', 'codex']),
+        }),
+      ],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      if (url === 'https://api.perplexity.ai/v1/agent') {
+        const body = JSON.parse(String(init?.body));
+        expect(body).toMatchObject({ preset: 'medium', stream: false, store: false });
+        expect(body.instructions).toContain('Perplexity inside Maestro');
+        return new Response(
+          JSON.stringify({
+            status: 'completed',
+            model: 'openai/gpt-5.6-luna',
+            output: [
+              { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Rascunho completo.' }] },
+            ],
+            usage: { input_tokens: 20, output_tokens: 10, cost: { currency: 'USD', total_cost: 0.0042 } },
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({
+            output_text:
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[]}</maestro_revision_report>',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(
+      db,
+      { ...env, BIGDATA_DB: db, MAESTRO_PERPLEXITY_API_KEY: 'k-perplexity' },
+      'run-1',
+    );
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('converged');
+    expect(Number(row?.observed_cost_usd)).toBeGreaterThanOrEqual(0.0042);
+    const events = JSON.parse(String(row?.events_json)) as Array<{
+      role?: string;
+      cost_usd?: number;
+      cost_source?: string;
+    }>;
+    expect(events.find((event) => event.role === 'draft' && event.cost_source === 'provider')?.cost_usd).toBe(0.0042);
+  });
+
+  it('charges and journals a billed incomplete Perplexity response before draft fallback', async () => {
+    const db = createInMemoryDb({
+      sessions: [
+        runnableSession({
+          initial_agent: 'perplexity',
+          cycle_lead: 'perplexity',
+          active_agents_json: JSON.stringify(['perplexity', 'codex']),
+        }),
+      ],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      if (url === 'https://api.perplexity.ai/v1/agent') {
+        return new Response(
+          JSON.stringify({
+            status: 'incomplete',
+            output: [],
+            usage: { input_tokens: 20, output_tokens: 4, cost: { currency: 'USD', total_cost: 0.003 } },
+          }),
+          { status: 200 },
+        );
+      }
+      if (hostOf(url) === 'api.openai.com') {
+        return new Response(
+          JSON.stringify({ output_text: 'Rascunho de fallback.', usage: { input_tokens: 10, output_tokens: 20 } }),
+          { status: 200 },
+        );
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(
+      db,
+      { ...env, BIGDATA_DB: db, MAESTRO_PERPLEXITY_API_KEY: 'k-perplexity' },
+      'run-1',
+    );
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(Number(row?.observed_cost_usd)).toBeGreaterThanOrEqual(0.003);
+    const events = JSON.parse(String(row?.events_json)) as Array<{
+      agent?: string;
+      role?: string;
+      status?: string;
+      cost_usd?: number;
+      cost_source?: string;
+    }>;
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        agent: 'perplexity',
+        role: 'draft',
+        status: 'blocked',
+        cost_usd: 0.003,
+        cost_source: 'provider',
+      }),
+    );
+  });
+
   it('falls back to the next active agent when the initial draft text is empty (canonical draft fallback)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
     // Claude (lead) returns a blank draft; codex must take over as draft author.
     const fetchMock = providerFetch({
       claudeText:
-        'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found</maestro_revision_report>',
+        'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found"]}</maestro_revision_report>',
       codexText: 'Texto de rascunho de fallback robusto e completo.',
     });
     // Override: anthropic returns empty ONLY for the draft (first anthropic call).
@@ -1791,8 +1910,8 @@ describe('runSession orchestrator', () => {
         codexBodies.push(String(init?.body ?? ''));
         const text =
           codexCalls === 1
-            ? 'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nvague complaint without correction</maestro_revision_report>'
-            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+            ? 'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["vague complaint without correction"]}</maestro_revision_report>'
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>';
         return new Response(JSON.stringify({ output_text: text, usage: { input_tokens: 10, output_tokens: 20 } }), {
           status: 200,
         });
@@ -1829,8 +1948,8 @@ describe('runSession orchestrator', () => {
         codexBodies.push(String(init?.body ?? ''));
         const text =
           codexCalls === 1
-            ? 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "revised"\nchanges: ["rewrote the paragraph"]</maestro_revision_report>\n<maestro_final_text>Texto reescrito sem declarar blocos.</maestro_final_text>'
-            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+            ? 'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"revised","changes":["rewrote the paragraph"]}</maestro_revision_report>\n<maestro_final_text>Texto reescrito sem declarar blocos.</maestro_final_text>'
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>';
         return new Response(JSON.stringify({ output_text: text, usage: { input_tokens: 10, output_tokens: 20 } }), {
           status: 200,
         });
@@ -1912,8 +2031,7 @@ describe('runSession orchestrator', () => {
       acceptedText += ` Melhoria editorial substantiva ${reviewCalls}.`;
       return (
         'MAESTRO_STATUS: READY\n' +
-        '<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "precision rule"}]\n' +
-        'custody: "revised"</maestro_revision_report>\n' +
+        '<maestro_revision_report>{"changed_blocks": [{"block_id": "B0001", "protocol_basis": "precision rule"}], "custody": "revised"}</maestro_revision_report>\n' +
         `<maestro_final_text>${acceptedText}</maestro_final_text>`
       );
     };
@@ -1956,10 +2074,7 @@ describe('runSession orchestrator', () => {
   it('accepts READY with a substantive revision as a normal turn (desktop bans inversion)', async () => {
     const db = createInMemoryDb({ sessions: [runnableSession()] });
     const revised = 'Texto revisado, mais preciso e completo, sem marcadores pendentes.';
-    // changed_blocks leads the report: the canonical section finder recognizes
-    // the key at report start or after {, [ or , (a preceding quoted value
-    // line would hide it, matching the desktop parser).
-    const codexText = `MAESTRO_STATUS: READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "precision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
+    const codexText = `MAESTRO_STATUS: READY\n<maestro_revision_report>{"changed_blocks": [{"block_id": "B0001", "protocol_basis": "precision rule"}], "custody": "revised"}</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
     vi.stubGlobal('fetch', providerFetch({ claudeText: 'Rascunho original razoavel e completo.', codexText }));
     await maestroAiTestHooks.runSession(db, { ...env, BIGDATA_DB: db }, 'run-1');
     vi.unstubAllGlobals();
@@ -1998,8 +2113,8 @@ describe('runSession orchestrator', () => {
         deepseekBodies.push(String(init?.body ?? ''));
         const text =
           deepseekCalls === 1
-            ? `MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "concision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${shrunk}</maestro_final_text>`
-            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+            ? `MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>{"changed_blocks": [{"block_id": "B0001", "protocol_basis": "concision rule"}], "custody": "revised"}</maestro_revision_report>\n<maestro_final_text>${shrunk}</maestro_final_text>`
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>';
         return new Response(
           JSON.stringify({
             choices: [{ message: { content: text } }],
@@ -2041,7 +2156,7 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: {},
           }),
           { status: 200 },
@@ -2051,8 +2166,8 @@ describe('runSession orchestrator', () => {
         deepseekCalls += 1;
         const text =
           deepseekCalls === 1
-            ? 'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nblocker passed forward without correction</maestro_revision_report>'
-            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+            ? 'MAESTRO_STATUS: NOT_READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["blocker passed forward without correction"]}</maestro_revision_report>'
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>';
         return new Response(JSON.stringify({ choices: [{ message: { content: text } }], usage: {} }), {
           status: 200,
         });
@@ -2088,7 +2203,7 @@ describe('runSession orchestrator', () => {
         const text =
           claudeCalls === 1
             ? 'Rascunho original valido.'
-            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>';
+            : 'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>';
         return new Response(JSON.stringify({ content: [{ type: 'text', text }], usage: {} }), { status: 200 });
       }
       if (hostOf(url) === 'api.openai.com') {
@@ -2096,14 +2211,14 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: {},
           }),
           { status: 200 },
         );
       }
       if (hostOf(url) === 'api.deepseek.com') {
-        const text = `MAESTRO_STATUS: READY\n<maestro_revision_report>changed_blocks: [{"block_id": "B0001", "protocol_basis": "precision rule"}]\ncustody: "revised"</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
+        const text = `MAESTRO_STATUS: READY\n<maestro_revision_report>{"changed_blocks": [{"block_id": "B0001", "protocol_basis": "precision rule"}], "custody": "revised"}</maestro_revision_report>\n<maestro_final_text>${revised}</maestro_final_text>`;
         return new Response(JSON.stringify({ choices: [{ message: { content: text } }], usage: {} }), {
           status: 200,
         });
@@ -2158,7 +2273,7 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -2211,7 +2326,7 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -2265,7 +2380,7 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -2310,7 +2425,7 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -2353,7 +2468,7 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -2394,7 +2509,7 @@ describe('runSession orchestrator', () => {
         return new Response(
           JSON.stringify({
             output_text:
-              'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+              'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
             usage: { input_tokens: 10, output_tokens: 20 },
           }),
           { status: 200 },
@@ -2913,7 +3028,7 @@ describe('session cancellation and sweeper', () => {
           return new Response(
             JSON.stringify({
               output_text:
-                'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+                'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
               usage: { input_tokens: 10, output_tokens: 20 },
             }),
             { status: 200 },
@@ -3017,7 +3132,7 @@ describe('session cancellation and sweeper', () => {
                 {
                   message: {
                     content:
-                      'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+                      'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
                   },
                 },
               ],
@@ -3291,7 +3406,7 @@ describe('session cancellation and sweeper', () => {
               content: [
                 {
                   type: 'text',
-                  text: 'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+                  text: 'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
                 },
               ],
               usage: {},
@@ -3307,7 +3422,7 @@ describe('session cancellation and sweeper', () => {
                 {
                   message: {
                     content:
-                      'MAESTRO_STATUS: READY\n<maestro_revision_report>custody: "unchanged"\nchanges: []\nno blockers found in the current text</maestro_revision_report>',
+                      'MAESTRO_STATUS: READY\n<maestro_revision_report>{"custody":"unchanged","changes":[],"out_of_scope":["no blockers found in the current text"]}</maestro_revision_report>',
                   },
                 },
               ],
@@ -3599,7 +3714,7 @@ describe('maestro provider request construction', () => {
     expect(body.stream).toBe(false);
   });
 
-  it('uses the Perplexity Sonar endpoint with chat messages', () => {
+  it('uses the Perplexity Agent API medium preset', () => {
     const request = maestroAiTestHooks.buildProviderHttpRequest(
       'perplexity',
       'perplexity-secret',
@@ -3608,19 +3723,54 @@ describe('maestro provider request construction', () => {
       prompt,
     );
     const body = JSON.parse(String(request.init.body)) as {
-      model: string;
-      messages: Array<{ role: string; content: string }>;
-      search_mode: string;
+      preset: string;
+      instructions: string;
+      input: string;
+      max_output_tokens: number;
     };
 
-    expect(request.endpoint).toBe('https://api.perplexity.ai/v1/sonar');
+    expect(request.endpoint).toBe('https://api.perplexity.ai/v1/agent');
     expect(request.init.headers).toMatchObject({ authorization: 'Bearer perplexity-secret' });
-    expect(body.model).toBe('sonar-reasoning-pro');
-    expect(body.messages).toEqual([
-      { role: 'system', content: system },
-      { role: 'user', content: prompt },
-    ]);
-    expect(body.search_mode).toBe('web');
+    expect(body.preset).toBe('medium');
+    expect(body.instructions).toBe(system);
+    expect(body.input).toBe(prompt);
+    expect(body.max_output_tokens).toBeGreaterThan(0);
+  });
+
+  it('reads typed Perplexity output and charges the provider-reported USD cost', () => {
+    const result = maestroAiTestHooks.parsePerplexityAgentResult(
+      {
+        status: 'completed',
+        model: 'openai/gpt-5.4-mini',
+        output: [
+          { type: 'search_results', content: [{ type: 'output_text', text: 'Source text is not the answer.' }] },
+          { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Resposta final.' }] },
+        ],
+        usage: { input_tokens: 25, output_tokens: 12, cost: { currency: 'USD', total_cost: 0.0042 } },
+      },
+      'medium',
+    );
+    expect(result).toMatchObject({ text: 'Resposta final.', model: 'openai/gpt-5.4-mini' });
+    expect(maestroAiTestHooks.calculateObservedCost(result, 'prompt', rates.perplexity)).toBe(0.0042);
+    expect(maestroAiTestHooks.observedCostSource(result)).toBe('provider');
+  });
+
+  it('falls back to estimated cost when Perplexity omits usage and preserves billed incomplete output', () => {
+    const result = maestroAiTestHooks.parsePerplexityAgentResult(
+      {
+        status: 'completed',
+        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'OK' }] }],
+      },
+      'medium',
+    );
+    expect(maestroAiTestHooks.calculateObservedCost(result, 'prompt', rates.perplexity)).toBeGreaterThan(0);
+    expect(maestroAiTestHooks.observedCostSource(result)).toBe('estimate');
+    const incomplete = maestroAiTestHooks.parsePerplexityAgentResult(
+      { status: 'incomplete', output: [], usage: { cost: { currency: 'USD', total_cost: 0.0021 } } },
+      'medium',
+    );
+    expect(incomplete.operationalError).toContain('did not complete');
+    expect(maestroAiTestHooks.calculateObservedCost(incomplete, 'prompt', rates.perplexity)).toBe(0.0021);
   });
 
   it('treats an authenticated empty provider response as a successful health check', () => {
