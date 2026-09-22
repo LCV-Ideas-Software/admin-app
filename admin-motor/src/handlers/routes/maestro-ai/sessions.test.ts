@@ -1386,6 +1386,12 @@ describe('Maestro AI serial turn contract (Plan B1)', () => {
     expect(reportDeclaresCustodyValue('{"custody":"revised"}', 'revised')).toBe(true);
     expect(reportDeclaresCustodyValue('{"custody":"REVISED"}', 'revised')).toBe(true);
     expect(reportDeclaresCustodyValue('{"custody":"unchanged"}', 'revised')).toBe(false);
+    expect(
+      reportDeclaresCustodyValue(
+        '{"custody":"unchanged","quality_preservation":"custody: revised was not needed"}',
+        'revised',
+      ),
+    ).toBe(false);
     expect(reportDeclaresCustodyValue('custody: revised', 'revised')).toBe(true);
     expect(reportDeclaresCustodyValue('"custody": \'Revised\'', 'revised')).toBe(true);
     expect(reportDeclaresCustodyValue('notes\ncustody: unchanged\nmore', 'unchanged')).toBe(true);
@@ -1808,6 +1814,59 @@ describe('runSession orchestrator', () => {
         role: 'draft',
         status: 'blocked',
         cost_usd: 0.003,
+        cost_source: 'provider',
+      }),
+    );
+  });
+
+  it('charges billed incomplete Perplexity reviewer turns before the outage pause', async () => {
+    const db = createInMemoryDb({
+      sessions: [runnableSession({ active_agents_json: JSON.stringify(['claude', 'perplexity']) })],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      if (hostOf(url) === 'api.anthropic.com') {
+        return new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: 'Rascunho completo.' }],
+            usage: { input_tokens: 10, output_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url === 'https://api.perplexity.ai/v1/agent') {
+        return new Response(
+          JSON.stringify({ status: 'incomplete', output: [], usage: { cost: { currency: 'USD', total_cost: 0.002 } } }),
+          { status: 200 },
+        );
+      }
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await maestroAiTestHooks.runSession(
+      db,
+      { ...env, BIGDATA_DB: db, MAESTRO_PERPLEXITY_API_KEY: 'k-perplexity' },
+      'run-1',
+    );
+    vi.unstubAllGlobals();
+
+    const row = db.__sessions.get('run-1');
+    expect(row?.status).toBe('paused_reviewer_outage');
+    expect(Number(row?.observed_cost_usd)).toBeGreaterThanOrEqual(0.006);
+    const events = JSON.parse(String(row?.events_json)) as Array<{
+      agent?: string;
+      role?: string;
+      status?: string;
+      cost_usd?: number;
+      cost_source?: string;
+    }>;
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        agent: 'perplexity',
+        role: 'revision',
+        status: 'blocked',
+        cost_usd: 0.002,
         cost_source: 'provider',
       }),
     );
