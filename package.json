@@ -118,7 +118,7 @@
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.0",
     "vitest": "^5.0.0",
-    "wrangler": "4.131.2"
+    "wrangler": "4.136.2"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
@@ -129,15 +129,11 @@
   "overrides": {
     "picomatch": "4.0.4",
     "unbash": "4.0.9",
-    "miniflare": {
-      "undici": "7.29.0"
-    },
     "vite": "$vite",
     "@xmldom/xmldom": "^0.9.12",
     "ws": "8.21.0",
     "esbuild": "0.28.1",
     "@babel/core": "7.29.6",
-    "linkify-it": "5.0.2",
-    "sharp": "0.35.4"
+    "linkify-it": "5.0.2"
   }
 }

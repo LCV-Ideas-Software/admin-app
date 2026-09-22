@@ -7,7 +7,7 @@
 - Os quatro passos da Cloudflare Wrangler Action no Deploy (migrações D1,
   TLS-RPT Motor, Admin Motor e Admin Pages) deixam de pinar `wranglerVersion`
   e passam a usar o Wrangler que `npm ci` instala a partir do lockfile do
-  diretório em que rodam, hoje 4.130.0; o pin manual ficava para trás a cada
+  diretório em que rodam; o pin manual ficava para trás a cada
   atualização do Dependabot (ADMIAPP-26 / #634, GIT-230).
 
 - O auto-merge do Dependabot usa uma mensagem fixa no commit de squash para que
@@ -25,21 +25,19 @@
   se aplica às versões anteriores; o registro deixa de ser `INCONCLUSIVO`
   (ADMIAPP-18 / #581). `react-remove-scroll-bar@2.3.8` permanece inconclusivo.
 
-- O Wrangler passa a ser declarado com pin exato `4.130.0` nos dois manifestos
-  (raiz e `tlsrpt-motor`), em vez da faixa `^4.130.0`, com os lockfiles
-  regenerados pelo npm; a versão instalada não muda. Padroniza a grafia com os
-  demais repositórios da frota depois que o Deploy passou a usar o Wrangler do
-  lockfile, e corrige a frase do README que ainda falava em versão fixa no
-  workflow (ADMIAPP-27 / #636, GIT-230).
+- Atualizado o pin exato do Wrangler para `4.136.2` nos dois manifestos
+  (raiz e `tlsrpt-motor`), com os lockfiles regenerados pelo npm. O Deploy
+  continua usando a versão instalada pelo lockfile (ADMIAPP-27 / #636, GIT-230).
 
 ### Segurança
 
 - Atualizadas a Action oficial e a CLI do Linear Release para `v0.18.0`, com pin
   por SHA completo, incorporando a correção upstream na execução de comandos Git.
 
-- Atualizados os overrides existentes de `sharp` para `0.35.4` nos dois pacotes npm,
-  com os lockfiles regenerados pelo npm, para corrigir GHSA-rgj7-g3m4-5g8c
-  na cadeia de desenvolvimento do Wrangler/Miniflare.
+- Removidos os overrides de `sharp` e `miniflare > undici` da raiz: o novo
+  Miniflare já exige `0.35.4` e `7.29.0` diretamente. Os overrides do
+  `tlsrpt-motor` permanecem necessários para o Miniflare anterior usado pelo
+  `@cloudflare/vitest-pool-workers`.
 
 ### Documentação
 
