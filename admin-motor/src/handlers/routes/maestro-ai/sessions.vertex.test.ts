@@ -149,20 +149,18 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     }
   });
 
-  it('test-api: com location regional não usa o catálogo global (modelos global-only não existem lá)', async () => {
-    const res = await handleMaestroAiSettingsTestPost(
-      context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us-central1' }),
-    );
+  it('test-api: sem modelo Pro atual na location regional informa configuração incompatível', async () => {
+    const res = await handleMaestroAiSettingsTestPost(context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us' }));
     const body = (await res.json()) as TestResults;
     const gemini = body.results.find((r) => r.agent === 'gemini');
-    expect(gemini?.ok).toBe(true);
-    expect(gemini?.model).toBe('gemini-2.5-pro');
+    expect(gemini?.ok).toBe(false);
+    expect(gemini?.message).toContain('use global');
     // Nada de consultar o catálogo global para escolher um modelo que será
     // chamado numa região onde ele pode não existir.
     expect(runtime.listRequests).toHaveLength(0);
   });
 
-  it('test-api: modelo global-only já persistido não é usado numa location regional', async () => {
+  it('test-api: modelo Pro persistido não contorna restrição da location regional', async () => {
     const settingsRow = {
       id: 'default',
       protocol_text: 'p'.repeat(120),
@@ -184,24 +182,33 @@ describe('Maestro AI provider gemini via Vertex (SA OAuth)', () => {
     };
 
     const res = await handleMaestroAiSettingsTestPost(
-      context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us-central1' }, undefined, settingsRow),
+      context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us' }, undefined, settingsRow),
     );
     const body = (await res.json()) as TestResults;
     const gemini = body.results.find((r) => r.agent === 'gemini');
-    expect(gemini?.ok).toBe(true);
-    // Sem essa checagem, a escolha persistida chegaria à região e devolveria 404.
-    expect(gemini?.model).toBe('gemini-2.5-pro');
-    const gen = runtime.generateRequests[0] as { model: string };
-    expect(gen.model).toBe('gemini-2.5-pro');
+    expect(gemini?.ok).toBe(false);
+    expect(gemini?.message).toContain('use global');
+    expect(runtime.generateRequests).toHaveLength(0);
   });
 
-  it('test-api: falha na listagem cai no fallback gemini-2.5-pro', async () => {
+  it('test-api: região sem suporte atual falha sem chamar modelo antigo', async () => {
+    const res = await handleMaestroAiSettingsTestPost(
+      context({ VERTEX_SA_KEY: '{"sa":"x"}', VERTEX_LOCATION: 'us-central1' }),
+    );
+    const body = (await res.json()) as TestResults;
+    const gemini = body.results.find((r) => r.agent === 'gemini');
+    expect(gemini?.ok).toBe(false);
+    expect(gemini?.message).toContain('use global');
+    expect(runtime.generateRequests).toHaveLength(0);
+  });
+
+  it('test-api: falha na listagem global cai no fallback atual gemini-3.1-pro-preview', async () => {
     runtime.listError = new runtime.MockVertexHttpError('Vertex listModels falhou (HTTP 403): x', 403, 'listModels');
     const res = await handleMaestroAiSettingsTestPost(context({ VERTEX_SA_KEY: '{"sa":"x"}' }));
     const body = (await res.json()) as TestResults;
     const gemini = body.results.find((r) => r.agent === 'gemini');
     expect(gemini?.ok).toBe(true);
-    expect(gemini?.model).toBe('gemini-2.5-pro');
+    expect(gemini?.model).toBe('gemini-3.1-pro-preview');
   });
 
   it('test-api: sem VERTEX_SA_KEY o gemini reporta chave não configurada e não instancia cliente', async () => {

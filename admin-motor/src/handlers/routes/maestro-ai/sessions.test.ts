@@ -103,6 +103,9 @@ function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; a
                   legacy_defaults_migrated: 1,
                 });
               }
+              if (/UPDATE maestro_ai_sessions SET models_json/i.test(query)) {
+                for (const session of sessions.values()) session.models_json = values[0];
+              }
               if (/INSERT INTO maestro_ai_artifacts/i.test(query)) {
                 artifacts.set(String(values[0]), {
                   id: values[0],
@@ -488,15 +491,15 @@ describe('Maestro AI settings', () => {
     expect(payload.settings.agents.find((agent) => agent.key === 'claude')).toMatchObject({
       configured: true,
       runtime_ready: true,
-      model: 'claude-fable-5',
+      model: 'claude-fable-5-1',
     });
     expect(payload.settings.models).toMatchObject({
-      claude: 'claude-fable-5',
-      codex: 'gpt-5.6-sol',
-      gemini: 'gemini-2.5-pro',
+      claude: 'claude-fable-5-1',
+      codex: 'gpt-6-astra',
+      gemini: 'gemini-3.1-pro-preview',
       deepseek: 'deepseek-v4-pro',
-      grok: 'grok-4.5',
-      perplexity: 'medium',
+      grok: 'grok-4.7',
+      perplexity: 'perplexity/sonar',
     });
     expect(JSON.stringify(payload)).not.toContain('secret-claude');
   });
@@ -797,11 +800,11 @@ describe('Maestro AI prior-reports feed, prompt sections and model resolution (P
     expect(prompt).not.toContain('## Prior Session Events');
   });
 
-  it('choosePreferredModel picks the first live candidate, else first live model, else the fallback', () => {
+  it('choosePreferredModel never selects an old first live model', () => {
     const { choosePreferredModel } = maestroAiTestHooks;
     expect(choosePreferredModel(['a', 'gpt-5.4', 'gpt-5.5'], ['gpt-5.5', 'gpt-5.4'], 'fb')).toBe('gpt-5.5');
     expect(choosePreferredModel(['a', 'gpt-5.4'], ['gpt-5.5', 'gpt-5.4'], 'fb')).toBe('gpt-5.4');
-    expect(choosePreferredModel(['other-1', 'other-2'], ['gpt-5.5'], 'fb')).toBe('other-1');
+    expect(choosePreferredModel(['other-1', 'other-2'], ['gpt-5.5'], 'fb')).toBe('fb');
     expect(choosePreferredModel([], ['gpt-5.5'], 'fb')).toBe('fb');
   });
 
@@ -820,33 +823,47 @@ describe('Maestro AI prior-reports feed, prompt sections and model resolution (P
         return new Response(JSON.stringify({ data: [] }), { status: 200 });
       }),
     );
-    // Candidate priority beats live-list order: gpt-5.6-terra outranks gpt-4.1.
-    expect(await resolveProviderModel('codex', 'key')).toBe('gpt-5.6-terra');
+    // Older generations remain listed, but may not be chosen.
+    expect(await resolveProviderModel('codex', 'key')).toBe('gpt-6-astra');
     expect(endpoints.some((e) => e.includes('api.openai.com/v1/models'))).toBe(true);
     // Endpoint failure -> canonical hardcoded fallback.
-    expect(await resolveProviderModel('grok', 'key')).toBe('grok-4.5');
+    expect(await resolveProviderModel('grok', 'key')).toBe('grok-4.7');
     // Perplexity has NO live resolution (canonical): no fetch, default returned.
     endpoints.length = 0;
-    expect(await resolveProviderModel('perplexity', 'key')).toBe('medium');
+    expect(await resolveProviderModel('perplexity', 'key')).toBe('perplexity/sonar');
     expect(endpoints).toEqual([]);
     vi.unstubAllGlobals();
   });
 
-  it('resolveProviderModel prefers claude-fable-5 over claude-opus-5 and falls back down the Claude 5 line', async () => {
+  it('resolveProviderModel prefers Claude Fable 5.1 and never falls back to an older generation', async () => {
     const { resolveProviderModel } = maestroAiTestHooks;
     vi.stubGlobal(
       'fetch',
       vi.fn(
         async () =>
-          new Response(JSON.stringify({ data: [{ id: 'claude-opus-5' }, { id: 'claude-fable-5' }] }), { status: 200 }),
+          new Response(JSON.stringify({ data: [{ id: 'claude-fable-5' }, { id: 'claude-fable-5-1' }] }), {
+            status: 200,
+          }),
       ),
     );
-    expect(await resolveProviderModel('claude', 'key')).toBe('claude-fable-5');
+    expect(await resolveProviderModel('claude', 'key')).toBe('claude-fable-5-1');
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'claude-opus-5' }] }), { status: 200 })),
     );
-    expect(await resolveProviderModel('claude', 'key')).toBe('claude-opus-5');
+    expect(await resolveProviderModel('claude', 'key')).toBe('claude-fable-5-1');
+    vi.unstubAllGlobals();
+  });
+
+  it('prefers Grok 4.7 over older live models', async () => {
+    const { resolveProviderModel } = maestroAiTestHooks;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ data: [{ id: 'grok-4.5' }, { id: 'grok-4.7' }] }), { status: 200 }),
+      ),
+    );
+    expect(await resolveProviderModel('grok', 'key')).toBe('grok-4.7');
     vi.unstubAllGlobals();
   });
 });
@@ -877,7 +894,7 @@ describe('Maestro AI legacy seeded-default migration', () => {
     expect(noop.changed).toBe(false);
   });
 
-  it('one-shot migration strips pre-release seeded values and then respects post-release pins', async () => {
+  it('migrates obsolete Grok settings even after the one-shot migration', async () => {
     const seededDb = createMaestroDb({
       settings: {
         models_json: JSON.stringify({ claude: 'claude-opus-4-7', codex: 'gpt-5.5' }),
@@ -888,16 +905,202 @@ describe('Maestro AI legacy seeded-default migration', () => {
     const migrated = (await (await handleMaestroAiSettingsGet(createContext({}, {}, seededDb))).json()) as {
       settings: { models: Record<string, string> };
     };
-    expect(migrated.settings.models.claude).toBe('claude-fable-5');
-    expect(migrated.settings.models.codex).toBe('gpt-5.6-sol');
+    expect(migrated.settings.models.claude).toBe('claude-fable-5-1');
+    expect(migrated.settings.models.codex).toBe('gpt-6-astra');
 
     const pinnedDb = createMaestroDb({
-      settings: { models_json: JSON.stringify({ codex: 'gpt-5.5' }), legacy_defaults_migrated: 1 },
+      settings: {
+        models_json: JSON.stringify({
+          claude: 'claude-fable-5',
+          codex: 'gpt-5.5',
+          gemini: 'gemini-2.5-pro',
+          deepseek: 'deepseek-flash',
+          grok: 'grok-4.5',
+          perplexity: 'sonar-reasoning-pro',
+        }),
+        rates_json: JSON.stringify({
+          ...rates,
+          codex: { input_usd_per_million: 4, output_usd_per_million: 20 },
+        }),
+        legacy_defaults_migrated: 1,
+      },
     });
     const pinned = (await (await handleMaestroAiSettingsGet(createContext({}, {}, pinnedDb))).json()) as {
-      settings: { models: Record<string, string> };
+      settings: {
+        models: Record<string, string>;
+        rates: Record<string, { input_usd_per_million: number; output_usd_per_million: number }>;
+      };
     };
-    expect(pinned.settings.models.codex).toBe('gpt-5.5');
+    expect(pinned.settings.models).toEqual({
+      claude: 'claude-fable-5-1',
+      codex: 'gpt-6-astra',
+      gemini: 'gemini-3.1-pro-preview',
+      deepseek: 'deepseek-v4-pro',
+      grok: 'grok-4.7',
+      perplexity: 'perplexity/sonar',
+    });
+    expect(pinned.settings.rates.codex).toMatchObject({ input_usd_per_million: 10, output_usd_per_million: 50 });
+    expect(pinned.settings.rates.deepseek).toMatchObject({ input_usd_per_million: 1.74, output_usd_per_million: 3.96 });
+    const stored = await pinnedDb
+      .prepare('SELECT models_json, rates_json FROM maestro_ai_settings WHERE id = ? LIMIT 1')
+      .bind('default')
+      .first<{ models_json: string; rates_json: string }>();
+    expect(JSON.parse(String(stored?.models_json))).toEqual(pinned.settings.models);
+    expect(JSON.parse(String(stored?.rates_json)).codex).toMatchObject({
+      input_usd_per_million: 10,
+      output_usd_per_million: 50,
+    });
+  });
+
+  it('migrates resumable session model snapshots while preserving historical events', async () => {
+    const eventsJson = JSON.stringify([{ model: 'grok-4.5', status: 'error' }]);
+    const db = createMaestroDb({
+      sessions: [
+        {
+          id: 'old-session',
+          status: 'error',
+          models_json: JSON.stringify({ grok: 'grok-4.5' }),
+          events_json: eventsJson,
+        },
+      ],
+    });
+    await handleMaestroAiSettingsGet(createContext({}, {}, db));
+    const session = await db
+      .prepare('SELECT models_json, events_json FROM maestro_ai_sessions WHERE id = ?')
+      .bind('old-session')
+      .first<{ models_json: string; events_json: string }>();
+    expect(JSON.parse(String(session?.models_json))).toMatchObject({
+      grok: 'grok-4.7',
+      perplexity: 'perplexity/sonar',
+    });
+    expect(session?.events_json).toBe(eventsJson);
+  });
+});
+
+describe('Maestro AI current provider contracts', () => {
+  it('dispatches DeepSeek V4 Pro when resuming a session with a Flash snapshot', async () => {
+    const requestedModels: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === 'https://api.deepseek.com/models') {
+          return new Response(JSON.stringify({ data: [{ id: 'deepseek-v4-pro' }, { id: 'deepseek-flash' }] }), {
+            status: 200,
+          });
+        }
+        if (url === 'https://api.deepseek.com/chat/completions') {
+          requestedModels.push((JSON.parse(String(init?.body)) as { model: string }).model);
+          return new Response(
+            JSON.stringify({
+              choices: [{ message: { content: 'OK' } }],
+              usage: { prompt_tokens: 10, completion_tokens: 5 },
+            }),
+            { status: 200 },
+          );
+        }
+        throw new Error(`unexpected request: ${url}`);
+      }),
+    );
+    const result = await maestroAiTestHooks.callProvider(
+      { MAESTRO_DEEPSEEK_API_KEY: 'test-key' },
+      'deepseek',
+      'Reply OK',
+      { deepseek: 'deepseek-flash' },
+      32,
+      'system',
+    );
+    expect(result).toMatchObject({ model: 'deepseek-v4-pro', text: 'OK' });
+    expect(requestedModels).toEqual(['deepseek-v4-pro']);
+    vi.unstubAllGlobals();
+  });
+
+  it('does not persist obsolete models submitted in settings', async () => {
+    const db = createMaestroDb();
+    const response = await handleMaestroAiSettingsPut(
+      createContext(
+        {
+          protocol_text: protocolText,
+          max_cost_usd: 20,
+          models: {
+            claude: 'claude-fable-5',
+            codex: 'gpt-5.6-sol',
+            gemini: 'gemini-2.5-pro',
+            deepseek: 'deepseek-flash',
+            grok: 'grok-4.5',
+          },
+        },
+        {},
+        db,
+      ),
+    );
+    expect(response.status).toBe(200);
+    const stored = await db
+      .prepare('SELECT models_json FROM maestro_ai_settings WHERE id = ? LIMIT 1')
+      .bind('default')
+      .first<{ models_json: string }>();
+    expect(JSON.parse(String(stored?.models_json))).toMatchObject({
+      claude: 'claude-fable-5-1',
+      codex: 'gpt-6-astra',
+      gemini: 'gemini-3.1-pro-preview',
+      deepseek: 'deepseek-v4-pro',
+      grok: 'grok-4.7',
+    });
+  });
+
+  it('reads the output message after encrypted reasoning and never dispatches an obsolete Grok pin', async () => {
+    const requests: Array<{ url: string; model?: string; store?: boolean; prompt_cache_key?: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === 'https://api.x.ai/v1/models') {
+          requests.push({ url });
+          return new Response(JSON.stringify({ data: [{ id: 'grok-4.5' }, { id: 'grok-4.7' }] }), { status: 200 });
+        }
+        if (url === 'https://api.x.ai/v1/responses') {
+          requests.push({ url, ...(JSON.parse(String(init?.body)) as Record<string, unknown>) });
+          return new Response(
+            JSON.stringify({
+              status: 'completed',
+              output: [
+                { type: 'reasoning', encrypted_content: 'opaque' },
+                { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'OK' }] },
+              ],
+              usage: { input_tokens: 1253, output_tokens: 271 },
+            }),
+            { status: 200 },
+          );
+        }
+        throw new Error(`unexpected request: ${url}`);
+      }),
+    );
+
+    const env = { MAESTRO_GROK_API_KEY: 'test-key' };
+    const current = await maestroAiTestHooks.callProvider(env, 'grok', 'Reply OK', { grok: 'grok-4.7' }, 64, 'system');
+    expect(current.text).toBe('OK');
+    expect(current.model).toBe('grok-4.7');
+    expect(requests.filter((request) => request.url.endsWith('/models'))).toHaveLength(1);
+    expect(requests.find((request) => request.url.endsWith('/responses'))).toMatchObject({
+      model: 'grok-4.7',
+      store: false,
+      prompt_cache_key: expect.stringMatching(/^maestro-web-grok-/u),
+    });
+
+    const pinned = await maestroAiTestHooks.callProvider(env, 'grok', 'Reply OK', { grok: 'grok-4.5' }, 64, 'system');
+    expect(pinned.model).toBe('grok-4.7');
+    expect(requests.filter((request) => request.url.endsWith('/models'))).toHaveLength(2);
+    expect(requests.at(-1)?.model).toBe('grok-4.7');
+    vi.unstubAllGlobals();
+  });
+
+  it('never selects an older live Grok model if 4.7 is missing from the catalog', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'grok-4.5' }] }), { status: 200 })),
+    );
+    expect(await maestroAiTestHooks.resolveProviderModel('grok', 'key')).toBe('grok-4.7');
+    vi.unstubAllGlobals();
   });
 });
 
@@ -935,8 +1138,9 @@ describe('Maestro AI prompt-cache port (desktop parity)', () => {
     const gatedBody = JSON.parse(String(codexGated.init.body)) as Record<string, unknown>;
     expect(gatedBody.prompt_cache_retention).toBe('24h');
 
-    const grok = buildProviderHttpRequest('grok', 'k', 'grok-4.5', 'sys', 'p', 256, 'maestro-web-grok-ghi');
+    const grok = buildProviderHttpRequest('grok', 'k', 'grok-4.7', 'sys', 'p', 256, 'maestro-web-grok-ghi');
     const grokBody = JSON.parse(String(grok.init.body)) as Record<string, unknown>;
+    expect(grokBody.model).toBe('grok-4.7');
     expect(grokBody.prompt_cache_key).toBe('maestro-web-grok-ghi');
     expect(grokBody.prompt_cache_retention).toBeUndefined();
 
@@ -1715,12 +1919,12 @@ describe('runSession orchestrator', () => {
       if (url.includes('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
       if (url === 'https://api.perplexity.ai/v1/agent') {
         const body = JSON.parse(String(init?.body));
-        expect(body).toMatchObject({ preset: 'medium', stream: false, store: false });
+        expect(body).toMatchObject({ preset: 'xhigh', model: 'perplexity/sonar', stream: false, store: false });
         expect(body.instructions).toContain('Perplexity inside Maestro');
         return new Response(
           JSON.stringify({
             status: 'completed',
-            model: 'openai/gpt-5.6-luna',
+            model: 'perplexity/sonar',
             output: [
               { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Rascunho completo.' }] },
             ],
@@ -3734,18 +3938,12 @@ describe('maestro provider request construction', () => {
   });
 
   it('uses the xAI Responses API for Grok requests', () => {
-    const request = maestroAiTestHooks.buildProviderHttpRequest(
-      'grok',
-      'xai-secret',
-      'grok-4.20-multi-agent',
-      system,
-      prompt,
-    );
+    const request = maestroAiTestHooks.buildProviderHttpRequest('grok', 'xai-secret', 'grok-4.7', system, prompt);
     const body = JSON.parse(String(request.init.body)) as { model: string; input: unknown };
 
     expect(request.endpoint).toBe('https://api.x.ai/v1/responses');
     expect(request.init.headers).toMatchObject({ authorization: 'Bearer xai-secret' });
-    expect(body.model).toBe('grok-4.20-multi-agent');
+    expect(body.model).toBe('grok-4.7');
     expect(body.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: prompt }] }]);
   });
 
@@ -3773,16 +3971,17 @@ describe('maestro provider request construction', () => {
     expect(body.stream).toBe(false);
   });
 
-  it('uses the Perplexity Agent API medium preset', () => {
+  it('uses the Perplexity Agent API xhigh preset with one current model', () => {
     const request = maestroAiTestHooks.buildProviderHttpRequest(
       'perplexity',
       'perplexity-secret',
-      'sonar-reasoning-pro',
+      'perplexity/sonar',
       system,
       prompt,
     );
     const body = JSON.parse(String(request.init.body)) as {
       preset: string;
+      model: string;
       instructions: string;
       input: string;
       max_output_tokens: number;
@@ -3790,7 +3989,8 @@ describe('maestro provider request construction', () => {
 
     expect(request.endpoint).toBe('https://api.perplexity.ai/v1/agent');
     expect(request.init.headers).toMatchObject({ authorization: 'Bearer perplexity-secret' });
-    expect(body.preset).toBe('medium');
+    expect(body.preset).toBe('xhigh');
+    expect(body.model).toBe('perplexity/sonar');
     expect(body.instructions).toBe(system);
     expect(body.input).toBe(prompt);
     expect(body.max_output_tokens).toBeGreaterThan(0);

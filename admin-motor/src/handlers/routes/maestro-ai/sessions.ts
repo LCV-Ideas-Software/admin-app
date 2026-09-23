@@ -243,12 +243,23 @@ const AGENT_LABELS: Record<ProviderKey, string> = {
 };
 
 const DEFAULT_MODELS: Record<ProviderKey, string> = {
-  claude: 'claude-fable-5',
-  codex: 'gpt-5.6-sol',
-  gemini: 'gemini-2.5-pro',
+  claude: 'claude-fable-5-1',
+  codex: 'gpt-6-astra',
+  gemini: 'gemini-3.1-pro-preview',
   deepseek: 'deepseek-v4-pro',
-  grok: 'grok-4.5',
-  perplexity: 'medium',
+  grok: 'grok-4.7',
+  perplexity: 'perplexity/sonar',
+};
+
+// Only current documented generations are selectable. The other IDs may remain
+// listed by a provider for compatibility, but must not become saved Maestro settings.
+const CURRENT_MODELS: Record<ProviderKey, readonly string[]> = {
+  claude: ['claude-fable-5-1'],
+  codex: ['gpt-6-astra'],
+  gemini: ['gemini-3.1-pro-preview'],
+  deepseek: ['deepseek-v4-pro'],
+  grok: ['grok-4.7'],
+  perplexity: ['perplexity/sonar'],
 };
 
 const DEFAULT_RATES: Record<
@@ -256,18 +267,19 @@ const DEFAULT_RATES: Record<
   ProviderRates & { input_usd_per_million: number; output_usd_per_million: number }
 > = {
   claude: { input_usd_per_million: 10, output_usd_per_million: 50 },
-  codex: { input_usd_per_million: 5, output_usd_per_million: 30 },
+  codex: { input_usd_per_million: 10, output_usd_per_million: 50 },
   gemini: { input_usd_per_million: 2, output_usd_per_million: 12 },
-  deepseek: { input_usd_per_million: 0.435, output_usd_per_million: 0.87 },
+  deepseek: { input_usd_per_million: 1.32, output_usd_per_million: 3.96 },
   grok: { input_usd_per_million: 2, output_usd_per_million: 6 },
-  perplexity: { input_usd_per_million: 2, output_usd_per_million: 8, request_usd_per_1k: 14 },
+  perplexity: { input_usd_per_million: 0.25, output_usd_per_million: 2.5, request_usd_per_1k: 14 },
 };
 
 // Model ids and rate values seeded as defaults by earlier releases. A seeded
 // value the operator never typed must not survive a default bump as an
 // explicit pin (callProvider treats stored !== current default as a pin).
 // Stripped exactly once by ensureSchema (legacy_defaults_migrated); values
-// typed after that migration pin normally, including former defaults.
+// typed after that migration pin normally only when still in CURRENT_MODELS.
+// Older generations are replaced in settings and resumed sessions.
 const LEGACY_SEEDED_MODELS: Partial<Record<ProviderKey, string[]>> = {
   claude: ['claude-opus-4-7'],
   codex: ['gpt-5.5'],
@@ -382,9 +394,14 @@ function sanitizeRates(value: unknown): Record<ProviderKey, ProviderRates> {
     const outputRate = Number(rates.output_usd_per_million);
     const requestRate = Number(rates.request_usd_per_1k);
     next[agent] = {
-      input_usd_per_million: Number.isFinite(inputRate) && inputRate > 0 ? inputRate : defaults.input_usd_per_million,
+      input_usd_per_million:
+        Number.isFinite(inputRate) && inputRate > 0
+          ? Math.max(inputRate, defaults.input_usd_per_million)
+          : defaults.input_usd_per_million,
       output_usd_per_million:
-        Number.isFinite(outputRate) && outputRate > 0 ? outputRate : defaults.output_usd_per_million,
+        Number.isFinite(outputRate) && outputRate > 0
+          ? Math.max(outputRate, defaults.output_usd_per_million)
+          : defaults.output_usd_per_million,
       request_usd_per_1k:
         Number.isFinite(requestRate) && requestRate > 0 ? requestRate : (defaults.request_usd_per_1k ?? 0),
     };
@@ -395,10 +412,10 @@ function sanitizeRates(value: unknown): Record<ProviderKey, ProviderRates> {
 function sanitizeModels(value: unknown): Record<ProviderKey, string> {
   const raw = value && typeof value === 'object' ? (value as Partial<Record<ProviderKey, string>>) : {};
   return Object.fromEntries(
-    PROVIDER_KEYS.map((agent) => [
-      agent,
-      agent === 'perplexity' ? 'medium' : sanitizeText(raw[agent], 120) || DEFAULT_MODELS[agent],
-    ]),
+    PROVIDER_KEYS.map((agent) => {
+      const configured = sanitizeText(raw[agent], 120);
+      return [agent, CURRENT_MODELS[agent].includes(configured) ? configured : DEFAULT_MODELS[agent]];
+    }),
   ) as Record<ProviderKey, string>;
 }
 
@@ -586,15 +603,46 @@ async function ensureSchema(db: D1Database): Promise<void> {
     .prepare('SELECT models_json, rates_json, legacy_defaults_migrated FROM maestro_ai_settings WHERE id = ? LIMIT 1')
     .bind(SETTINGS_ID)
     .first<{ models_json: string; rates_json: string; legacy_defaults_migrated: number }>();
-  if (seedRow && Number(seedRow.legacy_defaults_migrated) !== 1) {
-    const stripped = stripLegacySeededDefaults(seedRow.models_json, seedRow.rates_json);
-    await db
-      .prepare(
-        'UPDATE maestro_ai_settings SET models_json = ?, rates_json = ?, legacy_defaults_migrated = 1 WHERE id = ?',
-      )
-      .bind(stripped.modelsJson, stripped.ratesJson, SETTINGS_ID)
-      .run();
+  if (seedRow) {
+    const needsLegacyMigration = Number(seedRow.legacy_defaults_migrated) !== 1;
+    const stripped = needsLegacyMigration
+      ? stripLegacySeededDefaults(seedRow.models_json, seedRow.rates_json)
+      : { modelsJson: seedRow.models_json, ratesJson: seedRow.rates_json };
+    const parsedModels = parseJson<Partial<Record<ProviderKey, string>> | null>(stripped.modelsJson, {});
+    const storedModels = parsedModels && typeof parsedModels === 'object' ? parsedModels : {};
+    const currentModels = sanitizeModels(storedModels);
+    const needsModelUpgrade = PROVIDER_KEYS.some((agent) => storedModels[agent] !== currentModels[agent]);
+    const parsedRates = parseJson<Partial<Record<ProviderKey, ProviderRates>> | null>(stripped.ratesJson, {});
+    const storedRates = parsedRates && typeof parsedRates === 'object' ? parsedRates : {};
+    const currentRates = sanitizeRates(storedRates);
+    const needsRateUpgrade = PROVIDER_KEYS.some((agent) => {
+      const stored = storedRates[agent];
+      return Boolean(
+        stored &&
+          (Number(stored.input_usd_per_million) !== currentRates[agent].input_usd_per_million ||
+            Number(stored.output_usd_per_million) !== currentRates[agent].output_usd_per_million),
+      );
+    });
+    if (needsLegacyMigration || needsModelUpgrade || needsRateUpgrade) {
+      await db
+        .prepare(
+          'UPDATE maestro_ai_settings SET models_json = ?, rates_json = ?, legacy_defaults_migrated = 1 WHERE id = ?',
+        )
+        .bind(
+          needsModelUpgrade ? JSON.stringify(currentModels) : stripped.modelsJson,
+          needsRateUpgrade ? JSON.stringify(currentRates) : stripped.ratesJson,
+          SETTINGS_ID,
+        )
+        .run();
+    }
   }
+  // Session models_json is a resumable configuration, including on errored
+  // sessions. Keep event/artifact history intact while removing obsolete pins.
+  const canonicalModelsJson = JSON.stringify(DEFAULT_MODELS);
+  await db
+    .prepare('UPDATE maestro_ai_sessions SET models_json = ? WHERE models_json != ?')
+    .bind(canonicalModelsJson, canonicalModelsJson)
+    .run();
 }
 
 function requireDb(env: MaestroAiEnv): D1Database {
@@ -2365,8 +2413,8 @@ interface ProviderCallOptions {
 // ── Plan F: canonical live model resolution (port of resolve_*_model +
 // choose_preferred_model, provider_runners.rs:1184-1269 and the DeepSeek/Grok
 // variants). Perplexity has NO live resolution (canonical). Precedence in the
-// web: operator-configured model -> live candidate list -> first live model ->
-// canonical hardcoded fallback.
+// web: current operator-configured model -> current live candidate -> canonical
+// hardcoded fallback. Older live catalog entries are never selected.
 const MODEL_RESOLUTION: Partial<
   Record<
     ProviderKey,
@@ -2376,33 +2424,31 @@ const MODEL_RESOLUTION: Partial<
   codex: {
     endpoint: 'https://api.openai.com/v1/models',
     auth: 'bearer',
-    // Bare gpt-5.6 and bare gpt-5.3 are not live-listed (2026-07-24): excluded.
-    candidates: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.2', 'gpt-5', 'gpt-4.1'],
-    fallback: 'gpt-5.6-sol',
+    candidates: ['gpt-6-astra'],
+    fallback: 'gpt-6-astra',
   },
   claude: {
     endpoint: 'https://api.anthropic.com/v1/models',
     auth: 'x-api-key',
-    candidates: ['claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-sonnet-5'],
-    fallback: 'claude-fable-5',
+    candidates: ['claude-fable-5-1'],
+    fallback: 'claude-fable-5-1',
   },
   deepseek: {
     endpoint: 'https://api.deepseek.com/models',
     auth: 'bearer',
-    candidates: ['deepseek-v4-pro', 'deepseek-v4-flash'],
+    candidates: ['deepseek-v4-pro'],
     fallback: 'deepseek-v4-pro',
   },
   grok: {
     endpoint: 'https://api.x.ai/v1/models',
     auth: 'bearer',
-    // xAI live-lists only dated 4.20 ids; the web re-adopts -0309 (desktop parity).
-    candidates: ['grok-4.5', 'grok-4.20-multi-agent-0309', 'grok-4.20-0309-reasoning', 'grok-4.3'],
-    fallback: 'grok-4.5',
+    candidates: ['grok-4.7'],
+    fallback: 'grok-4.7',
   },
 };
 
-const VERTEX_GEMINI_CANDIDATES = ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'];
-const VERTEX_GEMINI_FALLBACK = 'gemini-2.5-pro';
+const VERTEX_GEMINI_CANDIDATES = ['gemini-3.1-pro-preview'];
+const VERTEX_GEMINI_FALLBACK = 'gemini-3.1-pro-preview';
 const DEFAULT_VERTEX_LOCATION = 'global';
 // Mesmo teto que o fetchWithTimeout dos demais providers usa no /models: a
 // resolução roda antes da geração e não pode consumir o prazo da sessão.
@@ -2422,11 +2468,12 @@ function vertexClient(env: MaestroAiEnv): VertexGenAI {
 /** Vertex publisher-model catalog (v1beta1 global) em vez do /models do AI
  *  Studio; qualquer falha cai no default canônico, como nos demais providers. */
 async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
-  // O catálogo só existe no host global e lista modelos que podem não estar
-  // publicados numa região específica (os previews, por exemplo). Se a geração
-  // vai para uma região, escolher por esse catálogo produziria um modelo que
-  // depois falha com 404 — melhor ficar no default, que é regionalmente amplo.
-  if (vertexLocationIsRegional(env)) return VERTEX_GEMINI_FALLBACK;
+  // O único modelo Pro atual é global-only. A região explícita deve falhar
+  // antes da chamada para não enviar um preview a um endpoint sem suporte.
+  if (vertexLocationIsRegional(env)) {
+    const location = env.VERTEX_LOCATION;
+    throw new Error(`Gemini 3.1 Pro não está disponível em VERTEX_LOCATION=${location}; use global.`);
+  }
   try {
     const ids: string[] = [];
     const catalog = vertexClient(env).models.list({
@@ -2442,13 +2489,13 @@ async function resolveVertexModel(env: MaestroAiEnv): Promise<string> {
   }
 }
 
-/** Port of choose_preferred_model: first candidate present in the live list;
- *  else the first live model; else the fallback. */
+/** Use only a current candidate from the live list; never adopt an older
+ *  first-listed model merely because the preferred generation is absent. */
 function choosePreferredModel(models: string[], candidates: string[], fallback: string): string {
   for (const candidate of candidates) {
     if (models.includes(candidate)) return candidate;
   }
-  return models[0] ?? fallback;
+  return fallback;
 }
 
 /** Resolve the model for a provider via its live /models endpoint. Any HTTP or
@@ -2496,11 +2543,12 @@ async function callProvider(
 ): Promise<ProviderCallResult> {
   const apiKey = secretForAgent(env, agent);
   if (!apiKey) throw new Error(`${AGENT_LABELS[agent]} API key is not configured in admin-motor secrets.`);
-  // Plan F precedence: an operator-configured model (anything other than the
-  // seeded default) wins; otherwise resolve live against the provider's
+  // Plan F precedence: a supported current operator-configured model wins;
+  // otherwise resolve live against the provider's
   // /models list (canonical), memoized per execution via options.modelCache.
-  const configured = agent === 'perplexity' ? '' : sanitizeText(models[agent], 120);
-  // Uma escolha persistida vence a resolução ao vivo — mas o catálogo do Vertex
+  const currentConfigured = sanitizeModels(models)[agent];
+  const configured = agent === 'perplexity' ? '' : currentConfigured;
+  // Uma escolha persistida válida vence a resolução ao vivo. O catálogo do Vertex
   // é global e anuncia previews que uma região não serve. Sem esta checagem, um
   // `gemini-3.1-pro-preview` salvo antes contornaria o fallback regional e toda
   // chamada seguinte voltaria 404.
@@ -2703,7 +2751,8 @@ function buildProviderHttpRequest(
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
         body: JSON.stringify({
-          preset: 'medium',
+          preset: 'xhigh',
+          model,
           instructions: system,
           input: prompt,
           max_output_tokens: maxOutputTokens,
@@ -2773,6 +2822,7 @@ const RESUMABLE_STATUSES = new Set([
 
 export const maestroAiTestHooks = {
   buildProviderHttpRequest,
+  callProvider,
   parsePerplexityAgentResult,
   calculateObservedCost,
   observedCostSource,
@@ -3258,8 +3308,8 @@ async function runSession(db: D1Database, env: MaestroAiEnv, id: string): Promis
     initial_content: row.current_text,
     max_cost_usd: row.max_cost_usd,
     max_runtime_minutes: row.max_runtime_minutes,
-    rates: parseJson(row.rates_json, {}),
-    models: parseJson(row.models_json, {}),
+    rates: sanitizeRates(parseJson(row.rates_json, {})),
+    models: sanitizeModels(parseJson(row.models_json, {})),
     max_cycles: row.max_cycles,
   };
   const activeAgents = input.active_agents?.length ? input.active_agents : PROVIDER_KEYS;

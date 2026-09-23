@@ -66,6 +66,21 @@
   `fetch-timeout` 60 s). Motivo: em 03/09 o serviço ficou horas sem responder e nenhum
   deploy saía, hotfix incluído (ADMIAPP-22 / #604).
 
+## [APP v02.15.29] — 22/09/2026
+
+### Alterado
+
+- O Maestro AI fixa um modelo atual e próprio por peer: Claude Fable 5.1,
+  GPT-6 Astra, Gemini 3.1 Pro Preview, DeepSeek V4 Pro, Grok 4.7 e
+  Perplexity Sonar. A Agent API usa o preset oficial `xhigh` com
+  `perplexity/sonar` explícito para manter seis peers distintos. Modelos Flash,
+  IDs de gerações superadas e escolhas alternativas deixam de ser aceitos nas
+  configurações; leituras, gravações e sessões retomadas normalizam os modelos.
+  O painel mostra os seis IDs fixos. Os preços base de Codex e DeepSeek foram
+  atualizados; o DeepSeek usa a tarifa de pico, e as tarifas de contexto longo
+  dos demais provedores seguem documentadas no README
+  (ADMIAPP-32 / #655; ADMIAPP-33 / #656).
+
 ## [APP v02.15.28] — 22/09/2026
 
 ### Corrigido

@@ -141,20 +141,20 @@ const ARTIFACT_TABS: Array<{ id: ArtifactTab; label: string; Icon: typeof FileTe
 
 const EMPTY_RATES: Record<AgentKey, AgentRate> = {
   claude: { input_usd_per_million: 10, output_usd_per_million: 50 },
-  codex: { input_usd_per_million: 5, output_usd_per_million: 30 },
+  codex: { input_usd_per_million: 10, output_usd_per_million: 50 },
   gemini: { input_usd_per_million: 2, output_usd_per_million: 12 },
-  deepseek: { input_usd_per_million: 0.435, output_usd_per_million: 0.87 },
+  deepseek: { input_usd_per_million: 1.32, output_usd_per_million: 3.96 },
   grok: { input_usd_per_million: 2, output_usd_per_million: 6 },
-  perplexity: { input_usd_per_million: 2, output_usd_per_million: 8, request_usd_per_1k: 14 },
+  perplexity: { input_usd_per_million: 0.25, output_usd_per_million: 2.5, request_usd_per_1k: 14 },
 };
 
-const EMPTY_MODELS: Record<AgentKey, string> = {
-  claude: '',
-  codex: '',
-  gemini: '',
-  deepseek: '',
-  grok: '',
-  perplexity: '',
+const CURRENT_MODELS: Record<AgentKey, string> = {
+  claude: 'claude-fable-5-1',
+  codex: 'gpt-6-astra',
+  gemini: 'gemini-3.1-pro-preview',
+  deepseek: 'deepseek-v4-pro',
+  grok: 'grok-4.7',
+  perplexity: 'perplexity/sonar',
 };
 
 function PopupNotificationBridge({
@@ -320,7 +320,7 @@ function mergeSettings(settings: MaestroSettings): MaestroSettings {
     rates: Object.fromEntries(
       AGENTS.map((agent) => [agent.key, { ...EMPTY_RATES[agent.key], ...(settings.rates[agent.key] ?? {}) }]),
     ) as Record<AgentKey, AgentRate>,
-    models: { ...EMPTY_MODELS, ...settings.models },
+    models: { ...CURRENT_MODELS },
   };
 }
 
@@ -360,7 +360,6 @@ export function MaestroAiModule() {
   const [maxCostUsd, setMaxCostUsd] = useState<number | ''>(0);
   const [maxRuntimeMinutes, setMaxRuntimeMinutes] = useState<number | ''>('');
   const [rates, setRates] = useState<Record<AgentKey, AgentRate>>(EMPTY_RATES);
-  const [models, setModels] = useState<Record<AgentKey, string>>(EMPTY_MODELS);
   const [testResults, setTestResults] = useState<ApiTestResult[]>([]);
 
   const selectedSession = useMemo(
@@ -387,7 +386,6 @@ export function MaestroAiModule() {
     setMaxCostUsd(Number(merged.max_cost_usd) || 0);
     setMaxRuntimeMinutes(Number(merged.max_runtime_minutes) > 0 ? Number(merged.max_runtime_minutes) : '');
     setRates(merged.rates);
-    setModels(merged.models);
     const firstReady = merged.agents.find((agent) => agent.configured && agent.financially_ready)?.key;
     const ready = merged.agents
       .filter((agent) => agent.runtime_ready && agent.financially_ready)
@@ -548,7 +546,7 @@ export function MaestroAiModule() {
             max_cost_usd: nextMaxCostUsd,
             max_runtime_minutes: nextMaxRuntimeMinutes,
             rates,
-            models,
+            models: CURRENT_MODELS,
             api_keys,
           }),
         }),
@@ -1385,11 +1383,10 @@ export function MaestroAiModule() {
                   >
                     <strong>{agent.label}</strong>
                     <input
-                      value={models[agent.key]}
-                      onChange={(event) => setModels((current) => ({ ...current, [agent.key]: event.target.value }))}
-                      placeholder={agent.key === 'perplexity' ? 'Preset Agent API' : 'Modelo padrão'}
-                      readOnly={agent.key === 'perplexity'}
-                      title={agent.key === 'perplexity' ? 'Preset medium da Agent API' : undefined}
+                      aria-label={`Modelo ${agent.label}`}
+                      value={CURRENT_MODELS[agent.key]}
+                      readOnly
+                      title={agent.key === 'perplexity' ? 'Preset xhigh da Agent API' : 'Modelo atual fixo'}
                     />
                   </div>
                 ))}

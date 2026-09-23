@@ -22,7 +22,14 @@ const settingsPayload = {
     max_runtime_minutes: null,
     max_cycles: 2,
     rates: Object.fromEntries(AGENT_KEYS.map((key) => [key, rate])),
-    models: Object.fromEntries(AGENT_KEYS.map((key) => [key, key === 'perplexity' ? 'medium' : `${key}-model`])),
+    models: {
+      claude: 'claude-fable-5-1',
+      codex: 'gpt-6-astra',
+      gemini: 'gemini-3.1-pro-preview',
+      deepseek: 'deepseek-v4-pro',
+      grok: 'grok-4.7',
+      perplexity: 'perplexity/sonar',
+    },
     agents: AGENT_KEYS.map((key) => ({
       key,
       label: key,
@@ -81,14 +88,31 @@ afterEach(() => {
 });
 
 describe('MaestroAiModule — credencial do Gemini é gerida pela infraestrutura', () => {
-  it('mostra o preset oficial da Perplexity sem permitir um modelo ignorado pelo Worker', async () => {
+  it('fixa um único modelo de maior capacidade por provedor', async () => {
+    renderModule();
+    await settingsSection().findByRole('textbox', { name: 'Modelo Codex' });
+    for (const [label, model] of [
+      ['Claude', 'claude-fable-5-1'],
+      ['Codex', 'gpt-6-astra'],
+      ['Gemini', 'gemini-3.1-pro-preview'],
+      ['DeepSeek', 'deepseek-v4-pro'],
+      ['Grok', 'grok-4.7'],
+      ['Perplexity', 'perplexity/sonar'],
+    ]) {
+      const field = settingsSection().getByRole('textbox', { name: `Modelo ${label}` });
+      expect(field).toHaveValue(model);
+      expect(field).toHaveAttribute('readonly');
+    }
+  });
+
+  it('mostra o modelo atual usado com o preset xhigh da Perplexity', async () => {
     renderModule();
     const preset = await waitFor(() => {
-      const input = document.querySelector('input[title="Preset medium da Agent API"]') as HTMLInputElement | null;
+      const input = document.querySelector('input[title="Preset xhigh da Agent API"]') as HTMLInputElement | null;
       expect(input).not.toBeNull();
       return input as HTMLInputElement;
     });
-    expect(preset.value).toBe('medium');
+    expect(preset.value).toBe('perplexity/sonar');
     expect(preset.readOnly).toBe(true);
   });
 
