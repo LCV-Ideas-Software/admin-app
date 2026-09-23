@@ -25,12 +25,12 @@
   se aplica às versões anteriores; o registro deixa de ser `INCONCLUSIVO`
   (ADMIAPP-18 / #581). `react-remove-scroll-bar@2.3.8` permanece inconclusivo.
 
-- Atualizado o pin exato do Wrangler para `4.136.2` nos dois manifestos
+- Atualizado o pin exato do Wrangler para `4.137.0` nos dois manifestos
   (raiz e `tlsrpt-motor`), com os lockfiles regenerados pelo npm. O Deploy
   continua usando a versão instalada pelo lockfile (ADMIAPP-27 / #636, GIT-230).
   A padronização anterior substituiu a faixa `^4.130.0` por pin exato e corrigiu
   o README que ainda descrevia uma versão fixa no workflow. Esta atualização
-  para `4.136.2` integra a LCV-213.
+  para `4.137.0` integra a LCV-214.
 
 ### Segurança
 
