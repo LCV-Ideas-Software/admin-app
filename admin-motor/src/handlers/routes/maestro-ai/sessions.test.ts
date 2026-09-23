@@ -48,6 +48,7 @@ function createMaestroDb(
     rates_json: JSON.stringify(rates),
     models_json: JSON.stringify({}),
     legacy_defaults_migrated: 1,
+    session_models_migrated_json: '',
     updated_at: '2026-05-14T00:00:00.000Z',
     ...options.settings,
   };
@@ -105,6 +106,9 @@ function createMaestroDb(
                   rates_json: values[1],
                   legacy_defaults_migrated: 1,
                 });
+              }
+              if (/UPDATE maestro_ai_settings SET session_models_migrated_json/i.test(query)) {
+                settings.session_models_migrated_json = values[0];
               }
               if (/UPDATE maestro_ai_sessions SET models_json/i.test(query)) {
                 for (const session of sessions.values()) {
@@ -173,6 +177,7 @@ function createInMemoryDb(seed: { settings?: Partial<Row>; sessions?: Row[]; art
     configured_secrets_json: '{}',
     rates_json: JSON.stringify(rates),
     models_json: JSON.stringify({}),
+    session_models_migrated_json: '',
     updated_at: '2026-05-14T00:00:00.000Z',
     ...seed.settings,
   };
@@ -996,6 +1001,27 @@ describe('Maestro AI legacy seeded-default migration', () => {
     expect(queryLog).toHaveLength(1);
     await handleMaestroAiSettingsGet(createContext({}, {}, db));
     expect(queryLog).toHaveLength(1);
+  });
+
+  it('repairs an obsolete session even when settings were already upgraded', async () => {
+    const canonicalModels = {
+      claude: 'claude-fable-5-1',
+      codex: 'gpt-6-astra',
+      gemini: 'gemini-3.1-pro-preview',
+      deepseek: 'deepseek-v4-pro',
+      grok: 'grok-4.7',
+      perplexity: 'perplexity/sonar',
+    };
+    const db = createMaestroDb({
+      settings: { models_json: JSON.stringify(canonicalModels) },
+      sessions: [{ id: 'partially-migrated', status: 'error', models_json: JSON.stringify({ grok: 'grok-4.5' }) }],
+    });
+    await handleMaestroAiSettingsGet(createContext({}, {}, db));
+    const session = await db
+      .prepare('SELECT models_json FROM maestro_ai_sessions WHERE id = ?')
+      .bind('partially-migrated')
+      .first<{ models_json: string }>();
+    expect(JSON.parse(String(session?.models_json))).toEqual(canonicalModels);
   });
 });
 

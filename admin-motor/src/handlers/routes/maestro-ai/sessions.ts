@@ -489,6 +489,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
         rates_json TEXT NOT NULL,
         models_json TEXT NOT NULL,
         legacy_defaults_migrated INTEGER NOT NULL DEFAULT 0,
+        session_models_migrated_json TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL
       )`,
     )
@@ -599,11 +600,40 @@ async function ensureSchema(db: D1Database): Promise<void> {
       throw error;
     }
   }
+  try {
+    await db
+      .prepare("ALTER TABLE maestro_ai_settings ADD COLUMN session_models_migrated_json TEXT NOT NULL DEFAULT ''")
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/duplicate column|already exists/i.test(message)) throw error;
+  }
   const seedRow = await db
-    .prepare('SELECT models_json, rates_json, legacy_defaults_migrated FROM maestro_ai_settings WHERE id = ? LIMIT 1')
+    .prepare(
+      'SELECT models_json, rates_json, legacy_defaults_migrated, session_models_migrated_json FROM maestro_ai_settings WHERE id = ? LIMIT 1',
+    )
     .bind(SETTINGS_ID)
-    .first<{ models_json: string; rates_json: string; legacy_defaults_migrated: number }>();
+    .first<{
+      models_json: string;
+      rates_json: string;
+      legacy_defaults_migrated: number;
+      session_models_migrated_json: string;
+    }>();
   if (seedRow) {
+    const canonicalModelsJson = JSON.stringify(DEFAULT_MODELS);
+    if (seedRow.session_models_migrated_json !== canonicalModelsJson) {
+      // This marker is independent of the settings model IDs: an older deploy
+      // could have saved settings before failing to update session snapshots.
+      // A later generation change automatically starts another one-time pass.
+      await db
+        .prepare('UPDATE maestro_ai_sessions SET models_json = ? WHERE models_json != ?')
+        .bind(canonicalModelsJson, canonicalModelsJson)
+        .run();
+      await db
+        .prepare('UPDATE maestro_ai_settings SET session_models_migrated_json = ? WHERE id = ?')
+        .bind(canonicalModelsJson, SETTINGS_ID)
+        .run();
+    }
     const needsLegacyMigration = Number(seedRow.legacy_defaults_migrated) !== 1;
     const stripped = needsLegacyMigration
       ? stripLegacySeededDefaults(seedRow.models_json, seedRow.rates_json)
@@ -624,15 +654,6 @@ async function ensureSchema(db: D1Database): Promise<void> {
       );
     });
     if (needsLegacyMigration || needsModelUpgrade || needsRateUpgrade) {
-      if (needsModelUpgrade) {
-        // Upgrade stored session configuration once, while settings still carry
-        // the previous generation. Events and artifacts retain their history.
-        const canonicalModelsJson = JSON.stringify(DEFAULT_MODELS);
-        await db
-          .prepare('UPDATE maestro_ai_sessions SET models_json = ? WHERE models_json != ?')
-          .bind(canonicalModelsJson, canonicalModelsJson)
-          .run();
-      }
       await db
         .prepare(
           'UPDATE maestro_ai_settings SET models_json = ?, rates_json = ?, legacy_defaults_migrated = 1 WHERE id = ?',
