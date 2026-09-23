@@ -35,7 +35,9 @@ const hostOf = (u: unknown): string => {
 
 type Row = Record<string, unknown>;
 
-function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; artifacts?: Row[] } = {}) {
+function createMaestroDb(
+  options: { settings?: Partial<Row>; sessions?: Row[]; artifacts?: Row[]; queryLog?: string[] } = {},
+) {
   const settings: Row = {
     id: 'default',
     protocol_text: protocolText,
@@ -53,6 +55,7 @@ function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; a
   const artifacts = new Map<string, Row>((options.artifacts ?? []).map((row) => [String(row.id), row]));
   return {
     prepare(query: string) {
+      if (/UPDATE maestro_ai_sessions SET models_json/i.test(query)) options.queryLog?.push(query);
       return {
         bind(...values: unknown[]) {
           return {
@@ -104,7 +107,9 @@ function createMaestroDb(options: { settings?: Partial<Row>; sessions?: Row[]; a
                 });
               }
               if (/UPDATE maestro_ai_sessions SET models_json/i.test(query)) {
-                for (const session of sessions.values()) session.models_json = values[0];
+                for (const session of sessions.values()) {
+                  if (session.models_json !== values[1]) session.models_json = values[0];
+                }
               }
               if (/INSERT INTO maestro_ai_artifacts/i.test(query)) {
                 artifacts.set(String(values[0]), {
@@ -954,12 +959,20 @@ describe('Maestro AI legacy seeded-default migration', () => {
 
   it('migrates resumable session model snapshots while preserving historical events', async () => {
     const eventsJson = JSON.stringify([{ model: 'grok-4.5', status: 'error' }]);
+    const queryLog: string[] = [];
     const db = createMaestroDb({
+      queryLog,
       sessions: [
         {
           id: 'old-session',
           status: 'error',
           models_json: JSON.stringify({ grok: 'grok-4.5' }),
+          events_json: eventsJson,
+        },
+        {
+          id: 'completed-session',
+          status: 'completed',
+          models_json: JSON.stringify({ codex: 'gpt-5.6-sol' }),
           events_json: eventsJson,
         },
       ],
@@ -974,6 +987,15 @@ describe('Maestro AI legacy seeded-default migration', () => {
       perplexity: 'perplexity/sonar',
     });
     expect(session?.events_json).toBe(eventsJson);
+    const completed = await db
+      .prepare('SELECT models_json, events_json FROM maestro_ai_sessions WHERE id = ?')
+      .bind('completed-session')
+      .first<{ models_json: string; events_json: string }>();
+    expect(JSON.parse(String(completed?.models_json))).toMatchObject({ codex: 'gpt-6-astra' });
+    expect(completed?.events_json).toBe(eventsJson);
+    expect(queryLog).toHaveLength(1);
+    await handleMaestroAiSettingsGet(createContext({}, {}, db));
+    expect(queryLog).toHaveLength(1);
   });
 });
 
