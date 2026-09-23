@@ -132,6 +132,11 @@ export function validateRevisionContentLock(before: string, after: string, repor
     }
     return `approved-content lock violation: revised custody changed received blocks ${changedIds.join(', ')} but maestro_revision_report has no changed_blocks section with block IDs`;
   }
+  const receivedIds = new Set(beforeBlocks.map((block) => block.id));
+  const unknownIds = [...declarations.keys()].filter((id) => !receivedIds.has(id));
+  if (unknownIds.length > 0) {
+    return `approved-content lock violation: changed_blocks block_id ${unknownIds.join(', ')} is not in the received block manifest`;
+  }
   const undeclared = changedIds.filter((id) => !declarations.has(id));
   if (undeclared.length > 0) {
     return `approved-content lock violation: changed received blocks ${undeclared.join(', ')} without matching changed_blocks declaration`;

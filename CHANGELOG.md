@@ -66,6 +66,20 @@
   `fetch-timeout` 60 s). Motivo: em 03/09 o serviço ficou horas sem responder e nenhum
   deploy saía, hotfix incluído (ADMIAPP-22 / #604).
 
+## [APP v02.15.31] — 22/09/2026
+
+### Corrigido
+
+- A trava de conteúdo do Maestro AI rejeita um `block_id` em `changed_blocks`
+  quando ele não existe no manifesto dos blocos recebidos, antes de contabilizar
+  qualquer permissão de crescimento. A fixture JSON com dígitos árabes agora
+  exige a rejeição do ID inexistente; `B10000` continua aceito quando existe
+  (ADMIAPP-30 / #653).
+- A migração dos modelos de sessão usa um marcador independente dos modelos
+  salvos nas configurações. Isso recupera tentativas parciais de versões
+  anteriores e faz uma única varredura por geração; eventos e artefatos
+  históricos permanecem preservados (ADMIAPP-33 / #656).
+
 ## [APP v02.15.30] — 22/09/2026
 
 ### Corrigido

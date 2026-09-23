@@ -95,7 +95,7 @@ describe('Maestro AI approved-content lock (Plan B2)', () => {
     expect(error).toContain('without matching changed_blocks declaration');
     expect(error).toContain('B0002');
   });
-  it('rejects non-JSON field whitespace and retains Unicode digit growth declarations', () => {
+  it('rejects non-JSON field whitespace and nonexistent Unicode digit IDs', () => {
     const after = '# Titulo\n\nParagrafo corrigido com base protocolar.\n\nReferencia pendente citada.';
     // U+0085 (NEL) is outside the JSON whitespace grammar.
     const nelReport =
@@ -106,12 +106,12 @@ describe('Maestro AI approved-content lock (Plan B2)', () => {
       '"changed_blocks": [{"block_id":\uFEFF"B0002", "protocol_basis": "precision rule"}]\n"custody": "revised"';
     const feffError = validateRevisionContentLock(BEFORE, after, feffReport);
     expect(feffError).toContain('strict JSON');
-    // Rust \d is Unicode Nd: a declaration keyed by Arabic-Indic digits is
-    // still parsed on the desktop, so its change_type addition allows growth.
+    // Unicode Nd is accepted by the parser, but the ID must exist in the
+    // received manifest before its addition permission can authorize growth.
     const grown = `${BEFORE}\n\nBloco novo acrescentado.`;
     const arabicReport =
       '{"changed_blocks": [{"block_id": "B\u0660\u0661\u0662\u0663", "protocol_basis": "x", "change_type": "addition"}], "custody": "revised"}';
-    expect(validateRevisionContentLock(BEFORE, grown, arabicReport)).toBeNull();
+    expect(validateRevisionContentLock(BEFORE, grown, arabicReport)).toContain('not in the received block manifest');
   });
   it('requires JSON for a changed block declaration', () => {
     const after = '# Titulo\n\nParagrafo corrigido com base protocolar.\n\nReferencia pendente citada.';
@@ -247,5 +247,17 @@ describe('ADMIAPP-29 measured content-lock failures', () => {
     expect(
       validateRevisionContentLock(before, after, declared([{ block_id: 'B0001', protocol_basis: basis }])),
     ).toBeNull();
+  });
+});
+
+describe('ADMIAPP-30 received block ID validation', () => {
+  it('rejects growth permission from an ID absent from the received manifest', () => {
+    const report = JSON.stringify({
+      custody: 'revised',
+      changed_blocks: [{ block_id: 'B9999', change_type: 'addition', protocol_basis: 'editorial protocol' }],
+    });
+    expect(validateRevisionContentLock('Primeiro.', 'Primeiro.\n\nSegundo.', report)).toContain(
+      'B9999 is not in the received block manifest',
+    );
   });
 });
