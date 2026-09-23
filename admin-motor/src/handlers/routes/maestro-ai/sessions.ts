@@ -624,6 +624,15 @@ async function ensureSchema(db: D1Database): Promise<void> {
       );
     });
     if (needsLegacyMigration || needsModelUpgrade || needsRateUpgrade) {
+      if (needsModelUpgrade) {
+        // Upgrade stored session configuration once, while settings still carry
+        // the previous generation. Events and artifacts retain their history.
+        const canonicalModelsJson = JSON.stringify(DEFAULT_MODELS);
+        await db
+          .prepare('UPDATE maestro_ai_sessions SET models_json = ? WHERE models_json != ?')
+          .bind(canonicalModelsJson, canonicalModelsJson)
+          .run();
+      }
       await db
         .prepare(
           'UPDATE maestro_ai_settings SET models_json = ?, rates_json = ?, legacy_defaults_migrated = 1 WHERE id = ?',
@@ -636,13 +645,6 @@ async function ensureSchema(db: D1Database): Promise<void> {
         .run();
     }
   }
-  // Session models_json is a resumable configuration, including on errored
-  // sessions. Keep event/artifact history intact while removing obsolete pins.
-  const canonicalModelsJson = JSON.stringify(DEFAULT_MODELS);
-  await db
-    .prepare('UPDATE maestro_ai_sessions SET models_json = ? WHERE models_json != ?')
-    .bind(canonicalModelsJson, canonicalModelsJson)
-    .run();
 }
 
 function requireDb(env: MaestroAiEnv): D1Database {
@@ -2548,10 +2550,8 @@ async function callProvider(
   // /models list (canonical), memoized per execution via options.modelCache.
   const currentConfigured = sanitizeModels(models)[agent];
   const configured = agent === 'perplexity' ? '' : currentConfigured;
-  // Uma escolha persistida válida vence a resolução ao vivo. O catálogo do Vertex
-  // é global e anuncia previews que uma região não serve. Sem esta checagem, um
-  // `gemini-3.1-pro-preview` salvo antes contornaria o fallback regional e toda
-  // chamada seguinte voltaria 404.
+  // O catálogo global do Vertex anuncia previews que uma região não serve.
+  // Verificar a localização evita um erro opaco do endpoint regional.
   const configuredIsUnusableHere =
     agent === 'gemini' && vertexLocationIsRegional(env) && isGlobalOnlyModelId(configured ?? '');
   let model = configured && configured !== DEFAULT_MODELS[agent] && !configuredIsUnusableHere ? configured : '';

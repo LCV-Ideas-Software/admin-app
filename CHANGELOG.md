@@ -66,6 +66,17 @@
   `fetch-timeout` 60 s). Motivo: em 03/09 o serviço ficou horas sem responder e nenhum
   deploy saía, hotfix incluído (ADMIAPP-22 / #604).
 
+## [APP v02.15.30] — 22/09/2026
+
+### Corrigido
+
+- A migração dos modelos persistidos do Maestro AI atualiza os snapshots de
+  sessão apenas quando os modelos salvos mudam. Leituras seguintes não varrem
+  novamente a tabela de sessões; eventos e artefatos históricos permanecem
+  preservados. O rate card documenta o piso de preços base e distingue a
+  estimativa conservadora de ferramentas da Agent API da cobrança efetiva
+  (ADMIAPP-33 / #656).
+
 ## [APP v02.15.29] — 22/09/2026
 
 ### Alterado
