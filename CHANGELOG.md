@@ -18,6 +18,9 @@
 
 ### Alterado
 
+- Atualizado o pin exato do Wrangler para `4.142.0` nos manifestos da raiz e
+  de `tlsrpt-motor`, com ambos os lockfiles regenerados pelo npm (ADMIAPP-34, LCV-239).
+
 - `THIRDPARTY.md` e `public/legal/THIRDPARTY.md` (byte-idênticos) passam a
   registrar o aviso de copyright confirmado para `dingbat-to-unicode@1.0.1`:
   em 19/09/2026 o titular publicou `js/LICENSE` (BSD-2-Clause,
