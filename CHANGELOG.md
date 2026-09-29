@@ -48,9 +48,10 @@
   por SHA completo, incorporando a correção upstream na execução de comandos Git.
 
 - O override de `sharp` da raiz continua removido, pois o Miniflare já exige
-  `0.35.4`. Overrides npm locais de `miniflare > undici` fixam `7.29.1` na
-  raiz e no `tlsrpt-motor` enquanto o upstream exige `7.29.0`, corrigindo
-  GHSA-3wwx-pv8p-q78v. O `tlsrpt-motor` mantém o override de `sharp` para
+  `0.35.4`. Overrides npm locais de `miniflare > undici@7.29.0` resolvem
+  somente essa exigência para `7.29.1` na raiz e no `tlsrpt-motor`,
+  corrigindo GHSA-3wwx-pv8p-q78v sem fixar versões futuras do upstream.
+  O `tlsrpt-motor` mantém o override de `sharp` para
   `0.35.4` exigido pelo Miniflare anterior de `@cloudflare/vitest-pool-workers`,
   que corrige GHSA-rgj7-g3m4-5g8c.
 
