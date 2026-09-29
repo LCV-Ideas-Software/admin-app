@@ -22,9 +22,11 @@
 
 ### Alterado
 
-- Atualizado o pin exato do Wrangler para `4.143.0` nos manifestos da raiz e
-  de `tlsrpt-motor`, com ambos os lockfiles regenerados pelo npm
-  (ADMIAPP-34, LCV-239, LCV-241).
+- Atualizado o pin exato do Wrangler de `4.142.0` para `4.143.0` nos
+  manifestos e lockfiles npm da raiz e do TLS-RPT Motor (LCV-241).
+
+- Atualizado o pin exato do Wrangler para `4.142.0` nos manifestos da raiz e
+  de `tlsrpt-motor`, com ambos os lockfiles regenerados pelo npm (ADMIAPP-34, LCV-239).
 
 - `THIRDPARTY.md` e `public/legal/THIRDPARTY.md` (byte-idênticos) passam a
   registrar o aviso de copyright confirmado para `dingbat-to-unicode@1.0.1`:
