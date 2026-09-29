@@ -4,6 +4,10 @@
 
 ### Corrigido
 
+- Corrigido o Deploy após a publicação defeituosa da Cloudflare Wrangler Action
+  v4.1.1: os quatro passos usam o commit compilado de v4.1.2, fixado por SHA
+  completo.
+
 - Os quatro passos da Cloudflare Wrangler Action no Deploy (migrações D1,
   TLS-RPT Motor, Admin Motor e Admin Pages) deixam de pinar `wranglerVersion`
   e passam a usar o Wrangler que `npm ci` instala a partir do lockfile do
