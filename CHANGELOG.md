@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Alterado
+
+- Atualizado o pin exato do Wrangler de `4.142.0` para `4.143.0` nos
+  manifestos e lockfiles npm da raiz e do TLS-RPT Motor.
+
 ### Corrigido
 
 - Corrigido o Deploy após a publicação defeituosa da Cloudflare Wrangler Action
