@@ -133,6 +133,9 @@
     "@xmldom/xmldom": "^0.9.12",
     "ws": "8.21.0",
     "esbuild": "0.28.1",
+    "miniflare": {
+      "undici": "7.29.1"
+    },
     "@babel/core": "7.29.6",
     "linkify-it": "5.0.2"
   }

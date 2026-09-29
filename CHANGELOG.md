@@ -47,11 +47,12 @@
 - Atualizadas a Action oficial e a CLI do Linear Release para `v0.18.0`, com pin
   por SHA completo, incorporando a correção upstream na execução de comandos Git.
 
-- Removidos os overrides de `sharp` e `miniflare > undici` da raiz: o novo
-  Miniflare já exige `0.35.4` e `7.29.0` diretamente. Os overrides do
-  `tlsrpt-motor` permanecem necessários para o Miniflare anterior usado pelo
-  `@cloudflare/vitest-pool-workers`: a atualização anterior do override de
-  `sharp` para `0.35.4` corrige GHSA-rgj7-g3m4-5g8c nesse pacote.
+- O override de `sharp` da raiz continua removido, pois o Miniflare já exige
+  `0.35.4`. Overrides npm locais de `miniflare > undici` fixam `7.29.1` na
+  raiz e no `tlsrpt-motor` enquanto o upstream exige `7.29.0`, corrigindo
+  GHSA-3wwx-pv8p-q78v. O `tlsrpt-motor` mantém o override de `sharp` para
+  `0.35.4` exigido pelo Miniflare anterior de `@cloudflare/vitest-pool-workers`,
+  que corrige GHSA-rgj7-g3m4-5g8c.
 
 ### Documentação
 
