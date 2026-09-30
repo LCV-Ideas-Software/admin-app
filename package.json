@@ -85,7 +85,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
-    "@cloudflare/workers-types": "^5.20260922.1",
+    "@cloudflare/workers-types": "^5.20260923.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.2",
@@ -112,7 +112,7 @@
     "knip": "^6.37.0",
     "lightningcss": "^1.33.0",
     "lint-staged": "^17.5.1",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "rollup-plugin-visualizer": "^7.1.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
