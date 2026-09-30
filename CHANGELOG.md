@@ -4,6 +4,9 @@
 
 ### Corrigido
 
+- Atualizado `brace-expansion` de 5.0.9 para 5.0.12 no lockfile oficial,
+  eliminando o alerta de alta severidade que bloqueava o Deploy em `main`.
+
 - Corrigido o Deploy após a publicação defeituosa da Cloudflare Wrangler Action
   v4.1.1: os quatro passos usam o commit compilado de v4.1.2, fixado por SHA
   completo.
