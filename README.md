@@ -294,6 +294,24 @@ The separate GitHub Pages documentation site expects Pages to be enabled once
 under **Settings → Pages → GitHub Actions** in a fresh fork. The workflow does
 not request an administrative PAT or GitHub App credential to self-enable it.
 
+## TLS-RPT test integration
+
+The TLS-RPT workspace uses Vitest 5 with the official Cloudflare preview from
+[workers-sdk PR #15500](https://github.com/cloudflare/workers-sdk/pull/15500),
+pinned to the exact upstream commit in its manifest and npm lockfile. This
+preview supports Vitest 5 but remains an unmerged upstream contribution, rather
+than the stable npm plugin release of the same version number. It requires
+preview Miniflare/Wrangler packages for the test environment.
+
+The direct deployment CLI remains the stable npm Wrangler 4.147.0 artifact. Its
+official registry tarball is specified in the manifest so npm cannot satisfy
+that direct dependency with the test preview's identically numbered Wrangler.
+The nested preview is retained for the integration that requires it. CI and
+deploy continue to use the npm locks and the existing official Wrangler Action.
+See [THIRDPARTY.md](THIRDPARTY.md#proveniência-do-preview-de-testes-tls-rpt) for the
+source grants and remaining limitations. Existing tests run with
+`npm --prefix tlsrpt-motor test -- --run`.
+
 ## Repository conventions
 
 - **License**: [AGPL-3.0-or-later](./LICENSE). Network-service trigger applies: running a modified fork as a public service obligates you to publish modifications.

@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Atualizado o Vitest para 5.0.3, que seleciona o `why-is-node-running` oficial 3.2.1 sem `stackback`; manifestos e lockfiles regenerados pelo npm. O TLS-RPT Motor preserva o Vitest 4.1.11 compatível com a integração oficial da Cloudflare. Atualizado `launder` para 1.7.2, com licença MIT integral publicada pelo titular.
+- Atualizado o Vitest para 5.0.3, que seleciona o `why-is-node-running` oficial 3.2.1 sem `stackback`; manifestos e lockfiles regenerados pelo npm. O TLS-RPT Motor usa o preview oficial de `@cloudflare/vitest-plugin` da PR upstream #15500, fixado por commit completo, para suportar Vitest 5.0.3 sem `stackback`; a CLI direta de deploy permanece no artefato npm estável de Wrangler 4.147.0, separado dos previews transitivos de testes. Atualizado `launder` para 1.7.2, com licença MIT integral publicada pelo titular.
 
 - Update the pinned Cloudflare Wrangler CLI to 4.147.0 and regenerate npm dependency locks.
 
@@ -56,13 +56,12 @@
 
 - O override de `sharp` da raiz continua removido, pois o Miniflare já exige
   `0.35.4`. O override temporário de `miniflare > undici@7.29.0` foi removido
-  da raiz após a atualização oficial do Wrangler para `4.147.0`. Ele permanece
-  em `tlsrpt-motor` para o Miniflare anterior de `@cloudflare/vitest-pool-workers`,
-  resolvendo somente essa exigência para `7.29.1` e corrigindo
-  GHSA-3wwx-pv8p-q78v sem fixar versões futuras do upstream.
-  O `tlsrpt-motor` mantém o override de `sharp` para
-  `0.35.4` exigido pelo Miniflare anterior de `@cloudflare/vitest-pool-workers`,
-  que corrige GHSA-rgj7-g3m4-5g8c.
+  da raiz após a atualização oficial do Wrangler para `4.147.0`. Os overrides
+  temporários de `miniflare > undici@7.29.0` e de `sharp` também foram removidos
+  do TLS-RPT após a substituição da integração anterior: tanto o Miniflare
+  estável de deploy quanto o preview oficial de testes já exigem `undici`
+  `7.29.1` e `sharp` `0.35.4` diretamente. As demais resoluções fixadas e o
+  histórico das correções de segurança foram preservados.
 
 ### Documentação
 
