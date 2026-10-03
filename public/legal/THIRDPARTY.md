@@ -156,7 +156,7 @@ inclui o arquivo de licença. Estes complementos não substituem
 | Pako                           | Vendorizado na distribuição browser do JSZip; não recebe seção própria do inventário nativo                              | `(MIT AND Zlib)`; **ambas** se aplicam        | <https://github.com/nodeca/pako>                               |
 | Spark MD5                      | Dependência direta detectada pelo Vite; o projeto usa a alternativa oficial MIT                                          | `(WTFPL OR MIT)`; eleição: **MIT**            | <https://github.com/satazor/js-spark-md5> (arquivo `LICENSE2`) |
 | dingbat-to-unicode             | Detectado pelo Vite; o tarball 1.0.1 não contém arquivo de licença, e o titular confirmou o aviso aplicável em 19/09/2026 (ver suplemento) | BSD-2-Clause; `Copyright (c) 2021, Michael Williamson` | <https://github.com/mwilliamson/dingbat-to-unicode>            |
-| react-remove-scroll-bar        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; concessão atual dos 12 JS; aviso histórico em aberto          | <https://github.com/theKashey/react-remove-scroll-bar>         |
+| react-remove-scroll-bar        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; concessão atual dos 26 membros; aviso histórico em aberto          | <https://github.com/theKashey/react-remove-scroll-bar>         |
 | Assets do scaffold create-vite | `src/assets/hero.png`, `react.svg` e `vite.svg`; distribuídos no código-fonte, sem consumidores e fora do bundle público | MIT                                           | <https://github.com/vitejs/vite> (`packages/create-vite`)      |
 
 ### Assets do scaffold create-vite — MIT
@@ -338,16 +338,32 @@ ou emit fixado pelo tsconfig/lockfile. Os quatro arquivos de código dessa
 fonte licenciada também são byte iguais aos da revisão upstream examinada
 em 03/10/2026; essa comparação é entre duas revisões Git.
 
-Esta identidade cobre somente os 12 payloads JavaScript, dentre 27 arquivos
-do tarball npm. Não cobre por reprodução os 12 arquivos `.d.ts`, README ou
-os dois `package.json`, nem concede licença às dependências importadas.
+A prova adicional de 03/10/2026 reproduziu com TypeScript 4.6.3 os 12
+arquivos `.d.ts` byte a byte iguais aos publicados. O README e
+`constants/package.json` também são byte-idênticos aos membros da fonte
+licenciada. São, assim, 26 correspondências exatas entre os 27 membros do
+tarball: 12 JavaScript, 12 declarações e esses dois arquivos associados.
+
+O membro restante, `package.json` da raiz, difere somente em duas literais:
+`"version": "2.3.7"` para `"version": "2.3.8"` e
+`"react-style-singleton": "^2.2.1"` para `"react-style-singleton": "^2.2.2"`.
+Aplicar apenas essas duas alterações de metadados reconstrói integralmente
+seus bytes publicados. Essa comparação local não identifica o `gitHead`
+histórico nem certifica o procedimento original de release. A emissão exata
+das declarações conserva os diagnósticos de tipagem encontrados; não é uma
+certificação de build completo do upstream.
 
 O texto completo é preservado como concessão atual da fonte correspondente
-aos 12 payloads JavaScript idênticos, com a atribuição literal de 2025. A
-aprovação da inclusão de LICENSE não responde às perguntas posteriores sobre
-o aviso npm histórico. Permanecem abertos o `gitHead` original, o aviso exato
-de 2024 e a confirmação de usos anteriores à concessão. Não se afirma que
-esse texto acompanhava o tarball original, nem PASS global do licenciamento.
+a esses 26 membros de código e documentação, com a atribuição literal de
+2025. A MIT permite modificar e distribuir o Software e a documentação
+associada, preservados os avisos exigidos. As duas diferenças de metadados
+estão delimitadas acima; não se declara identidade integral dos pacotes nem
+uma confirmação do mantenedor sobre a publicação npm histórica.
+
+A aprovação da inclusão de LICENSE não responde às perguntas posteriores
+sobre o aviso npm histórico. Permanecem sem comprovação o `gitHead` original,
+o aviso exato de 2024 e usos anteriores à concessão. Não se afirma que esse
+texto acompanhava o tarball original, nem PASS global do licenciamento.
 As dependências importadas mantêm seus próprios avisos no inventário do build.
 
 Fonte exata: <https://github.com/theKashey/react-remove-scroll-bar/blob/7301c160fda44cb8cf2b9fdfde61efad35736196/LICENSE>.
