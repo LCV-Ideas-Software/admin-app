@@ -156,7 +156,7 @@ inclui o arquivo de licença. Estes complementos não substituem
 | Pako                           | Vendorizado na distribuição browser do JSZip; não recebe seção própria do inventário nativo                              | `(MIT AND Zlib)`; **ambas** se aplicam        | <https://github.com/nodeca/pako>                               |
 | Spark MD5                      | Dependência direta detectada pelo Vite; o projeto usa a alternativa oficial MIT                                          | `(WTFPL OR MIT)`; eleição: **MIT**            | <https://github.com/satazor/js-spark-md5> (arquivo `LICENSE2`) |
 | dingbat-to-unicode             | Detectado pelo Vite; o tarball 1.0.1 não contém arquivo de licença, e o titular confirmou o aviso aplicável em 19/09/2026 (ver suplemento) | BSD-2-Clause; `Copyright (c) 2021, Michael Williamson` | <https://github.com/mwilliamson/dingbat-to-unicode>            |
-| react-remove-scroll-bar        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; aviso de copyright inconclusivo          | <https://github.com/theKashey/react-remove-scroll-bar>         |
+| react-remove-scroll-bar        | Detectado pelo Vite; o tarball não contém arquivo de licença e o suplemento preserva somente evidência exata             | MIT; concessão atual dos 12 JS; aviso histórico em aberto          | <https://github.com/theKashey/react-remove-scroll-bar>         |
 | Assets do scaffold create-vite | `src/assets/hero.png`, `react.svg` e `vite.svg`; distribuídos no código-fonte, sem consumidores e fora do bundle público | MIT                                           | <https://github.com/vitejs/vite> (`packages/create-vite`)      |
 
 ### Assets do scaffold create-vite — MIT
@@ -316,17 +316,46 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### react-remove-scroll-bar — MIT
 
-O `package.json` e o `README.md` do tarball npm declaram `MIT` de forma
-independente e o manifesto identifica Anton Korzunov como autor.
-O `gitHead` publicado no registro npm já não é alcançável no repositório; o
-`LICENSE` acrescentado depois apenas corrobora os termos e não comprova o aviso
-histórico da versão instalada. Resultado: **INCONCLUSIVO** quanto ao aviso de
-copyright da versão exata. O suplemento separa a atribuição literal do manifesto
-dos [termos canônicos da MIT](https://spdx.org/licenses/MIT), sem inventar
-titular, ano ou aviso de copyright ausente no artefato.
+O tarball npm de `react-remove-scroll-bar` 2.3.8 declara MIT e identifica Anton
+Korzunov como autor, mas não contém LICENSE. Seu `gitHead` publicado não é
+alcançável na pesquisa registrada. O aviso histórico exato do artefato de 2024
+continua aguardando a confirmação upstream; não se atribui a ele um aviso de
+copyright posterior.
+
+A concessão de origem abaixo foi acrescentada no commit oficial
+`7301c160fda44cb8cf2b9fdfde61efad35736196`, aprovado e mesclado pelo mantenedor
+em [react-remove-scroll-bar #76](https://github.com/theKashey/react-remove-scroll-bar/pull/76).
+A fonte licenciada declara versão 2.3.7 e `react-style-singleton ^2.2.1`;
+o manifesto npm 2.3.8 declara `react-style-singleton ^2.2.2`. Não são árvores
+de pacote idênticas nem se identifica aquele commit como o `gitHead` publicado.
+
+A reprodução com o compilador oficial TypeScript 4.6.3, escolhido para esta
+prova, gerou os 12 arquivos JavaScript de `dist/es5`, `dist/es2015` e
+`dist/es2019` byte a byte iguais aos publicados em 2.3.8, sem alterar ou
+normalizar fonte e saída. As seis combinações explícitas de target e interop
+por arquivo foram registradas; não se afirma reconstrução do build original
+ou emit fixado pelo tsconfig/lockfile. Os quatro arquivos de código dessa
+fonte licenciada também são byte iguais aos da revisão upstream examinada
+em 03/10/2026; essa comparação é entre duas revisões Git.
+
+Esta identidade cobre somente os 12 payloads JavaScript, dentre 27 arquivos
+do tarball npm. Não cobre por reprodução os 12 arquivos `.d.ts`, README ou
+os dois `package.json`, nem concede licença às dependências importadas.
+
+O texto completo é preservado como concessão atual da fonte correspondente
+aos 12 payloads JavaScript idênticos, com a atribuição literal de 2025. A
+aprovação da inclusão de LICENSE não responde às perguntas posteriores sobre
+o aviso npm histórico. Permanecem abertos o `gitHead` original, o aviso exato
+de 2024 e a confirmação de usos anteriores à concessão. Não se afirma que
+esse texto acompanhava o tarball original, nem PASS global do licenciamento.
+As dependências importadas mantêm seus próprios avisos no inventário do build.
+
+Fonte exata: <https://github.com/theKashey/react-remove-scroll-bar/blob/7301c160fda44cb8cf2b9fdfde61efad35736196/LICENSE>.
 
 ```text
 MIT License
+
+Copyright (c) 2025 Anton Korzunov <thekashey@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
