@@ -62,9 +62,13 @@ Out of scope: social engineering, physical attacks, denial-of-service testing wi
   repository has no Actions secrets or variables of its own, and no secret value belongs in Git.
 
 The optional TLS-RPT acknowledgement in `Deploy` is for an explicitly approved
-one-off adoption of the reconciled `last_deployed_from: api` edit. Only a manual
-dispatch with `acknowledge_tlsrpt_dashboard_change: true` selects `deploy` without
-`--strict` for TLS-RPT Motor; pushes and omitted or false inputs keep strict mode.
+one-off adoption of the reconciled `last_deployed_from: api` edit. Only the first
+attempt (`github.run_attempt == 1`) of a manual dispatch with
+`acknowledge_tlsrpt_dashboard_change: true` selects `deploy` without `--strict` for
+TLS-RPT Motor; pushes and omitted or false inputs keep strict mode. Every re-run
+keeps `--strict`, even when it retains the true input. A renewed acknowledgement
+requires a new dispatch, renewed operator approval and fresh whole readback; a
+previous run does not authorize it.
 In CI, ordinary deploy auto-accepts all Wrangler pre-upload confirmations, including
 origin overwrite, remote configuration/secrets and workflow conflicts. It is not
 bound by code to a particular remote version or compatibility-date-only change.
