@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- O Deploy tem reconhecimento manual opcional de TLS-RPT: somente `workflow_dispatch` com `acknowledge_tlsrpt_dashboard_change: true` executa `deploy` sem `--strict` nesse Worker. Em CI isso aceita todas as confirmações de pré-upload, sem vínculo automático com uma versão remota; exige aprovação para o uso pontual e releitura integral imediatamente antes do disparo. Push, entrada omitida ou falsa e os outros Workers preservam `--strict`.
+
+- Alinhadas as datas de compatibilidade de Pages, Admin Motor e TLS-RPT Motor para `2026-10-03`, preservando flags e recursos. Corrigida a documentação do preview oficial Cloudflare usado com Vitest 5.0.3 e ajustada a exclusão scoped do Dependabot para Vitest 6 ou posterior, sem alterar dependências ou lockfiles.
+
 - Atualizado o Vitest para 5.0.3, que seleciona o `why-is-node-running` oficial 3.2.1 sem `stackback`; manifestos e lockfiles regenerados pelo npm. O TLS-RPT Motor usa o preview oficial de `@cloudflare/vitest-plugin` da PR upstream #15500, fixado por commit completo, para suportar Vitest 5.0.3 sem `stackback`; a CLI direta de deploy permanece no artefato npm estável de Wrangler 4.147.0, separado dos previews transitivos de testes. Atualizado `launder` para 1.7.2, com licença MIT integral publicada pelo titular.
 
 - Update the pinned Cloudflare Wrangler CLI to 4.147.0 and regenerate npm dependency locks.

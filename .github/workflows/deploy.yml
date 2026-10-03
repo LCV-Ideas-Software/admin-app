@@ -4,6 +4,18 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      acknowledge_tlsrpt_dashboard_change:
+        description: >-
+          True runs TLS-RPT once without --strict for the known source=api edit.
+          In CI it auto-accepts every Wrangler pre-upload confirmation, including
+          origin overwrite, remote config/secrets and workflow conflicts, without
+          a remote-version binding. Requires operator approval and fresh whole
+          remote version/code/config/bindings readback immediately before dispatch;
+          abort on unexpected drift.
+        type: boolean
+        required: false
+        default: false
 
 permissions: {}
 
@@ -177,7 +189,8 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
           workingDirectory: tlsrpt-motor
-          command: deploy --strict
+          # True accepts all pre-upload prompts without a version binding; fresh whole remote readback is mandatory before dispatch.
+          command: ${{ github.event_name == 'workflow_dispatch' && inputs.acknowledge_tlsrpt_dashboard_change == true && 'deploy' || 'deploy --strict' }}
 
       - name: Deploy Admin Motor with Wrangler
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3

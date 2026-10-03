@@ -61,6 +61,22 @@ Out of scope: social engineering, physical attacks, denial-of-service testing wi
   holds `LINEAR_ACCESS_KEY` for the `Linear Release` workflow; `github-pages` holds nothing. The
   repository has no Actions secrets or variables of its own, and no secret value belongs in Git.
 
+The optional TLS-RPT acknowledgement in `Deploy` is for an explicitly approved
+one-off adoption of the reconciled `last_deployed_from: api` edit. Only a manual
+dispatch with `acknowledge_tlsrpt_dashboard_change: true` selects `deploy` without
+`--strict` for TLS-RPT Motor; pushes and omitted or false inputs keep strict mode.
+In CI, ordinary deploy auto-accepts all Wrangler pre-upload confirmations, including
+origin overwrite, remote configuration/secrets and workflow conflicts. It is not
+bound by code to a particular remote version or compatibility-date-only change.
+Immediately before an authorized dispatch, reread the whole live service provenance,
+current version and deployment allocation, module bytes, compatibility date and
+flags, configuration and bindings against the reviewed snapshot and source. Abort
+on any unapproved drift; this input does not authorize overwriting new edits, secrets
+or workflow conflicts. Record the exact workflow SHA/input and post-run version,
+code/configuration/bindings, date and deployment provenance in the private audit
+evidence, then verify a subsequent ordinary push deploy retains `--strict`. A past
+readback or a successful local dry run does not satisfy this fresh live check.
+
 ## Dependency updates
 
 Dependabot checks all configured ecosystems every day, including weekends, at
@@ -76,12 +92,18 @@ adjusting the native group configuration or recreating a pull request. Any
 configured version ignores also constrain security fixes, so review them when
 upstream compatibility changes. Native auto-merge remains subject to every required check.
 
-The TLS reporting worker retains Vitest 4 because Cloudflare's official Workers
-test integration requires `vitest: ^4.1.0`. Its scoped Dependabot ignore excludes
-Vitest 5 and later, including security updates in that range. Remove this ignore
-when the official integration supports the new Vitest version and the repository
-checks pass; investigate any security fix blocked by this compatibility constraint.
-See Cloudflare's [Workers testing prerequisites](https://developers.cloudflare.com/workers/testing/vitest-integration/write-your-first-test/).
+The TLS reporting worker uses Vitest 5.0.3 with Cloudflare's official
+`@cloudflare/vitest-plugin` preview from workers-sdk PR #15500, pinned to
+commit `160d3a445597e650500253831000f3dffc624fa8`. This preview is not a stable
+release. The direct deployment CLI remains Wrangler 4.147.0 from the official
+npm registry, separate from preview-only test dependencies through scoped npm
+overrides. The preview declares Vitest `^4.1.11 || ^5.0.0` peer support. The
+scoped Dependabot ignore excludes only Vitest 6 and later, including security
+updates in that unsupported range. Remove the constraint only after upstream
+support and the required repository checks pass; investigate any security fix
+blocked by the retained constraint.
+See the [official integration PR](https://github.com/cloudflare/workers-sdk/pull/15500)
+and the exact package manifest, lockfile and [third-party notices](THIRDPARTY.md).
 
 See the [Dependabot options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)
 and [security update documentation](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-security-updates).
