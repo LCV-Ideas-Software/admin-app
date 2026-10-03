@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Atualizado o Vitest para 5.0.3, que seleciona o `why-is-node-running` oficial 3.2.1 sem `stackback`; manifestos e lockfiles regenerados pelo npm. O TLS-RPT Motor preserva o Vitest 4.1.11 compatível com a integração oficial da Cloudflare. Atualizado `launder` para 1.7.2, com licença MIT integral publicada pelo titular.
+
 - Update the pinned Cloudflare Wrangler CLI to 4.147.0 and regenerate npm dependency locks.
 
 ### Corrigido
