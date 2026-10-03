@@ -308,6 +308,18 @@ official registry tarball is specified in the manifest so npm cannot satisfy
 that direct dependency with the test preview's identically numbered Wrangler.
 The nested preview is retained for the integration that requires it. CI and
 deploy continue to use the npm locks and the existing official Wrangler Action.
+Native npm overrides preserve the complete stable deployment dependency
+closure: Wrangler's Miniflare, KV asset handler and unenv preset resolve their
+official registry tarballs, while nested plugin overrides retain the upstream
+preview URLs for tests. A version-scoped `@jridgewell/trace-mapping@0.3.9`
+override preserves its compatible `sourcemap-codec` 1.5.5 baseline; Vitest's
+`magic-string` keeps the required 1.6.0. The deployment closure matches all 91
+baseline package artifact identities, including integrity values. No global
+codec downgrade or peer forcing is applied. The test-tree `picomatch` override is 4.0.7,
+meeting Vitest 5.0.3's original `^4.0.7` minimum and the original ranges
+of Vite, tinyglobby and fdir. Its full MIT license is included in the official
+npm artifact.
+
 See [THIRDPARTY.md](THIRDPARTY.md#proveniência-do-preview-de-testes-tls-rpt) for the
 source grants and remaining limitations. Existing tests run with
 `npm --prefix tlsrpt-motor test -- --run`.

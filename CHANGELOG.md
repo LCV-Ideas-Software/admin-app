@@ -51,6 +51,16 @@
 
 ### Segurança
 
+- Elevado o override TLS-RPT de `picomatch` para 4.0.7, compatível com o
+  mínimo `^4.0.7` declarado originalmente pelo Vitest 5.0.3 e com os demais
+  consumidores. A árvore de deploy preserva a identidade dos 91 artefatos da base.
+
+- **Isolamento completo do deploy TLS-RPT:** overrides nativos do npm
+  separam os descendentes oficiais estáveis do Wrangler dos previews de testes
+  de mesmo número de versão. A closure de deploy conserva os 91 artefatos da
+  base; o codec 1.5.5 fica limitado ao trace-mapping 0.3.9 compatível, enquanto
+  `magic-string` e Vitest mantêm o codec 1.6.0 declarado pelo upstream.
+
 - Atualizadas a Action oficial e a CLI do Linear Release para `v0.18.0`, com pin
   por SHA completo, incorporando a correção upstream na execução de comandos Git.
 

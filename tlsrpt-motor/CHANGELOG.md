@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- Elevado `picomatch` de 4.0.4 para 4.0.7 por override nativo compatível
+  com o mínimo `^4.0.7` do Vitest 5.0.3, Vite, tinyglobby e fdir. Os manifests
+  originais dos publicadores foram conferidos, além da leitura de `npm ls`.
+- Corrigida a resolução transitiva de deploy: overrides nativos do npm
+  mantêm Miniflare, KV asset handler e unenv preset nos artefatos oficiais
+  publicados, separados dos previews de mesmo número de versão exigidos pelo
+  plugin. A closure estável conserva os 91 artefatos e suas integridades da base.
+- O codec de trace-mapping 0.3.9 permanece em 1.5.5, dentro do range original
+  `^1.4.10`, por override específico da versão do pai. A árvore de testes mantém
+  codec 1.6.0, compatível com a exigência original de `magic-string` 1.4.2;
+  nenhum downgrade global foi aplicado.
 - Atualizada a integração de testes para Vitest 5.0.3 e o preview oficial
   `@cloudflare/vitest-plugin` da PR Cloudflare workers-sdk #15500, fixado no
   commit `160d3a445597e650500253831000f3dffc624fa8`. O preview ainda não é uma
